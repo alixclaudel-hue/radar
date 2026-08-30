@@ -1,0 +1,31 @@
+# secrets & données (jamais dans git — elles vivent sur le volume du serveur)
+.env
+/data/
+crate_radar_config.json
+labels_resolved.json
+labels_profile.json
+labels_profile_*.json
+taste_corpus.json
+lookup_cache.json
+producer_graph.json
+artists_resolved.json
+collection_cache.json
+search_history.json
+search_results.json
+reco_feedback.json
+sellers_seen.json
+seller_new.json
+scoring_profiles.json
+djset_seen.json
+jobs/
+*.bak
+*.bak2
+*.tmp
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+.DS_Store

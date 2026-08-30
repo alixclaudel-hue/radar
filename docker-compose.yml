@@ -1,0 +1,12 @@
+services:
+  crate-radar:
+    build: .
+    image: crate-radar:latest
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    env_file: .env
+    volumes:
+      # bind-mount : les données sont dans ./data sur l'hôte -> faciles à
+      # sauvegarder (rsync) et à alimenter (scp depuis le Mac).
+      - ./data:/data

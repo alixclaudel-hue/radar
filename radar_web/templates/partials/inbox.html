@@ -20,7 +20,6 @@
           <a href="{{ it.uri or ('https://www.discogs.com/release/' ~ it.release_id) }}" target="_blank" rel="noopener">
             {{ it.artist }} — {{ it.title }}</a>
           <div class="sub">
-            {% if it[source_label|lower] is defined %}{% endif %}
             <b>{{ it.rule or it.seller }}</b>
             {% if it.label %} · {{ it.label }}{% endif %}
             {% if it.price %} · {{ it.price }} {{ it.currency }}{% endif %}

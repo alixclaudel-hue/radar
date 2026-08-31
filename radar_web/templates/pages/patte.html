@@ -103,34 +103,30 @@
     </div>
   </details>
 
-  <!-- ============ Import CSV ============ -->
-  <details class="acc">
-    <summary>📄 Import CSV (labels / artistes aimés)</summary>
-    <div class="acc__body">
-      <div class="row">
-        <div>
-          <label>Labels</label>
-          <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
-            <input type="file" name="file" accept=".csv" required>
-            <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer</label>
-            <button type="submit" class="small">Importer</button>
-          </form>
-        </div>
-        <div>
-          <label>Artistes aimés</label>
-          <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
-            <input type="file" name="file" accept=".csv" required>
-            <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimés</option></select>
-            <button type="submit" class="small">Importer</button>
-          </form>
-        </div>
-      </div>
-      <p id="csv-msg" class="small muted"></p>
-    </div>
-  </details>
-
   <div style="margin-top:12px"><button class="primary" type="submit">💾 Enregistrer</button></div>
 </form>
+
+<!-- ============ Import CSV (hors du formulaire principal) ============ -->
+<details class="acc" style="margin-top:10px">
+  <summary>📄 Import CSV (labels / artistes aimés)</summary>
+  <div class="acc__body">
+    <div class="row">
+      <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+        <label>Labels</label>
+        <input type="file" name="file" accept=".csv" required>
+        <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer</label>
+        <button type="submit" class="small">Importer</button>
+      </form>
+      <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+        <label>Artistes aimés</label>
+        <input type="file" name="file" accept=".csv" required>
+        <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimés</option></select>
+        <button type="submit" class="small">Importer</button>
+      </form>
+    </div>
+    <p id="csv-msg" class="small muted"></p>
+  </div>
+</details>
 
 <hr>
 <h3>En bref</h3>

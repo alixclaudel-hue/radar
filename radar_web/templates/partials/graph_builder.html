@@ -11,9 +11,10 @@
         <label class="small"><input type="radio" name="mode" value="seeds" style="width:auto"> Graines choisies :</label>
       </div>
       <textarea name="seed_names" rows="4" placeholder="un nom d'artiste par ligne">{{ coeur }}</textarea>
+      <script>window._seeds = {c: {{ coeur|tojson }}, a: {{ coeur_aimes|tojson }}};</script>
       <div style="margin:4px 0">
-        <button type="button" class="small" onclick="this.closest('form').seed_names.value=this.dataset.v" data-v="{{ coeur }}">mes Cœur</button>
-        <button type="button" class="small" onclick="this.closest('form').seed_names.value=this.dataset.v" data-v="{{ coeur_aimes }}">Cœur + Aimés</button>
+        <button type="button" class="small" onclick="this.closest('form').seed_names.value=window._seeds.c">mes Cœur</button>
+        <button type="button" class="small" onclick="this.closest('form').seed_names.value=window._seeds.a">Cœur + Aimés</button>
       </div>
       <div class="row" style="align-items:end">
         <div class="field" style="flex:0 0 130px"><label>Pages / graine</label><input name="pages" value="2" style="width:70px"></div>

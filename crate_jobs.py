@@ -1686,30 +1686,44 @@ def job_scan_veille(job, params):
 
 _MKT_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-_MKT_TOTAL_RE = re.compile(r'pagination_total"[^>]*>(.*?)</', re.S)
+_MKT_CF = ("just a moment", "un instant", "attention required", "cf-browser-verification",
+           "/cdn-cgi/challenge", "verifying you are human")
+# « 1 – 25 de 234 » (fr) / « 1 – 25 of 234 » (en) -> on veut le total (dernier nombre)
+_MKT_TOTAL_RE = re.compile(r'(\d[\d.,   ]*)\s+(?:de|of)\s+(\d[\d.,   ]*)', re.I)
+_MKT_PAGTOT_RE = re.compile(r'pagination_total["\s][^>]*>(.*?)</', re.S)
+
+
+def _is_cf(page):
+    t = (page.title() or "").lower()
+    if any(s in t for s in _MKT_CF):
+        return True
+    return any(s in page.content()[:4000].lower() for s in _MKT_CF)
 
 
 def _mkt_count(page, rid, country):
     page.goto(f"https://www.discogs.com/sell/release/{rid}?ships_from={country}",
               timeout=45000, wait_until="domcontentloaded")
-    for _ in range(4):  # laisse passer le challenge Cloudflare si présent
-        if "just a moment" not in (page.title() or "").lower():
+    for _ in range(7):  # laisse passer le challenge Cloudflare si présent
+        if not _is_cf(page):
             break
-        page.wait_for_timeout(6000)
+        page.wait_for_timeout(5000)
     try:
         page.wait_for_load_state("networkidle", timeout=12000)
     except Exception:
         pass
-    body = page.content()
-    if "just a moment" in body[:3000].lower():
+    if _is_cf(page):
         return None
+    body = page.content()
     m = _MKT_TOTAL_RE.search(body)
     if m:
-        digits = re.sub(r"[^\d]", "", m.group(1).split(">")[-1])
+        return int(re.sub(r"[^\d]", "", m.group(2)))
+    m = _MKT_PAGTOT_RE.search(body)
+    if m:
+        digits = re.sub(r"[^\d]", "", re.split(r">", m.group(1))[-1])
         if digits:
             return int(digits)
     low = body.lower()
-    if "no items for sale" in low or "aucun article" in low or "0 for sale" in low:
+    if "no items for sale" in low or "aucun article" in low or "no listings" in low:
         return 0
     return None
 

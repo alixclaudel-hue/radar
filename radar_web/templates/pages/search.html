@@ -31,14 +31,14 @@
       </select>
     </div>
   </div>
-  <div class="row">
-    <div class="field">
-      <label>Année de</label>
-      <input name="year_from" inputmode="numeric" placeholder="2005" value="{{ q.year_from or '' }}">
-    </div>
-    <div class="field">
-      <label>Année à</label>
-      <input name="year_to" inputmode="numeric" placeholder="2014" value="{{ q.year_to or '' }}">
+  <div class="field">
+    <label>Période <span class="muted" id="yr-label">toutes années</span></label>
+    <div class="yrange" id="yrange" data-min="{{ year_min }}" data-max="{{ year_max }}">
+      <div class="yrange__rail"><div class="yrange__fill" id="yr-fill"></div></div>
+      <input type="range" name="year_from" id="yr-from"
+             min="{{ year_min }}" max="{{ year_max }}" value="{{ year_min }}" step="1">
+      <input type="range" name="year_to" id="yr-to"
+             min="{{ year_min }}" max="{{ year_max }}" value="{{ year_max }}" step="1">
     </div>
   </div>
   <p class="muted small">Plusieurs styles = union (l'un OU l'autre). Ctrl/⌘ ou appui long pour en sélectionner plusieurs.</p>
@@ -63,4 +63,34 @@
 <div id="results">
   {% include "partials/results.html" %}
 </div>
+
+<script>
+(function () {
+  var box = document.getElementById('yrange');
+  if (!box) return;
+  var lo = document.getElementById('yr-from'),
+      hi = document.getElementById('yr-to'),
+      fill = document.getElementById('yr-fill'),
+      lbl = document.getElementById('yr-label'),
+      MIN = +box.dataset.min, MAX = +box.dataset.max, SPAN = MAX - MIN;
+  function pct(v) { return ((v - MIN) / SPAN) * 100; }
+  function draw() {
+    var a = +lo.value, b = +hi.value;
+    if (a > b) { var t = a; a = b; b = t; }
+    fill.style.left = pct(a) + '%';
+    fill.style.right = (100 - pct(b)) + '%';
+    lbl.textContent = (a <= MIN && b >= MAX) ? 'toutes années' : (a + ' – ' + b);
+    // le curseur bas passe devant quand les deux sont proches du maximum
+    lo.style.zIndex = (a > MAX - SPAN * 0.08) ? 5 : 3;
+  }
+  function clamp(moved) {
+    var a = +lo.value, b = +hi.value;
+    if (a > b) { if (moved === lo) lo.value = b; else hi.value = a; }
+    draw();
+  }
+  lo.addEventListener('input', function () { clamp(lo); });
+  hi.addEventListener('input', function () { clamp(hi); });
+  draw();
+})();
+</script>
 {% endblock %}

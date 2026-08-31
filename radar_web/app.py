@@ -222,6 +222,24 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
 
 
 # ============================================================ 🔍 Recherche ciblée
+SEARCH_MIN_YEAR = 1960
+
+
+def _year_param(year_from, year_to):
+    """Construit 'AAAA-AAAA' pour Discogs ; '' si l'intervalle couvre tout."""
+    mx = int(time.strftime("%Y"))
+    try:
+        a = int(year_from) if str(year_from).strip() else SEARCH_MIN_YEAR
+        b = int(year_to) if str(year_to).strip() else mx
+    except ValueError:
+        return ""
+    a, b = min(a, b), max(a, b)
+    a, b = max(SEARCH_MIN_YEAR, a), min(mx, b)
+    if a <= SEARCH_MIN_YEAR and b >= mx:
+        return ""
+    return f"{a}-{b}"
+
+
 def _search_styles(c):
     """Styles proposés : d'abord les catégories de goût de l'utilisateur
     (noms canoniques), puis le reste du vocabulaire Discogs."""
@@ -242,7 +260,8 @@ def search_page(request: Request):
     c = Ctx()
     styles_mine, styles_more = _search_styles(c)
     return render(request, "pages/search.html", active="search", q={},
-                  genres=vocab.GENRES, styles_mine=styles_mine, styles_more=styles_more)
+                  genres=vocab.GENRES, styles_mine=styles_mine, styles_more=styles_more,
+                  year_min=SEARCH_MIN_YEAR, year_max=int(time.strftime("%Y")))
 
 
 @app.post("/search", response_class=HTMLResponse)
@@ -252,7 +271,7 @@ def search_run(request: Request, label: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2")):
     c = Ctx()
     token = c.cfg.get("token", "")
-    year = f"{year_from}-{year_to}" if year_from and year_to else (year_from or year_to or "")
+    year = _year_param(year_from, year_to)
     fmt = "Vinyl" if vinyl else ""
     genres = [g.strip() for g in genre if g and g.strip()]
     styles = [s.strip() for s in style if s and s.strip()]

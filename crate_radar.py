@@ -82,12 +82,12 @@ CURRENT_YEAR = datetime.now().year
 DEFAULT_TASTE_CATEGORIES = {
     "1": ["House", "Deep House", "Tech House", "Progressive House", "Deep Techno",
           "Hip-House", "Synth-pop"],
-    "2": ["Downtempo", "Electro House", "Funk", "Future Jazz", "Acid House"],
-    "3": ["Techno", "Electro", "Minimal", "Breaks", "Prog Rock"],
+    "2": ["Downtempo", "Electro House", "Funk", "Future Jazz", "Acid House",
+          "Techno", "Electro", "Minimal", "Breaks", "Prog Rock"],
 }
 DEFAULT_TASTE_WEIGHTS = {"1": 1.0, "2": 0.6, "3": 0.3}
 DEFAULT_ALBUM_WEIGHTS = {"label": 0.4, "artist": 0.4, "style": 0.2}
-CAT_LABELS = {"1": "Cœur", "2": "2ᵉ rang", "3": "Périphérie"}          # styles (3 rangs)
+CAT_LABELS = {"1": "Cœur", "2": "Aimés"}                               # styles (2 rangs)
 ARTIST_CAT_LABELS = {"1": "Cœur", "2": "Aimés"}                         # artistes (2 rangs)
 
 # Artistes : mêmes 3 catégories/poids, alimentées manuellement (par défaut vides).
@@ -200,16 +200,15 @@ def load_config():
             data.pop(k, None)
         for k, v in default.items():
             data.setdefault(k, v)
-        for k in ("1", "2", "3"):
-            data["taste_categories"].setdefault(k, [])
-        _ac = data.setdefault("artist_categories", {})
-        if _ac.get("3"):        # fusion cat.3 (Périphérie) -> cat.2 (Aimés)
-            _seen2 = {normalize_label(x) for x in _ac.get("2", [])}
-            _ac["2"] = list(_ac.get("2", [])) + [n for n in _ac["3"]
-                                                 if normalize_label(n) not in _seen2]
-        _ac.pop("3", None)
-        for k in ("1", "2"):
-            _ac.setdefault(k, [])
+        for _key in ("taste_categories", "artist_categories"):
+            _cc = data.setdefault(_key, {})
+            if _cc.get("3"):        # fusion cat.3 -> cat.2 (styles ET artistes)
+                _seen2 = {normalize_label(x) for x in _cc.get("2", [])}
+                _cc["2"] = list(_cc.get("2", [])) + [n for n in _cc["3"]
+                                                     if normalize_label(n) not in _seen2]
+            _cc.pop("3", None)
+            for k in ("1", "2"):
+                _cc.setdefault(k, [])
         _env_secrets(data)
         return data
     _env_secrets(default)
@@ -2899,13 +2898,13 @@ if _nav == "🎧 Sources & reco":
 # ---------------------------------------------------------------- Tab: Profilage des labels
 
 if _nav == "🎛️ Réglages" and _set_sub == "Goût & profilage":
-    st.caption("Profile les labels par style → **score d'affinité**. Range tes styles en 3 "
-               "catégories ci-dessous ; poids & seuil dans **Scoring**.")
+    st.caption("Profile les labels par style → **score d'affinité**. Range tes styles en 2 "
+               "catégories ; poids & seuil dans **Scoring**.")
     cats_cfg = cfg().get("taste_categories", DEFAULT_TASTE_CATEGORIES)
     _tw = scoring()["taste_tiers"]
-    tc1, tc2, tc3 = st.columns(3)
+    tc1, tc2 = st.columns(2)
     new_cats = {}
-    for cid, col in (("1", tc1), ("2", tc2), ("3", tc3)):
+    for cid, col in (("1", tc1), ("2", tc2)):
         with col:
             st.caption(f"Catégorie {cid} — {CAT_LABELS[cid]} · poids {_tw[cid]}")
             raw = st.text_area(f"Styles cat. {cid}", value="\n".join(cats_cfg.get(cid, [])),
@@ -2951,7 +2950,7 @@ if _nav == "🎛️ Réglages" and _set_sub == "Goût & profilage":
     st.divider()
     st.markdown("**Résultats** — labels classés par affinité pondérée. "
                 f"Colonnes C1/C2/C3 = part des styles dans chaque catégorie "
-                f"({CAT_LABELS['1']} / {CAT_LABELS['2']} / {CAT_LABELS['3']}).")
+                f"({CAT_LABELS['1']} / {CAT_LABELS['2']}).")
     rows = []
     for lab in labels_all:
         e = prof.get(normalize_label(lab))
@@ -3512,7 +3511,7 @@ if _nav == "🎛️ Réglages" and _set_sub == "Scoring":
 
     st.subheader("Rangs de goût (styles) & rangs d'artistes")
     g1, g2 = st.columns(2)
-    for cid in ("1", "2", "3"):
+    for cid in ("1", "2"):
         W["taste_tiers"][cid] = g1.slider(f"Style — {CAT_LABELS[cid]}", 0.0, 1.0,
                                           float(S["taste_tiers"][cid]), 0.05, key=f"sc_tt_{cid}")
     for cid in ("1", "2"):

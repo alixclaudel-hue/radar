@@ -43,10 +43,11 @@ def style_key(s):
 DEFAULT_TASTE_CATEGORIES = {
     "1": ["House", "Deep House", "Tech House", "Progressive House", "Deep Techno",
           "Hip-House", "Synth-pop"],
-    "2": ["Downtempo", "Electro House", "Funk", "Future Jazz", "Acid House"],
-    "3": ["Techno", "Electro", "Minimal", "Breaks", "Prog Rock"],
+    "2": ["Downtempo", "Electro House", "Funk", "Future Jazz", "Acid House",
+          "Techno", "Electro", "Minimal", "Breaks", "Prog Rock"],
 }
 DEFAULT_ARTIST_CATEGORIES = {"1": [], "2": []}
+CAT2 = {"1": "Cœur", "2": "Aimés"}
 
 DEFAULT_SCORING = {
     "taste_tiers":  {"1": 1.0, "2": 0.6, "3": 0.3},
@@ -115,13 +116,16 @@ def load_config():
     data["scoring"]["artist_tiers"].pop("3", None)
     for k in _FLAT_WEIGHT_KEYS:
         data.pop(k, None)
-    ac = data["artist_categories"]
-    if ac.get("3"):
-        seen2 = {normalize_label(x) for x in ac.get("2", [])}
-        ac["2"] = list(ac.get("2", [])) + [n for n in ac["3"] if normalize_label(n) not in seen2]
-    ac.pop("3", None)
-    for k in ("1", "2"):
-        ac.setdefault(k, [])
+    # fusion cat.3 -> cat.2 (artistes ET styles) puis 2 catégories seulement
+    for key in ("artist_categories", "taste_categories"):
+        cc = data.setdefault(key, {})
+        if cc.get("3"):
+            seen2 = {normalize_label(x) for x in cc.get("2", [])}
+            cc["2"] = list(cc.get("2", [])) + [n for n in cc["3"]
+                                               if normalize_label(n) not in seen2]
+        cc.pop("3", None)
+        for k in ("1", "2"):
+            cc.setdefault(k, [])
     for key, env in _ENV_SECRETS:
         if not data.get(key) and os.environ.get(env):
             data[key] = os.environ[env]

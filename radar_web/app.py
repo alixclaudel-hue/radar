@@ -16,12 +16,20 @@ from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, store
 from .radar.paths import (CORPUS, PENDING_ENRICH, SELLERS_NEW, SELLERS_SEEN,
-                          VEILLE_NEW, VEILLE_SEEN)
+                          VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
+
+
+def _pl_id(url):
+    m = re.search(r"[?&]list=([A-Za-z0-9_-]+)", url or "")
+    return m.group(1) if m else ((url or "").strip() or None)
+
+
+templates.env.filters["pl_id"] = _pl_id
 app = FastAPI(title="Radar")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 
@@ -117,22 +125,18 @@ def home():
     return RedirectResponse("/patte", status_code=303)
 
 
-# ============================================================ 🧠 Ma patte musicale
-PATTE_INGEST = [
-    ("fetch_collection", "Charger collection + wantlist Discogs"),
-    ("ingest_youtube", "Importer les playlists YouTube"),
-    ("ingest_bandcamp", "Importer la collection Bandcamp"),
-    ("merge_corpus", "Consolider le corpus → base de labels"),
-]
+# ============================================================ 🧠 Mieux connaître ton univers
+SYNC_ALL_JOBS = ["fetch_collection", "ingest_youtube", "ingest_bandcamp", "merge_corpus"]
 
 
 @app.get("/patte", response_class=HTMLResponse)
 def patte_page(request: Request, saved: int = 0):
     c = Ctx()
+    pl_urls = [u for u in (c.cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
     return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
-                  ingest=PATTE_INGEST, corpus_total=len(c.corpus),
-                  corpus_src=c.corpus_by_source(), saved=saved)
+                  pl_urls=pl_urls, pl_meta=load(YOUTUBE_META, {}),
+                  src=c.corpus_by_source(), st=c.stats(), saved=saved)
 
 
 @app.post("/patte")
@@ -140,15 +144,58 @@ async def patte_save(request: Request):
     f = await request.form()
     c = _cfg()
     for k in ("token", "youtube_api_key", "bandcamp_sub_user", "bandcamp_sub_pass",
-              "youtube_playlists"):
+              "djset_sources"):
         if k in f:
             c[k] = f.get(k, "").strip()
+    if "yt_pl" in f:
+        c["youtube_playlists"] = "\n".join(u.strip() for u in f.getlist("yt_pl") if u.strip())
     cats = c.setdefault("taste_categories", {})
-    for cid in ("1", "2", "3"):
+    for cid in ("1", "2"):
         if f"styles_{cid}" in f:
             cats[cid] = [x.strip() for x in f.get(f"styles_{cid}", "").splitlines() if x.strip()]
     store.save_config(c)
     return RedirectResponse("/patte?saved=1", status_code=303)
+
+
+@app.post("/patte/sync-all", response_class=HTMLResponse)
+def patte_sync_all():
+    n = sum(1 for j in SYNC_ALL_JOBS if jobs.launch(j))
+    return HTMLResponse(f"<span class='small ok'>{n} tâche(s) lancée(s) — voir l'avancement par rubrique.</span>")
+
+
+@app.post("/patte/import-csv", response_class=HTMLResponse)
+async def patte_import_csv(request: Request, kind: str = "labels", file: UploadFile = None,
+                           replace: str = Form(""), tier: str = Form("2")):
+    raw = (await file.read()).decode("utf-8", "ignore") if file else ""
+    names = [line.split(",")[0].strip().strip('"')
+             for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
+    c = _cfg()
+    if kind == "artists":
+        ac = c.setdefault("artist_categories", {"1": [], "2": []})
+        t = tier if tier in ("1", "2") else "2"
+        have = {normalize_label(x) for cid in ("1", "2") for x in ac.get(cid, [])}
+        added = 0
+        for n in names:
+            if normalize_label(n) not in have:
+                have.add(normalize_label(n))
+                ac.setdefault(t, []).append(n)
+                added += 1
+        q = load(PENDING_ENRICH, {})
+        q.setdefault("artists", []).extend(names)
+        save(PENDING_ENRICH, q)
+        store.save_config(c)
+        return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
+    if replace:
+        c["labels"] = []
+    have = {normalize_label(x) for x in c["labels"]}
+    added = 0
+    for n in names:
+        if normalize_label(n) not in have:
+            have.add(normalize_label(n))
+            c["labels"].append(n)
+            added += 1
+    store.save_config(c)
+    return HTMLResponse(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
 
 
 # ============================================================ 🔍 Recherche ciblée

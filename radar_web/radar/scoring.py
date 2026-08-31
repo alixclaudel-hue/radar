@@ -175,6 +175,24 @@ class Ctx:
             out[r.get("source", "?")] = out.get(r.get("source", "?"), 0) + 1
         return out
 
+    def stats(self):
+        ac = self.cfg.get("artist_categories", {})
+        res_ok = sum(1 for v in self.artists_res.values()
+                     if v.get("discogs_id") and v.get("status") in ("exact", "approx", "confirmed"))
+        return {
+            "labels": len(self.cfg.get("labels", [])),
+            "labels_profiled": len(self.profile),
+            "coeur": len(ac.get("1", [])),
+            "aimes": len(ac.get("2", [])),
+            "artists_resolved": res_ok,
+            "artists_identified": len(self.ascore),
+            "graph_edges": len((self.graph or {}).get("edges", {})),
+            "tracks": len(self.corpus),
+            "tracks_by_source": self.corpus_by_source(),
+            "watchlist": len(self.cfg.get("watchlist", [])),
+            "sellers": len(self.cfg.get("sellers", [])),
+        }
+
     def split_credit_artists(self, s):
         out = []
         for p in _CREDIT_SPLIT.split(s or ""):

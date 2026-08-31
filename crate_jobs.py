@@ -307,17 +307,31 @@ def job_ingest_youtube(job, params):
     key = params.get("api_key") or cfg.get("youtube_api_key", "")
     urls = params.get("urls") or [u for u in cfg.get("youtube_playlists", "").splitlines() if u.strip()]
     deep = params.get("deep", True)
-    pids = [p for p in (yt_playlist_id(u) for u in urls) if p]
+    pairs = [(u, yt_playlist_id(u)) for u in urls]
+    pids = [p for _, p in pairs if p]
     if not pids:
         return job.finish(error="Aucune playlist.")
     job.msg("Lecture des playlists…")
+    meta = load_json(os.path.join(DATA, "youtube_meta.json"), {})
     raw = []
-    for pid in pids:
-        for it in youtube_items(pid, key):
+    for url, pid in [(u, p) for u, p in pairs if p]:
+        try:
+            r = requests.get(f"{YOUTUBE_API}/playlists",
+                             params={"part": "snippet", "id": pid, "key": key}, timeout=20)
+            sn = (r.json().get("items") or [{}])[0].get("snippet", {})
+        except Exception:
+            sn = {}
+        items = youtube_items(pid, key)
+        for it in items:
             a, t = parse_yt_title(it["title"], it["channel"])
             if a or t:
                 raw.append({"artist": a, "title": t, "label": parse_yt_label(it["description"]),
                             "url": None})
+        meta[pid] = {"url": url, "title": sn.get("title") or pid,
+                     "channel": sn.get("channelTitle") or "",
+                     "n_items": len(items),
+                     "imported_at": datetime.now().isoformat(timespec="seconds")}
+    save_json(os.path.join(DATA, "youtube_meta.json"), meta)
     cache = load_json(LOOKUP_CACHE_PATH, {})
     corpus = load_json(CORPUS_PATH, [])
     seen = {("youtube", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}

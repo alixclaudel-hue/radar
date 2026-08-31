@@ -139,9 +139,7 @@ def patte_page(request: Request, saved: int = 0):
                   src=c.corpus_by_source(), st=c.stats(), saved=saved)
 
 
-@app.post("/patte")
-async def patte_save(request: Request):
-    f = await request.form()
+def _apply_patte_form(f):
     c = _cfg()
     for k in ("token", "youtube_api_key", "bandcamp_sub_user", "bandcamp_sub_pass",
               "djset_sources"):
@@ -154,7 +152,20 @@ async def patte_save(request: Request):
         if f"styles_{cid}" in f:
             cats[cid] = [x.strip() for x in f.get(f"styles_{cid}", "").splitlines() if x.strip()]
     store.save_config(c)
+
+
+@app.post("/patte")
+async def patte_save(request: Request):
+    _apply_patte_form(await request.form())
     return RedirectResponse("/patte?saved=1", status_code=303)
+
+
+@app.post("/patte/run/{job}", response_class=HTMLResponse)
+async def patte_run(request: Request, job: str):
+    """Enregistre les identifiants/champs saisis PUIS lance le job (pour que le job
+    utilise bien ce qui vient d'être tapé, sans étape « Enregistrer » séparée)."""
+    _apply_patte_form(await request.form())
+    return job_launch(job)
 
 
 @app.post("/patte/sync-all", response_class=HTMLResponse)

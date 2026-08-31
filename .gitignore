@@ -29,3 +29,11 @@ __pycache__/
 venv/
 
 .DS_Store
+
+# fichiers de file d'attente / cache veille (données locales)
+pending_enrich.json
+veille_new.json
+veille_seen.json
+sellers_seen.json
+seller_new.json
+canonicalize.state.json

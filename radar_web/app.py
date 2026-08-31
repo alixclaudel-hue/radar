@@ -1,10 +1,12 @@
-"""Radar — interface FastAPI + HTMX (parité en cours avec l'appli Streamlit).
-
+"""Radar — interface FastAPI + HTMX. Données PARTAGÉES avec l'appli Streamlit.
 Lancement :  uvicorn radar_web.app:app --reload --port 8600
-Données PARTAGÉES avec l'appli Streamlit (même CRATE_DATA_DIR)."""
+
+Nav : 🧠 Ma patte musicale · 🔍 Recherche ciblée · 📻 Veille Discogs · 🌐 Mon univers · 🎛️ Réglages
+"""
 import hashlib
 import io
 import os
+import re
 import time
 
 from fastapi import FastAPI, Form, Request, UploadFile
@@ -13,9 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, store
-from .radar.paths import CORPUS, SELLERS_NEW, VEILLE_NEW, VEILLE_SEEN, SELLERS_SEEN
+from .radar.paths import (CORPUS, PENDING_ENRICH, SELLERS_NEW, SELLERS_SEEN,
+                          VEILLE_NEW, VEILLE_SEEN)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
-from .radar.store import load, save, normalize_label
+from .radar.store import load, normalize_label, save
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
@@ -24,7 +27,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="
 
 AUTH_TTL = 5 * 3600
 COOKIE = "radar_auth"
-STUB = {"artists": "Mes artistes", "sets": "Mes sets"}
+CURRENT_YEAR = time.gmtime().tm_year
 
 
 # --------------------------------------------------------------------- auth
@@ -45,7 +48,7 @@ def _token_ok(tok):
     return time.time() < exp and _token(exp) == tok
 
 
-def _authed(request: Request) -> bool:
+def _authed(request):
     return not _pw() or _token_ok(request.cookies.get(COOKIE, ""))
 
 
@@ -100,23 +103,55 @@ def render(request, tpl, **ctx):
     return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
 
 
+def frag(request, tpl, **ctx):
+    return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
+
+
 def _cfg():
     return store.load_config()
 
 
-def _save_cfg(cfg):
-    store.save_config(cfg)
-
-
-CURRENT_YEAR = time.gmtime().tm_year
-
-
-# --------------------------------------------------------------------- home / search
+# --------------------------------------------------------------------- home
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return RedirectResponse("/search", status_code=303)
+    return RedirectResponse("/patte", status_code=303)
 
 
+# ============================================================ 🧠 Ma patte musicale
+PATTE_INGEST = [
+    ("fetch_collection", "Charger collection + wantlist Discogs"),
+    ("ingest_youtube", "Importer les playlists YouTube"),
+    ("ingest_bandcamp", "Importer la collection Bandcamp"),
+    ("merge_corpus", "Consolider le corpus → base de labels"),
+]
+
+
+@app.get("/patte", response_class=HTMLResponse)
+def patte_page(request: Request, saved: int = 0):
+    c = Ctx()
+    return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
+                  cats=c.cfg.get("taste_categories", {}), coll=c.collection,
+                  ingest=PATTE_INGEST, corpus_total=len(c.corpus),
+                  corpus_src=c.corpus_by_source(), saved=saved)
+
+
+@app.post("/patte")
+async def patte_save(request: Request):
+    f = await request.form()
+    c = _cfg()
+    for k in ("token", "youtube_api_key", "bandcamp_sub_user", "bandcamp_sub_pass",
+              "youtube_playlists"):
+        if k in f:
+            c[k] = f.get(k, "").strip()
+    cats = c.setdefault("taste_categories", {})
+    for cid in ("1", "2", "3"):
+        if f"styles_{cid}" in f:
+            cats[cid] = [x.strip() for x in f.get(f"styles_{cid}", "").splitlines() if x.strip()]
+    store.save_config(c)
+    return RedirectResponse("/patte?saved=1", status_code=303)
+
+
+# ============================================================ 🔍 Recherche ciblée
 @app.get("/search", response_class=HTMLResponse)
 def search_page(request: Request):
     return render(request, "pages/search.html", active="search", q={})
@@ -151,8 +186,7 @@ def search_run(request: Request, label: str = Form(""), genre: str = Form(""),
                 if pg >= d.get("pagination", {}).get("pages", 1) or not got:
                     break
     except discogs.DiscogsError as e:
-        return templates.TemplateResponse(request, "partials/results.html",
-                                          {"request": request, "error": str(e)})
+        return frag(request, "partials/results.html", error=str(e))
     seen, scored = set(), []
     for r in raw:
         rid = r.get("id")
@@ -163,8 +197,7 @@ def search_run(request: Request, label: str = Form(""), genre: str = Form(""),
         r["thumb"] = r.get("thumb") or r.get("cover_image")
         scored.append({"raw": r, "score": sc, "detail": det})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
-    return templates.TemplateResponse(request, "partials/results.html",
-                                      {"request": request, "results": scored[:120]})
+    return frag(request, "partials/results.html", results=scored[:120])
 
 
 @app.get("/release/{rid}/tracks", response_class=HTMLResponse)
@@ -173,156 +206,39 @@ def tracklist(request: Request, rid: int):
     try:
         data = discogs.release(rid, token=c.cfg.get("token", ""))
     except discogs.DiscogsError as e:
-        return templates.TemplateResponse(request, "partials/tracklist.html",
-                                          {"request": request, "error": str(e)})
-    rel_artist = ", ".join(a.get("name", "") for a in data.get("artists", []))
+        return frag(request, "partials/tracklist.html", error=str(e))
+    ra = ", ".join(a.get("name", "") for a in data.get("artists", []))
     tracks = [{"pos": (t.get("position") or "").strip(),
                "title": (t.get("title") or "").strip(),
-               "yt": yt_search_url(f"{(', '.join(a.get('name','') for a in t.get('artists', [])) or rel_artist)} {t.get('title','')}")}
+               "yt": yt_search_url(f"{(', '.join(a.get('name','') for a in t.get('artists', [])) or ra)} {t.get('title','')}")}
               for t in real_tracks(data.get("tracklist", []))]
-    return templates.TemplateResponse(request, "partials/tracklist.html",
-                                      {"request": request, "tracks": tracks})
+    return frag(request, "partials/tracklist.html", tracks=tracks)
 
 
-# --------------------------------------------------------------------- Réglages
-@app.get("/settings", response_class=HTMLResponse)
-def settings_page(request: Request, saved: int = 0):
-    c = _cfg()
-    return render(request, "pages/settings.html", active="settings", cfg=c,
-                  sc=c["scoring"], saved=saved)
-
-
-@app.post("/settings")
-async def settings_save(request: Request):
-    f = await request.form()
-    c = _cfg()
-    for k in ("token", "youtube_api_key", "youtube_playlists",
-              "bandcamp_sub_user", "bandcamp_sub_pass", "djset_sources"):
-        if k in f:
-            c[k] = f.get(k, "").strip()
-    sc = c["scoring"]
-    for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor")),
-                      ("album", ("label", "artist", "style", "artist_max_vs_mean")),
-                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset"))):
-        for key in keys:
-            fld = f.get(f"{grp}__{key}")
-            if fld not in (None, ""):
-                try:
-                    sc[grp][key] = float(fld)
-                except ValueError:
-                    pass
-    for t in ("1", "2"):
-        v = f.get(f"artist_tiers__{t}")
-        if v:
-            sc["artist_tiers"][t] = float(v)
-    for t in ("1", "2", "3"):
-        v = f.get(f"taste_tiers__{t}")
-        if v:
-            sc["taste_tiers"][t] = float(v)
-    fl = f.get("label_affinity_floor")
-    if fl not in (None, ""):
-        sc["label_affinity_floor"] = int(float(fl))
-    _save_cfg(c)
-    return RedirectResponse("/settings?saved=1", status_code=303)
-
-
-# --------------------------------------------------------------------- Mes labels
-def _labels_view(cfg, flt="", cap=200):
-    labs = cfg.get("labels", [])
-    if flt:
-        f = flt.lower()
-        shown = [l for l in labs if f in l.lower()]
-    else:
-        shown = labs
-    return {"total": len(labs), "shown": shown[:cap], "n_shown": len(shown), "flt": flt}
-
-
-@app.get("/labels", response_class=HTMLResponse)
-def labels_page(request: Request, flt: str = ""):
-    return render(request, "pages/labels.html", active="labels", **_labels_view(_cfg(), flt))
-
-
-@app.get("/labels/list", response_class=HTMLResponse)
-def labels_list(request: Request, flt: str = ""):
-    return templates.TemplateResponse(request, "partials/labels_list.html",
-                                      {"request": request, **_labels_view(_cfg(), flt)})
-
-
-@app.post("/labels/add", response_class=HTMLResponse)
-def labels_add(request: Request, name: str = Form("")):
-    c = _cfg()
-    name = name.strip()
-    if name and normalize_label(name) not in {normalize_label(x) for x in c["labels"]}:
-        c["labels"].append(name)
-        q = load(store.paths.PENDING_ENRICH, {})
-        q.setdefault("labels", []).append(name)
-        save(store.paths.PENDING_ENRICH, q)
-        _save_cfg(c)
-    return templates.TemplateResponse(request, "partials/labels_list.html",
-                                      {"request": request, **_labels_view(c)})
-
-
-@app.post("/labels/remove", response_class=HTMLResponse)
-def labels_remove(request: Request, name: str = Form("")):
-    c = _cfg()
-    c["labels"] = [l for l in c["labels"] if l != name]
-    _save_cfg(c)
-    return templates.TemplateResponse(request, "partials/labels_list.html",
-                                      {"request": request, **_labels_view(c)})
-
-
-@app.post("/labels/import", response_class=HTMLResponse)
-async def labels_import(request: Request, file: UploadFile, replace: str = Form("")):
-    raw = (await file.read()).decode("utf-8", "ignore")
-    names = []
-    for i, line in enumerate(io.StringIO(raw)):
-        if i == 0:
-            continue
-        n = line.split(",")[0].strip().strip('"')
-        if n:
-            names.append(n)
-    c = _cfg()
-    if replace:
-        c["labels"] = []
-    have = {normalize_label(x) for x in c["labels"]}
-    for n in names:
-        if normalize_label(n) not in have:
-            have.add(normalize_label(n))
-            c["labels"].append(n)
-    _save_cfg(c)
-    return templates.TemplateResponse(request, "partials/labels_list.html",
-                                      {"request": request, **_labels_view(c)})
-
-
-# --------------------------------------------------------------------- inbox partagée (veille + vendeurs)
-def _inbox(request, path, source_key, source_label, key_ns, mins=30):
+# ============================================================ 📻 Veille Discogs (+ vendeurs + reco)
+def _inbox(request, path, source_key, key_ns, mins=30):
     items = load(path, [])
     if not items:
-        return templates.TemplateResponse(request, "partials/inbox.html",
-                                          {"request": request, "rows": [], "key_ns": key_ns,
-                                           "source_label": source_label, "sources": [], "mins": mins,
-                                           "n_total": 0})
+        return frag(request, "partials/inbox.html", rows=[], key_ns=key_ns, sources=[],
+                    mins=mins, n_total=0)
     c = Ctx()
     scored = []
     for it in items:
-        sc, det = c.album_score({"title": f"{it.get('artist','')} - {it.get('title','')}",
-                                 "label": [it["label"]] if it.get("label") else [],
-                                 "style": it.get("style") or []})
+        sc, _ = c.album_score({"title": f"{it.get('artist','')} - {it.get('title','')}",
+                               "label": [it["label"]] if it.get("label") else [],
+                               "style": it.get("style") or []})
         scored.append({"it": it, "score": sc, "src": it.get(source_key)})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     rows = [r for r in scored if (r["score"] or 0) >= mins]
-    return templates.TemplateResponse(request, "partials/inbox.html",
-                                      {"request": request, "rows": rows[:150], "key_ns": key_ns,
-                                       "source_label": source_label, "mins": mins,
-                                       "sources": sorted({r["src"] for r in scored if r["src"]}),
-                                       "n_total": len(items), "path_key": key_ns})
+    return frag(request, "partials/inbox.html", rows=rows[:150], key_ns=key_ns, mins=mins,
+                sources=sorted({r["src"] for r in scored if r["src"]}), n_total=len(items))
 
 
 @app.get("/inbox/{kind}", response_class=HTMLResponse)
 def inbox(request: Request, kind: str, mins: int = 30):
     if kind == "veille":
-        return _inbox(request, VEILLE_NEW, "rule", "Règle", "veille", mins)
-    return _inbox(request, SELLERS_NEW, "seller", "Vendeur", "sellers", mins)
+        return _inbox(request, VEILLE_NEW, "rule", "veille", mins)
+    return _inbox(request, SELLERS_NEW, "seller", "sellers", mins)
 
 
 @app.post("/inbox/{kind}/clear", response_class=HTMLResponse)
@@ -339,15 +255,20 @@ def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
     return inbox(request, kind)
 
 
-# --------------------------------------------------------------------- Veille
 @app.get("/veille", response_class=HTMLResponse)
 def veille_page(request: Request):
-    c = _cfg()
-    seen = load(VEILLE_SEEN, {})
-    last = max((v.get("last_scan", "") for v in seen.values()), default="")
+    c = Ctx()
+    reco = c.reco_rows()
+    base = {normalize_label(x) for x in c.cfg.get("labels", [])}
+    watch = {normalize_label(x) for x in c.cfg.get("watchlist", [])}
+    for r in reco:
+        r["in_base"], r["watched"] = r["key"] in base, r["key"] in watch
     return render(request, "pages/veille.html", active="veille",
-                  rules=c.get("veille_rules", []), watchlist=c.get("watchlist", []),
-                  last=last, year=CURRENT_YEAR)
+                  rules=c.cfg.get("veille_rules", []), watchlist=c.cfg.get("watchlist", []),
+                  sellers=c.cfg.get("sellers", []), year=CURRENT_YEAR,
+                  v_last=max((v.get("last_scan", "") for v in load(VEILLE_SEEN, {}).values()), default=""),
+                  s_last=max((v.get("last_scan", "") for v in load(SELLERS_SEEN, {}).values()), default=""),
+                  reco=[r for r in reco if not r["in_base"]][:40], n_reco=len(reco))
 
 
 @app.post("/veille/rules")
@@ -355,12 +276,13 @@ async def veille_rules_save(request: Request):
     f = await request.form()
     c = _cfg()
     rules = c.setdefault("veille_rules", [])
-    if f.get("_action") == "add":
+    act = f.get("_action", "")
+    if act == "add":
         rules.append({"name": "Nouvelle règle", "active": True, "styles": [], "genres": ["Electronic"],
                       "year_from": 2000, "year_to": CURRENT_YEAR, "labels": [], "artists": [],
                       "vinyl_only": True})
-    elif f.get("_action", "").startswith("del:"):
-        i = int(f["_action"][4:])
+    elif act.startswith("del:"):
+        i = int(act[4:])
         if 0 <= i < len(rules):
             rules.pop(i)
     else:
@@ -368,33 +290,20 @@ async def veille_rules_save(request: Request):
             r["name"] = f.get(f"name_{i}", r.get("name", ""))
             r["active"] = f.get(f"active_{i}") == "on"
             r["vinyl_only"] = f.get(f"vinyl_{i}") == "on"
-            r["styles"] = [x.strip() for x in f.get(f"styles_{i}", "").splitlines() if x.strip()]
-            r["genres"] = [x.strip() for x in f.get(f"genres_{i}", "").splitlines() if x.strip()]
-            r["labels"] = [x.strip() for x in f.get(f"labels_{i}", "").splitlines() if x.strip()]
-            r["artists"] = [x.strip() for x in f.get(f"artists_{i}", "").splitlines() if x.strip()]
+            for key in ("styles", "genres", "labels", "artists"):
+                r[key] = [x.strip() for x in f.get(f"{key}_{i}", "").splitlines() if x.strip()]
             try:
                 r["year_from"] = int(f.get(f"yf_{i}") or r.get("year_from") or 2000)
                 r["year_to"] = int(f.get(f"yt_{i}") or r.get("year_to") or CURRENT_YEAR)
             except ValueError:
                 pass
-    _save_cfg(c)
+    store.save_config(c)
     return RedirectResponse("/veille", status_code=303)
-
-
-# --------------------------------------------------------------------- Vendeurs
-@app.get("/sellers", response_class=HTMLResponse)
-def sellers_page(request: Request):
-    c = _cfg()
-    seen = load(SELLERS_SEEN, {})
-    last = max((v.get("last_scan", "") for v in seen.values()), default="")
-    return render(request, "pages/sellers.html", active="sellers",
-                  sellers=c.get("sellers", []), last=last)
 
 
 @app.post("/sellers/add")
 def sellers_add(name: str = Form("")):
     c = _cfg()
-    import re
     for n in re.split(r"[,\s]+", name.strip()):
         n = n.strip().strip("@/")
         m = re.search(r"/seller/([^/]+)", n)
@@ -402,50 +311,104 @@ def sellers_add(name: str = Form("")):
             n = m.group(1)
         if n and n not in c.setdefault("sellers", []):
             c["sellers"].append(n)
-    _save_cfg(c)
-    return RedirectResponse("/sellers", status_code=303)
+    store.save_config(c)
+    return RedirectResponse("/veille", status_code=303)
 
 
 @app.post("/sellers/remove")
 def sellers_remove(name: str = Form("")):
     c = _cfg()
     c["sellers"] = [s for s in c.get("sellers", []) if s != name]
-    _save_cfg(c)
-    return RedirectResponse("/sellers", status_code=303)
+    store.save_config(c)
+    return RedirectResponse("/veille", status_code=303)
 
 
-# --------------------------------------------------------------------- Sources & reco
-JOB_BUTTONS = [
-    ("fetch_collection", "Charger collection + wantlist Discogs", {}),
-    ("ingest_youtube", "Importer playlists YouTube", {"deep": True}),
-    ("ingest_bandcamp", "Importer collection Bandcamp", {"deep": True}),
-    ("scan_veille", "Scanner la veille", {}),
-    ("scan_sellers", "Scanner les vendeurs", {}),
-    ("merge_corpus", "Consolider corpus → base", {}),
-]
+@app.post("/reco/label", response_class=HTMLResponse)
+def reco_label(name: str = Form(""), dest: str = Form("base")):
+    c = _cfg()
+    name = name.strip()
+    if name:
+        nk = normalize_label(name)
+        if dest in ("base", "both") and nk not in {normalize_label(x) for x in c["labels"]}:
+            c["labels"].append(name)
+        if dest in ("veille", "both") and nk not in {normalize_label(x) for x in c.get("watchlist", [])}:
+            c.setdefault("watchlist", []).append(name)
+        q = load(PENDING_ENRICH, {})
+        q.setdefault("labels", []).append(name)
+        save(PENDING_ENRICH, q)
+        store.save_config(c)
+    return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
 
-@app.get("/sources", response_class=HTMLResponse)
-def sources_page(request: Request):
+# ============================================================ 🌐 Mon univers
+@app.get("/univers", response_class=HTMLResponse)
+def univers_page(request: Request, tab: str = "labels"):
     c = Ctx()
-    rows = c.reco_rows()
-    base = {normalize_label(x) for x in c.cfg.get("labels", [])}
-    watch = {normalize_label(x) for x in c.cfg.get("watchlist", [])}
-    for r in rows:
-        r["in_base"] = r["key"] in base
-        r["watched"] = r["key"] in watch
-    return render(request, "pages/sources.html", active="sources",
-                  jobs=JOB_BUTTONS, reco=rows[:60], n_reco=len(rows),
-                  cfg=c.cfg)
+    return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
+                  n_labels=len(c.cfg.get("labels", [])),
+                  n_profiled=len(c.profile),
+                  n_artists=sum(len(v) for v in c.cfg.get("artist_categories", {}).values()),
+                  n_sets=len([r for r in c.corpus if r.get("source") == "djset"]))
+
+
+@app.get("/univers/labels", response_class=HTMLResponse)
+def univers_labels(request: Request, flt: str = ""):
+    c = _cfg()
+    labs = c.get("labels", [])
+    shown = [l for l in labs if flt.lower() in l.lower()] if flt else labs
+    return frag(request, "partials/labels_list.html", total=len(labs), shown=shown[:200],
+                n_shown=len(shown), flt=flt)
+
+
+@app.post("/univers/labels/add", response_class=HTMLResponse)
+def univers_labels_add(request: Request, name: str = Form("")):
+    c = _cfg()
+    name = name.strip()
+    if name and normalize_label(name) not in {normalize_label(x) for x in c["labels"]}:
+        c["labels"].append(name)
+        q = load(PENDING_ENRICH, {})
+        q.setdefault("labels", []).append(name)
+        save(PENDING_ENRICH, q)
+        store.save_config(c)
+    return univers_labels(request)
+
+
+@app.post("/univers/labels/remove", response_class=HTMLResponse)
+def univers_labels_remove(request: Request, name: str = Form("")):
+    c = _cfg()
+    c["labels"] = [l for l in c["labels"] if l != name]
+    store.save_config(c)
+    return univers_labels(request)
+
+
+@app.post("/univers/labels/import", response_class=HTMLResponse)
+async def univers_labels_import(request: Request, file: UploadFile, replace: str = Form("")):
+    raw = (await file.read()).decode("utf-8", "ignore")
+    names = [line.split(",")[0].strip().strip('"')
+             for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
+    c = _cfg()
+    if replace:
+        c["labels"] = []
+    have = {normalize_label(x) for x in c["labels"]}
+    for n in names:
+        if normalize_label(n) not in have:
+            have.add(normalize_label(n))
+            c["labels"].append(n)
+    store.save_config(c)
+    return univers_labels(request)
+
+
+# ============================================================ jobs
+VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_bandcamp", "merge_corpus",
+              "scan_veille", "scan_sellers", "build_graph", "profile_labels",
+              "ingest_djsets", "resolve_artists", "canonicalize", "enrich"}
+JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_bandcamp": {"deep": True}}
 
 
 @app.post("/jobs/{name}/launch", response_class=HTMLResponse)
-def job_launch(request: Request, name: str):
-    valid = {b[0] for b in JOB_BUTTONS} | {"build_graph", "profile_labels", "ingest_djsets",
-                                           "resolve_artists", "canonicalize", "enrich"}
-    if name in valid:
-        params = next((p for n, _, p in JOB_BUTTONS if n == name), {})
-        jobs.launch(name, params)
+def job_launch(name: str):
+    if name in VALID_JOBS:
+        jobs.launch(name, JOB_PARAMS.get(name, {}))
     return job_status_frag(name)
 
 
@@ -468,25 +431,35 @@ def job_status_frag(name: str):
     return HTMLResponse(f"<div id='job-{name}' {poll}>{inner}</div>")
 
 
-@app.post("/reco/label", response_class=HTMLResponse)
-def reco_label(request: Request, name: str = Form(""), dest: str = Form("base")):
+# ============================================================ 🎛️ Réglages
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request, saved: int = 0):
     c = _cfg()
-    name = name.strip()
-    if name:
-        if dest in ("base", "both") and normalize_label(name) not in {normalize_label(x) for x in c["labels"]}:
-            c["labels"].append(name)
-        if dest in ("veille", "both") and normalize_label(name) not in {normalize_label(x) for x in c.get("watchlist", [])}:
-            c.setdefault("watchlist", []).append(name)
-        q = load(store.paths.PENDING_ENRICH, {})
-        q.setdefault("labels", []).append(name)
-        save(store.paths.PENDING_ENRICH, q)
-        _save_cfg(c)
-    return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
+    return render(request, "pages/settings.html", active="settings", cfg=c, sc=c["scoring"], saved=saved)
 
 
-# --------------------------------------------------------------------- stubs restants
-@app.get("/{section}", response_class=HTMLResponse)
-def stub(request: Request, section: str):
-    if section not in STUB:
-        return HTMLResponse("Page inconnue", status_code=404)
-    return render(request, "pages/stub.html", active=section, heading=STUB[section])
+@app.post("/settings")
+async def settings_save(request: Request):
+    f = await request.form()
+    c = _cfg()
+    sc = c["scoring"]
+    for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor")),
+                      ("album", ("label", "artist", "style", "artist_max_vs_mean")),
+                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset"))):
+        for key in keys:
+            v = f.get(f"{grp}__{key}")
+            if v not in (None, ""):
+                try:
+                    sc[grp][key] = float(v)
+                except ValueError:
+                    pass
+    for t in ("1", "2"):
+        if f.get(f"artist_tiers__{t}"):
+            sc["artist_tiers"][t] = float(f[f"artist_tiers__{t}"])
+    for t in ("1", "2", "3"):
+        if f.get(f"taste_tiers__{t}"):
+            sc["taste_tiers"][t] = float(f[f"taste_tiers__{t}"])
+    if f.get("label_affinity_floor") not in (None, ""):
+        sc["label_affinity_floor"] = int(float(f["label_affinity_floor"]))
+    store.save_config(c)
+    return RedirectResponse("/settings?saved=1", status_code=303)

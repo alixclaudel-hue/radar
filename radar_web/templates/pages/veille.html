@@ -1,13 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Veille · Radar{% endblock %}
+{% block title %}Veille Discogs · Radar{% endblock %}
 {% block content %}
-<h1>Veille</h1>
-<p class="muted small">Des règles de critères → un scan de fond remplit la boîte Nouveautés, notée.</p>
+<h1>Veille Discogs</h1>
+<p class="muted small">Règles de critères → scan de fond → boîte Nouveautés notée. 1ᵉʳ passage = référence.</p>
 
-{% if watchlist %}
-<p class="small muted">🏷️ Labels suivis ({{ watchlist|length }}) — règle implicite, scannée automatiquement.</p>
-{% endif %}
-
+<h3>Règles</h3>
+{% if watchlist %}<p class="small muted">🏷️ Labels suivis ({{ watchlist|length }}) — règle implicite, scannée auto.</p>{% endif %}
 <form method="post" action="/veille/rules">
   {% for r in rules %}
   <div class="notice" style="margin-bottom:12px">
@@ -21,23 +19,73 @@
       <div class="field" style="flex:0 0 90px"><label>à</label><input name="yt_{{ loop.index0 }}" value="{{ r.year_to or year }}"></div>
     </div>
     <div class="row">
-      <div class="field"><label>Styles (un/ligne)</label><textarea name="styles_{{ loop.index0 }}" rows="2">{{ r.styles|join('\n') }}</textarea></div>
+      <div class="field"><label>Styles</label><textarea name="styles_{{ loop.index0 }}" rows="2">{{ r.styles|join('\n') }}</textarea></div>
       <div class="field"><label>Genres</label><textarea name="genres_{{ loop.index0 }}" rows="2">{{ r.genres|join('\n') }}</textarea></div>
-      <div class="field"><label>Labels précis (opt.)</label><textarea name="labels_{{ loop.index0 }}" rows="2">{{ r.labels|join('\n') }}</textarea></div>
-      <div class="field"><label>Artistes précis (opt.)</label><textarea name="artists_{{ loop.index0 }}" rows="2">{{ r.artists|join('\n') }}</textarea></div>
+      <div class="field"><label>Labels précis</label><textarea name="labels_{{ loop.index0 }}" rows="2">{{ r.labels|join('\n') }}</textarea></div>
+      <div class="field"><label>Artistes précis</label><textarea name="artists_{{ loop.index0 }}" rows="2">{{ r.artists|join('\n') }}</textarea></div>
     </div>
     <button type="submit" name="_action" value="del:{{ loop.index0 }}">🗑 Supprimer</button>
   </div>
   {% endfor %}
-  <button class="primary" type="submit">💾 Enregistrer les règles</button>
+  <button class="primary" type="submit">💾 Enregistrer</button>
   <button type="submit" name="_action" value="add">+ Nouvelle règle</button>
 </form>
 
-<hr>
-<div class="section-title"><h3>🆕 Nouveautés</h3>
+<div class="section-title" style="margin-top:18px"><h3>🆕 Nouveautés — règles</h3>
   <button hx-post="/jobs/scan_veille/launch" hx-target="#job-scan_veille" hx-swap="outerHTML" class="primary">🔄 Scanner</button>
-  <span class="small muted">dernier : {{ last.replace('T',' ') or '—' }}</span>
-</div>
+  <span class="small muted">dernier : {{ v_last.replace('T',' ') or '—' }}</span></div>
 <div id="job-scan_veille" hx-get="/jobs/scan_veille/status" hx-trigger="load"></div>
 <div hx-get="/inbox/veille" hx-trigger="load"></div>
+
+<hr>
+<h3>Vendeurs Discogs</h3>
+<form method="post" action="/sellers/add" style="display:flex;gap:8px;align-items:end;max-width:520px">
+  <div class="field" style="flex:1;margin:0"><label>Ajouter (identifiants, séparés par virgule)</label>
+    <input name="name" placeholder="hardwax, redeye_records"></div>
+  <button class="primary" type="submit">Ajouter</button>
+</form>
+{% if sellers %}
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+  {% for s in sellers %}
+  <span class="chip" style="display:inline-flex;align-items:center;gap:6px">
+    <a href="https://www.discogs.com/seller/{{ s }}/profile" target="_blank" rel="noopener">{{ s }}</a>
+    <form method="post" action="/sellers/remove" style="display:inline">
+      <input type="hidden" name="name" value="{{ s }}">
+      <button style="border:0;padding:0 2px;background:none;color:var(--soft)" title="retirer">✕</button>
+    </form>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+<div class="section-title" style="margin-top:14px"><h3 style="font-size:1rem">🆕 Nouveautés — vendeurs</h3>
+  <button hx-post="/jobs/scan_sellers/launch" hx-target="#job-scan_sellers" hx-swap="outerHTML" class="primary">🔄 Scanner</button>
+  <span class="small muted">dernier : {{ s_last.replace('T',' ') or '—' }}</span></div>
+<div id="job-scan_sellers" hx-get="/jobs/scan_sellers/status" hx-trigger="load"></div>
+<div hx-get="/inbox/sellers" hx-trigger="load"></div>
+
+<hr>
+<div class="section-title"><h3>Labels recommandés</h3><span class="small muted">{{ n_reco }} au total · top {{ reco|length }}</span></div>
+<div style="display:flex;flex-direction:column">
+  {% for r in reco %}
+  <div class="inbox-row">
+    <span class="badge {{ 'clay' if not r.aff }}">{{ r.score }}</span>
+    <div class="txt"><b>{{ r.name }}</b>
+      <div class="sub">
+        {% if r.owned %}{{ r.owned }} possédé{{ 's' if r.owned>1 }} · {% endif %}
+        {% if r.want %}{{ r.want }} wantlist · {% endif %}
+        {% if r.corpus %}corpus {{ r.corpus }} · {% endif %}
+        {% if r.artists %}⭐ {{ r.artists }} artiste{{ 's' if r.artists>1 }} · {% endif %}
+        {{ ('affinité ' ~ r.aff ~ '%') if r.aff is not none else 'non profilé' }}
+      </div></div>
+    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
+      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="base">
+      <button class="small">+ base</button></form>
+    {% if not r.watched %}
+    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
+      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="veille">
+      <button class="small">+ veille</button></form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
 {% endblock %}

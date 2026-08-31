@@ -112,6 +112,12 @@ class Ctx:
             self._ascore = out
         return self._ascore
 
+    def corpus_by_source(self):
+        out = {}
+        for r in self.corpus:
+            out[r.get("source", "?")] = out.get(r.get("source", "?"), 0) + 1
+        return out
+
     def split_credit_artists(self, s):
         out = []
         for p in _CREDIT_SPLIT.split(s or ""):

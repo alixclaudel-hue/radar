@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Ma patte musicale · Radar{% endblock %}
+{% block content %}
+<h1>Ma patte musicale</h1>
+<p class="muted small">Tout ce qui te définit musicalement. Le reste de l'appli lit ça.</p>
+{% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
+
+<form method="post" action="/patte">
+  <h3>Connexions</h3>
+  <div class="row">
+    <div class="field"><label>Token Discogs</label>
+      <input type="password" name="token" value="{{ cfg.token or '' }}"></div>
+    <div class="field"><label>Clé API YouTube</label>
+      <input type="password" name="youtube_api_key" value="{{ cfg.youtube_api_key or '' }}"></div>
+  </div>
+  <div class="row">
+    <div class="field"><label>Bandcamp — identifiant Subsonic</label>
+      <input name="bandcamp_sub_user" value="{{ cfg.bandcamp_sub_user or '' }}"></div>
+    <div class="field"><label>Bandcamp — mot de passe</label>
+      <input type="password" name="bandcamp_sub_pass" value="{{ cfg.bandcamp_sub_pass or '' }}"></div>
+  </div>
+  <p class="small muted">
+    Collection Discogs : {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants
+    {% if coll.fetched_at %}· maj {{ coll.fetched_at.replace('T',' ') }}{% endif %}
+  </p>
+
+  <hr>
+  <h3>Mes styles</h3>
+  <p class="small muted">Trois rangs : Cœur, 2ᵉ rang, Périphérie. Un style par ligne.</p>
+  <div class="row">
+    {% for cid, name in [('1','Cœur'),('2','2ᵉ rang'),('3','Périphérie')] %}
+    <div class="field"><label>{{ name }} (poids {{ sc.taste_tiers[cid] }})</label>
+      <textarea name="styles_{{ cid }}" rows="6">{{ (cats.get(cid) or [])|join('\n') }}</textarea></div>
+    {% endfor %}
+  </div>
+
+  <hr>
+  <h3>Playlists YouTube</h3>
+  <div class="field"><label>Une URL par ligne</label>
+    <textarea name="youtube_playlists" rows="4">{{ cfg.youtube_playlists or '' }}</textarea></div>
+
+  <button class="primary" type="submit">💾 Enregistrer</button>
+</form>
+
+<hr>
+<h3>Ingestion</h3>
+<div style="display:flex;flex-direction:column;gap:10px;max-width:640px">
+  {% for name, label in ingest %}
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <button hx-post="/jobs/{{ name }}/launch" hx-target="#job-{{ name }}" hx-swap="outerHTML">{{ label }}</button>
+    <div id="job-{{ name }}" hx-get="/jobs/{{ name }}/status" hx-trigger="load" class="small"></div>
+  </div>
+  {% endfor %}
+</div>
+
+<hr>
+<h3>Corpus de goût</h3>
+<p class="small muted">
+  {{ corpus_total }} tracks agrégées —
+  {% for src, n in corpus_src.items() %}<span class="chip">{{ src }} {{ n }}</span> {% endfor %}
+</p>
+{% endblock %}

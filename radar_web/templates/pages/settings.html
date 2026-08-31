@@ -2,26 +2,10 @@
 {% block title %}Réglages · Radar{% endblock %}
 {% block content %}
 <h1>Réglages</h1>
+<p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes sont dans Ma patte musicale.</p>
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
 <form method="post" action="/settings">
-  <h3>Connexion</h3>
-  <div class="field"><label>Token Discogs</label>
-    <input type="password" name="token" value="{{ cfg.token or '' }}"></div>
-  <div class="row">
-    <div class="field"><label>Clé API YouTube</label>
-      <input type="password" name="youtube_api_key" value="{{ cfg.youtube_api_key or '' }}"></div>
-    <div class="field"><label>Bandcamp — identifiant Subsonic</label>
-      <input name="bandcamp_sub_user" value="{{ cfg.bandcamp_sub_user or '' }}"></div>
-    <div class="field"><label>Bandcamp — mot de passe</label>
-      <input type="password" name="bandcamp_sub_pass" value="{{ cfg.bandcamp_sub_pass or '' }}"></div>
-  </div>
-  <div class="field"><label>Playlists YouTube (une URL par ligne)</label>
-    <textarea name="youtube_playlists" rows="3">{{ cfg.youtube_playlists or '' }}</textarea></div>
-  <div class="field"><label>Sources DJ sets (nom / @handle / URL, une par ligne)</label>
-    <textarea name="djset_sources" rows="3">{{ cfg.djset_sources or '' }}</textarea></div>
-
-  <hr>
   <h3>Score label (reco)</h3>
   <div class="row">
     {% for k in ['collection','corpus','artist','affinity','want_factor'] %}
@@ -60,4 +44,18 @@
   <hr>
   <button class="primary" type="submit">💾 Enregistrer</button>
 </form>
+
+<hr>
+<h3>Nettoyage canonique Discogs</h3>
+<div style="display:flex;flex-direction:column;gap:8px;max-width:520px">
+  <div style="display:flex;gap:10px;align-items:center">
+    <button hx-post="/jobs/canonicalize/launch" hx-target="#job-canonicalize" hx-swap="outerHTML">Grand nettoyage (labels + artistes + corpus)</button>
+    <div id="job-canonicalize" hx-get="/jobs/canonicalize/status" hx-trigger="load" class="small"></div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <button hx-post="/jobs/profile_labels/launch" hx-target="#job-profile_labels" hx-swap="outerHTML">Profiler les labels (par tranches)</button>
+    <div id="job-profile_labels" hx-get="/jobs/profile_labels/status" hx-trigger="load" class="small"></div>
+  </div>
+</div>
+<p class="small muted">L'enrichissement (résolution + profilage) de chaque nouvel ajout se fait déjà en tâche de fond.</p>
 {% endblock %}

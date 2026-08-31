@@ -11,22 +11,19 @@
   <div class="wrap">
     <div class="topbar">
       <a class="brand" href="/">Rada<b>r</b></a>
-      <span class="brand-sub">Discogs × ta base de labels</span>
+      <span class="brand-sub">crate-digging assisté</span>
     </div>
     <nav class="nav">
       {% set cur = active|default('') %}
-      <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Recherche</a>
-      <a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Veille</a>
-      <a href="/sellers"  class="{{ 'active' if cur=='sellers' }}">🏪 Vendeurs</a>
-      <a href="/labels"   class="{{ 'active' if cur=='labels' }}">🏷️ Mes labels</a>
-      <a href="/sources"  class="{{ 'active' if cur=='sources' }}">🎧 Sources &amp; reco</a>
-      <a href="/artists"  class="{{ 'active' if cur=='artists' }}">🎤 Mes artistes</a>
-      <a href="/sets"     class="{{ 'active' if cur=='sets' }}">🎚️ Mes sets</a>
+      <a href="/patte"    class="{{ 'active' if cur=='patte' }}">🧠 Ma patte musicale</a>
+      <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Recherche ciblée</a>
+      <a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Veille Discogs</a>
+      <a href="/univers"  class="{{ 'active' if cur=='univers' }}">🌐 Mon univers</a>
       <a href="/settings" class="{{ 'active' if cur=='settings' }}">🎛️ Réglages</a>
     </nav>
     <hr>
-    {% if not has_token and active != 'settings' %}
-      <p class="notice warn small">⚠️ Token Discogs manquant — renseigne-le dans <a href="/settings">Réglages</a>.</p>
+    {% if not has_token and active != 'patte' %}
+      <p class="notice warn small">⚠️ Token Discogs manquant — <a href="/patte">Ma patte musicale → Connexions</a>.</p>
     {% endif %}
     {% block content %}{% endblock %}
   </div>

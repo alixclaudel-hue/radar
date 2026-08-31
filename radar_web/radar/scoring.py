@@ -33,6 +33,7 @@ class Ctx:
         self._wmap = None
         self._reco_idx = None
         self._ascore = None
+        self._graph_rs = None
 
     # -------------------------------------------------------------- goût / styles
     @property
@@ -82,9 +83,63 @@ class Ctx:
                 m[self.canon_artist_key(n)] = cid
         return m
 
+    def graph_rescore(self):
+        """{'artists': {ck: {name,id,score,why}}, 'labels': {lk: {...}}} — proximité
+        recalculée à partir des arêtes brutes + rangs courants (porté de crate_radar)."""
+        if self._graph_rs is not None:
+            return self._graph_rs
+        g = self.graph or {}
+        gp = self.scoring["graph"]
+        tw = gp["tier_w"]
+        TW = {"1": tw["1"], "2": tw["2"], "3": tw["3"], None: tw["none"]}
+        abr, lbr, c1b = gp["artist_breadth"], gp["label_breadth"], gp["cat1_bonus"]
+        tiers = self.artist_tier_map()
+        edges = g.get("edges")
+        if not edges:
+            self._graph_rs = {"artists": {}, "labels": g.get("labels", {})}
+            return self._graph_rs
+        seeds = g.get("seeds", {})
+        arts = {}
+        for ck, e in edges.items():
+            if ck in tiers:
+                continue
+            base, cat1, byseed = 0.0, 0, {}
+            for sk, d in e.get("co", {}).items():
+                t = tiers.get(sk)
+                base += d["n"] * d.get("rw", 1.0) * TW.get(t, 0.3)
+                if t == "1":
+                    cat1 += d["n"]
+                byseed[seeds.get(sk, sk)] = d["n"]
+            breadth = len(e.get("co", {}))
+            score = round(base * (1 + abr * (breadth - 1)) + (c1b if cat1 else 0), 2)
+            why = [f"{n}× avec {sn}" for sn, n in sorted(byseed.items(), key=lambda kv: -kv[1])[:3]]
+            if cat1:
+                why.insert(0, f"⭐ {cat1}× avec un artiste Cœur")
+            arts[ck] = {"name": e["name"], "id": e.get("id"), "score": score, "why": why}
+        watch = {normalize_label(x) for x in self.cfg.get("watchlist", [])}
+        basek = {normalize_label(x) for x in self.cfg.get("labels", [])}
+        labs = {}
+        for lk, le in g.get("label_edges", {}).items():
+            co = le.get("co", {})
+            if not co:
+                continue
+            b = sum(n * TW.get(tiers.get(sk), 0.3) for sk, n in co.items())
+            c1s = sum(1 for sk in co if tiers.get(sk) == "1")
+            n_seeds = len(co)
+            labs[lk] = {"name": le["name"],
+                        "score": round(b * (1 + lbr * (n_seeds - 1)) + (c1b if c1s else 0), 2),
+                        "n_seeds": n_seeds, "cat1_seeds": c1s,
+                        "seeds": [seeds.get(sk, sk) for sk in list(co)[:6]],
+                        "in_watchlist": lk in watch, "in_base": lk in basek}
+        self._graph_rs = {
+            "artists": dict(sorted(arts.items(), key=lambda kv: -kv[1]["score"])),
+            "labels": dict(sorted(labs.items(), key=lambda kv: -kv[1]["score"])),
+        }
+        return self._graph_rs
+
     @property
     def ascore(self):
-        """{clé canonique: score 0-100} — v0 : manuel + corpus + collection."""
+        """{clé canonique: score 0-100} — manuel + corpus + collection + proximité graphe."""
         if self._ascore is None:
             tiers = self.artist_tier_map()
             aw = self.scoring["artist_tiers"]
@@ -94,21 +149,23 @@ class Ctx:
                 a = (r.get("artist") or "").strip()
                 if not a or normalize_label(a) in ARTIST_STOPWORDS:
                     continue
-                k = self.canon_artist_key(a)
-                corpus_c[k] = corpus_c.get(k, 0) + 1
+                corpus_c[self.canon_artist_key(a)] = corpus_c.get(self.canon_artist_key(a), 0) + 1
             for a, n in self.collection.get("artist_counts", {}).items():
                 if not a or normalize_label(a) in ARTIST_STOPWORDS:
                     continue
                 coll_c[self.canon_artist_key(a)] = coll_c.get(self.canon_artist_key(a), 0) + n
+            graph = {ck: v["score"] for ck, v in self.graph_rescore()["artists"].items()}
             mc = max(corpus_c.values(), default=1)
             ml = max(coll_c.values(), default=1)
+            mg = max(graph.values(), default=1) or 1
             out = {}
-            for k in set(tiers) | set(corpus_c) | set(coll_c):
+            for k in set(tiers) | set(corpus_c) | set(coll_c) | set(graph):
                 tier = tiers.get(k)
                 manual = float(aw.get(tier, 0)) if tier else 0.0
                 out[k] = round(100 * (sw.get("manual", 0.5) * manual
                                       + sw.get("corpus", 0.18) * corpus_c.get(k, 0) / mc
-                                      + sw.get("collection", 0.1) * coll_c.get(k, 0) / ml))
+                                      + sw.get("collection", 0.1) * coll_c.get(k, 0) / ml
+                                      + sw.get("graph", 0.14) * graph.get(k, 0) / mg))
             self._ascore = out
         return self._ascore
 

@@ -1,0 +1,21 @@
+<div class="section-title"><h3>Recommandations — artistes proches de tes Cœur / Aimés</h3>
+  <span class="small muted">{{ n_reco }} candidats (graphe de producteurs) · top {{ reco|length }}</span></div>
+{% if not reco %}
+  <p class="small muted">Construis d'abord le graphe (bouton ci-dessus).</p>
+{% else %}
+<div style="display:flex;flex-direction:column">
+  {% for r in reco %}
+  <div class="inbox-row">
+    <span class="badge">{{ r.note }}</span>
+    <div class="txt"><b>{{ r.name }}</b>
+      <div class="sub">proximité {{ r.prox }} · {{ r.why }}</div></div>
+    <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">
+      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
+      <button class="small">+ Cœur</button></form>
+    <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">
+      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
+      <button class="small">+ Aimés</button></form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

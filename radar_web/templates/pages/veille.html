@@ -62,30 +62,4 @@
   <span class="small muted">dernier : {{ s_last.replace('T',' ') or '—' }}</span></div>
 <div id="job-scan_sellers" hx-get="/jobs/scan_sellers/status" hx-trigger="load"></div>
 <div hx-get="/inbox/sellers" hx-trigger="load"></div>
-
-<hr>
-<div class="section-title"><h3>Labels recommandés</h3><span class="small muted">{{ n_reco }} au total · top {{ reco|length }}</span></div>
-<div style="display:flex;flex-direction:column">
-  {% for r in reco %}
-  <div class="inbox-row">
-    <span class="badge {{ 'clay' if not r.aff }}">{{ r.score }}</span>
-    <div class="txt"><b>{{ r.name }}</b>
-      <div class="sub">
-        {% if r.owned %}{{ r.owned }} possédé{{ 's' if r.owned>1 }} · {% endif %}
-        {% if r.want %}{{ r.want }} wantlist · {% endif %}
-        {% if r.corpus %}corpus {{ r.corpus }} · {% endif %}
-        {% if r.artists %}⭐ {{ r.artists }} artiste{{ 's' if r.artists>1 }} · {% endif %}
-        {{ ('affinité ' ~ r.aff ~ '%') if r.aff is not none else 'non profilé' }}
-      </div></div>
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
-      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="base">
-      <button class="small">+ base</button></form>
-    {% if not r.watched %}
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
-      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="veille">
-      <button class="small">+ veille</button></form>
-    {% endif %}
-  </div>
-  {% endfor %}
-</div>
 {% endblock %}

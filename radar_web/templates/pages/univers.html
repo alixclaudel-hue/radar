@@ -35,7 +35,9 @@
   <div class="section-title"><h3>Graphe de labels</h3>
     <button hx-post="/jobs/build_graph/launch" hx-target="#job-build_graph" hx-swap="outerHTML" class="primary">Construire / mettre à jour</button></div>
   <div id="job-build_graph" hx-get="/jobs/build_graph/status" hx-trigger="load" class="small"></div>
-  <p class="small muted">Part de tous tes artistes résolus, remonte les co-labels. Résultat exploité dans les recos.</p>
+  <p class="small muted">Part de tous tes artistes résolus, remonte les co-labels.</p>
+  <hr>
+  <div hx-get="/univers/reco/labels" hx-trigger="load"></div>
 
 {% elif tab == 'artists' %}
   <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. <em>Édition détaillée à venir sur cette interface.</em></p>
@@ -52,6 +54,8 @@
   <div class="section-title" style="margin-top:10px"><h3 style="font-size:1rem">Résolution des artistes</h3>
     <button hx-post="/jobs/resolve_artists/launch" hx-target="#job-resolve_artists" hx-swap="outerHTML">Lancer</button></div>
   <div id="job-resolve_artists" hx-get="/jobs/resolve_artists/status" hx-trigger="load" class="small"></div>
+  <hr>
+  <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
 
 {% elif tab == 'sets' %}
   <div class="section-title"><h3>Extraire des DJ sets</h3>

@@ -257,18 +257,12 @@ def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
 
 @app.get("/veille", response_class=HTMLResponse)
 def veille_page(request: Request):
-    c = Ctx()
-    reco = c.reco_rows()
-    base = {normalize_label(x) for x in c.cfg.get("labels", [])}
-    watch = {normalize_label(x) for x in c.cfg.get("watchlist", [])}
-    for r in reco:
-        r["in_base"], r["watched"] = r["key"] in base, r["key"] in watch
+    c = _cfg()
     return render(request, "pages/veille.html", active="veille",
-                  rules=c.cfg.get("veille_rules", []), watchlist=c.cfg.get("watchlist", []),
-                  sellers=c.cfg.get("sellers", []), year=CURRENT_YEAR,
+                  rules=c.get("veille_rules", []), watchlist=c.get("watchlist", []),
+                  sellers=c.get("sellers", []), year=CURRENT_YEAR,
                   v_last=max((v.get("last_scan", "") for v in load(VEILLE_SEEN, {}).values()), default=""),
-                  s_last=max((v.get("last_scan", "") for v in load(SELLERS_SEEN, {}).values()), default=""),
-                  reco=[r for r in reco if not r["in_base"]][:40], n_reco=len(reco))
+                  s_last=max((v.get("last_scan", "") for v in load(SELLERS_SEEN, {}).values()), default=""))
 
 
 @app.post("/veille/rules")
@@ -338,6 +332,60 @@ def reco_label(name: str = Form(""), dest: str = Form("base")):
         save(PENDING_ENRICH, q)
         store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
+
+
+@app.post("/reco/artist", response_class=HTMLResponse)
+def reco_artist(name: str = Form(""), tier: str = Form("2")):
+    c = _cfg()
+    name = name.strip()
+    if name and tier in ("1", "2"):
+        ac = c.setdefault("artist_categories", {"1": [], "2": []})
+        nk = normalize_label(name)
+        if nk not in {normalize_label(x) for cid in ("1", "2") for x in ac.get(cid, [])}:
+            ac.setdefault(tier, []).append(name)
+            q = load(PENDING_ENRICH, {})
+            q.setdefault("artists", []).append(name)
+            save(PENDING_ENRICH, q)
+            store.save_config(c)
+    return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
+
+
+# --------------------------------------------------------------------- recos (dans Mon univers)
+@app.get("/univers/reco/labels", response_class=HTMLResponse)
+def reco_labels_frag(request: Request):
+    c = Ctx()
+    base = {normalize_label(x) for x in c.cfg.get("labels", [])}
+    watch = {normalize_label(x) for x in c.cfg.get("watchlist", [])}
+    rows = []
+    for r in c.reco_rows():
+        if r["key"] not in base:
+            r["watched"] = r["key"] in watch
+            rows.append(r)
+    # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base)
+    graph_rows = []
+    for lk, v in c.graph_rescore()["labels"].items():
+        if lk in base:
+            continue
+        graph_rows.append({"name": v["name"], "score": round(v["score"]), "aff": None,
+                           "owned": 0, "want": 0, "corpus": 0, "artists": v["n_seeds"],
+                           "watched": lk in watch,
+                           "seeds": ", ".join(v["seeds"])})
+    return frag(request, "partials/reco_labels.html", reco=rows[:30],
+                graph_reco=graph_rows[:30], n_reco=len(rows), n_graph=len(graph_rows))
+
+
+@app.get("/univers/reco/artists", response_class=HTMLResponse)
+def reco_artists_frag(request: Request):
+    c = Ctx()
+    g = c.graph_rescore()["artists"]
+    disp = {}
+    for cid, names in c.cfg.get("artist_categories", {}).items():
+        for n in names:
+            disp[c.canon_artist_key(n)] = c.canon_artist_name(n)
+    rows = [{"name": v["name"], "prox": round(v["score"]), "note": c.ascore.get(k, 0),
+             "why": ", ".join(v["why"])}
+            for k, v in list(g.items())[:40] if not str(v["name"]).startswith("id:")]
+    return frag(request, "partials/reco_artists.html", reco=rows, n_reco=len(g))
 
 
 # ============================================================ 🌐 Mon univers

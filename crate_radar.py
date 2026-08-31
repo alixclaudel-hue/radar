@@ -63,6 +63,7 @@ FEEDBACK_PATH = os.path.join(_DATA, "reco_feedback.json")
 SELLERS_SEEN_PATH = os.path.join(_DATA, "sellers_seen.json")
 SELLERS_NEW_PATH = os.path.join(_DATA, "seller_new.json")
 SCORING_PROFILES_PATH = os.path.join(_DATA, "scoring_profiles.json")
+PENDING_ENRICH_PATH = os.path.join(_DATA, "pending_enrich.json")
 JOBS_DIR = os.path.join(_DATA, "jobs")
 JOBS_SCRIPT = os.path.join(_HERE, "crate_jobs.py")
 
@@ -281,6 +282,19 @@ def _sig_reco():
             tuple(tuple(c.get("taste_categories", {}).get(k, [])) for k in ("1", "2", "3")))
 
 
+def enqueue_enrich(kind, name):
+    """File d'attente d'enrichissement auto (résolution Discogs + profilage).
+    `kind` = 'labels' | 'artists'. Drainée en tâche de fond par le job `enrich`."""
+    name = (name or "").strip()
+    if not name:
+        return
+    q = load_json(PENDING_ENRICH_PATH, {})
+    lst = q.setdefault(kind, [])
+    if normalize_label(name) not in {normalize_label(x) for x in lst}:
+        lst.append(name)
+        save_json(PENDING_ENRICH_PATH, q)
+
+
 def add_watch(name):
     """Ajoute un label à la veille sans doublon (comparaison normalisée)."""
     name = (name or "").strip()
@@ -291,11 +305,13 @@ def add_watch(name):
         return False
     cfg()["watchlist"].append(name)
     persist()
+    enqueue_enrich("labels", name)
     return True
 
 
 def add_label_to_base(name):
-    """Ajoute un label à la base (dédup) et le marque résolu (issu de la reco)."""
+    """Ajoute un label à la base (dédup). La résolution Discogs canonique + le
+    profilage sont faits ensuite en tâche de fond (job `enrich`)."""
     name = (name or "").strip()
     if not name:
         return False
@@ -306,8 +322,9 @@ def add_label_to_base(name):
     res = st.session_state.resolved
     if res.get(k, {}).get("status") not in ("exact", "confirmed"):
         res[k] = {"original": name, "discogs_name": name, "discogs_id": None,
-                  "status": "confirmed", "reviewed_by": "reco"}
+                  "status": "pending", "reviewed_by": "auto"}
         save_resolved(res)
+    enqueue_enrich("labels", name)
     return True
 
 
@@ -1059,7 +1076,10 @@ def artist_score(name):
 
 
 def set_artist_categories(cats):
-    """Écrit les 3 catégories d'artistes (dédup sur nom normalisé) en config."""
+    """Écrit les 3 catégories d'artistes (dédup sur nom normalisé) en config.
+    Les nouveaux noms sont mis en file d'enrichissement (résolution Discogs auto)."""
+    prev = {normalize_label(n) for cid in ("1", "2", "3")
+            for n in cfg().get("artist_categories", {}).get(cid, [])}
     seen = set()
     clean = {}
     for cid in ("1", "2", "3"):
@@ -1070,6 +1090,8 @@ def set_artist_categories(cats):
             if k and k not in seen:
                 seen.add(k)
                 clean[cid].append(n)
+                if k not in prev:
+                    enqueue_enrich("artists", n)
     cfg()["artist_categories"] = clean
     persist()
 
@@ -1633,6 +1655,24 @@ def sync_job_outputs():
 
 sync_job_outputs()
 
+
+def _auto_background():
+    """Tâches de fond automatiques : enrichissement des ajouts, consolidation du
+    corpus. Rien à cliquer."""
+    if not cfg().get("token"):
+        return
+    q = load_json(PENDING_ENRICH_PATH, {})
+    if (q.get("labels") or q.get("artists")) and not job_running("enrich"):
+        job_launch("enrich", {})
+    n_corpus = len(st.session_state.get("corpus", []))
+    if (n_corpus and n_corpus != st.session_state.get("_last_merge_corpus_n")
+            and not job_running("merge_corpus") and not job_running("enrich")):
+        st.session_state["_last_merge_corpus_n"] = n_corpus
+        job_launch("merge_corpus", {})
+
+
+_auto_background()
+
 st.markdown("""
 <style>
     .crate-title { font-family: Georgia, serif; font-weight: 700; font-size: 34px; margin-bottom: 0; }
@@ -1689,13 +1729,31 @@ with st.expander("⚙️ Configuration (token + base de labels)", expanded=not c
 status = "✅ Token ok" if cfg().get("token") else "⚠️ Token manquant"
 st.caption(f"{status} · {len(st.session_state.labels)} labels en base")
 
-with st.expander("🧹 Nettoyage des noms de labels (association avec les IDs Discogs)",
+with st.expander("🧹 Noms canoniques Discogs (résolution & profilage)",
                  expanded=st.session_state.cleanup_open):
     st.write(
-        "Ta base vient de plusieurs sources (Discogs, YouTube, Bandcamp) donc certains noms peuvent différer "
-        "légèrement de l'orthographe officielle Discogs. Cette étape résout chaque nom vers son identifiant "
-        "Discogs exact, une bonne fois pour toutes — les recherches utilisent ensuite ce nom canonique."
+        "Depuis maintenant, **chaque label / artiste ajouté est résolu et profilé "
+        "automatiquement en arrière-plan** (job `enrich`) — plus rien à lancer à la main. "
+        "Le bouton ci-dessous fait la passe unique sur l'existant."
     )
+    _pend = load_json(PENDING_ENRICH_PATH, {})
+    _npend = len(_pend.get("labels", [])) + len(_pend.get("artists", []))
+    if _npend:
+        st.caption(f"⏳ {_npend} ajout(s) en cours d'enrichissement…")
+    render_job("enrich", "Enrichissement auto")
+
+    gnc1, gnc2 = st.columns([2, 3])
+    if not job_running("canonicalize") and gnc1.button("🧹 Grand nettoyage Discogs",
+                                                       disabled=not cfg().get("token")):
+        job_launch("canonicalize", {"scope": "corpus"})
+        st.rerun()
+    gnc2.caption("Réécrit toute la base (labels + artistes) et les champs artiste/label du "
+                 "corpus avec les noms Discogs exacts. Tâche de fond, reprenable — plusieurs "
+                 "heures au 1ᵉʳ passage.")
+    render_job("canonicalize", "Grand nettoyage")
+
+    st.divider()
+    st.caption("— 🛠 Outils d'import initial (usage ponctuel) —")
     total = len(st.session_state.labels)
     done = sum(1 for l in st.session_state.labels if normalize_label(l) in st.session_state.resolved)
     not_found = sum(1 for l in st.session_state.labels
@@ -1743,16 +1801,39 @@ with st.expander("🧹 Nettoyage des noms de labels (association avec les IDs Di
                 st.success(f"Terminé — {st.session_state.resolve_done} label(s) traité(s) sur ce lancement.")
             st.rerun()
     else:
-        batch_size = st.number_input("Résoudre au maximum N labels non résolus maintenant",
-                                     min_value=10, max_value=2000, value=200, step=10)
+        _prof = st.session_state.get("profile", {})
+        _wmap = taste_weight_map()
+        _floor = int(scoring()["label_affinity_floor"] or 0)
+        rc1, rc2 = st.columns([3, 2])
+        only_prof = rc1.checkbox(
+            "Seulement les labels profilés au-dessus du seuil d'affinité", value=True,
+            key="resolve_only_profiled",
+            help="Recommandé : ne résous que les labels qui comptent (profilés + assez proches "
+                 "de tes goûts), pas les milliers d'autres.")
+        thr = rc1.slider("Affinité minimale", 0, 100,
+                         (max(_floor, 30) if _floor == 0 else _floor), 5,
+                         key="resolve_aff_min", disabled=not only_prof)
+        batch_size = rc2.number_input("Nb max à résoudre maintenant",
+                                      min_value=10, max_value=5000, value=200, step=10)
+        _unres = [l for l in st.session_state.labels
+                  if normalize_label(l) not in st.session_state.resolved]
+        if only_prof:
+            _pool = [l for l in _unres
+                     if _prof.get(normalize_label(l)) is not None
+                     and affinity_score(_prof[normalize_label(l)], _wmap) >= thr]
+        else:
+            _pool = _unres
+        rc2.caption(f"**{len(_pool)}** label(s) à résoudre dans le périmètre"
+                    + (f" · {len(_unres)} non résolus au total" if only_prof else ""))
         if st.button("Lancer la résolution"):
             if not cfg().get("token"):
                 st.error("Renseigne d'abord ton token Discogs.")
             else:
-                todo = [l for l in st.session_state.labels
-                        if normalize_label(l) not in st.session_state.resolved][:batch_size]
+                todo = _pool[:int(batch_size)]
                 if not todo:
-                    st.success("Tous les labels sont déjà résolus (ou marqués introuvables).")
+                    st.success("Aucun label à résoudre dans ce périmètre "
+                               + ("(baisse le seuil, ou profile davantage la base)."
+                                  if only_prof else "(tout est déjà résolu)."))
                 else:
                     st.session_state.resolve_queue = todo
                     st.session_state.resolve_total = len(todo)
@@ -2502,19 +2583,11 @@ if _nav == "🎧 Sources & reco":
     render_job("ingest_djsets", "Import DJ sets")
 
     st.divider()
-    st.markdown("**Consolidation**")
-    mc1, mc2 = st.columns(2)
-    with mc1:
-        if not job_running("merge_corpus") and st.button("Fusionner les labels du corpus → base"):
-            job_launch("merge_corpus", {})
-            st.rerun()
-    with mc2:
-        prof_n = st.number_input("Profiler N labels reco", 20, 3000, 150, 10)
-        if not job_running("profile_labels") and st.button("Profiler les labels reco"):
-            job_launch("profile_labels", {"limit": int(prof_n)})
-            st.rerun()
-    render_job("merge_corpus", "Fusion corpus → base")
-    render_job("profile_labels", "Profilage labels")
+    st.caption("La **consolidation** (labels du corpus → base) et l'**enrichissement** "
+               "(résolution + profilage des ajouts) tournent désormais en arrière-plan, "
+               "automatiquement. Profilage en masse de l'existant : onglet **🎯 Profilage**.")
+    render_job("merge_corpus", "Consolidation corpus → base")
+    render_job("enrich", "Enrichissement auto")
 
     with st.expander("Réglages"):
         st.caption("Les poids de la recommandation (collection / corpus / artiste / affinité / "
@@ -2660,20 +2733,21 @@ if _nav == "🎯 Profilage":
                    f"{len(labels_all) - len(done_keys)} non profilé(s) inactifs.")
 
     st.divider()
-    st.markdown("**Profilage par tranches** — 1 appel API par label (~1,1 s). Ordre de priorité : "
-                "collection / wantlist / corpus d'abord, puis le reste de la base. "
-                "Tâche de fond, reprenable et stoppable.")
     n_missing = len(labels_all) - len(done_keys)
-    st.caption(f"**{n_missing}** label(s) restant(s) à profiler sur {len(labels_all)}.")
-    if not render_job("profile_labels", "Profilage des labels") \
-            and not job_running("profile_labels"):
-        pc1, pc2 = st.columns([2, 1])
-        chunk_n = pc1.number_input("Labels à profiler dans cette tranche", 50, 8000, 500, 50,
-                                   key="prof_chunk_n")
-        if pc2.button("Profiler la tranche suivante", type="primary",
-                      disabled=not cfg().get("token") or n_missing == 0):
-            job_launch("profile_labels", {"limit": int(chunk_n)})
-            st.rerun()
+    st.caption("Les nouveaux labels sont profilés automatiquement à l'ajout. Ci-dessous : "
+               "rattrapage en masse de l'existant (usage ponctuel).")
+    _run_prof = render_job("profile_labels", "Profilage des labels")
+    with st.expander(f"🛠 Profilage en masse — {n_missing} label(s) restant(s)"):
+        st.markdown("1 appel API/label (~1,1 s). Priorité : collection / wantlist / corpus "
+                    "d'abord, puis le reste. Tâche de fond, reprenable.")
+        if not _run_prof and not job_running("profile_labels"):
+            pc1, pc2 = st.columns([2, 1])
+            chunk_n = pc1.number_input("Labels dans cette tranche", 50, 8000, 500, 50,
+                                       key="prof_chunk_n")
+            if pc2.button("Profiler la tranche suivante", type="primary",
+                          disabled=not cfg().get("token") or n_missing == 0):
+                job_launch("profile_labels", {"limit": int(chunk_n)})
+                st.rerun()
 
     st.divider()
     st.markdown("**Résultats** — labels classés par affinité pondérée. "

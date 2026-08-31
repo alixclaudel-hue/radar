@@ -1222,6 +1222,220 @@ def job_scan_sellers(job, params):
                f"file d'attente : {len(queue)}.")
 
 
+# =================================================== enrichissement auto + canonique
+
+PENDING_ENRICH_PATH = os.path.join(DATA, "pending_enrich.json")
+CANON_STATE_PATH = os.path.join(DATA, "canonicalize.state.json")
+
+
+def _resolve_entity(token, name, kind):
+    """kind='label'|'artist' -> (discogs_name, id, status, candidates)."""
+    d = discogs_search(token, type=kind, q=name, per_page=8)
+    cands = [{"name": c.get("title"), "id": c.get("id")}
+             for c in d.get("results", []) if c.get("title")]
+    if not cands:
+        return None, None, "not_found", []
+    tgt = normalize_label(name)
+    exact = next((c for c in cands if normalize_label(c["name"]) == tgt), None)
+    top = exact or cands[0]
+    return top["name"], top["id"], ("exact" if exact else "approx"), cands
+
+
+def _profile_label(token, name):
+    d = discogs_search(token, label=name, per_page=100, page=1, sort="want", sort_order="desc")
+    res = d.get("results", [])
+    sc, gc = Counter(), Counter()
+    for x in res:
+        sc.update(x.get("style") or [])
+        gc.update(x.get("genre") or [])
+    return {"original": name, "sampled": len(res), "style_counts": dict(sc),
+            "genre_counts": dict(gc),
+            "total_items": d.get("pagination", {}).get("items", len(res)),
+            "profiled_at": datetime.now().isoformat(timespec="seconds")}
+
+
+def _rename_in_list(lst, old, new):
+    """Remplace old -> new dans lst (comparaison normalisée), dédup. True si changé."""
+    if not new or normalize_label(old) == normalize_label(new):
+        return False
+    out, changed, seen = [], False, set()
+    for x in lst:
+        y = new if normalize_label(x) == normalize_label(old) else x
+        changed = changed or (y != x)
+        if normalize_label(y) not in seen:
+            seen.add(normalize_label(y))
+            out.append(y)
+    lst[:] = out
+    return changed
+
+
+def job_enrich(job, params):
+    """Draine pending_enrich.json : pour chaque label/artiste fraîchement ajouté,
+    résolution vers le nom Discogs canonique (+ id) puis profilage (labels).
+    Renomme au passage la base / la veille / les catégories."""
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    pend = load_json(PENDING_ENRICH_PATH, {})
+    labels = list(dict.fromkeys(pend.get("labels", [])))
+    artists = list(dict.fromkeys(pend.get("artists", [])))
+    if not token:
+        return job.finish(error="Pas de token Discogs.")
+    job.st["total"] = len(labels) + len(artists)
+    if not job.st["total"]:
+        return job.finish("Rien à enrichir.")
+
+    res = load_json(RESOLVED_PATH, {})
+    prof = load_json(PROFILE_PATH, {})
+    ares = load_json(ARTISTS_RESOLVED_PATH, {})
+    cfg_changed = False
+
+    for name in labels:
+        if job.stopped():
+            break
+        dn, did, status, cands = _resolve_entity(token, name, "label")
+        canon = dn if (dn and status == "exact") else name
+        res[normalize_label(name)] = {"original": name, "discogs_name": dn or name,
+                                      "discogs_id": did, "status": status,
+                                      "candidates": cands, "reviewed_by": "auto"}
+        if canon != name:
+            cfg_changed |= _rename_in_list(cfg.setdefault("labels", []), name, canon)
+            cfg_changed |= _rename_in_list(cfg.setdefault("watchlist", []), name, canon)
+            res[normalize_label(canon)] = res[normalize_label(name)]
+        time.sleep(1.1)
+        pk = normalize_label(canon)
+        if pk not in prof:
+            prof[pk] = _profile_label(token, canon)
+            time.sleep(1.1)
+        save_json(RESOLVED_PATH, res)
+        save_json(PROFILE_PATH, prof)
+        job.tick(f"label {name} → {dn or '?'} ({status})")
+
+    for name in artists:
+        if job.stopped():
+            break
+        dn, did, status, cands = _resolve_entity(token, name, "artist")
+        ares[normalize_label(name)] = {"original": name, "discogs_name": dn or name,
+                                       "discogs_id": did, "status": status,
+                                       "candidates": cands}
+        if dn and status == "exact" and normalize_label(dn) != normalize_label(name):
+            for cid in ("1", "2", "3"):
+                cfg_changed |= _rename_in_list(
+                    cfg.setdefault("artist_categories", {}).setdefault(cid, []), name, dn)
+        save_json(ARTISTS_RESOLVED_PATH, ares)
+        job.tick(f"artiste {name} → {dn or '?'} ({status})")
+        time.sleep(1.1)
+
+    if cfg_changed:
+        save_json(CONFIG_PATH, cfg)
+    save_json(PENDING_ENRICH_PATH, {"labels": [], "artists": []})
+    job.finish(f"+{len(labels)} label(s), +{len(artists)} artiste(s) enrichis.")
+
+
+def job_canonicalize(job, params):
+    """Passe unique : réécrit toute la base (labels + catégories d'artistes) avec les
+    noms Discogs canoniques + ids, puis les champs artiste/label du corpus. Reprenable
+    via canonicalize.state.json. `params['scope']` = 'names' | 'corpus' (défaut 'corpus')."""
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    if not token:
+        return job.finish(error="Pas de token Discogs.")
+    scope = params.get("scope", "corpus")
+    state = load_json(CANON_STATE_PATH, {"labels": [], "artists": [], "corpus_ids": []})
+    done_l = set(state["labels"])
+    done_a = set(state["artists"])
+    done_c = set(state["corpus_ids"])
+
+    res = load_json(RESOLVED_PATH, {})
+    ares = load_json(ARTISTS_RESOLVED_PATH, {})
+    base = list(cfg.get("labels", []))
+    cats = cfg.setdefault("artist_categories", {})
+    art_names = [n for cid in ("1", "2", "3") for n in cats.get(cid, [])]
+    corpus = load_json(CORPUS_PATH, [])
+    corpus_todo = ([r for r in corpus if r.get("release_id") and str(r["release_id"]) not in done_c]
+                   if scope == "corpus" else [])
+    job.st["total"] = (len(base) - len(done_l)) + (len(art_names) - len(done_a)) + len(corpus_todo)
+
+    changed = 0
+    for name in base:
+        if job.stopped():
+            break
+        k = normalize_label(name)
+        if k in done_l:
+            continue
+        cur = res.get(k)
+        if cur and cur.get("discogs_id") and cur.get("status") in ("exact", "confirmed"):
+            canon = cur.get("discogs_name") or name
+        else:
+            dn, did, status, cands = _resolve_entity(token, name, "label")
+            res[k] = {"original": name, "discogs_name": dn or name, "discogs_id": did,
+                      "status": status, "candidates": cands, "reviewed_by": "auto"}
+            canon = dn if (dn and status == "exact") else name
+            time.sleep(1.1)
+        if _rename_in_list(base, name, canon):
+            changed += 1
+            res[normalize_label(canon)] = res.get(k, {})
+        done_l.add(k)
+        if len(done_l) % 10 == 0:
+            cfg["labels"] = base
+            save_json(CONFIG_PATH, cfg)
+            save_json(RESOLVED_PATH, res)
+            state["labels"] = sorted(done_l)
+            save_json(CANON_STATE_PATH, state)
+        job.tick(f"label {name} → {canon}")
+    cfg["labels"] = base
+    save_json(CONFIG_PATH, cfg)
+    save_json(RESOLVED_PATH, res)
+
+    for name in list(art_names):
+        if job.stopped():
+            break
+        k = normalize_label(name)
+        if k in done_a:
+            continue
+        cur = ares.get(k)
+        if cur and cur.get("discogs_id") and cur.get("status") in ("exact", "confirmed"):
+            canon = cur.get("discogs_name") or name
+        else:
+            dn, did, status, cands = _resolve_entity(token, name, "artist")
+            ares[k] = {"original": name, "discogs_name": dn or name, "discogs_id": did,
+                       "status": status, "candidates": cands}
+            canon = dn if (dn and status == "exact") else name
+            time.sleep(1.1)
+        for cid in ("1", "2", "3"):
+            _rename_in_list(cats.setdefault(cid, []), name, canon)
+        done_a.add(k)
+        save_json(CONFIG_PATH, cfg)
+        save_json(ARTISTS_RESOLVED_PATH, ares)
+        state["artists"] = sorted(done_a)
+        save_json(CANON_STATE_PATH, state)
+        job.tick(f"artiste {name} → {canon}")
+
+    for i, r in enumerate(corpus_todo):
+        if job.stopped():
+            break
+        rid = str(r["release_id"])
+        d = discogs_get(token, f"/releases/{r['release_id']}")
+        if d:
+            arts = d.get("artists") or []
+            if arts:
+                r["artist"] = ", ".join(a.get("name", "").strip() for a in arts if a.get("name"))
+            labs = d.get("labels") or []
+            if labs:
+                r["label"] = labs[0].get("name") or r.get("label")
+        done_c.add(rid)
+        if (i + 1) % 8 == 0:
+            save_json(CORPUS_PATH, corpus)
+            state["corpus_ids"] = sorted(done_c)
+            save_json(CANON_STATE_PATH, state)
+        job.tick(f"corpus {r.get('artist', '')[:30]}")
+        time.sleep(1.1)
+    save_json(CORPUS_PATH, corpus)
+    state.update(labels=sorted(done_l), artists=sorted(done_a), corpus_ids=sorted(done_c))
+    save_json(CANON_STATE_PATH, state)
+    job.finish(f"Nettoyage : {changed} label(s) renommé(s), {len(done_a)} artiste(s), "
+               f"{len(done_c)} ligne(s) de corpus canonisées.")
+
+
 JOBS = {
     "ingest_youtube": job_ingest_youtube,
     "ingest_bandcamp": job_ingest_bandcamp,
@@ -1233,6 +1447,8 @@ JOBS = {
     "search_base": job_search_base,
     "ingest_djsets": job_ingest_djsets,
     "scan_sellers": job_scan_sellers,
+    "enrich": job_enrich,
+    "canonicalize": job_canonicalize,
 }
 
 

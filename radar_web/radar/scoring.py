@@ -83,6 +83,38 @@ class Ctx:
                 m[self.canon_artist_key(n)] = cid
         return m
 
+    def artist_disp(self):
+        """{clé canonique: nom d'affichage} depuis toutes les sources."""
+        d = {}
+        for cid, names in self.cfg.get("artist_categories", {}).items():
+            for n in names:
+                d.setdefault(self.canon_artist_key(n), self.canon_artist_name(n))
+        for r in self.corpus:
+            a = (r.get("artist") or "").strip()
+            if a:
+                d.setdefault(self.canon_artist_key(a), self.canon_artist_name(a))
+        for a in self.collection.get("artist_counts", {}):
+            if a:
+                d.setdefault(self.canon_artist_key(a), self.canon_artist_name(a))
+        for ck, v in self.graph_rescore()["artists"].items():
+            d.setdefault(ck, v.get("name", ck))
+        return d
+
+    def djset_rows(self):
+        """Lignes de corpus djset, notées (score album) et regroupées par DJ puis vidéo."""
+        ridx = self.reco_index
+        by_dj = {}
+        for r in self.corpus:
+            if r.get("source") != "djset":
+                continue
+            sc, _ = self.album_score({
+                "label": [r["label"]] if r.get("label") else [],
+                "title": f"{r.get('artist', '')} - {r.get('title', '')}",
+                "style": r.get("style") or []})
+            row = dict(r, _score=sc)
+            by_dj.setdefault(r.get("dj", "?"), {}).setdefault(r.get("video", "?"), []).append(row)
+        return by_dj
+
     def graph_rescore(self):
         """{'artists': {ck: {name,id,score,why}}, 'labels': {lk: {...}}} — proximité
         recalculée à partir des arêtes brutes + rangs courants (porté de crate_radar)."""

@@ -1,0 +1,38 @@
+{% if not groups %}
+  <p class="small muted">Aucune track de set (lance une extraction dans « Mieux connaître ton univers → DJ sets »).</p>
+{% else %}
+<div class="row" style="align-items:end;margin-bottom:8px">
+  <div class="field" style="flex:0 0 220px"><label>DJ</label>
+    <select hx-get="/univers/sets" hx-target="#sets" hx-swap="innerHTML" name="dj" hx-trigger="change" hx-include="[name=mins]">
+      <option value="">tous ({{ djs|length }})</option>
+      {% for d in djs %}<option value="{{ d }}" {{ 'selected' if d==dj }}>{{ d }}</option>{% endfor %}
+    </select></div>
+  <div class="field" style="flex:0 0 110px"><label>Note min</label>
+    <input type="number" step="5" name="mins" value="{{ mins }}"
+           hx-get="/univers/sets" hx-target="#sets" hx-swap="innerHTML" hx-trigger="change" hx-include="[name=dj]"></div>
+</div>
+{% for g in groups %}
+<details class="acc" {{ 'open' if dj }}>
+  <summary>🎧 {{ g.dj }} <span class="tag">{{ g.n }} tracks · {{ g.vids|length }} set(s)</span></summary>
+  <div class="acc__body">
+    {% for v in g.vids %}
+    <p style="margin:8px 0 2px"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
+      <span class="small muted">· {{ v.tracks|length }} track(s)</span></p>
+    {% for t in v.tracks %}
+    <div class="inbox-row" style="padding:6px 2px">
+      {% if t._score is not none %}<span class="badge">{{ t._score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
+      <div class="txt">
+        <a href="{{ t.track_url or ('https://www.youtube.com/results?search_query=' ~ (t.artist ~ ' ' ~ t.title)|urlencode) }}" target="_blank" rel="noopener">{{ t.artist }} — {{ t.title }}</a>
+        <span class="small muted">{% if t.label %} · {{ t.label }}{% endif %}{% if t.style %} · {{ t.style|join(', ') }}{% endif %}</span>
+      </div>
+      {% if t.release_id or t.vinyl_release_id %}
+        <a class="small" href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener">💿</a>
+      {% endif %}
+      <a class="small" href="https://bandcamp.com/search?q={{ (t.artist ~ ' ' ~ t.title)|urlencode }}&item_type=t" target="_blank" rel="noopener">🛒</a>
+    </div>
+    {% endfor %}
+    {% endfor %}
+  </div>
+</details>
+{% endfor %}
+{% endif %}

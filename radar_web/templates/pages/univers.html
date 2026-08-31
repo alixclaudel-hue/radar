@@ -40,13 +40,16 @@
   <div hx-get="/univers/reco/labels" hx-trigger="load"></div>
 
 {% elif tab == 'artists' %}
-  <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. <em>Édition détaillée à venir sur cette interface.</em></p>
-  <div class="row">
-    {% for cid, name in [('1','💗 Cœur'),('2','Aimés')] %}
-    <div class="field"><label>{{ name }}</label>
-      <textarea rows="10" readonly>{{ (cfg.get('artist_categories') or {}).get(cid, [])|join('\n') }}</textarea></div>
-    {% endfor %}
+  <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. Règle la catégorie d'un clic.</p>
+  <div class="row" style="align-items:end;max-width:640px">
+    <div class="field"><label>Filtrer</label>
+      <input name="flt" placeholder="nom…" hx-get="/univers/artists/table" hx-target="#atable"
+             hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]"></div>
+    <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
+      <label class="small"><input type="checkbox" name="hide" style="width:auto"
+        hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>
   </div>
+  <div id="atable" hx-get="/univers/artists/table" hx-trigger="load"></div>
   <hr>
   <div class="section-title"><h3>Graphe d'artistes (producteurs)</h3>
     <button hx-post="/jobs/build_graph/launch" hx-target="#job-build_graph" hx-swap="outerHTML" class="primary">Construire / mettre à jour</button></div>
@@ -61,7 +64,8 @@
   <div class="section-title"><h3>Extraire des DJ sets</h3>
     <button hx-post="/jobs/ingest_djsets/launch" hx-target="#job-ingest_djsets" hx-swap="outerHTML" class="primary">Lancer l'extraction</button></div>
   <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" class="small"></div>
-  <p class="small muted">Sources DJ définies dans Réglages. {{ n_sets }} tracks extraites à ce jour.
-  <em>Vue détaillée par DJ/vidéo à venir sur cette interface.</em></p>
+  <p class="small muted">Sources DJ dans « Mieux connaître ton univers → DJ sets ». {{ n_sets }} tracks extraites.</p>
+  <hr>
+  <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
 {% endif %}
 {% endblock %}

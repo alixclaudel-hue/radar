@@ -1,0 +1,29 @@
+<p class="small muted">{{ rows|length }} affichés sur {{ n }} — triés par note. Change la catégorie d'un clic.</p>
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+  <thead><tr style="text-align:left;color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em">
+    <th style="padding:6px 8px">Artiste</th><th style="padding:6px 8px;width:90px">Note</th>
+    <th style="padding:6px 8px;width:170px">Catégorie</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr style="border-top:1px solid var(--line)">
+    <td style="padding:6px 8px">{{ r.name }}</td>
+    <td style="padding:6px 8px">
+      <div class="progress" style="height:6px"><i style="width:{{ r.note }}%"></i></div>
+      <span class="small muted">{{ r.note }}</span>
+    </td>
+    <td style="padding:6px 8px">
+      <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"
+              hx-post="/univers/artist/set" hx-vals='{"name": {{ r.name|tojson }} }'
+              hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
+        <option value="" {{ 'selected' if r.cat=='—' }}>—</option>
+        <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Cœur</option>
+        <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
+      </select>
+    </td>
+    <td class="m small"></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>

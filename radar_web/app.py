@@ -476,6 +476,69 @@ def univers_labels_remove(request: Request, name: str = Form("")):
     return univers_labels(request)
 
 
+@app.get("/univers/artists/table", response_class=HTMLResponse)
+def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
+    c = Ctx()
+    disp, tiers, asc = c.artist_disp(), c.artist_tier_map(), c.ascore
+    catn = {"1": "Cœur", "2": "Aimé", None: "—"}
+    rows = []
+    for ck in set(asc) | set(tiers):
+        name = disp.get(ck, ck)
+        if str(name).startswith("id:"):
+            continue
+        t = tiers.get(ck)
+        if hide and t:
+            continue
+        if flt and flt.lower() not in str(name).lower():
+            continue
+        note = asc.get(ck, 0)
+        if not t and note == 0:
+            continue
+        rows.append({"name": name, "note": note, "cat": catn[t]})
+    rows.sort(key=lambda r: -r["note"])
+    return frag(request, "partials/artists_table.html", rows=rows[:250], n=len(rows))
+
+
+@app.post("/univers/artist/set", response_class=HTMLResponse)
+def univers_artist_set(name: str = Form(""), cat: str = Form("")):
+    c = _cfg()
+    ac = c.setdefault("artist_categories", {"1": [], "2": []})
+    ck = normalize_label(name)
+    for cid in ("1", "2"):
+        ac[cid] = [x for x in ac.get(cid, []) if normalize_label(x) != ck]
+    tgt = {"Cœur": "1", "Aimé": "2"}.get(cat)
+    if tgt:
+        ac.setdefault(tgt, []).append(name)
+        q = load(PENDING_ENRICH, {})
+        q.setdefault("artists", []).append(name)
+        save(PENDING_ENRICH, q)
+    store.save_config(c)
+    return HTMLResponse("<span class='small ok'>✓</span>")
+
+
+@app.get("/univers/sets", response_class=HTMLResponse)
+def univers_sets(request: Request, dj: str = "", mins: int = 0):
+    c = Ctx()
+    by_dj = c.djset_rows()
+    djs = sorted(by_dj)
+    if dj:
+        by_dj = {dj: by_dj.get(dj, {})}
+    out = []
+    for d in sorted(by_dj):
+        vids = []
+        for vid, tracks in by_dj[d].items():
+            tr = sorted([t for t in tracks if (t.get("_score") or 0) >= mins],
+                        key=lambda x: -(x.get("_score") or -1))
+            if not tr:
+                continue
+            vids.append({"vid": vid, "title": tr[0].get("set_title") or vid, "tracks": tr,
+                         "best": max((t.get("_score") or 0 for t in tr), default=0)})
+        if vids:
+            out.append({"dj": d, "vids": sorted(vids, key=lambda v: -v["best"]),
+                        "n": sum(len(v["tracks"]) for v in vids)})
+    return frag(request, "partials/sets.html", djs=djs, groups=out, dj=dj, mins=mins)
+
+
 @app.post("/univers/labels/import", response_class=HTMLResponse)
 async def univers_labels_import(request: Request, file: UploadFile, replace: str = Form("")):
     raw = (await file.read()).decode("utf-8", "ignore")

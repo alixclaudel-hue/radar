@@ -53,6 +53,36 @@
     </div>
   </details>
 
+  <!-- ============ Spotify ============ -->
+  <details class="acc">
+    <summary>
+      <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.5c3.2-1 7-.7 10 1M7.5 12.5c2.6-.8 5.7-.5 8 1M8 15.3c2-.6 4.4-.4 6 .8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+      Spotify
+      <span class="tag">{% if cfg.spotify_client_id %}<span class="ok">✓ clé</span>{% else %}clé manquante{% endif %} · {{ sp_urls|length }} playlist{{ 's' if sp_urls|length>1 }} · {{ src.get('spotify', 0) }} tracks</span>
+    </summary>
+    <div class="acc__body">
+      <p class="small muted">API Spotify → <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> → crée une app → récupère <em>Client ID</em> + <em>Client Secret</em>. Playlists publiques uniquement.</p>
+      <div class="row">
+        <div class="field"><label>Client ID</label>
+          <input name="spotify_client_id" value="{{ cfg.spotify_client_id or '' }}"></div>
+        <div class="field"><label>Client Secret</label>
+          <input type="password" name="spotify_client_secret" value="{{ cfg.spotify_client_secret or '' }}"></div>
+      </div>
+      <label>Playlists (une URL par champ)</label>
+      {% for u in (sp_urls + ['']) %}
+      {% set pid = (u | sp_id) %}
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <input name="sp_pl" value="{{ u }}" placeholder="https://open.spotify.com/playlist/…" style="flex:1">
+        {% if pid and sp_meta.get(pid) %}
+          <span class="small ok">✓ {{ sp_meta[pid].title }} <span class="muted">· {{ sp_meta[pid].channel }} · {{ sp_meta[pid].n_items }} titres</span></span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <button type="button" class="small" hx-post="/patte/run/ingest_spotify" hx-include="closest form" hx-target="#job-ingest_spotify" hx-swap="outerHTML">Importer les playlists</button>
+      <div id="job-ingest_spotify" hx-get="/jobs/ingest_spotify/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+    </div>
+  </details>
+
   <!-- ============ Bandcamp ============ -->
   <details class="acc">
     <summary>

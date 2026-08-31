@@ -45,8 +45,11 @@ SELLERS_NEW_PATH = os.path.join(DATA, "seller_new.json")
 
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
+SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
+SPOTIFY_API = "https://api.spotify.com/v1"
 SUBSONIC_BASE = "https://bandcamp.com/api/subsonic/rest"
-SOURCE_WEIGHTS = {"discogs_collection": 1.0, "discogs_want": 0.6, "youtube": 0.5, "bandcamp": 0.9, "djset": 0.4}
+SOURCE_WEIGHTS = {"discogs_collection": 1.0, "discogs_want": 0.6, "youtube": 0.5,
+                  "spotify": 0.5, "bandcamp": 0.9, "djset": 0.4}
 ARTIST_STOPWORDS = {"various artists", "various", "va", "unknown artist", "unknown",
                     "release", "progressive classics", "no artist", "traxsource"}
 
@@ -71,6 +74,8 @@ def cfg_load():
     """Config + secrets d'environnement (déploiement)."""
     d = load_json(CONFIG_PATH, {})
     for key, env in (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY"),
+                     ("spotify_client_id", "SPOTIFY_CLIENT_ID"),
+                     ("spotify_client_secret", "SPOTIFY_CLIENT_SECRET"),
                      ("bandcamp_sub_user", "BANDCAMP_SUB_USER"),
                      ("bandcamp_sub_pass", "BANDCAMP_SUB_PASS")):
         if not d.get(key) and os.environ.get(env):
@@ -249,6 +254,58 @@ def youtube_items(pid, key, max_pages=40):
     return items
 
 
+# ============================================================= Spotify
+
+def spotify_playlist_id(u):
+    m = re.search(r"playlist[/:]([A-Za-z0-9]+)", u or "")
+    return m.group(1) if m else ((u or "").strip() or None)
+
+
+def spotify_token(client_id, client_secret):
+    r = requests.post(SPOTIFY_TOKEN_URL, data={"grant_type": "client_credentials"},
+                      auth=(client_id, client_secret), timeout=20)
+    if not r.ok:
+        raise RuntimeError(f"Spotify auth {r.status_code}: {r.text[:200]}")
+    return r.json().get("access_token", "")
+
+
+def spotify_playlist_meta(pid, tok):
+    r = requests.get(f"{SPOTIFY_API}/playlists/{pid}",
+                     headers={"Authorization": f"Bearer {tok}"},
+                     params={"fields": "name,owner(display_name),tracks(total)"}, timeout=20)
+    if not r.ok:
+        raise RuntimeError(f"Spotify playlist {r.status_code}: {r.text[:200]}")
+    d = r.json()
+    return {"title": d.get("name") or pid,
+            "channel": (d.get("owner") or {}).get("display_name") or "",
+            "n_items": (d.get("tracks") or {}).get("total") or 0}
+
+
+def spotify_items(pid, tok, max_pages=40):
+    items = []
+    url = f"{SPOTIFY_API}/playlists/{pid}/tracks"
+    params = {"limit": 100,
+              "fields": "next,items(track(name,artists(name),album(name)))"}
+    for _ in range(max_pages):
+        r = requests.get(url, headers={"Authorization": f"Bearer {tok}"},
+                         params=params, timeout=25)
+        if not r.ok:
+            raise RuntimeError(f"Spotify tracks {r.status_code}: {r.text[:200]}")
+        d = r.json()
+        for it in d.get("items", []):
+            tr = it.get("track") or {}
+            if not tr.get("name"):
+                continue
+            arts = [a.get("name") for a in (tr.get("artists") or []) if a.get("name")]
+            items.append({"artist": ", ".join(arts), "title": tr.get("name") or "",
+                          "album": (tr.get("album") or {}).get("name") or ""})
+        url = d.get("next")
+        params = None
+        if not url:
+            break
+    return items
+
+
 # ============================================================= Bandcamp / Subsonic
 
 def subsonic_get(method, user, password, **params):
@@ -358,6 +415,72 @@ def job_ingest_youtube(job, params):
             acc = []
             save_json(LOOKUP_CACHE_PATH, cache)
     add, tot = corpus_merge(acc, "youtube")
+    save_json(LOOKUP_CACHE_PATH, cache)
+    job.finish(f"+{job.st['done']} traités. Corpus : {tot}.")
+
+
+def job_ingest_spotify(job, params):
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    cid = params.get("client_id") or cfg.get("spotify_client_id", "")
+    csec = params.get("client_secret") or cfg.get("spotify_client_secret", "")
+    urls = params.get("urls") or [u for u in cfg.get("spotify_playlists", "").splitlines() if u.strip()]
+    deep = params.get("deep", True)
+    if not (cid and csec):
+        return job.finish(error="Identifiants API Spotify manquants (client ID + secret).")
+    pids = [(u, p) for u, p in ((u, spotify_playlist_id(u)) for u in urls) if p]
+    if not pids:
+        return job.finish(error="Aucune playlist Spotify.")
+    job.msg("Connexion à l'API Spotify…")
+    try:
+        tok = spotify_token(cid, csec)
+    except Exception as e:
+        return job.finish(error=str(e))
+    if not tok:
+        return job.finish(error="Spotify : jeton d'accès vide (identifiants ?).")
+    meta = load_json(os.path.join(DATA, "spotify_meta.json"), {})
+    raw = []
+    for url, pid in pids:
+        try:
+            m = spotify_playlist_meta(pid, tok)
+        except Exception:
+            m = {"title": pid, "channel": "", "n_items": 0}
+        try:
+            items = spotify_items(pid, tok)
+        except Exception as e:
+            return job.finish(error=str(e))
+        for it in items:
+            if it["artist"] or it["title"]:
+                raw.append({"artist": it["artist"], "title": it["title"], "label": None, "url": None})
+        meta[pid] = {"url": url, "title": m["title"], "channel": m["channel"],
+                     "n_items": len(items) or m["n_items"],
+                     "imported_at": datetime.now().isoformat(timespec="seconds")}
+    save_json(os.path.join(DATA, "spotify_meta.json"), meta)
+    cache = load_json(LOOKUP_CACHE_PATH, {})
+    corpus = load_json(CORPUS_PATH, [])
+    seen = {("spotify", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
+    todo = [r for r in raw if ("spotify", style_key(r["artist"]), style_key(r["title"])) not in seen]
+    job.st["total"] = len(todo)
+    job.msg(f"{len(raw)} titres, {len(todo)} à traiter.")
+    acc = []
+    for i, r in enumerate(todo):
+        if job.stopped():
+            break
+        label, rid, style, calls = None, None, [], 0
+        if r["artist"] or r["title"]:
+            hit, calls = discogs_lookup(token, r["artist"], r["title"], cache, deep=deep)
+            if hit:
+                label, rid, style = hit["label"], hit["release_id"], hit["style"]
+        acc.append({"artist": r["artist"], "title": r["title"], "label": label,
+                    "release_id": rid, "style": style, "genre": None, "url": None})
+        job.tick(f"{r['artist']} — {r['title']}" + (f"  → {label}" if label else "  → —"))
+        if calls:
+            time.sleep(max(0.2, 1.1 * calls - 0.3 * (calls - 1)))
+        if (i + 1) % 15 == 0:
+            corpus_merge(acc, "spotify")
+            acc = []
+            save_json(LOOKUP_CACHE_PATH, cache)
+    add, tot = corpus_merge(acc, "spotify")
     save_json(LOOKUP_CACHE_PATH, cache)
     job.finish(f"+{job.st['done']} traités. Corpus : {tot}.")
 
@@ -1563,6 +1686,7 @@ def job_scan_veille(job, params):
 
 JOBS = {
     "ingest_youtube": job_ingest_youtube,
+    "ingest_spotify": job_ingest_spotify,
     "ingest_bandcamp": job_ingest_bandcamp,
     "fetch_collection": job_fetch_collection,
     "merge_corpus": job_merge_corpus,

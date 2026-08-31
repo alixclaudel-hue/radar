@@ -62,7 +62,7 @@ DEFAULT_SCORING = {
               "role_main": 1.0, "role_remix": 0.7, "role_other": 0.4,
               "max_credits": 6},
     "sources": {"discogs_collection": 1.0, "discogs_want": 0.6, "youtube": 0.5,
-                "bandcamp": 0.9, "djset": 0.4},
+                "spotify": 0.5, "bandcamp": 0.9, "djset": 0.4},
     "label_affinity_floor": 0,
     "learn": {"l2": 2.0, "min_feedback": 12, "min_per_class": 3},
 }
@@ -88,6 +88,8 @@ _FLAT_WEIGHT_KEYS = ("taste_weights", "artist_weights", "reco_weights",
                      "album_weights", "artist_score_weights", "label_affinity_floor")
 
 _ENV_SECRETS = (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY"),
+                ("spotify_client_id", "SPOTIFY_CLIENT_ID"),
+                ("spotify_client_secret", "SPOTIFY_CLIENT_SECRET"),
                 ("bandcamp_sub_user", "BANDCAMP_SUB_USER"),
                 ("bandcamp_sub_pass", "BANDCAMP_SUB_PASS"))
 

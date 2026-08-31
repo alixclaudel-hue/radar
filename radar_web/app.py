@@ -16,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, learn, store
 from .radar.paths import (CORPUS, PENDING_ENRICH, SELLERS_NEW, SELLERS_SEEN,
-                          VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
+                          SPOTIFY_META, VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -29,7 +29,13 @@ def _pl_id(url):
     return m.group(1) if m else ((url or "").strip() or None)
 
 
+def _sp_id(url):
+    m = re.search(r"playlist[/:]([A-Za-z0-9]+)", url or "")
+    return m.group(1) if m else ((url or "").strip() or None)
+
+
 templates.env.filters["pl_id"] = _pl_id
+templates.env.filters["sp_id"] = _sp_id
 app = FastAPI(title="Radar")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 
@@ -126,27 +132,32 @@ def home():
 
 
 # ============================================================ 🧠 Mieux connaître ton univers
-SYNC_ALL_JOBS = ["fetch_collection", "ingest_youtube", "ingest_bandcamp", "merge_corpus"]
+SYNC_ALL_JOBS = ["fetch_collection", "ingest_youtube", "ingest_spotify",
+                 "ingest_bandcamp", "merge_corpus"]
 
 
 @app.get("/patte", response_class=HTMLResponse)
 def patte_page(request: Request, saved: int = 0):
     c = Ctx()
     pl_urls = [u for u in (c.cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
+    sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
     return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(YOUTUBE_META, {}),
+                  sp_urls=sp_urls, sp_meta=load(SPOTIFY_META, {}),
                   src=c.corpus_by_source(), st=c.stats(), saved=saved)
 
 
 def _apply_patte_form(f):
     c = _cfg()
-    for k in ("token", "youtube_api_key", "bandcamp_sub_user", "bandcamp_sub_pass",
-              "djset_sources"):
+    for k in ("token", "youtube_api_key", "spotify_client_id", "spotify_client_secret",
+              "bandcamp_sub_user", "bandcamp_sub_pass", "djset_sources"):
         if k in f:
             c[k] = f.get(k, "").strip()
     if "yt_pl" in f:
         c["youtube_playlists"] = "\n".join(u.strip() for u in f.getlist("yt_pl") if u.strip())
+    if "sp_pl" in f:
+        c["spotify_playlists"] = "\n".join(u.strip() for u in f.getlist("sp_pl") if u.strip())
     cats = c.setdefault("taste_categories", {})
     for cid in ("1", "2"):
         if f"styles_{cid}" in f:
@@ -596,10 +607,11 @@ async def univers_labels_import(request: Request, file: UploadFile, replace: str
 
 
 # ============================================================ jobs
-VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_bandcamp", "merge_corpus",
-              "scan_veille", "scan_sellers", "build_graph", "profile_labels",
+VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
+              "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
               "ingest_djsets", "resolve_artists", "canonicalize", "enrich"}
-JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_bandcamp": {"deep": True}}
+JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
+              "ingest_bandcamp": {"deep": True}}
 
 
 @app.post("/jobs/{name}/launch", response_class=HTMLResponse)

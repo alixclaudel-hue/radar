@@ -1,0 +1,12 @@
+<p class="small muted">{{ n_shown }} affiché{{ 's' if n_shown > 1 }} sur {{ total }}{% if flt %} (filtre « {{ flt }} »){% endif %}</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+  {% for l in shown %}
+    <span class="chip" style="display:inline-flex;align-items:center;gap:6px">
+      {{ l }}
+      <button style="border:0;padding:0 2px;background:none;font-weight:400;color:var(--soft)"
+              hx-post="/labels/remove" hx-vals='{"name": {{ l|tojson }} }'
+              hx-target="#label-list" hx-swap="innerHTML" title="retirer">✕</button>
+    </span>
+  {% endfor %}
+</div>
+{% if total > n_shown and not flt %}<p class="small muted">… {{ total - n_shown }} autres — filtre pour les voir.</p>{% endif %}

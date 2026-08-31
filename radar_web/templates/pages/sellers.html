@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Vendeurs · Radar{% endblock %}
+{% block content %}
+<h1>Mes vendeurs</h1>
+<p class="muted small">Suis des vendeurs Discogs et scanne leur inventaire.</p>
+
+<form method="post" action="/sellers/add" style="display:flex;gap:8px;align-items:end;max-width:520px">
+  <div class="field" style="flex:1;margin:0"><label>Ajouter (identifiants, séparés par virgule)</label>
+    <input name="name" placeholder="hardwax, redeye_records"></div>
+  <button class="primary" type="submit">Ajouter</button>
+</form>
+
+{% if sellers %}
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+  {% for s in sellers %}
+  <span class="chip" style="display:inline-flex;align-items:center;gap:6px">
+    <a href="https://www.discogs.com/seller/{{ s }}/profile" target="_blank" rel="noopener">{{ s }}</a>
+    <form method="post" action="/sellers/remove" style="display:inline">
+      <input type="hidden" name="name" value="{{ s }}">
+      <button style="border:0;padding:0 2px;background:none;color:var(--soft)" title="retirer">✕</button>
+    </form>
+  </span>
+  {% endfor %}
+</div>
+{% else %}
+<p class="muted small">Aucun vendeur suivi.</p>
+{% endif %}
+
+<hr>
+<div class="section-title"><h3>🆕 Nouveautés</h3>
+  <button hx-post="/jobs/scan_sellers/launch" hx-target="#job-scan_sellers" hx-swap="outerHTML" class="primary">🔄 Scanner</button>
+  <span class="small muted">dernier : {{ last.replace('T',' ') or '—' }}</span>
+</div>
+<div id="job-scan_sellers" hx-get="/jobs/scan_sellers/status" hx-trigger="load"></div>
+<div hx-get="/inbox/sellers" hx-trigger="load"></div>
+{% endblock %}

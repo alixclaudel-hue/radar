@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Veille · Radar{% endblock %}
+{% block content %}
+<h1>Veille</h1>
+<p class="muted small">Des règles de critères → un scan de fond remplit la boîte Nouveautés, notée.</p>
+
+{% if watchlist %}
+<p class="small muted">🏷️ Labels suivis ({{ watchlist|length }}) — règle implicite, scannée automatiquement.</p>
+{% endif %}
+
+<form method="post" action="/veille/rules">
+  {% for r in rules %}
+  <div class="notice" style="margin-bottom:12px">
+    <div class="row">
+      <div class="field" style="flex:2"><label>Nom</label><input name="name_{{ loop.index0 }}" value="{{ r.name }}"></div>
+      <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
+        <label class="small"><input type="checkbox" name="active_{{ loop.index0 }}" style="width:auto" {{ 'checked' if r.active }}> active</label>
+        <label class="small"><input type="checkbox" name="vinyl_{{ loop.index0 }}" style="width:auto" {{ 'checked' if r.vinyl_only }}> vinyle</label>
+      </div>
+      <div class="field" style="flex:0 0 90px"><label>Année de</label><input name="yf_{{ loop.index0 }}" value="{{ r.year_from or 2000 }}"></div>
+      <div class="field" style="flex:0 0 90px"><label>à</label><input name="yt_{{ loop.index0 }}" value="{{ r.year_to or year }}"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Styles (un/ligne)</label><textarea name="styles_{{ loop.index0 }}" rows="2">{{ r.styles|join('\n') }}</textarea></div>
+      <div class="field"><label>Genres</label><textarea name="genres_{{ loop.index0 }}" rows="2">{{ r.genres|join('\n') }}</textarea></div>
+      <div class="field"><label>Labels précis (opt.)</label><textarea name="labels_{{ loop.index0 }}" rows="2">{{ r.labels|join('\n') }}</textarea></div>
+      <div class="field"><label>Artistes précis (opt.)</label><textarea name="artists_{{ loop.index0 }}" rows="2">{{ r.artists|join('\n') }}</textarea></div>
+    </div>
+    <button type="submit" name="_action" value="del:{{ loop.index0 }}">🗑 Supprimer</button>
+  </div>
+  {% endfor %}
+  <button class="primary" type="submit">💾 Enregistrer les règles</button>
+  <button type="submit" name="_action" value="add">+ Nouvelle règle</button>
+</form>
+
+<hr>
+<div class="section-title"><h3>🆕 Nouveautés</h3>
+  <button hx-post="/jobs/scan_veille/launch" hx-target="#job-scan_veille" hx-swap="outerHTML" class="primary">🔄 Scanner</button>
+  <span class="small muted">dernier : {{ last.replace('T',' ') or '—' }}</span>
+</div>
+<div id="job-scan_veille" hx-get="/jobs/scan_veille/status" hx-trigger="load"></div>
+<div hx-get="/inbox/veille" hx-trigger="load"></div>
+{% endblock %}

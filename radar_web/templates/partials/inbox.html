@@ -1,0 +1,38 @@
+<div id="inbox-{{ key_ns }}">
+  {% if not rows and n_total == 0 %}
+    <p class="muted small">Rien de nouveau. Lance un scan.</p>
+  {% else %}
+    <div class="row" style="align-items:end">
+      <div class="field" style="flex:0 0 auto"><label>Score min</label>
+        <input type="number" step="5" value="{{ mins }}" style="width:90px"
+               hx-get="/inbox/{{ key_ns }}" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML"
+               name="mins" hx-trigger="change"></div>
+      <div class="field" style="flex:0 0 auto">
+        <button hx-post="/inbox/{{ key_ns }}/clear" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML">✓ Tout vu</button>
+      </div>
+      <span class="small muted">{{ rows|length }} affichés · {{ n_total }} en attente</span>
+    </div>
+    {% for r in rows %}
+      {% set it = r.it %}
+      <div class="inbox-row">
+        {% if r.score is not none %}<span class="badge">🎯 {{ r.score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
+        <div class="txt">
+          <a href="{{ it.uri or ('https://www.discogs.com/release/' ~ it.release_id) }}" target="_blank" rel="noopener">
+            {{ it.artist }} — {{ it.title }}</a>
+          <div class="sub">
+            {% if it[source_label|lower] is defined %}{% endif %}
+            <b>{{ it.rule or it.seller }}</b>
+            {% if it.label %} · {{ it.label }}{% endif %}
+            {% if it.price %} · {{ it.price }} {{ it.currency }}{% endif %}
+            {% if it.condition %} · {{ it.condition }}{% endif %}
+            {% if it.year %} · {{ it.year }}{% endif %}
+            {% if it.style %} · <span class="muted">{{ it.style|join(', ') }}</span>{% endif %}
+          </div>
+        </div>
+        <button hx-post="/inbox/{{ key_ns }}/dismiss"
+                hx-vals='{"rid": "{{ it.release_id or it.listing_id }}"}'
+                hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer">✕</button>
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>

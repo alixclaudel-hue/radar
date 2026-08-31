@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Mes labels · Radar{% endblock %}
+{% block content %}
+<h1>Mes labels</h1>
+<p class="muted small">Base de labels — filtre pour la recherche et la veille.</p>
+
+<form hx-post="/labels/add" hx-target="#label-list" hx-swap="innerHTML"
+      hx-on::after-request="this.reset()" style="display:flex;gap:8px;align-items:end;max-width:520px">
+  <div class="field" style="flex:1;margin:0"><label>Ajouter un label</label>
+    <input name="name" placeholder="ex. Aim Records"></div>
+  <button class="primary" type="submit">Ajouter</button>
+</form>
+
+<div class="field" style="max-width:360px;margin-top:14px">
+  <label>Filtrer</label>
+  <input name="flt" placeholder="nom…" hx-get="/labels/list" hx-target="#label-list"
+         hx-trigger="input changed delay:250ms" hx-swap="innerHTML">
+</div>
+
+<div id="label-list">
+  {% include "partials/labels_list.html" %}
+</div>
+
+<hr>
+<details>
+  <summary class="small">Importer un CSV</summary>
+  <form method="post" action="/labels/import" enctype="multipart/form-data"
+        hx-post="/labels/import" hx-target="#label-list" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data" style="margin-top:10px">
+    <input type="file" name="file" accept=".csv" required>
+    <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer toute la base</label>
+    <button type="submit">Importer</button>
+  </form>
+</details>
+{% endblock %}

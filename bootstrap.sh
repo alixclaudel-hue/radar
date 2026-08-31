@@ -34,7 +34,16 @@ grep -q 'APP_PASSWORD=.\+' .env && ! grep -q 'CHANGE' .env || {
 
 echo "== Données =="
 mkdir -p data/jobs
-[ -f data/crate_radar_config.json ] || echo ">> pense à copier tes JSON dans ./data/ (rsync depuis le Mac)."
+if [ ! -f data/crate_radar_config.json ]; then
+  echo "   récupération du seed depuis la branche data-seed…"
+  git fetch -q origin data-seed && git show origin/data-seed:seed/crate_radar_config.json >/dev/null 2>&1 && {
+    for f in $(git ls-tree -r --name-only origin/data-seed -- seed | sed 's#^seed/##'); do
+      mkdir -p "data/$(dirname "$f")"
+      git show "origin/data-seed:seed/$f" > "data/$f"
+    done
+    echo "   seed installé ($(ls data/*.json | wc -l) fichiers). Les secrets viennent de .env."
+  } || echo ">> pas de branche data-seed — copie tes JSON dans ./data/ à la main."
+fi
 
 echo "== Build + run (Streamlit sur :8501) =="
 docker compose up -d --build

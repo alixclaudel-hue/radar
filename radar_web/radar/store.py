@@ -17,6 +17,28 @@ def load(path, default):
         return default
 
 
+# Cache process-local pour les gros fichiers relus à chaque requête
+# (labels_profile ~8 Mo, producer_graph ~4 Mo…). Invalidé sur (mtime, taille).
+_LOAD_CACHE = {}
+
+
+def load_cached(path, default):
+    """Comme load(), mais réutilise le résultat tant que le fichier n'a pas changé.
+    Renvoie l'objet mis en cache (à ne PAS muter) ; les jobs écrivent via save()."""
+    try:
+        st = os.stat(path)
+        sig = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        _LOAD_CACHE.pop(path, None)
+        return default
+    hit = _LOAD_CACHE.get(path)
+    if hit and hit[0] == sig:
+        return hit[1]
+    data = load(path, default)
+    _LOAD_CACHE[path] = (sig, data)
+    return data
+
+
 def save(path, data):
     d = os.path.dirname(path) or "."
     fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")

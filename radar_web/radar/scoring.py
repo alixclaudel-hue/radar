@@ -24,12 +24,13 @@ class Ctx:
     def __init__(self):
         self.cfg = store.load_config()
         self.scoring = self.cfg["scoring"]
-        self.profile = store.load(paths.PROFILE, {})
-        self.collection = store.load(paths.COLLECTION, {})
-        self.corpus = store.load(paths.CORPUS, [])
-        self.resolved = store.load(paths.RESOLVED, {})
-        self.artists_res = store.load(paths.ARTISTS_RES, {})
-        self.graph = store.load(paths.GRAPH, {})
+        # gros fichiers relus à chaque requête -> cache invalidé sur mtime
+        self.profile = store.load_cached(paths.PROFILE, {})
+        self.collection = store.load_cached(paths.COLLECTION, {})
+        self.corpus = store.load_cached(paths.CORPUS, [])
+        self.resolved = store.load_cached(paths.RESOLVED, {})
+        self.artists_res = store.load_cached(paths.ARTISTS_RES, {})
+        self.graph = store.load_cached(paths.GRAPH, {})
         self._wmap = None
         self._reco_idx = None
         self._ascore = None

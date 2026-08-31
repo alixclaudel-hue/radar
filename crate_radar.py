@@ -1691,6 +1691,20 @@ st.markdown("""
 st.markdown('<p class="crate-title">Crate <span>Radar</span></p>', unsafe_allow_html=True)
 st.markdown('<p class="crate-sub">Discogs × ta base de labels — version locale</p>', unsafe_allow_html=True)
 
+_NAV = ["🔍 Recherche", "📻 Liste de veille", "🏪 Mes vendeurs", "🏷️ Mes labels",
+        "🎧 Sources & reco", "🎤 Mes artistes", "🎚️ Mes sets", "🎛️ Réglages"]
+_nav = st.radio("Navigation", _NAV, horizontal=True, label_visibility="collapsed", key="_nav")
+_SET_SUBS = ["Connexion & données", "Goût & profilage", "Scoring", "Apprentissage",
+            "Nettoyage Discogs"]
+if _nav == "🎛️ Réglages":
+    _set_sub = st.radio("Section", _SET_SUBS, horizontal=True,
+                        label_visibility="collapsed", key="_set_sub")
+else:
+    _set_sub = None
+if not cfg().get("token") and _nav != "🎛️ Réglages":
+    st.info("⚠️ Token Discogs manquant — renseigne-le dans l'onglet **🎛️ Réglages**.")
+st.divider()
+
 # --- stop global : les tâches longues (résolution/scan/profilage) se relancent seules
 #     toutes les ~5 s et s'exécutent quel que soit l'onglet affiché ---
 _RUN_FLAGS = ("resolve_running", "search_running", "profile_running", "ingest_running")
@@ -1710,255 +1724,250 @@ if _running_now:
             st.session_state[k] = []
         st.rerun()
 
-with st.expander("⚙️ Configuration (token + base de labels)", expanded=not cfg().get("token")):
-    col1, col2 = st.columns(2)
-    with col1:
-        token_input = st.text_input("Token d'accès personnel Discogs", value=cfg().get("token", ""), type="password")
-        if token_input != cfg().get("token", ""):
-            cfg()["token"] = token_input
-            persist()
-        st.caption("Génère-le sur [discogs.com/settings/developers](https://www.discogs.com/settings/developers)")
-    with col2:
-        st.markdown("**Base de labels**")
-        st.caption(
-            f"{len(st.session_state.labels)} label(s) en base, sauvegardés dans "
-            "`crate_radar_config.json`. Import CSV, ajout et retrait se font dans "
-            "l'onglet **🏷️ Ma base**."
+if _nav == "🎛️ Réglages" and _set_sub == "Connexion & données":
+    with st.expander("⚙️ Configuration (token + base de labels)", expanded=not cfg().get("token")):
+        col1, col2 = st.columns(2)
+        with col1:
+            token_input = st.text_input("Token d'accès personnel Discogs", value=cfg().get("token", ""), type="password")
+            if token_input != cfg().get("token", ""):
+                cfg()["token"] = token_input
+                persist()
+            st.caption("Génère-le sur [discogs.com/settings/developers](https://www.discogs.com/settings/developers)")
+        with col2:
+            st.markdown("**Base de labels**")
+            st.caption(
+                f"{len(st.session_state.labels)} label(s) en base, sauvegardés dans "
+                "`crate_radar_config.json`. Import CSV, ajout et retrait se font dans "
+                "l'onglet **🏷️ Mes labels**."
+            )
+
+    status = "✅ Token ok" if cfg().get("token") else "⚠️ Token manquant"
+    st.caption(f"{status} · {len(st.session_state.labels)} labels en base")
+
+if _nav == "🎛️ Réglages" and _set_sub == "Nettoyage Discogs":
+    with st.expander("🧹 Noms canoniques Discogs (résolution & profilage)",
+                     expanded=st.session_state.cleanup_open):
+        st.write(
+            "Depuis maintenant, **chaque label / artiste ajouté est résolu et profilé "
+            "automatiquement en arrière-plan** (job `enrich`) — plus rien à lancer à la main. "
+            "Le bouton ci-dessous fait la passe unique sur l'existant."
         )
+        _pend = load_json(PENDING_ENRICH_PATH, {})
+        _npend = len(_pend.get("labels", [])) + len(_pend.get("artists", []))
+        if _npend:
+            st.caption(f"⏳ {_npend} ajout(s) en cours d'enrichissement…")
+        render_job("enrich", "Enrichissement auto")
 
-status = "✅ Token ok" if cfg().get("token") else "⚠️ Token manquant"
-st.caption(f"{status} · {len(st.session_state.labels)} labels en base")
-
-with st.expander("🧹 Noms canoniques Discogs (résolution & profilage)",
-                 expanded=st.session_state.cleanup_open):
-    st.write(
-        "Depuis maintenant, **chaque label / artiste ajouté est résolu et profilé "
-        "automatiquement en arrière-plan** (job `enrich`) — plus rien à lancer à la main. "
-        "Le bouton ci-dessous fait la passe unique sur l'existant."
-    )
-    _pend = load_json(PENDING_ENRICH_PATH, {})
-    _npend = len(_pend.get("labels", [])) + len(_pend.get("artists", []))
-    if _npend:
-        st.caption(f"⏳ {_npend} ajout(s) en cours d'enrichissement…")
-    render_job("enrich", "Enrichissement auto")
-
-    gnc1, gnc2 = st.columns([2, 3])
-    if not job_running("canonicalize") and gnc1.button("🧹 Grand nettoyage Discogs",
-                                                       disabled=not cfg().get("token")):
-        job_launch("canonicalize", {"scope": "corpus"})
-        st.rerun()
-    gnc2.caption("Réécrit toute la base (labels + artistes) et les champs artiste/label du "
-                 "corpus avec les noms Discogs exacts. Tâche de fond, reprenable — plusieurs "
-                 "heures au 1ᵉʳ passage.")
-    render_job("canonicalize", "Grand nettoyage")
-
-    st.divider()
-    st.caption("— 🛠 Outils d'import initial (usage ponctuel) —")
-    total = len(st.session_state.labels)
-    done = sum(1 for l in st.session_state.labels if normalize_label(l) in st.session_state.resolved)
-    not_found = sum(1 for l in st.session_state.labels
-                     if st.session_state.resolved.get(normalize_label(l), {}).get("status") == "not_found")
-    st.progress(done / total if total else 0, text=f"{done}/{total} labels résolus ({not_found} introuvables sur Discogs)")
-
-    st.caption("Avec la limite Discogs (~1 requête/seconde en pratique), résoudre toute la base prend plusieurs heures. "
-               "La progression est sauvegardée à chaque label : tu peux arrêter puis reprendre quand tu veux.")
-
-    # Traitement par petits lots avec rerun entre chaque, pour garder le bouton « Arrêter » réactif.
-    RESOLVE_CHUNK = 5
-
-    if st.session_state.resolve_running:
-        st.session_state.cleanup_open = True  # garde l'expander ouvert pendant la résolution
-        rdone, rtot = st.session_state.resolve_done, st.session_state.resolve_total
-        st.progress(rdone / rtot if rtot else 0,
-                    text=f"Résolution : {rdone}/{rtot} — {st.session_state.resolve_last or '…'}")
-        stop = st.button("⏹ Arrêter la résolution")
-        if stop:
-            st.session_state.resolve_running = False
-            st.session_state.resolve_queue = []
-            st.success(f"Résolution arrêtée à {rdone}/{rtot}. Progression sauvegardée — "
-                       "relance quand tu veux, elle reprendra là où elle en est.")
-        else:
-            chunk = st.session_state.resolve_queue[:RESOLVE_CHUNK]
-            st.session_state.resolve_queue = st.session_state.resolve_queue[RESOLVE_CHUNK:]
-            token = cfg().get("token", "")
-            for j, name in enumerate(chunk):
-                try:
-                    dname, did, status_r, cands = resolve_one_label(name, token=token)
-                except Exception as e:
-                    dname, did, status_r, cands = None, None, f"error: {e}", []
-                st.session_state.resolved[normalize_label(name)] = {
-                    "original": name, "discogs_name": dname, "discogs_id": did,
-                    "status": status_r, "candidates": cands,
-                }
-                save_resolved(st.session_state.resolved)
-                st.session_state.resolve_done += 1
-                st.session_state.resolve_last = f"{name} → {dname or '?'} ({status_r})"
-                more_coming = st.session_state.resolve_queue or j < len(chunk) - 1
-                if more_coming:
-                    time.sleep(1.1)
-            if not st.session_state.resolve_queue:
-                st.session_state.resolve_running = False
-                st.success(f"Terminé — {st.session_state.resolve_done} label(s) traité(s) sur ce lancement.")
+        gnc1, gnc2 = st.columns([2, 3])
+        if not job_running("canonicalize") and gnc1.button("🧹 Grand nettoyage Discogs",
+                                                           disabled=not cfg().get("token")):
+            job_launch("canonicalize", {"scope": "corpus"})
             st.rerun()
-    else:
-        _prof = st.session_state.get("profile", {})
-        _wmap = taste_weight_map()
-        _floor = int(scoring()["label_affinity_floor"] or 0)
-        rc1, rc2 = st.columns([3, 2])
-        only_prof = rc1.checkbox(
-            "Seulement les labels profilés au-dessus du seuil d'affinité", value=True,
-            key="resolve_only_profiled",
-            help="Recommandé : ne résous que les labels qui comptent (profilés + assez proches "
-                 "de tes goûts), pas les milliers d'autres.")
-        thr = rc1.slider("Affinité minimale", 0, 100,
-                         (max(_floor, 30) if _floor == 0 else _floor), 5,
-                         key="resolve_aff_min", disabled=not only_prof)
-        batch_size = rc2.number_input("Nb max à résoudre maintenant",
-                                      min_value=10, max_value=5000, value=200, step=10)
-        _unres = [l for l in st.session_state.labels
-                  if normalize_label(l) not in st.session_state.resolved]
-        if only_prof:
-            _pool = [l for l in _unres
-                     if _prof.get(normalize_label(l)) is not None
-                     and affinity_score(_prof[normalize_label(l)], _wmap) >= thr]
-        else:
-            _pool = _unres
-        rc2.caption(f"**{len(_pool)}** label(s) à résoudre dans le périmètre"
-                    + (f" · {len(_unres)} non résolus au total" if only_prof else ""))
-        if st.button("Lancer la résolution"):
-            if not cfg().get("token"):
-                st.error("Renseigne d'abord ton token Discogs.")
-            else:
-                todo = _pool[:int(batch_size)]
-                if not todo:
-                    st.success("Aucun label à résoudre dans ce périmètre "
-                               + ("(baisse le seuil, ou profile davantage la base)."
-                                  if only_prof else "(tout est déjà résolu)."))
-                else:
-                    st.session_state.resolve_queue = todo
-                    st.session_state.resolve_total = len(todo)
-                    st.session_state.resolve_done = 0
-                    st.session_state.resolve_last = ""
-                    st.session_state.resolve_running = True
-                    st.session_state.cleanup_open = True
-                    st.rerun()
+        gnc2.caption("Réécrit toute la base (labels + artistes) et les champs artiste/label du "
+                     "corpus avec les noms Discogs exacts. Tâche de fond, reprenable — plusieurs "
+                     "heures au 1ᵉʳ passage.")
+        render_job("canonicalize", "Grand nettoyage")
 
-    approx_keys = [k for k, v in st.session_state.resolved.items() if v.get("status") == "approx"]
-    confirmed_n = sum(1 for v in st.session_state.resolved.values() if v.get("status") == "confirmed")
-    if approx_keys or confirmed_n:
         st.divider()
-        st.markdown(f"### ⚠️ Correspondances approximatives — {len(approx_keys)} à vérifier"
-                    + (f" · {confirmed_n} validée(s)" if confirmed_n else ""))
-        if confirmed_n and st.button(f"↩️ Repasser les {confirmed_n} validées en « à vérifier »"):
-            for v in st.session_state.resolved.values():
-                if v.get("status") == "confirmed":
-                    v["status"] = "approx"
-            save_resolved(st.session_state.resolved)
-            st.session_state.cleanup_open = True
-            st.rerun()
+        st.caption("— 🛠 Outils d'import initial (usage ponctuel) —")
+        total = len(st.session_state.labels)
+        done = sum(1 for l in st.session_state.labels if normalize_label(l) in st.session_state.resolved)
+        not_found = sum(1 for l in st.session_state.labels
+                         if st.session_state.resolved.get(normalize_label(l), {}).get("status") == "not_found")
+        st.progress(done / total if total else 0, text=f"{done}/{total} labels résolus ({not_found} introuvables sur Discogs)")
 
-    if approx_keys:
-        show_approx = st.checkbox("Traiter les correspondances approximatives", key="show_approx")
-        st.caption(f"{len(approx_keys)} restante(s).")
-        if show_approx:
-            st.session_state.cleanup_open = True
-            # ----- traitement groupé par score de similarité (aucun appel API) -----
-            st.markdown("**Traitement groupé**")
-            st.caption(
-                "Compare le nom d'origine à la proposition Discogs. Au-dessus du seuil, "
-                "la proposition est probablement bonne → validation en un clic. Réversible "
-                "via le bouton ci-dessus."
-            )
-            thr = st.slider("Seuil de similarité", 0.50, 1.00, 0.82, 0.01)
-            scored = [(k, name_similarity(st.session_state.resolved[k].get("original", k),
-                                          st.session_state.resolved[k].get("discogs_name") or ""))
-                      for k in approx_keys]
-            above = [k for k, s in scored if s >= thr]
-            bc1, bc2 = st.columns(2)
-            if bc1.button(f"✅ Valider les {len(above)} ≥ {thr:.2f}", disabled=not above):
-                now = datetime.now().isoformat(timespec="seconds")
-                for k in above:
-                    st.session_state.resolved[k].update(
-                        status="confirmed", reviewed_at=now, reviewed_by="bulk")
-                save_resolved(st.session_state.resolved)
+        st.caption("Avec la limite Discogs (~1 requête/seconde en pratique), résoudre toute la base prend plusieurs heures. "
+                   "La progression est sauvegardée à chaque label : tu peux arrêter puis reprendre quand tu veux.")
+
+        # Traitement par petits lots avec rerun entre chaque, pour garder le bouton « Arrêter » réactif.
+        RESOLVE_CHUNK = 5
+
+        if st.session_state.resolve_running:
+            st.session_state.cleanup_open = True  # garde l'expander ouvert pendant la résolution
+            rdone, rtot = st.session_state.resolve_done, st.session_state.resolve_total
+            st.progress(rdone / rtot if rtot else 0,
+                        text=f"Résolution : {rdone}/{rtot} — {st.session_state.resolve_last or '…'}")
+            stop = st.button("⏹ Arrêter la résolution")
+            if stop:
+                st.session_state.resolve_running = False
+                st.session_state.resolve_queue = []
+                st.success(f"Résolution arrêtée à {rdone}/{rtot}. Progression sauvegardée — "
+                           "relance quand tu veux, elle reprendra là où elle en est.")
+            else:
+                chunk = st.session_state.resolve_queue[:RESOLVE_CHUNK]
+                st.session_state.resolve_queue = st.session_state.resolve_queue[RESOLVE_CHUNK:]
+                token = cfg().get("token", "")
+                for j, name in enumerate(chunk):
+                    try:
+                        dname, did, status_r, cands = resolve_one_label(name, token=token)
+                    except Exception as e:
+                        dname, did, status_r, cands = None, None, f"error: {e}", []
+                    st.session_state.resolved[normalize_label(name)] = {
+                        "original": name, "discogs_name": dname, "discogs_id": did,
+                        "status": status_r, "candidates": cands,
+                    }
+                    save_resolved(st.session_state.resolved)
+                    st.session_state.resolve_done += 1
+                    st.session_state.resolve_last = f"{name} → {dname or '?'} ({status_r})"
+                    more_coming = st.session_state.resolve_queue or j < len(chunk) - 1
+                    if more_coming:
+                        time.sleep(1.1)
+                if not st.session_state.resolve_queue:
+                    st.session_state.resolve_running = False
+                    st.success(f"Terminé — {st.session_state.resolve_done} label(s) traité(s) sur ce lancement.")
                 st.rerun()
-            if bc2.button(f"⚡ Tout valider ({len(approx_keys)}) sans filtre"):
-                now = datetime.now().isoformat(timespec="seconds")
-                for k in approx_keys:
-                    st.session_state.resolved[k].update(
-                        status="confirmed", reviewed_at=now, reviewed_by="bulk")
-                save_resolved(st.session_state.resolved)
-                st.rerun()
-            st.caption(f"{len(above)} validé(s) au seuil actuel · "
-                       f"{len(approx_keys) - len(above)} resteraient à vérifier à la main.")
-
-            st.divider()
-            st.markdown("**Revue une par une**")
-            st.caption(
-                "Pour chaque label : **Valider** la proposition choisie, ou **Introuvable** "
-                "si rien ne colle. Le champ de recherche donne d'autres propositions. "
-                "Les 15 premiers sont affichés — traite-les et les suivants apparaissent."
-            )
-            REVIEW_N = 15
-            for k in approx_keys[:REVIEW_N]:
-                entry = st.session_state.resolved[k]
-                orig = entry.get("original", k)
-                cands = entry.get("candidates") or []
-                # garde la proposition actuelle dans la liste même si les candidats manquent
-                if entry.get("discogs_name") and not any(
-                        c.get("name") == entry["discogs_name"] for c in cands):
-                    cands = [{"name": entry["discogs_name"], "id": entry.get("discogs_id")}] + cands
-
-                st.markdown(f"**{orig}**")
-                c1, c2, c3 = st.columns([3, 1, 1])
-                if cands:
-                    opt_labels = [f"{c['name']}  ·  id {c.get('id', '?')}" for c in cands]
-                    sel = c1.selectbox("Proposition", options=list(range(len(cands))),
-                                       format_func=lambda i: opt_labels[i],
-                                       key=f"apx_sel_{k}", label_visibility="collapsed")
+        else:
+            _prof = st.session_state.get("profile", {})
+            _wmap = taste_weight_map()
+            _floor = int(scoring()["label_affinity_floor"] or 0)
+            rc1, rc2 = st.columns([3, 2])
+            only_prof = rc1.checkbox(
+                "Seulement les labels profilés au-dessus du seuil d'affinité", value=True,
+                key="resolve_only_profiled",
+                help="Recommandé : ne résous que les labels qui comptent (profilés + assez proches "
+                     "de tes goûts), pas les milliers d'autres.")
+            thr = rc1.slider("Affinité minimale", 0, 100,
+                             (max(_floor, 30) if _floor == 0 else _floor), 5,
+                             key="resolve_aff_min", disabled=not only_prof)
+            batch_size = rc2.number_input("Nb max à résoudre maintenant",
+                                          min_value=10, max_value=5000, value=200, step=10)
+            _unres = [l for l in st.session_state.labels
+                      if normalize_label(l) not in st.session_state.resolved]
+            if only_prof:
+                _pool = [l for l in _unres
+                         if _prof.get(normalize_label(l)) is not None
+                         and affinity_score(_prof[normalize_label(l)], _wmap) >= thr]
+            else:
+                _pool = _unres
+            rc2.caption(f"**{len(_pool)}** label(s) à résoudre dans le périmètre"
+                        + (f" · {len(_unres)} non résolus au total" if only_prof else ""))
+            if st.button("Lancer la résolution"):
+                if not cfg().get("token"):
+                    st.error("Renseigne d'abord ton token Discogs.")
                 else:
-                    c1.caption("Aucune proposition en cache — lance une recherche ci-dessous.")
-                    sel = None
-                if c2.button("✅ Valider", key=f"apx_ok_{k}", disabled=sel is None):
-                    chosen = cands[sel]
-                    entry["discogs_name"] = chosen["name"]
-                    entry["discogs_id"] = chosen.get("id")
-                    entry["status"] = "confirmed"
-                    entry["reviewed_at"] = datetime.now().isoformat(timespec="seconds")
-                    save_resolved(st.session_state.resolved)
-                    st.rerun()
-                if c3.button("🚫 Introuvable", key=f"apx_no_{k}"):
-                    entry.update(discogs_name=None, discogs_id=None, status="not_found",
-                                 reviewed_at=datetime.now().isoformat(timespec="seconds"))
-                    save_resolved(st.session_state.resolved)
-                    st.rerun()
+                    todo = _pool[:int(batch_size)]
+                    if not todo:
+                        st.success("Aucun label à résoudre dans ce périmètre "
+                                   + ("(baisse le seuil, ou profile davantage la base)."
+                                      if only_prof else "(tout est déjà résolu)."))
+                    else:
+                        st.session_state.resolve_queue = todo
+                        st.session_state.resolve_total = len(todo)
+                        st.session_state.resolve_done = 0
+                        st.session_state.resolve_last = ""
+                        st.session_state.resolve_running = True
+                        st.session_state.cleanup_open = True
+                        st.rerun()
 
-                if st.checkbox("🔎 Autre recherche Discogs", value=not cands, key=f"apx_more_{k}"):
-                    sc1, sc2 = st.columns([4, 1])
-                    q = sc1.text_input("Terme", value=orig, key=f"apx_q_{k}",
-                                       label_visibility="collapsed")
-                    if sc2.button("Chercher", key=f"apx_search_{k}"):
-                        try:
-                            entry["candidates"] = label_candidates(q, per_page=8)
-                            save_resolved(st.session_state.resolved)
-                            if not entry["candidates"]:
-                                st.warning("Aucun résultat.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erreur Discogs : {e}")
+        approx_keys = [k for k, v in st.session_state.resolved.items() if v.get("status") == "approx"]
+        confirmed_n = sum(1 for v in st.session_state.resolved.values() if v.get("status") == "confirmed")
+        if approx_keys or confirmed_n:
+            st.divider()
+            st.markdown(f"### ⚠️ Correspondances approximatives — {len(approx_keys)} à vérifier"
+                        + (f" · {confirmed_n} validée(s)" if confirmed_n else ""))
+            if confirmed_n and st.button(f"↩️ Repasser les {confirmed_n} validées en « à vérifier »"):
+                for v in st.session_state.resolved.values():
+                    if v.get("status") == "confirmed":
+                        v["status"] = "approx"
+                save_resolved(st.session_state.resolved)
+                st.session_state.cleanup_open = True
+                st.rerun()
+
+        if approx_keys:
+            show_approx = st.checkbox("Traiter les correspondances approximatives", key="show_approx")
+            st.caption(f"{len(approx_keys)} restante(s).")
+            if show_approx:
+                st.session_state.cleanup_open = True
+                # ----- traitement groupé par score de similarité (aucun appel API) -----
+                st.markdown("**Traitement groupé**")
+                st.caption(
+                    "Compare le nom d'origine à la proposition Discogs. Au-dessus du seuil, "
+                    "la proposition est probablement bonne → validation en un clic. Réversible "
+                    "via le bouton ci-dessus."
+                )
+                thr = st.slider("Seuil de similarité", 0.50, 1.00, 0.82, 0.01)
+                scored = [(k, name_similarity(st.session_state.resolved[k].get("original", k),
+                                              st.session_state.resolved[k].get("discogs_name") or ""))
+                          for k in approx_keys]
+                above = [k for k, s in scored if s >= thr]
+                bc1, bc2 = st.columns(2)
+                if bc1.button(f"✅ Valider les {len(above)} ≥ {thr:.2f}", disabled=not above):
+                    now = datetime.now().isoformat(timespec="seconds")
+                    for k in above:
+                        st.session_state.resolved[k].update(
+                            status="confirmed", reviewed_at=now, reviewed_by="bulk")
+                    save_resolved(st.session_state.resolved)
+                    st.rerun()
+                if bc2.button(f"⚡ Tout valider ({len(approx_keys)}) sans filtre"):
+                    now = datetime.now().isoformat(timespec="seconds")
+                    for k in approx_keys:
+                        st.session_state.resolved[k].update(
+                            status="confirmed", reviewed_at=now, reviewed_by="bulk")
+                    save_resolved(st.session_state.resolved)
+                    st.rerun()
+                st.caption(f"{len(above)} validé(s) au seuil actuel · "
+                           f"{len(approx_keys) - len(above)} resteraient à vérifier à la main.")
+
                 st.divider()
+                st.markdown("**Revue une par une**")
+                st.caption(
+                    "Pour chaque label : **Valider** la proposition choisie, ou **Introuvable** "
+                    "si rien ne colle. Le champ de recherche donne d'autres propositions. "
+                    "Les 15 premiers sont affichés — traite-les et les suivants apparaissent."
+                )
+                REVIEW_N = 15
+                for k in approx_keys[:REVIEW_N]:
+                    entry = st.session_state.resolved[k]
+                    orig = entry.get("original", k)
+                    cands = entry.get("candidates") or []
+                    # garde la proposition actuelle dans la liste même si les candidats manquent
+                    if entry.get("discogs_name") and not any(
+                            c.get("name") == entry["discogs_name"] for c in cands):
+                        cands = [{"name": entry["discogs_name"], "id": entry.get("discogs_id")}] + cands
 
-# Navigation : un seul onglet exécuté par rerun (st.tabs exécute les 9 corps à
-# chaque interaction — d'où la lenteur). Le radio conserve le choix en session.
-_NAV = ["🔍 Recherche", "📻 Liste de veille", "🏪 Mes vendeurs", "🏷️ Ma base",
-        "🎯 Profilage", "🎧 Sources & reco", "🎤 Mes artistes", "🎚️ Sets",
-        "🎛️ Réglages", "📈 Apprentissage"]
-_nav = st.radio("Navigation", _NAV, horizontal=True, label_visibility="collapsed", key="_nav")
-st.divider()
+                    st.markdown(f"**{orig}**")
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    if cands:
+                        opt_labels = [f"{c['name']}  ·  id {c.get('id', '?')}" for c in cands]
+                        sel = c1.selectbox("Proposition", options=list(range(len(cands))),
+                                           format_func=lambda i: opt_labels[i],
+                                           key=f"apx_sel_{k}", label_visibility="collapsed")
+                    else:
+                        c1.caption("Aucune proposition en cache — lance une recherche ci-dessous.")
+                        sel = None
+                    if c2.button("✅ Valider", key=f"apx_ok_{k}", disabled=sel is None):
+                        chosen = cands[sel]
+                        entry["discogs_name"] = chosen["name"]
+                        entry["discogs_id"] = chosen.get("id")
+                        entry["status"] = "confirmed"
+                        entry["reviewed_at"] = datetime.now().isoformat(timespec="seconds")
+                        save_resolved(st.session_state.resolved)
+                        st.rerun()
+                    if c3.button("🚫 Introuvable", key=f"apx_no_{k}"):
+                        entry.update(discogs_name=None, discogs_id=None, status="not_found",
+                                     reviewed_at=datetime.now().isoformat(timespec="seconds"))
+                        save_resolved(st.session_state.resolved)
+                        st.rerun()
+
+                    if st.checkbox("🔎 Autre recherche Discogs", value=not cands, key=f"apx_more_{k}"):
+                        sc1, sc2 = st.columns([4, 1])
+                        q = sc1.text_input("Terme", value=orig, key=f"apx_q_{k}",
+                                           label_visibility="collapsed")
+                        if sc2.button("Chercher", key=f"apx_search_{k}"):
+                            try:
+                                entry["candidates"] = label_candidates(q, per_page=8)
+                                save_resolved(st.session_state.resolved)
+                                if not entry["candidates"]:
+                                    st.warning("Aucun résultat.")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erreur Discogs : {e}")
+                    st.divider()
+
 
 # ---------------------------------------------------------------- Tab: Sets (DJ sets ingérés)
 
-if _nav == "🎚️ Sets":
+if _nav == "🎚️ Mes sets":
     st.write("Toutes les tracks extraites des DJ sets YouTube, par DJ puis par vidéo. "
              "Liens cliquables pour écouter (la track si YouTube l'a identifiée, sinon "
              "recherche YouTube ; + le set de provenance).")
@@ -2692,7 +2701,7 @@ if _nav == "🎧 Sources & reco":
 
 # ---------------------------------------------------------------- Tab: Profilage des labels
 
-if _nav == "🎯 Profilage":
+if _nav == "🎛️ Réglages" and _set_sub == "Goût & profilage":
     st.write(
         "Analyse les styles des sorties de chaque label de ta base pour lui donner un **score "
         "d'affinité** avec tes goûts. Ensuite, l'onglet Recherche peut ne cibler que les labels "
@@ -2781,9 +2790,9 @@ if _nav == "🎯 Profilage":
         st.caption(f"{len(shown_rows)} label(s) affiché(s) sur {len(rows)} profilé(s).")
         st.dataframe(shown_rows, use_container_width=True, hide_index=True)
 
-# ---------------------------------------------------------------- Tab: Ma base de labels
+# ---------------------------------------------------------------- Tab: Mes labels
 
-if _nav == "🏷️ Ma base":
+if _nav == "🏷️ Mes labels":
     st.write(
         "Ta base de labels sert de filtre pour la recherche et la veille. Alimente-la par import "
         "CSV (fusion ou remplacement) et ajuste-la à la main ici — tout est sauvegardé dans "
@@ -3332,7 +3341,7 @@ if _nav == "🏪 Mes vendeurs":
 
 # ---------------------------------------------------------------- Tab: Réglages (board de scoring)
 
-if _nav == "🎛️ Réglages":
+if _nav == "🎛️ Réglages" and _set_sub == "Scoring":
     st.write("**Tous les paramètres de notation / classement au même endroit.** Lus partout via "
              "`scoring()` ; chaque modification recalcule les scores. Sauvegarde des jeux de "
              "réglages en **profils** pour comparer.")
@@ -3476,7 +3485,7 @@ if _nav == "🎛️ Réglages":
 
 # ---------------------------------------------------------------- Tab: Apprentissage (étape 7)
 
-if _nav == "📈 Apprentissage":
+if _nav == "🎛️ Réglages" and _set_sub == "Apprentissage":
     st.write(
         "Boucle de feedback. Chaque **👍 / 👎** posé sur une reco est journalisé avec les "
         "sous-signaux qui ont produit son score, au moment du clic :\n"

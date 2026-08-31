@@ -1226,6 +1226,8 @@ def job_scan_sellers(job, params):
 
 PENDING_ENRICH_PATH = os.path.join(DATA, "pending_enrich.json")
 CANON_STATE_PATH = os.path.join(DATA, "canonicalize.state.json")
+VEILLE_SEEN_PATH = os.path.join(DATA, "veille_seen.json")
+VEILLE_NEW_PATH = os.path.join(DATA, "veille_new.json")
 
 
 def _resolve_entity(token, name, kind):
@@ -1436,6 +1438,115 @@ def job_canonicalize(job, params):
                f"{len(done_c)} ligne(s) de corpus canonisées.")
 
 
+def _veille_search(token, rule):
+    """Releases Discogs correspondant à une règle de veille (dédoublonnées par id)."""
+    styles = (rule.get("styles") or [])[:3]
+    genre = (rule.get("genres") or [None])[0]
+    yf, yt = rule.get("year_from"), rule.get("year_to")
+    yr = f"{yf}-{yt}" if (yf and yt) else (str(yf) if yf else (str(yt) if yt else None))
+    fmt = "Vinyl" if rule.get("vinyl_only") else None
+    labels = rule.get("labels") or []
+    base = {"sort": "year", "sort_order": "desc", "per_page": 100}
+    if genre:
+        base["genre"] = genre
+    if yr:
+        base["year"] = yr
+    if fmt:
+        base["format"] = fmt
+    out, seen = [], set()
+
+    def go(extra, pages):
+        for pg in range(1, pages + 1):
+            d = discogs_search(token, page=pg, **base, **extra)
+            res = d.get("results", [])
+            for r in res:
+                if r.get("id") and r["id"] not in seen:
+                    seen.add(r["id"])
+                    out.append(r)
+            if pg >= d.get("pagination", {}).get("pages", 1) or not res:
+                break
+            time.sleep(1.1)
+
+    if labels:
+        for lab in labels:
+            go({"label": lab}, 1)
+            time.sleep(1.1)
+    elif styles:
+        for stl in styles:
+            go({"style": stl}, 2)
+            time.sleep(1.1)
+    else:
+        go({}, 3)
+    return out
+
+
+def job_scan_veille(job, params):
+    """Scanne chaque règle de veille active (+ la règle implicite « labels suivis »),
+    repère les sorties Discogs nouvelles depuis le dernier passage et les empile dans
+    veille_new.json. 1er passage d'une règle = référence."""
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    if not token:
+        return job.finish(error="Pas de token Discogs.")
+    rules = [dict(r) for r in cfg.get("veille_rules", []) if r.get("active", True)]
+    wl = [w for w in cfg.get("watchlist", []) if w and w.strip()]
+    wl_cap = int(params.get("watchlist_cap", 150))
+    if wl:
+        rules.insert(0, {"id": "__watchlist__",
+                         "name": f"Labels suivis ({min(len(wl), wl_cap)}/{len(wl)})",
+                         "labels": wl[:wl_cap], "vinyl_only": True})
+    if not rules:
+        return job.finish("Aucune règle de veille active.")
+    seen = load_json(VEILLE_SEEN_PATH, {})
+    queue = load_json(VEILLE_NEW_PATH, [])
+    known = {str(e.get("release_id")) for e in queue}
+    job.st["total"] = len(rules)
+    now = datetime.now().isoformat(timespec="seconds")
+    total_new = 0
+    for rule in rules:
+        if job.stopped():
+            break
+        rid = rule.get("id") or normalize_label(rule.get("name", "")) or "r"
+        ent = seen.get(rid) or {}
+        seen_ids = set(ent.get("ids", []))
+        boot = bool(ent.get("bootstrapped"))
+        try:
+            found = _veille_search(token, rule)
+        except Exception as e:
+            job.msg(f"{rule.get('name')} : erreur ({e})")
+            found = []
+        cur_ids = [str(r.get("id")) for r in found if r.get("id")]
+        fresh = [r for r in found if r.get("id") and str(r["id"]) not in seen_ids
+                 and str(r["id"]) not in known]
+        if boot:
+            for r in fresh:
+                labs = r.get("label") or []
+                t = r.get("title", "")
+                art, _, ti = t.partition(" - ")
+                queue.append({
+                    "release_id": r.get("id"), "rule": rule.get("name"),
+                    "artist": art.strip() if ti else "", "title": (ti or t).strip(),
+                    "label": labs[0] if labs else None,
+                    "style": r.get("style") or [], "year": r.get("year"),
+                    "thumb": r.get("thumb") or r.get("cover_image"),
+                    "uri": f"https://www.discogs.com{r.get('uri')}" if r.get("uri") else None,
+                    "first_seen": now,
+                })
+                known.add(str(r.get("id")))
+            total_new += len(fresh)
+            job.msg(f"{rule.get('name')} : +{len(fresh)} nouveauté(s)")
+        else:
+            job.msg(f"{rule.get('name')} : {len(found)} sorties (référence initiale)")
+        merged = cur_ids + [i for i in ent.get("ids", []) if i not in set(cur_ids)]
+        seen[rid] = {"ids": merged[:4000], "bootstrapped": True, "last_scan": now}
+        job.tick(rule.get("name", ""))
+        save_json(VEILLE_SEEN_PATH, seen)
+        save_json(VEILLE_NEW_PATH, queue)
+    save_json(VEILLE_SEEN_PATH, seen)
+    save_json(VEILLE_NEW_PATH, queue)
+    job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
+
+
 JOBS = {
     "ingest_youtube": job_ingest_youtube,
     "ingest_bandcamp": job_ingest_bandcamp,
@@ -1449,6 +1560,7 @@ JOBS = {
     "scan_sellers": job_scan_sellers,
     "enrich": job_enrich,
     "canonicalize": job_canonicalize,
+    "scan_veille": job_scan_veille,
 }
 
 

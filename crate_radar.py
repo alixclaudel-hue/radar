@@ -64,6 +64,8 @@ SELLERS_SEEN_PATH = os.path.join(_DATA, "sellers_seen.json")
 SELLERS_NEW_PATH = os.path.join(_DATA, "seller_new.json")
 SCORING_PROFILES_PATH = os.path.join(_DATA, "scoring_profiles.json")
 PENDING_ENRICH_PATH = os.path.join(_DATA, "pending_enrich.json")
+VEILLE_SEEN_PATH = os.path.join(_DATA, "veille_seen.json")
+VEILLE_NEW_PATH = os.path.join(_DATA, "veille_new.json")
 JOBS_DIR = os.path.join(_DATA, "jobs")
 JOBS_SCRIPT = os.path.join(_HERE, "crate_jobs.py")
 
@@ -169,6 +171,7 @@ def load_config():
                "youtube_api_key": "", "youtube_playlists": "",
                "bandcamp_sub_user": "", "bandcamp_sub_pass": "", "djset_sources": "",
                "artist_categories": {k: list(v) for k, v in DEFAULT_ARTIST_CATEGORIES.items()},
+               "veille_rules": [],
                "scoring": _deep_merge(DEFAULT_SCORING, {})}
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, encoding="utf-8") as f:
@@ -1567,6 +1570,80 @@ def render_release_card(image_url, title, label_text, year_text, release_id, key
     st.divider()
 
 
+def render_new_inbox(items, path, id_field, key_ns, source_field=None, source_label="Source"):
+    """Boîte de nouveautés notée, partagée entre la veille et les vendeurs.
+    `items` = list de dicts {artist,title,label,style,release_id,uri,price?,condition?,...}."""
+    if not items:
+        st.info("Rien de nouveau pour l'instant.")
+        return
+    _ridx = reco_index()
+    _asc = {k: v[0] for k, v in artist_scores().items()}
+
+    def _sc(it):
+        pseudo = {"label": [it["label"]] if it.get("label") else [],
+                  "title": f"{it.get('artist', '')} - {it.get('title', '')}",
+                  "style": it.get("style") or []}
+        return album_score(pseudo, _ridx, _asc)
+
+    scored = sorted(((it, *_sc(it)) for it in items),
+                    key=lambda t: (t[1] is None, -(t[1] or 0)))
+    fc1, fc2, fc3 = st.columns(3)
+    mins = fc1.slider("Score album minimum", 0, 100, 30, 5, key=f"{key_ns}_min")
+    srcs = sorted({it.get(source_field) for it in items
+                   if source_field and it.get(source_field)})
+    sf = fc2.multiselect(source_label, srcs, key=f"{key_ns}_sf") if srcs else []
+    show = [(it, sc, det) for it, sc, det in scored
+            if (sc or 0) >= mins and (not sf or it.get(source_field) in sf)]
+    fc3.metric("À voir", len(show))
+    b1, b2 = st.columns([1, 3])
+    if b1.button("✓ Tout marquer comme vu", key=f"{key_ns}_seenall"):
+        save_json(path, [])
+        st.rerun()
+    b2.caption(f"{len(items)} en attente au total.")
+    _fbdone = st.session_state.setdefault("_fb_done", {})
+    for it, sc, det in show[:150]:
+        _id = it.get(id_field)
+        cc1, cc2, cc3, cc4 = st.columns([8, 1, 1, 1])
+        badge = (f"<span class='album-badge'>🎯 {sc}</span> " if sc is not None
+                 else "<span class='rc-style'>—</span> ")
+        bits = []
+        if source_field and it.get(source_field):
+            bits.append(f"**{it[source_field]}**")
+        if it.get("label"):
+            bits.append(str(it["label"]))
+        if it.get("price"):
+            bits.append(f"{it['price']} {it.get('currency', '')}".strip())
+        if it.get("condition"):
+            bits.append(str(it["condition"]))
+        if it.get("year"):
+            bits.append(str(it["year"]))
+        if it.get("style"):
+            bits.append("_" + ", ".join(it["style"]) + "_")
+        url = it.get("uri") or (f"https://www.discogs.com/release/{it['release_id']}"
+                                if it.get("release_id") else "#")
+        cc1.markdown(f"{badge}[{it.get('artist', '')} — {it.get('title', '')}]({url})  "
+                     f"<span class='rc-style'>{' · '.join(bits)}</span>",
+                     unsafe_allow_html=True)
+        _fk = normalize_label(f"{it.get('artist', '')} - {it.get('title', '')}")
+        _mk = _fbdone.get(f"album:{_fk}")
+        _nm = f"{it.get('artist', '')} — {it.get('title', '')}"[:90]
+        if _mk:
+            cc2.caption("👍" if _mk == "up" else "👎")
+        elif sc is not None:
+            _ft = {k: (det.get(k) or 0) / 100 for k in ALBUM_FEAT_KEYS}
+            if cc2.button("👍", key=f"{key_ns}_up_{_id}"):
+                log_feedback("album", _fk, _nm, "up", sc, _ft)
+                _fbdone[f"album:{_fk}"] = "up"
+                st.rerun()
+            if cc3.button("👎", key=f"{key_ns}_dn_{_id}"):
+                log_feedback("album", _fk, _nm, "down", sc, _ft)
+                _fbdone[f"album:{_fk}"] = "down"
+                st.rerun()
+        if cc4.button("✕", key=f"{key_ns}_x_{_id}", help="Retirer de la liste"):
+            save_json(path, [x for x in load_json(path, []) if x.get(id_field) != _id])
+            st.rerun()
+
+
 # ---------------------------------------------------------------- UI
 
 st.set_page_config(page_title="Crate Radar", page_icon="🎛️", layout="wide")
@@ -1678,6 +1755,15 @@ def _auto_background():
             and not job_running("merge_corpus") and not job_running("enrich")):
         st.session_state["_last_merge_corpus_n"] = n_corpus
         job_launch("merge_corpus", {})
+    # veille : scan auto si le dernier passage remonte à > 24 h
+    if (cfg().get("veille_rules") or cfg().get("watchlist")) and not job_running("scan_veille") \
+            and not st.session_state.get("_veille_autoscan"):
+        _vs = load_json(VEILLE_SEEN_PATH, {})
+        _vl = max((v.get("last_scan", "") for v in _vs.values()), default="")
+        _stale = (not _vl) or (datetime.now() - datetime.fromisoformat(_vl)).total_seconds() > 86400
+        if _stale:
+            st.session_state["_veille_autoscan"] = True
+            job_launch("scan_veille", {})
 
 
 _auto_background()
@@ -2828,75 +2914,82 @@ if _nav == "🔍 Recherche":
 # ---------------------------------------------------------------- Tab: Liste de veille
 
 if _nav == "📻 Liste de veille":
-    st.write("Les labels ajoutés depuis l'onglet Recherche apparaissent ici. Lance un scan groupé pour voir leurs sorties récentes en une fois.")
+    st.write(
+        "La veille surveille en continu ce qui **correspond à des critères** que tu définis "
+        "(styles, genres, années, format, labels ou artistes précis). Un scan de fond compare "
+        "les sorties Discogs à l'état du dernier passage et remplit la boîte **Nouveautés**, "
+        "notée avec le score album. Le 1ᵉʳ passage d'une règle sert de référence."
+    )
 
-    # dédoublonnage silencieux d'un historique éventuellement pollué
-    _wl_seen, _wl_clean = set(), []
-    for w in cfg().get("watchlist", []):
-        k = normalize_label(w)
-        if k and k not in _wl_seen:
-            _wl_seen.add(k)
-            _wl_clean.append(w)
-    if _wl_clean != cfg().get("watchlist", []):
-        cfg()["watchlist"] = _wl_clean
-        persist()
+    _nnew_v = len(load_json(VEILLE_NEW_PATH, []))
+    if _nnew_v:
+        st.success(f"🆕 **{_nnew_v}** nouveauté(s) en attente — section plus bas.")
 
-    if not cfg()["watchlist"]:
-        st.info('Ta liste de veille est vide. Va dans "Recherche", choisis un label, et clique "+ Ajouter à la veille".')
-    else:
-        for i, w in enumerate(list(cfg()["watchlist"])):
-            c1, c2 = st.columns([5, 1])
-            c1.write(w)
-            if c2.button("Retirer", key=f"rm_wl_{i}_{w}"):
-                cfg()["watchlist"] = [x for x in cfg()["watchlist"] if x != w]
+    rules = cfg().setdefault("veille_rules", [])
+    _wl = [w for w in cfg().get("watchlist", []) if w]
+    st.subheader("Règles")
+    if _wl:
+        st.caption(f"🏷️ **Labels suivis** ({len(_wl)}) — règle implicite, scannée automatiquement. "
+                   "Se gère via « + veille » depuis Recherche / la reco, et l'onglet 🏷️ Mes labels.")
+
+    for i, r in enumerate(rules):
+        _mark = "🟢" if r.get("active", True) else "⚪️"
+        with st.expander(f"{_mark} {r.get('name') or 'règle sans nom'}"):
+            r["name"] = st.text_input("Nom", r.get("name", ""), key=f"vr_name_{i}")
+            r["active"] = st.checkbox("Active", r.get("active", True), key=f"vr_act_{i}")
+            e1, e2 = st.columns(2)
+            r["styles"] = [x.strip() for x in e1.text_area(
+                "Styles (un par ligne)", "\n".join(r.get("styles", [])),
+                key=f"vr_st_{i}", height=100).splitlines() if x.strip()]
+            r["genres"] = [x.strip() for x in e2.text_area(
+                "Genres (un par ligne)", "\n".join(r.get("genres", [])),
+                key=f"vr_ge_{i}", height=100).splitlines() if x.strip()]
+            y1, y2, y3 = st.columns(3)
+            r["year_from"] = y1.number_input("Année de", 1950, CURRENT_YEAR,
+                                             int(r.get("year_from") or 2000), key=f"vr_yf_{i}")
+            r["year_to"] = y2.number_input("Année à", 1950, CURRENT_YEAR,
+                                           int(r.get("year_to") or CURRENT_YEAR), key=f"vr_yt_{i}")
+            r["vinyl_only"] = y3.checkbox("Vinyle seulement", r.get("vinyl_only", True),
+                                         key=f"vr_vy_{i}")
+            r["labels"] = [x.strip() for x in st.text_area(
+                "Labels précis (optionnel — un par ligne ; sinon recherche large)",
+                "\n".join(r.get("labels", [])), key=f"vr_lb_{i}", height=70).splitlines() if x.strip()]
+            r["artists"] = [x.strip() for x in st.text_area(
+                "Artistes précis (optionnel)", "\n".join(r.get("artists", [])),
+                key=f"vr_ar_{i}", height=70).splitlines() if x.strip()]
+            if st.button("🗑 Supprimer cette règle", key=f"vr_del_{i}"):
+                rules.pop(i)
                 persist()
                 st.rerun()
 
-    wl_year_from = st.text_input("Depuis l'année", str(CURRENT_YEAR - 1))
-    if st.button("Lancer la veille", type="primary", disabled=not cfg()["watchlist"]):
-        if not cfg().get("token"):
-            st.error("Renseigne d'abord ton token Discogs.")
-        else:
-            progress = st.progress(0, text="Scan en cours...")
-            combined = []
-            errors = []
-            wl = cfg()["watchlist"]
-            for i, lab in enumerate(wl):
-                try:
-                    data = discogs_search(label=get_canonical(lab), format="Vinyl", year=wl_year_from, per_page=20)
-                    for r in data.get("results", []):
-                        r["_watched_label"] = lab
-                        combined.append(r)
-                except Exception as e:
-                    errors.append(f'Erreur sur "{lab}": {e}')
-                progress.progress(int((i + 1) / len(wl) * 100))
-                if i < len(wl) - 1:
-                    time.sleep(1.1)
-            progress.empty()
-            combined.sort(key=lambda r: int(r.get("year") or 0), reverse=True)
-            st.session_state.wl_results = combined
-            for e in errors:
-                st.error(e)
+    rc1, rc2 = st.columns([1, 1])
+    if rc1.button("💾 Enregistrer les règles", type="primary"):
+        persist()
+        st.success("Règles enregistrées.")
+        st.rerun()
+    if rc2.button("+ Nouvelle règle"):
+        rules.append({"name": "Nouvelle règle", "active": True, "styles": [],
+                      "genres": ["Electronic"], "year_from": 2000, "year_to": CURRENT_YEAR,
+                      "labels": [], "artists": [], "vinyl_only": True})
+        persist()
+        st.rerun()
 
-    st.caption("Un scan interroge l'API une fois par label avec une pause d'1,1s entre chaque appel, pour rester dans la limite de Discogs (60 requêtes/min).")
+    st.divider()
+    _vseen = load_json(VEILLE_SEEN_PATH, {})
+    _vlast = max((v.get("last_scan", "") for v in _vseen.values()), default="")
+    sc1, sc2 = st.columns([1, 3])
+    if sc1.button("🔄 Scanner la veille", type="primary",
+                  disabled=not cfg().get("token") or job_running("scan_veille")):
+        job_launch("scan_veille", {})
+        st.rerun()
+    sc2.caption(f"Dernier scan : {_vlast.replace('T', ' ') if _vlast else '—'} · "
+                "scan auto si > 24 h.")
+    render_job("scan_veille", "Scan de la veille")
 
-    st.subheader(f"Nouveautés détectées ({len(st.session_state.wl_results)})")
-    if not st.session_state.wl_results:
-        st.info("Lance un scan pour voir apparaître les sorties récentes de tes labels suivis.")
-    else:
-        cols = st.columns(4)
-        for i, r in enumerate(st.session_state.wl_results):
-            with cols[i % 4]:
-                render_release_card(
-                    image_url=r.get("thumb") or r.get("cover_image"),
-                    title=r.get("title"),
-                    label_text=", ".join(r.get("label", [])),
-                    year_text=r.get("year", "—"),
-                    release_id=r.get("id"),
-                    key_prefix=f"watch_{i}",
-                    discogs_url=f"https://www.discogs.com{r.get('uri')}" if r.get("uri") else None,
-                    extra_caption=f"via {r.get('_watched_label', '')}",
-                )
+    st.subheader("🆕 Nouveautés")
+    render_new_inbox(load_json(VEILLE_NEW_PATH, []), VEILLE_NEW_PATH,
+                     "release_id", "veille_new", "rule", "Règle")
+
 
 # ---------------------------------------------------------------- Tab: Mes vendeurs
 
@@ -3002,71 +3095,8 @@ if _nav == "🏪 Mes vendeurs":
         scb2.caption(f"Dernier scan : {_last.replace('T', ' ') if _last else '—'}")
         render_job("scan_sellers", "Scan des vendeurs")
 
-        new_items = load_json(SELLERS_NEW_PATH, [])
-        if not new_items:
-            st.info("Rien de nouveau pour l'instant.")
-        else:
-            _ridx = reco_index()
-            _asc = {k: v[0] for k, v in artist_scores().items()}
-
-            def _sell_score(it):
-                pseudo = {"label": [it["label"]] if it.get("label") else [],
-                          "title": f"{it.get('artist', '')} - {it.get('title', '')}",
-                          "style": it.get("style") or []}
-                return album_score(pseudo, _ridx, _asc)
-
-            scored = sorted(((it, *_sell_score(it)) for it in new_items),
-                            key=lambda t: (t[1] is None, -(t[1] or 0)))
-            fc1, fc2, fc3 = st.columns(3)
-            mins = fc1.slider("Score album minimum", 0, 100, 30, 5, key="sell_new_min")
-            sf = fc2.multiselect("Vendeurs", sorted({it["seller"] for it in new_items}),
-                                 key="sell_new_sf")
-            show = [(it, sc, det) for it, sc, det in scored
-                    if (sc or 0) >= mins and (not sf or it["seller"] in sf)]
-            fc3.metric("À voir", len(show))
-            bc1, bc2 = st.columns([1, 3])
-            if bc1.button("✓ Tout marquer comme vu"):
-                save_json(SELLERS_NEW_PATH, [])
-                st.rerun()
-            bc2.caption(f"{len(new_items)} nouvelle(s) annonce(s) en attente au total.")
-
-            _fbdone = st.session_state.setdefault("_fb_done", {})
-            for it, sc, det in show[:150]:
-                lid = it.get("listing_id")
-                cc1, cc2, cc3, cc4 = st.columns([8, 1, 1, 1])
-                badge = (f"<span class='album-badge'>🎯 {sc}</span> " if sc is not None
-                         else "<span class='rc-style'>—</span> ")
-                price = (f" · {it['price']} {it.get('currency', '')}" if it.get("price") else "")
-                cond = f" · {it['condition']}" if it.get("condition") else ""
-                sty = f" · _{', '.join(it.get('style') or [])}_" if it.get("style") else ""
-                url = it.get("uri") or (f"https://www.discogs.com/release/{it['release_id']}"
-                                        if it.get("release_id") else "#")
-                cc1.markdown(
-                    f"{badge}[{it.get('artist', '')} — {it.get('title', '')}]({url})  "
-                    f"<span class='rc-style'>chez **{it['seller']}**"
-                    f"{' · ' + it['label'] if it.get('label') else ''}{price}{cond}{sty}</span>",
-                    unsafe_allow_html=True)
-                _fk = normalize_label(f"{it.get('artist', '')} - {it.get('title', '')}")
-                _mk = _fbdone.get(f"album:{_fk}")
-                if _mk:
-                    cc2.caption("👍" if _mk == "up" else "👎")
-                elif sc is not None:
-                    _ft = {k: (det.get(k) or 0) / 100 for k in ALBUM_FEAT_KEYS}
-                    if cc2.button("👍", key=f"sfbup_{lid}"):
-                        log_feedback("album", _fk, f"{it.get('artist', '')} — {it.get('title', '')}"[:90],
-                                     "up", sc, _ft)
-                        _fbdone[f"album:{_fk}"] = "up"
-                        st.rerun()
-                    if cc3.button("👎", key=f"sfbdn_{lid}"):
-                        log_feedback("album", _fk, f"{it.get('artist', '')} — {it.get('title', '')}"[:90],
-                                     "down", sc, _ft)
-                        _fbdone[f"album:{_fk}"] = "down"
-                        st.rerun()
-                if cc4.button("✕", key=f"sdismiss_{lid}", help="Retirer de la liste"):
-                    save_json(SELLERS_NEW_PATH,
-                              [x for x in load_json(SELLERS_NEW_PATH, [])
-                               if x.get("listing_id") != lid])
-                    st.rerun()
+        render_new_inbox(load_json(SELLERS_NEW_PATH, []), SELLERS_NEW_PATH,
+                         "listing_id", "sell_new", "seller", "Vendeurs")
 
 # ---------------------------------------------------------------- Tab: Réglages (board de scoring)
 

@@ -16,12 +16,14 @@
     <div class="card">
       <div class="cover {{ 'empty' if not rr.thumb }}">
         {% if rr.thumb %}<img src="{{ rr.thumb }}" alt="" loading="lazy">{% endif %}
+        <div class="cover-meta" hx-get="/release/{{ rr.id }}/meta"
+             hx-trigger="revealed" hx-swap="outerHTML"></div>
       </div>
       <div class="body">
         {% if sep %}<span class="artist">{{ artist }}</span>{% endif %}
         <span class="title">{{ album if sep else rr.title }}</span>
         <span class="meta">
-          {{ (rr.label or [])|join(', ') }}
+          {{ rr.label1 or '—' }}
           {% if r.detail.label is not none %} · aff. label {{ r.detail.label }}{% endif %}
         </span>
         <span class="meta">{{ (rr.style or [])|join(', ') }}</span>

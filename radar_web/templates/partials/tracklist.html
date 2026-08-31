@@ -4,10 +4,12 @@
   <span class="muted small">Pas de tracklist sur Discogs.</span>
 {% else %}
   {% for t in tracks %}
-    <div>
+    <div class="tk-row">
       <code>{{ t.pos or '•' }}</code>
-      {{ t.title }}
-      — <a href="{{ t.yt }}" target="_blank" rel="noopener">▶ YouTube</a>
+      <span class="tk-title">{{ t.title }}</span>
+      <a class="tk-play" href="{{ t.play }}" target="_blank" rel="noopener"
+         title="{{ 'Vidéo Discogs' if t.kind == 'discogs' else 'Meilleure vidéo YouTube' }}">▶</a>
     </div>
   {% endfor %}
+  <div class="muted small" style="margin-top:4px">▶ = lecture directe de la vidéo la plus proche</div>
 {% endif %}

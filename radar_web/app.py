@@ -9,15 +9,18 @@ import os
 import re
 import time
 from typing import List
+from urllib.parse import quote_plus
 
+import requests
 from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, learn, store, vocab
-from .radar.paths import (CORPUS, PENDING_ENRICH, SELLERS_NEW, SELLERS_SEEN,
-                          SPOTIFY_META, VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
+from .radar.paths import (CORPUS, PENDING_ENRICH, RELEASE_META, SELLERS_NEW,
+                          SELLERS_SEEN, SPOTIFY_META, VEILLE_NEW, VEILLE_SEEN,
+                          YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -355,10 +358,16 @@ def search_run(request: Request, label: str = Form(""),
             continue
         seen.add(rid)
         sc, det = c.album_score(r)
-        r["thumb"] = r.get("thumb") or r.get("cover_image")
+        # cover_image (~500 px) est bien meilleure que thumb (150 px)
+        r["thumb"] = r.get("cover_image") or r.get("thumb")
+        r["label1"] = next((x for x in (r.get("label") or []) if x), "")
         scored.append({"raw": r, "score": sc, "detail": det})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
-    return frag(request, "partials/results.html", results=scored[:120])
+    return frag(request, "partials/results.html", results=scored[:48])
+
+
+def _toks(s):
+    return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
 
 
 @app.get("/release/{rid}/tracks", response_class=HTMLResponse)
@@ -369,11 +378,82 @@ def tracklist(request: Request, rid: int):
     except discogs.DiscogsError as e:
         return frag(request, "partials/tracklist.html", error=str(e))
     ra = ", ".join(a.get("name", "") for a in data.get("artists", []))
-    tracks = [{"pos": (t.get("position") or "").strip(),
-               "title": (t.get("title") or "").strip(),
-               "yt": yt_search_url(f"{(', '.join(a.get('name','') for a in t.get('artists', [])) or ra)} {t.get('title','')}")}
-              for t in real_tracks(data.get("tracklist", []))]
-    return frag(request, "partials/tracklist.html", tracks=tracks)
+    labels = data.get("labels") or []
+    label1 = (labels[0].get("name") if labels and isinstance(labels[0], dict) else "") or ""
+    year = data.get("year") or ""
+    videos = [{"uri": v.get("uri"), "tok": _toks(v.get("title"))}
+              for v in (data.get("videos") or []) if v.get("uri")]
+    rows = []
+    for t in real_tracks(data.get("tracklist", [])):
+        ttl = (t.get("title") or "").strip()
+        tart = ", ".join(a.get("name", "") for a in t.get("artists", [])) or ra
+        want = _toks(f"{tart} {ttl}")
+        best, best_sc = None, 0.0
+        for v in videos:
+            if not v["tok"] or not want:
+                continue
+            sc = len(want & v["tok"]) / len(want)
+            if sc > best_sc:
+                best, best_sc = v, sc
+        if best and best_sc >= 0.55:
+            play, kind = best["uri"], "discogs"
+        else:
+            q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
+            play, kind = "/yt/first?q=" + quote_plus(q), "yt"
+        rows.append({"pos": (t.get("position") or "").strip(), "title": ttl,
+                     "play": play, "kind": kind})
+    return frag(request, "partials/tracklist.html", tracks=rows)
+
+
+@app.get("/yt/first")
+def yt_first(q: str = ""):
+    """Redirige vers LA vidéo YouTube la plus pertinente (API Data si clé dispo),
+    sinon vers la page de résultats YouTube."""
+    q = (q or "").strip()
+    if not q:
+        return RedirectResponse("https://www.youtube.com", status_code=302)
+    key = _cfg().get("youtube_api_key", "")
+    if key:
+        try:
+            r = requests.get("https://www.googleapis.com/youtube/v3/search",
+                             params={"part": "id", "type": "video", "maxResults": 1,
+                                     "q": q, "key": key}, timeout=12)
+            if r.ok:
+                items = r.json().get("items", [])
+                vid = (items[0].get("id", {}) or {}).get("videoId") if items else ""
+                if vid:
+                    return RedirectResponse(f"https://www.youtube.com/watch?v={vid}",
+                                            status_code=302)
+        except (requests.RequestException, ValueError, KeyError, IndexError):
+            pass
+    return RedirectResponse(yt_search_url(q), status_code=302)
+
+
+RELEASE_META_TTL = 86400
+
+
+@app.get("/release/{rid}/meta", response_class=HTMLResponse)
+def release_meta(request: Request, rid: int):
+    cache = load(RELEASE_META, {})
+    ent = cache.get(str(rid))
+    if not ent or time.time() - ent.get("ts", 0) > RELEASE_META_TTL:
+        token = _cfg().get("token", "")
+        rating = rcount = nfs = low = None
+        try:
+            d = discogs.release(rid, token=token)
+            rt = (d.get("community") or {}).get("rating") or {}
+            rating, rcount = rt.get("average"), rt.get("count")
+            nfs, low = d.get("num_for_sale"), d.get("lowest_price")
+        except discogs.DiscogsError:
+            pass
+        ent = {"ts": time.time(), "rating": rating, "rcount": rcount,
+               "nfs": nfs, "low": low}
+        cache[str(rid)] = ent
+        if len(cache) > 4000:
+            for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
+                cache.pop(k, None)
+        save(RELEASE_META, cache)
+    return frag(request, "partials/release_meta.html", m=ent, rid=rid)
 
 
 # ============================================================ 📻 Veille Discogs (+ vendeurs + reco)

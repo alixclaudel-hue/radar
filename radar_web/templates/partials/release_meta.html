@@ -1,0 +1,7 @@
+<div class="cover-meta">
+  {% if m.rating %}<span class="cm cm--star" title="{{ m.rcount or 0 }} votes Discogs">★ {{ '%.2f'|format(m.rating) }}</span>{% endif %}
+  {% if m.low %}<span class="cm">dès {{ m.low|round(0)|int }} €</span>{% endif %}
+  {% if m.nfs is not none %}<span class="cm">{{ m.nfs }} en vente</span>{% endif %}
+  <a class="cm cm--fr" href="https://www.discogs.com/sell/release/{{ rid }}?ships_from=France"
+     target="_blank" rel="noopener" title="Annonces localisées en France">🇫🇷 voir</a>
+</div>

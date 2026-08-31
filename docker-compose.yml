@@ -1,4 +1,5 @@
 services:
+  # Version Streamlit (référence, complète) — :8501
   crate-radar:
     build: .
     image: crate-radar:latest
@@ -7,6 +8,17 @@ services:
       - "8501:8501"
     env_file: .env
     volumes:
-      # bind-mount : les données sont dans ./data sur l'hôte -> faciles à
-      # sauvegarder (rsync) et à alimenter (scp depuis le Mac).
+      - ./data:/data
+
+  # Version FastAPI + HTMX (en construction, parité en cours) — :8600
+  radar-web:
+    build:
+      context: .
+      dockerfile: radar_web/Dockerfile
+    image: radar-web:latest
+    restart: unless-stopped
+    ports:
+      - "8600:8600"
+    env_file: .env
+    volumes:
       - ./data:/data

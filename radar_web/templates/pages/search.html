@@ -12,13 +12,26 @@
   </div>
   <div class="row">
     <div class="field">
-      <label>Genre</label>
-      <input name="genre" placeholder="Electronic" value="{{ q.genre or '' }}">
+      <label>Genre <span class="muted">· choix multiple</span></label>
+      <select name="genre" multiple size="6">
+        {% for g in genres %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+      </select>
     </div>
     <div class="field">
-      <label>Style</label>
-      <input name="style" placeholder="Deep House" value="{{ q.style or '' }}">
+      <label>Style <span class="muted">· choix multiple</span></label>
+      <select name="style" multiple size="8">
+        {% if styles_mine %}
+        <optgroup label="Mes catégories">
+          {% for s in styles_mine %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </optgroup>
+        {% endif %}
+        <optgroup label="Autres styles Discogs">
+          {% for s in styles_more %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </optgroup>
+      </select>
     </div>
+  </div>
+  <div class="row">
     <div class="field">
       <label>Année de</label>
       <input name="year_from" inputmode="numeric" placeholder="2005" value="{{ q.year_from or '' }}">
@@ -28,6 +41,7 @@
       <input name="year_to" inputmode="numeric" placeholder="2014" value="{{ q.year_to or '' }}">
     </div>
   </div>
+  <p class="muted small">Plusieurs styles = union (l'un OU l'autre). Ctrl/⌘ ou appui long pour en sélectionner plusieurs.</p>
   <div class="row">
     <div class="field" style="flex:0 0 auto">
       <label>&nbsp;</label>

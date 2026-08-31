@@ -8,13 +8,14 @@ import io
 import os
 import re
 import time
+from typing import List
 
 from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import discogs, jobs, learn, store
+from .radar import discogs, jobs, learn, store, vocab
 from .radar.paths import (CORPUS, PENDING_ENRICH, SELLERS_NEW, SELLERS_SEEN,
                           SPOTIFY_META, VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
@@ -221,39 +222,71 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
 
 
 # ============================================================ 🔍 Recherche ciblée
+def _search_styles(c):
+    """Styles proposés : d'abord les catégories de goût de l'utilisateur
+    (noms canoniques), puis le reste du vocabulaire Discogs."""
+    cats = c.cfg.get("taste_categories", {})
+    mine, seen = [], set()
+    for cid in ("1", "2"):
+        for s in cats.get(cid, []):
+            s = (s or "").strip()
+            if s and s.lower() not in seen:
+                seen.add(s.lower())
+                mine.append(s)
+    more = [s for s in vocab.STYLES if s.lower() not in seen]
+    return mine, more
+
+
 @app.get("/search", response_class=HTMLResponse)
 def search_page(request: Request):
-    return render(request, "pages/search.html", active="search", q={})
+    c = Ctx()
+    styles_mine, styles_more = _search_styles(c)
+    return render(request, "pages/search.html", active="search", q={},
+                  genres=vocab.GENRES, styles_mine=styles_mine, styles_more=styles_more)
 
 
 @app.post("/search", response_class=HTMLResponse)
-def search_run(request: Request, label: str = Form(""), genre: str = Form(""),
-               style: str = Form(""), year_from: str = Form(""), year_to: str = Form(""),
+def search_run(request: Request, label: str = Form(""),
+               genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
+               year_from: str = Form(""), year_to: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2")):
     c = Ctx()
     token = c.cfg.get("token", "")
     year = f"{year_from}-{year_to}" if year_from and year_to else (year_from or year_to or "")
     fmt = "Vinyl" if vinyl else ""
+    genres = [g.strip() for g in genre if g and g.strip()]
+    styles = [s.strip() for s in style if s and s.strip()]
     try:
         npages = max(1, min(4, int(pages or 2)))
     except ValueError:
         npages = 2
+    # produit genres × styles (sémantique OU) ; borné pour ménager l'API
+    combos = [(g, s) for g in (genres or [""]) for s in (styles or [""])][:8]
+    raw, seen_ids = [], set()
     try:
-        if label.strip():
-            raw = discogs.search_label_releases(token, label.strip(), genre=genre,
-                                                style=style, fmt=fmt, year=year, max_pages=npages)
-        else:
-            raw = []
-            for pg in range(1, npages + 1):
-                p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
-                for k, v in (("genre", genre), ("style", style), ("year", year), ("format", fmt)):
-                    if v:
-                        p[k] = v
-                d = discogs.search(token=token, **p)
-                got = d.get("results", [])
-                raw += got
-                if pg >= d.get("pagination", {}).get("pages", 1) or not got:
-                    break
+        for i, (g, s) in enumerate(combos):
+            if i:
+                time.sleep(1.0)
+            if label.strip():
+                part = discogs.search_label_releases(token, label.strip(), genre=g,
+                                                     style=s, fmt=fmt, year=year, max_pages=npages)
+            else:
+                part = []
+                for pg in range(1, npages + 1):
+                    p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
+                    for k, v in (("genre", g), ("style", s), ("year", year), ("format", fmt)):
+                        if v:
+                            p[k] = v
+                    d = discogs.search(token=token, **p)
+                    got = d.get("results", [])
+                    part += got
+                    if pg >= d.get("pagination", {}).get("pages", 1) or not got:
+                        break
+            for r in part:
+                rid = r.get("id")
+                if rid and rid not in seen_ids:
+                    seen_ids.add(rid)
+                    raw.append(r)
     except discogs.DiscogsError as e:
         return frag(request, "partials/results.html", error=str(e))
     seen, scored = set(), []

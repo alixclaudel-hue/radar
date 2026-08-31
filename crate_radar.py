@@ -1649,18 +1649,54 @@ def render_new_inbox(items, path, id_field, key_ns, source_field=None, source_la
 st.set_page_config(page_title="Radar", page_icon="📡", layout="wide")
 
 
+_AUTH_TTL = 5 * 3600   # validité (fenêtre glissante) — resaisie après ce délai d'inactivité
+
+
+def _auth_token(exp):
+    exp = int(exp)
+    sig = hashlib.sha256(f"{os.environ.get('APP_PASSWORD', '')}|{exp}".encode()).hexdigest()[:20]
+    return f"{exp}.{sig}"
+
+
+def _auth_token_exp(tok):
+    """Timestamp d'expiration si le jeton est valide et non expiré, sinon 0."""
+    try:
+        exp = int(tok.split(".", 1)[0])
+    except Exception:
+        return 0
+    if time.time() > exp or _auth_token(exp) != tok:
+        return 0
+    return exp
+
+
 def _require_login():
     """Porte d'accès quand l'appli est exposée (déploiement). Sans APP_PASSWORD
-    défini (usage local), aucun mot de passe n'est demandé."""
+    défini (usage local), aucun mot de passe n'est demandé. Le jeton vit dans l'URL
+    (`?t=…`) → survit aux reconnexions et se renouvelle tant qu'on utilise l'appli."""
     pw = os.environ.get("APP_PASSWORD", "")
     if not pw:
         return
-    if st.session_state.get("_authed"):
+    try:
+        tok = st.experimental_get_query_params().get("t", [""])[0]
+    except Exception:
+        tok = ""
+    exp = _auth_token_exp(tok)
+    if st.session_state.get("_authed") or exp:
+        st.session_state["_authed"] = True
+        if exp - time.time() < _AUTH_TTL / 2:      # renouvellement glissant
+            try:
+                st.experimental_set_query_params(t=_auth_token(time.time() + _AUTH_TTL))
+            except Exception:
+                pass
         return
     st.markdown("### 🔒 Radar")
     got = st.text_input("Mot de passe", type="password", key="_login_pw")
     if got and hashlib.sha256(got.encode()).digest() == hashlib.sha256(pw.encode()).digest():
         st.session_state["_authed"] = True
+        try:
+            st.experimental_set_query_params(t=_auth_token(time.time() + _AUTH_TTL))
+        except Exception:
+            pass
         st.rerun()
     elif got:
         st.error("Mot de passe incorrect.")

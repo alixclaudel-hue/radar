@@ -1646,7 +1646,7 @@ def render_new_inbox(items, path, id_field, key_ns, source_field=None, source_la
 
 # ---------------------------------------------------------------- UI
 
-st.set_page_config(page_title="Radar", page_icon="📡", layout="wide")
+st.set_page_config(page_title="Radar · Streamlit", page_icon="📡", layout="wide")
 
 
 _AUTH_TTL = 5 * 3600   # validité (fenêtre glissante) — resaisie après ce délai d'inactivité
@@ -1689,7 +1689,7 @@ def _require_login():
             except Exception:
                 pass
         return
-    st.markdown("### 🔒 Radar")
+    st.markdown("### 🔒 Radar · Streamlit")
     got = st.text_input("Mot de passe", type="password", key="_login_pw")
     if got and hashlib.sha256(got.encode()).digest() == hashlib.sha256(pw.encode()).digest():
         st.session_state["_authed"] = True
@@ -1894,7 +1894,7 @@ hr{ border-color:var(--line); }
 """, unsafe_allow_html=True)
 
 st.markdown('<p class="radar-title">Rada<b>r</b></p>', unsafe_allow_html=True)
-st.markdown('<p class="radar-sub">Discogs × ta base de labels</p>', unsafe_allow_html=True)
+st.markdown('<p class="radar-sub">version Streamlit · référence</p>', unsafe_allow_html=True)
 
 _NAV = ["🔍 Recherche", "📻 Liste de veille", "🏪 Mes vendeurs", "🏷️ Mes labels",
         "🎧 Sources & reco", "🎤 Mes artistes", "🎚️ Mes sets", "🎛️ Réglages"]

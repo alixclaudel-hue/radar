@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Recherche · Radar{% endblock %}
+{% block content %}
+
+<h1>Recherche</h1>
+<p class="muted small">Un label pour une recherche ciblée, ou laisse vide et filtre par style / genre / année.</p>
+
+<form hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
+  <div class="field">
+    <label for="f-label">Label (optionnel)</label>
+    <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}">
+  </div>
+  <div class="row">
+    <div class="field">
+      <label>Genre</label>
+      <input name="genre" placeholder="Electronic" value="{{ q.genre or '' }}">
+    </div>
+    <div class="field">
+      <label>Style</label>
+      <input name="style" placeholder="Deep House" value="{{ q.style or '' }}">
+    </div>
+    <div class="field">
+      <label>Année de</label>
+      <input name="year_from" inputmode="numeric" placeholder="2005" value="{{ q.year_from or '' }}">
+    </div>
+    <div class="field">
+      <label>Année à</label>
+      <input name="year_to" inputmode="numeric" placeholder="2014" value="{{ q.year_to or '' }}">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field" style="flex:0 0 auto">
+      <label>&nbsp;</label>
+      <label class="small"><input type="checkbox" name="vinyl" style="width:auto" {{ 'checked' if q.vinyl }}> Vinyle uniquement</label>
+    </div>
+    <div class="field" style="flex:0 0 auto">
+      <label>Pages / label</label>
+      <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}" style="width:80px">
+    </div>
+    <div class="field" style="flex:0 0 auto; align-self:end">
+      <label>&nbsp;</label>
+      <button class="primary" type="submit">Rechercher</button>
+      <span id="busy" class="htmx-indicator"><span class="spinner"></span></span>
+    </div>
+  </div>
+</form>
+
+<hr>
+<div id="results">
+  {% include "partials/results.html" %}
+</div>
+{% endblock %}

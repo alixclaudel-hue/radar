@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Radar{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="brand" href="/">Rada<b>r</b></a>
+      <span class="brand-sub">Discogs × ta base de labels</span>
+    </div>
+    <nav class="nav">
+      {% set cur = active|default('') %}
+      <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Recherche</a>
+      <a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Veille</a>
+      <a href="/sellers"  class="{{ 'active' if cur=='sellers' }}">🏪 Vendeurs</a>
+      <a href="/labels"   class="{{ 'active' if cur=='labels' }}">🏷️ Mes labels</a>
+      <a href="/sources"  class="{{ 'active' if cur=='sources' }}">🎧 Sources &amp; reco</a>
+      <a href="/artists"  class="{{ 'active' if cur=='artists' }}">🎤 Mes artistes</a>
+      <a href="/sets"     class="{{ 'active' if cur=='sets' }}">🎚️ Mes sets</a>
+      <a href="/settings" class="{{ 'active' if cur=='settings' }}">🎛️ Réglages</a>
+    </nav>
+    <hr>
+    {% if not has_token and active != 'settings' %}
+      <p class="notice warn small">⚠️ Token Discogs manquant — renseigne-le dans <a href="/settings">Réglages</a>.</p>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{% if error %}
+  <span class="muted small">{{ error }}</span>
+{% elif not tracks %}
+  <span class="muted small">Pas de tracklist sur Discogs.</span>
+{% else %}
+  {% for t in tracks %}
+    <div>
+      <code>{{ t.pos or '•' }}</code>
+      {{ t.title }}
+      — <a href="{{ t.yt }}" target="_blank" rel="noopener">▶ YouTube</a>
+    </div>
+  {% endfor %}
+{% endif %}

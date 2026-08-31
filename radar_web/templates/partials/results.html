@@ -1,0 +1,46 @@
+{% if error %}
+  <p class="notice warn">{{ error }}</p>
+{% elif results is not defined %}
+  <p class="muted small">Aucune recherche lancée.</p>
+{% elif not results %}
+  <p class="muted small">Aucun résultat pour ces filtres.</p>
+{% else %}
+  <div class="section-title">
+    <h3>{{ results|length }} résultat{{ 's' if results|length > 1 }}</h3>
+    <span class="muted small">triés par score album</span>
+  </div>
+  <div class="grid">
+  {% for r in results %}
+    {% set rr = r.raw %}
+    {% set artist, sep, album = (rr.title or '').partition(' - ') %}
+    <div class="card">
+      <div class="cover {{ 'empty' if not rr.thumb }}">
+        {% if rr.thumb %}<img src="{{ rr.thumb }}" alt="" loading="lazy">{% endif %}
+      </div>
+      <div class="body">
+        {% if sep %}<span class="artist">{{ artist }}</span>{% endif %}
+        <span class="title">{{ album if sep else rr.title }}</span>
+        <span class="meta">
+          {{ (rr.label or [])|join(', ') }}
+          {% if r.detail.label is not none %} · aff. label {{ r.detail.label }}{% endif %}
+        </span>
+        <span class="meta">{{ (rr.style or [])|join(', ') }}</span>
+        <span class="catno">{{ rr.catno }}{% if rr.catno and rr.year %} · {% endif %}{{ rr.year }}</span>
+        <div class="tracklist">
+          <button type="button" class="small"
+                  hx-get="/release/{{ rr.id }}/tracks"
+                  hx-target="closest .tracklist" hx-swap="innerHTML">🎵 Pistes</button>
+        </div>
+        <div class="foot">
+          {% if r.score is not none %}
+            <span class="badge">🎯 {{ r.score }}</span>
+          {% else %}
+            <span class="badge ghost">—</span>
+          {% endif %}
+          {% if rr.uri %}<a class="small" href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs ↗</a>{% endif %}
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+{% endif %}

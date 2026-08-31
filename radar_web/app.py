@@ -593,6 +593,14 @@ JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_bandcamp": {"deep": True
 
 @app.post("/jobs/{name}/launch", response_class=HTMLResponse)
 def job_launch(name: str):
+    if name == "ingest_djsets":
+        srcs = [s.strip() for s in (_cfg().get("djset_sources") or "").splitlines() if s.strip()]
+        if not srcs:
+            return HTMLResponse("<div id='job-ingest_djsets' class='notice warn small'>"
+                                "Aucune source DJ — renseigne-les dans « Mieux connaître ton univers → DJ sets ».</div>")
+        save(os.path.join(store.paths.JOBS_DIR, "djsets.input.json"),
+             {"sources": srcs, "max_per_source": 25, "min_minutes": 35,
+              "require_hint": True, "deep": True})
     if name in VALID_JOBS:
         jobs.launch(name, JOB_PARAMS.get(name, {}))
     return job_status_frag(name)

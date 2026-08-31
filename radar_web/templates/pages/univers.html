@@ -51,14 +51,14 @@
   {% include "partials/graph_builder.html" %}
   <div class="section-title" style="margin-top:10px"><h3 style="font-size:1rem">Résolution des artistes</h3>
     <button hx-post="/jobs/resolve_artists/launch" hx-target="#job-resolve_artists" hx-swap="outerHTML">Lancer</button></div>
-  <div id="job-resolve_artists" hx-get="/jobs/resolve_artists/status" hx-trigger="load" class="small"></div>
+  <div id="job-resolve_artists" hx-get="/jobs/resolve_artists/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
   <hr>
   <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
 
 {% elif tab == 'sets' %}
   <div class="section-title"><h3>Extraire des DJ sets</h3>
     <button hx-post="/jobs/ingest_djsets/launch" hx-target="#job-ingest_djsets" hx-swap="outerHTML" class="primary">Lancer l'extraction</button></div>
-  <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" class="small"></div>
+  <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
   <p class="small muted">Sources DJ dans « Mieux connaître ton univers → DJ sets ». {{ n_sets }} tracks extraites.</p>
   <hr>
   <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>

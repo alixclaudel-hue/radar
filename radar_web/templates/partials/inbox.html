@@ -30,8 +30,8 @@
         </div>
         {% if r.score is not none %}
         <span class="vote" hx-swap="outerHTML">
-          <button hx-post="/feedback" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>👍</button>
-          <button hx-post="/feedback" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>👎</button>
+          <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>👍</button>
+          <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>👎</button>
         </span>
         {% endif %}
         <button hx-post="/inbox/{{ key_ns }}/dismiss"

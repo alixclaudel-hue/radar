@@ -1,6 +1,7 @@
-# Image légère : FastAPI + uvicorn. (Les jobs Playwright tournent via crate_jobs.py ;
-# si tu veux le scraping DJ sets côté conteneur, repars de l'image playwright/python.)
-FROM python:3.12-slim
+# Même base que la version Streamlit : Python + Chromium + deps système déjà là.
+# Nécessaire pour que radar-web puisse lancer TOUS les jobs (dont l'extraction des
+# DJ sets, qui utilise Playwright + yt-dlp via crate_jobs.py).
+FROM mcr.microsoft.com/playwright/python:v1.48.0-jammy
 
 WORKDIR /app
 COPY radar_web/requirements.txt radar_web/requirements.txt

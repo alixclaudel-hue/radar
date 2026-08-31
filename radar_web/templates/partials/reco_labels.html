@@ -22,8 +22,8 @@
       <button class="small">+ veille</button></form>
     {% endif %}
     <span class="vote" hx-swap="outerHTML">
-      <button hx-post="/feedback" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"up","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👍</button>
-      <button hx-post="/feedback" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"down","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👎</button>
+      <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"up","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👍</button>
+      <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"down","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👎</button>
     </span>
   </div>
   {% endfor %}

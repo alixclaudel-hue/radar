@@ -40,8 +40,8 @@
           {% if rr.uri %}<a class="small" href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs ↗</a>{% endif %}
           {% if r.score is not none %}
           <span class="vote" hx-swap="outerHTML" style="margin-left:auto">
-            <button hx-post="/feedback" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👍</button>
-            <button hx-post="/feedback" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👎</button>
+            <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👍</button>
+            <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👎</button>
           </span>
           {% endif %}
         </div>

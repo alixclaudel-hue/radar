@@ -66,7 +66,7 @@
       {% endfor %}
       <button type="submit" formaction="/patte" class="small">Enregistrer les URLs</button>
       <button class="small" type="button" hx-post="/jobs/ingest_youtube/launch" hx-target="#job-ingest_youtube" hx-swap="outerHTML">Importer les playlists</button>
-      <span id="job-ingest_youtube" hx-get="/jobs/ingest_youtube/status" hx-trigger="load" class="small"></span>
+      <div id="job-ingest_youtube" hx-get="/jobs/ingest_youtube/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
     </div>
   </details>
 
@@ -76,7 +76,7 @@
     <div class="acc__body">
       <p class="small muted">Identifiants dans « Connexions ».</p>
       <button class="small" type="button" hx-post="/jobs/ingest_bandcamp/launch" hx-target="#job-ingest_bandcamp" hx-swap="outerHTML">Importer ma collection Bandcamp</button>
-      <span id="job-ingest_bandcamp" hx-get="/jobs/ingest_bandcamp/status" hx-trigger="load" class="small"></span>
+      <div id="job-ingest_bandcamp" hx-get="/jobs/ingest_bandcamp/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
     </div>
   </details>
 
@@ -89,7 +89,7 @@
         <textarea name="djset_sources" rows="5">{{ cfg.djset_sources or '' }}</textarea></div>
       <button type="submit" formaction="/patte" class="small">Enregistrer</button>
       <button class="small" type="button" hx-post="/jobs/ingest_djsets/launch" hx-target="#job-ingest_djsets" hx-swap="outerHTML">Lancer l'extraction</button>
-      <span id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" class="small"></span>
+      <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
     </div>
   </details>
 
@@ -99,7 +99,7 @@
     <div class="acc__body">
       <p class="small muted">{% if coll.fetched_at %}Dernier chargement : {{ coll.fetched_at.replace('T',' ') }}{% else %}Jamais chargée.{% endif %}</p>
       <button class="small" type="button" hx-post="/jobs/fetch_collection/launch" hx-target="#job-fetch_collection" hx-swap="outerHTML">Charger / rafraîchir</button>
-      <span id="job-fetch_collection" hx-get="/jobs/fetch_collection/status" hx-trigger="load" class="small"></span>
+      <div id="job-fetch_collection" hx-get="/jobs/fetch_collection/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
     </div>
   </details>
 

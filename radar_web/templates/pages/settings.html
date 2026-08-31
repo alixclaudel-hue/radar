@@ -49,11 +49,11 @@
 <div style="display:flex;flex-direction:column;gap:8px;max-width:520px">
   <div style="display:flex;gap:10px;align-items:center">
     <button hx-post="/jobs/canonicalize/launch" hx-target="#job-canonicalize" hx-swap="outerHTML">Grand nettoyage (labels + artistes + corpus)</button>
-    <div id="job-canonicalize" hx-get="/jobs/canonicalize/status" hx-trigger="load" class="small"></div>
+    <div id="job-canonicalize" hx-get="/jobs/canonicalize/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
   </div>
   <div style="display:flex;gap:10px;align-items:center">
     <button hx-post="/jobs/profile_labels/launch" hx-target="#job-profile_labels" hx-swap="outerHTML">Profiler les labels (par tranches)</button>
-    <div id="job-profile_labels" hx-get="/jobs/profile_labels/status" hx-trigger="load" class="small"></div>
+    <div id="job-profile_labels" hx-get="/jobs/profile_labels/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
   </div>
 </div>
 <p class="small muted">L'enrichissement (résolution + profilage) de chaque nouvel ajout se fait déjà en tâche de fond.</p>

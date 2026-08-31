@@ -1684,9 +1684,82 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
+_MKT_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+_MKT_TOTAL_RE = re.compile(r'pagination_total"[^>]*>(.*?)</', re.S)
+
+
+def _mkt_count(page, rid, country):
+    page.goto(f"https://www.discogs.com/sell/release/{rid}?ships_from={country}",
+              timeout=45000, wait_until="domcontentloaded")
+    for _ in range(4):  # laisse passer le challenge Cloudflare si présent
+        if "just a moment" not in (page.title() or "").lower():
+            break
+        page.wait_for_timeout(6000)
+    try:
+        page.wait_for_load_state("networkidle", timeout=12000)
+    except Exception:
+        pass
+    body = page.content()
+    if "just a moment" in body[:3000].lower():
+        return None
+    m = _MKT_TOTAL_RE.search(body)
+    if m:
+        digits = re.sub(r"[^\d]", "", m.group(1).split(">")[-1])
+        if digits:
+            return int(digits)
+    low = body.lower()
+    if "no items for sale" in low or "aucun article" in low or "0 for sale" in low:
+        return 0
+    return None
+
+
+def job_market_fr(job, params):
+    """Complète release_meta_cache.json avec le nb d'annonces localisées en France
+    (scrape via navigateur — l'API Discogs n'expose pas ce filtre)."""
+    country = params.get("country", "France")
+    cap = int(params.get("cap", 120))
+    path = os.path.join(DATA, "release_meta_cache.json")
+    cache = load_json(path, {})
+    todo = [rid for rid, e in cache.items() if e.get("fr") is None][:cap]
+    if not todo:
+        return job.finish("Rien à compléter (aucune carte disque consultée récemment).")
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        return job.finish(error="Playwright absent du conteneur.")
+    job.st["total"] = len(todo)
+    done = 0
+    with sync_playwright() as pw:
+        b = pw.chromium.launch(args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
+        ctx = b.new_context(user_agent=_MKT_UA, locale="fr-FR",
+                            viewport={"width": 1280, "height": 900})
+        page = ctx.new_page()
+        for rid in todo:
+            if job.stopped():
+                break
+            try:
+                n = _mkt_count(page, rid, country)
+            except Exception as e:
+                n = None
+                job.msg(f"{rid}: {type(e).__name__}")
+            if n is not None:
+                cache.setdefault(rid, {})["fr"] = n
+                cache[rid]["fr_at"] = datetime.now().isoformat(timespec="seconds")
+                done += 1
+            job.tick(f"release {rid} → {n if n is not None else '?'}")
+            if job.st["done"] % 10 == 0:
+                save_json(path, cache)
+            time.sleep(0.5)
+        b.close()
+    save_json(path, cache)
+    job.finish(f"{done}/{len(todo)} sorties complétées (localisées en {country}).")
+
+
 JOBS = {
     "ingest_youtube": job_ingest_youtube,
     "ingest_spotify": job_ingest_spotify,
+    "market_fr": job_market_fr,
     "ingest_bandcamp": job_ingest_bandcamp,
     "fetch_collection": job_fetch_collection,
     "merge_corpus": job_merge_corpus,

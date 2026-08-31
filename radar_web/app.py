@@ -805,7 +805,7 @@ def univers_artists_export():
 # ============================================================ jobs
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
-              "ingest_djsets", "resolve_artists", "canonicalize", "enrich"}
+              "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "market_fr"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 

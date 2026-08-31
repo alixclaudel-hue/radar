@@ -85,10 +85,11 @@ DEFAULT_TASTE_CATEGORIES = {
 }
 DEFAULT_TASTE_WEIGHTS = {"1": 1.0, "2": 0.6, "3": 0.3}
 DEFAULT_ALBUM_WEIGHTS = {"label": 0.4, "artist": 0.4, "style": 0.2}
-CAT_LABELS = {"1": "Cœur", "2": "2ᵉ rang", "3": "Périphérie"}
+CAT_LABELS = {"1": "Cœur", "2": "2ᵉ rang", "3": "Périphérie"}          # styles (3 rangs)
+ARTIST_CAT_LABELS = {"1": "Cœur", "2": "Aimés"}                         # artistes (2 rangs)
 
 # Artistes : mêmes 3 catégories/poids, alimentées manuellement (par défaut vides).
-DEFAULT_ARTIST_CATEGORIES = {"1": [], "2": [], "3": []}
+DEFAULT_ARTIST_CATEGORIES = {"1": [], "2": []}
 DEFAULT_ARTIST_WEIGHTS = {"1": 1.0, "2": 0.6, "3": 0.3}
 DEFAULT_ARTIST_SCORE_WEIGHTS = {"manual": 0.5, "corpus": 0.18, "collection": 0.1,
                                 "graph": 0.14, "djset": 0.08}
@@ -102,7 +103,7 @@ ARTIST_STOPWORDS = {"various artists", "various", "va", "unknown artist", "unkno
 # ---------------------------------------------------------------------------
 DEFAULT_SCORING = {
     "taste_tiers":  {"1": 1.0, "2": 0.6, "3": 0.3},          # rangs de styles
-    "artist_tiers": {"1": 1.0, "2": 0.6, "3": 0.3},          # rangs d'artistes
+    "artist_tiers": {"1": 1.0, "2": 0.5},                     # rangs d'artistes (Cœur / Aimés)
     "reco": {"collection": 0.6, "corpus": 0.5, "artist": 0.4,
              "affinity": 0.4, "want_factor": 0.6},           # score label (reco)
     "album": {"label": 0.4, "artist": 0.4, "style": 0.2,
@@ -191,13 +192,21 @@ def load_config():
                 sc["label_affinity_floor"] = data["label_affinity_floor"]
             data["scoring"] = sc
         data["scoring"] = _deep_merge(DEFAULT_SCORING, data.get("scoring", {}))
+        data["scoring"]["artist_tiers"].pop("3", None)
         for k in _FLAT_WEIGHT_KEYS:
             data.pop(k, None)
         for k, v in default.items():
             data.setdefault(k, v)
         for k in ("1", "2", "3"):
             data["taste_categories"].setdefault(k, [])
-            data["artist_categories"].setdefault(k, [])
+        _ac = data.setdefault("artist_categories", {})
+        if _ac.get("3"):        # fusion cat.3 (Périphérie) -> cat.2 (Aimés)
+            _seen2 = {normalize_label(x) for x in _ac.get("2", [])}
+            _ac["2"] = list(_ac.get("2", [])) + [n for n in _ac["3"]
+                                                 if normalize_label(n) not in _seen2]
+        _ac.pop("3", None)
+        for k in ("1", "2"):
+            _ac.setdefault(k, [])
         _env_secrets(data)
         return data
     _env_secrets(default)
@@ -255,7 +264,7 @@ def _sig_artist_signal():
 
 def _sig_cats():
     c = st.session_state.cfg
-    return tuple(tuple(c.get("artist_categories", {}).get(k, [])) for k in ("1", "2", "3"))
+    return tuple(tuple(c.get("artist_categories", {}).get(k, [])) for k in ("1", "2"))
 
 
 def _sig_graph():
@@ -1076,13 +1085,13 @@ def artist_score(name):
 
 
 def set_artist_categories(cats):
-    """Écrit les 3 catégories d'artistes (dédup sur nom normalisé) en config.
+    """Écrit les 2 catégories d'artistes (Cœur / Aimés, dédup sur nom normalisé) en config.
     Les nouveaux noms sont mis en file d'enrichissement (résolution Discogs auto)."""
-    prev = {normalize_label(n) for cid in ("1", "2", "3")
+    prev = {normalize_label(n) for cid in ("1", "2")
             for n in cfg().get("artist_categories", {}).get(cid, [])}
     seen = set()
     clean = {}
-    for cid in ("1", "2", "3"):
+    for cid in ("1", "2"):
         clean[cid] = []
         for n in cats.get(cid, []):
             n = (n or "").strip()
@@ -2089,371 +2098,91 @@ if _nav == "🎚️ Mes sets":
 
 if _nav == "🎤 Mes artistes":
     st.write(
-        "Ta liste d'artistes préférés, hiérarchisée en 3 catégories comme les styles. "
-        "Elle donnera un **score d'artiste** qui entrera dans la reco (aujourd'hui : liste "
-        "manuelle + présence dans ton corpus/collection ; bientôt : proximité dans le graphe "
-        "de producteurs)."
+        "Deux niveaux&nbsp;: **Cœur** (tes références, quelques noms) et **Aimés** (ceux que tu "
+        "aimes bien). Ils pilotent le **score d'artiste**, qui remonte ensuite dans la reco et "
+        "le score album. Le tableau liste tous les artistes déjà repérés (catégories + corpus + "
+        "collection + graphe de producteurs) avec leur **note** ; règle la catégorie d'un clic."
     )
 
-    a_cats = cfg().get("artist_categories", DEFAULT_ARTIST_CATEGORIES)
-    st.session_state.setdefault("_seed_editor_n", 0)
-    # les text_areas ne se resynchronisent pas seules : on force leur contenu quand
-    # la config change (après un « Appliquer » du tableau).
-    for cid in ("1", "2", "3"):
-        want = "\n".join(a_cats.get(cid, []))
-        if st.session_state.get(f"_artcat_shadow_{cid}") != want:
-            st.session_state[f"artcat_{cid}"] = want
-            st.session_state[f"_artcat_shadow_{cid}"] = want
+    _scores = artist_scores()
+    _tiers = artist_tier_map()
+    _cc, _lc, _gr, _disp = artist_signal()
+    _CATNAME = {"1": "Cœur", "2": "Aimé", None: "—"}
+    _NAMEBACK = {"Cœur": "1", "Aimé": "2", "—": None}
 
-    acol = st.columns(3)
-    new_a_cats = {}
-    for cid, col in zip(("1", "2", "3"), acol):
-        with col:
-            st.caption(f"Catégorie {cid} — {CAT_LABELS[cid]} · poids {scoring()['artist_tiers'][cid]}")
-            raw = st.text_area(f"Artistes cat. {cid}", height=180,
-                               key=f"artcat_{cid}", label_visibility="collapsed")
-            new_a_cats[cid] = [s.strip() for s in raw.splitlines() if s.strip()]
-    n_art = sum(len(v) for v in new_a_cats.values())
-    sc1, sc2 = st.columns([1, 3])
-    if sc1.button("💾 Enregistrer les listes"):
-        set_artist_categories(new_a_cats)
-        for cid in ("1", "2", "3"):
-            st.session_state.pop(f"_artcat_shadow_{cid}", None)
-        st.rerun()
-    sc2.caption(f"{n_art} artiste(s) dans les listes. Les **poids** (rangs d'artistes, score "
-                "d'artiste : manuel/corpus/collection/graphe/sets) sont dans l'onglet **🎛️ Réglages**.")
+    _univ = set(_tiers) | set(_cc) | set(_lc) | set(_gr)
+    m1, m2, m3 = st.columns(3)
+    m1.metric("💗 Cœur", sum(1 for v in _tiers.values() if v == "1"))
+    m2.metric("Aimés", sum(1 for v in _tiers.values() if v == "2"))
+    m3.metric("Artistes repérés", len(_univ))
 
-    st.divider()
-    st.subheader("Alimenter depuis ce que j'écoute déjà")
-    st.caption("Artistes de ton corpus (YouTube/Bandcamp) + ta collection Discogs. Colonne "
-               "**« → Cat »** : choisis une catégorie, puis **Appliquer** — ça les ajoute aux "
-               "listes ci-dessus.")
+    fc1, fc2 = st.columns([3, 2])
+    flt = fc1.text_input("Filtrer", key="art_flt", placeholder="nom d'artiste…",
+                         label_visibility="collapsed")
+    hide_class = fc2.checkbox("Masquer ceux déjà classés", value=False, key="art_hide_class")
 
-    corpus_c, coll_c, _graph, disp = artist_signal()
-    tiers = artist_tier_map()
-    order = sorted(set(corpus_c) | set(coll_c),
-                   key=lambda k: (coll_c.get(k, 0) + corpus_c.get(k, 0)), reverse=True)
-    flt_a = st.text_input("Filtrer", key="artist_seed_filter", placeholder="nom d'artiste…")
-    if flt_a:
-        order = [k for k in order if flt_a.lower() in disp.get(k, k).lower()]
-    order = order[:120]
-    seed_rows = [{"Artiste": disp.get(k, k), "Coll": coll_c.get(k, 0),
-                  "Corp": corpus_c.get(k, 0),
-                  "Actuel": tiers.get(k, "—"), "→ Cat": ""}
-                 for k in order]
+    rows = []
+    for ck in _univ:
+        name = _disp.get(ck, ck)
+        if str(name).startswith("id:"):
+            continue
+        tier = _tiers.get(ck)
+        sc = _scores.get(ck) or (0, name, "—")
+        if not tier and sc[0] == 0:
+            continue
+        if hide_class and tier:
+            continue
+        if flt and flt.lower() not in str(name).lower():
+            continue
+        rows.append({"Artiste": name, "Note": sc[0], "Signaux": sc[2],
+                     "Catégorie": _CATNAME[tier], "_ck": ck})
+    rows.sort(key=lambda r: -r["Note"])
+    _cap = 300
+    st.caption(f"{min(len(rows), _cap)} affiché(s) sur {len(rows)} — triés par note. "
+               "Change « Catégorie » puis **Enregistrer**.")
     edited = st.data_editor(
-        seed_rows, hide_index=True, use_container_width=True, height=380,
-        key=f"seed_editor_{st.session_state['_seed_editor_n']}",
+        rows[:_cap], hide_index=True, use_container_width=True, height=460,
+        key=f"art_editor_{st.session_state.get('_art_editor_n', 0)}",
         column_config={
             "Artiste": st.column_config.TextColumn(disabled=True),
-            "Coll": st.column_config.NumberColumn(disabled=True, width="small"),
-            "Corp": st.column_config.NumberColumn(disabled=True, width="small"),
-            "Actuel": st.column_config.TextColumn(disabled=True, width="small"),
-            "→ Cat": st.column_config.SelectboxColumn(options=["", "1", "2", "3"], width="small"),
+            "Note": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d"),
+            "Signaux": st.column_config.TextColumn(disabled=True, width="large"),
+            "Catégorie": st.column_config.SelectboxColumn(options=["—", "Cœur", "Aimé"],
+                                                         width="small"),
+            "_ck": None,
         })
-    picks = [(r["Artiste"], str(r.get("→ Cat") or "").strip())
-             for r in edited if str(r.get("→ Cat") or "").strip() in ("1", "2", "3")]
-    if st.button(f"Appliquer ({len(picks)})", type="primary", disabled=not picks):
-        merged = {cid: list(cfg().get("artist_categories", {}).get(cid, [])) for cid in ("1", "2", "3")}
-        for name, cid in picks:
-            for lst in merged.values():
-                if name in lst:
-                    lst.remove(name)
-            merged[cid].append(name)
-        set_artist_categories(merged)
-        for cid in ("1", "2", "3"):
-            st.session_state.pop(f"_artcat_shadow_{cid}", None)
-        st.session_state["_seed_editor_n"] += 1   # remet la colonne « → Cat » à zéro
+    if st.button("💾 Enregistrer les catégories", type="primary"):
+        newc = {"1": list(cfg().get("artist_categories", {}).get("1", [])),
+                "2": list(cfg().get("artist_categories", {}).get("2", []))}
+        for r in edited:
+            ck = r["_ck"]
+            tgt = _NAMEBACK.get(r["Catégorie"])
+            for cid in ("1", "2"):
+                newc[cid] = [n for n in newc[cid] if canonical_artist_key(n) != ck]
+            if tgt:
+                nm = canonical_artist_name(_disp.get(ck, ck)) or _disp.get(ck, ck)
+                newc[tgt].append(nm)
+        set_artist_categories(newc)
+        st.session_state["_art_editor_n"] = st.session_state.get("_art_editor_n", 0) + 1
+        st.success("Catégories enregistrées — notes recalculées.")
         st.rerun()
 
     st.divider()
-    st.subheader("Aperçu du score d'artiste")
-    ascores = sorted(artist_scores().values(), reverse=True)
-    top_rows = [{"Artiste": d, "Score": s, "Pourquoi": w} for s, d, w in ascores[:40]]
-    st.dataframe(top_rows, hide_index=True, use_container_width=True)
+    st.caption("Ajouter un artiste absent de la liste (résolu automatiquement) :")
+    ac1, ac2, ac3 = st.columns([3, 1, 1])
+    _newname = ac1.text_input("Nom", key="art_add_name", label_visibility="collapsed",
+                              placeholder="ex. Terrence Dixon")
+    _newcat = ac2.selectbox("Cat.", ["Cœur", "Aimé"], key="art_add_cat",
+                            label_visibility="collapsed")
+    if ac3.button("Ajouter") and _newname.strip():
+        cur = {"1": list(cfg().get("artist_categories", {}).get("1", [])),
+               "2": list(cfg().get("artist_categories", {}).get("2", []))}
+        cur[_NAMEBACK[_newcat]].append(_newname.strip())
+        set_artist_categories(cur)
+        st.session_state["_art_editor_n"] = st.session_state.get("_art_editor_n", 0) + 1
+        st.rerun()
+    st.caption("Résolution & alias des artistes : onglet **🎛️ Réglages → Nettoyage Discogs**.")
 
-    st.divider()
-    st.subheader("🧹 Résolution des artistes vers Discogs")
-    st.caption("Associe chaque artiste de ta liste à son identifiant Discogs exact (comme pour "
-               "les labels). Le graphe utilise alors ces IDs — fini les collisions "
-               "« Buck » ≠ « DJ Buck » ou les mauvais homonymes.")
-    ar = st.session_state.get("artists_resolved", {})
-    manual_all = [n for cid in ("1", "2", "3")
-                  for n in cfg().get("artist_categories", {}).get(cid, [])]
-    # noms bruts de toutes les sources -> clés normalize_label (index de artists_resolved.json)
-    raw_names = set(manual_all)
-    for _r in st.session_state.get("corpus", []):
-        if _r.get("artist"):
-            raw_names.add(_r["artist"])
-    for _a in st.session_state.get("collection", {}).get("artist_counts", {}):
-        raw_names.add(_a)
-    raw_names = {n for n in raw_names if n and normalize_label(n) not in ARTIST_STOPWORDS}
-    all_keys = {normalize_label(n) for n in raw_names}
-    manual_keys = {normalize_label(n) for n in manual_all}
-    n_res = sum(1 for k in all_keys if k in ar)
-    n_approx = sum(1 for k in all_keys if ar.get(k, {}).get("status") == "approx")
-    st.progress(n_res / len(all_keys) if all_keys else 0,
-                text=f"{n_res}/{len(all_keys)} artistes résolus · {n_approx} approx à vérifier "
-                     f"· {sum(1 for k in all_keys if ar.get(k, {}).get('status') == 'not_found')} introuvables")
-
-    if not render_job("resolve_artists", "Résolution artistes") \
-            and not job_running("resolve_artists"):
-        scope = st.radio("Périmètre", [f"Ma liste ({len(manual_all)})",
-                                       f"Liste + corpus + collection ({len(all_keys)})"],
-                         horizontal=True, key="ar_scope")
-        rc1, rc2 = st.columns([3, 1])
-        reforce = rc1.checkbox("Re-résoudre aussi ceux déjà validés", key="ar_force")
-        if rc2.button("Lancer la résolution", key="btn_resolve_artists",
-                      disabled=not cfg().get("token")):
-            job_launch("resolve_artists",
-                       {"force": reforce, "scope": "all" if scope.startswith("Liste +") else "manual"})
-            st.rerun()
-
-    approx = sorted(((k, ar[k]) for k in all_keys if ar.get(k, {}).get("status") == "approx"),
-                    key=lambda t: (t[0] not in manual_keys, t[1].get("original", "")))
-    if approx:
-        with st.expander(f"⚠️ {len(approx)} correspondance(s) approximative(s) à vérifier "
-                         "(ta liste d'abord)"):
-            for k, e in approx[:30]:
-                st.markdown(f"**{e['original']}** → proposition : *{e.get('discogs_name')}*")
-                cands = e.get("candidates") or []
-                r1, r2, r3 = st.columns([4, 1, 1])
-                if cands:
-                    idx = r1.selectbox(
-                        "Bon artiste", list(range(len(cands))),
-                        format_func=lambda i, cc=cands: f"{cc[i]['name']} · id {cc[i]['id']}",
-                        key=f"ares_sel_{k}", label_visibility="collapsed")
-                else:
-                    r1.caption("aucun candidat Discogs")
-                    idx = None
-                if r2.button("✅", key=f"ares_ok_{k}", disabled=idx is None):
-                    c = cands[idx]
-                    ar[k] = {**e, "discogs_name": c["name"], "discogs_id": c["id"],
-                             "status": "confirmed"}
-                    save_json(ARTISTS_RESOLVED_PATH, ar)
-                    st.rerun()
-                if r3.button("🚫", key=f"ares_no_{k}"):
-                    ar[k] = {**e, "status": "not_found", "discogs_id": None, "discogs_name": None}
-                    save_json(ARTISTS_RESOLVED_PATH, ar)
-                    st.rerun()
-
-    st.divider()
-    st.subheader("🕸️ Graphe de producteurs")
-    st.caption("Interroge la discographie de tes artistes-graines sur Discogs et remonte les "
-               "**co-crédités** et **co-labels**. Le **graphe global** part de *tous* tes artistes "
-               "résolus (liste + corpus + collection) : chaque artiste d'un résultat de recherche "
-               "obtient alors un vrai score de proximité. Le score est **recalculé à la volée** "
-               "quand tu recatégorises un artiste, sans reconstruire.")
-    _gmeta = st.session_state.producer_graph
-    _grr = graph_rescore()
-    if _gmeta.get("built_at"):
-        st.caption(f"Dernier calcul : {_gmeta['built_at'].replace('T', ' ')} · "
-                   f"mode **{_gmeta.get('mode', '?')}** · "
-                   f"{_gmeta.get('n_resolved_seeds', len(_gmeta.get('seeds', {})))} graines · "
-                   f"{len(_grr.get('artists', {}))} artistes proches · "
-                   f"{len(_grr.get('labels', {}))} labels candidats.")
-
-    if render_job("build_graph", "Graphe de producteurs"):
-        pass
-    elif not job_running("build_graph"):
-        _cc, _lc, _gg, _dp = artist_signal()          # clés canoniques (id:X après résolution)
-        _tier = artist_tier_map()
-        _manual = [n for cid in ("1", "2", "3")
-                   for n in cfg().get("artist_categories", {}).get(cid, [])]
-        _seed_meta = {}   # display -> {"w": présence, "orig": nom original}
-        for k in set(_cc) | set(_lc) | set(_tier):
-            nm = _dp.get(k, k)
-            _seed_meta[nm] = {"w": _lc.get(k, 0) + _cc.get(k, 0), "orig": nm}
-        for n in _manual:
-            nm = canonical_artist_name(n)
-            _seed_meta.setdefault(nm, {"w": 0, "orig": n})
-        seed_choices = sorted(_seed_meta, key=lambda nm: -_seed_meta[nm]["w"])
-        _n_resolved = sum(1 for v in st.session_state.get("artists_resolved", {}).values()
-                          if v.get("discogs_id") and v.get("status") in
-                          ("exact", "approx", "confirmed"))
-
-        mode = st.radio("Graines du graphe",
-                        [f"Graphe global ({_n_resolved} artistes résolus)",
-                         "Top automatique par score", "Je choisis les artistes"],
-                        key="graph_seed_mode")
-        n_page = st.slider("Pages de discographie par graine", 1, 3, 2, key="graph_pages")
-        params = {"pages": n_page}
-        if mode.startswith("Graphe global"):
-            params["mode"] = "global"
-            _pg = st.session_state.producer_graph
-            _existing = set(_pg.get("seeds", {})) if _pg.get("edges") is not None else set()
-            _current = {f"id:{v['discogs_id']}" for v in st.session_state.get("artists_resolved", {}).values()
-                        if v.get("discogs_id") and v.get("status") in ("exact", "approx", "confirmed")}
-            _new = _current - _existing
-            _full_min = max(1, round(_n_resolved * (n_page + 1) * 1.1 / 60))
-            st.warning(f"⏳ **Construction complète** : ~{_n_resolved} artistes-graines, "
-                       f"~{_n_resolved}–{_n_resolved * (n_page + 1)} appels Discogs, "
-                       f"**≈ {_full_min} min**. À ne faire qu'une fois.")
-            gb1, gb2 = st.columns(2)
-            if gb1.button("Construire le graphe global (complet)", type="primary",
-                          disabled=not cfg().get("token")):
-                job_launch("build_graph", {"pages": n_page, "mode": "global"})
-                st.rerun()
-            if _existing:
-                _upd_min = max(1, round(len(_new) * (n_page + 1) * 1.1 / 60))
-                gb2.caption(f"**{len(_new)}** nouvel(s) artiste(s) résolu(s) depuis le dernier "
-                            f"graphe (≈ {_upd_min} min).")
-                if gb2.button(f"Mettre à jour (+{len(_new)} artistes)",
-                              disabled=not cfg().get("token") or not _new):
-                    job_launch("build_graph", {"pages": n_page, "mode": "global",
-                                               "incremental": True})
-                    st.rerun()
-                st.caption("Un changement de **catégorie** ne nécessite AUCune reconstruction — "
-                           "le score se recalcule tout seul. Seuls les artistes **nouvellement "
-                           "ajoutés/résolus** exigent une mise à jour.")
-            n = 2  # court-circuite le bouton générique plus bas
-        elif mode == "Je choisis les artistes":
-
-            def _cat_choices(cids):
-                out = set()
-                for cid in cids:
-                    for n in cfg().get("artist_categories", {}).get(cid, []):
-                        out.add(canonical_artist_name(n))
-                return {n for n in out if n in _seed_meta}
-
-            pc1, pc2, pc3 = st.columns(3)
-            if pc1.button("＋ mes catégorie 1"):
-                st.session_state["graph_seed_pick"] = sorted(
-                    set(st.session_state.get("graph_seed_pick", [])) | _cat_choices(("1",)))
-                st.rerun()
-            if pc2.button("＋ cat. 1 + 2"):
-                st.session_state["graph_seed_pick"] = sorted(
-                    set(st.session_state.get("graph_seed_pick", [])) | _cat_choices(("1", "2")))
-                st.rerun()
-            if pc3.button("Vider la sélection"):
-                st.session_state["graph_seed_pick"] = []
-                st.rerun()
-            picked_seeds = st.multiselect(
-                f"Artistes-graines — choisis dans la liste ({len(seed_choices)} identifiés)",
-                seed_choices, key="graph_seed_pick",
-                placeholder="Tape un nom pour chercher…")
-            # on envoie au job le nom "original" (ses lookups artists_resolved.json sont par nom)
-            params["seed_names"] = [_seed_meta.get(d, {}).get("orig", d) for d in picked_seeds]
-            n = len(picked_seeds)
-            if 0 < n < 3:
-                st.warning("Sélectionne au moins 3 graines pour un graphe utile.")
-        else:
-            n = st.slider("Nombre d'artistes-graines (les mieux notés — tes cat.1 en tête)",
-                          5, 200, 40, 5, key="graph_seed_n")
-            params["seeds"] = n
-        if not mode.startswith("Graphe global"):
-            est = max(1, round(n * (1 + n_page) * 1.1 / 60))
-            st.caption(f"{n} graine(s) → ≈ {n}–{n * (n_page + 1)} appels API, ~{est} min.")
-            if st.button("Construire le graphe", type="primary",
-                         disabled=not cfg().get("token") or n < 2):
-                job_launch("build_graph", params)
-                st.rerun()
-
-    if _grr.get("artists"):
-        tiers_now = artist_tier_map()
-        cand_all = [(k, v) for k, v in _grr["artists"].items() if k not in tiers_now]
-
-        # --- ajout automatique en catégorie 1 au-dessus d'un seuil ---
-        aa1, aa2 = st.columns([2, 3])
-        g_thr = aa1.slider("Ajout auto en catégorie 1 si score ≥", 0.0, 20.0, 5.0, 0.5,
-                           key="g_auto_thr")
-        only_c1 = aa2.checkbox("… et ≥ 1 sortie avec un artiste catégorie 1", value=True)
-        auto_c = [(k, v) for k, v in cand_all if v["score"] >= g_thr
-                  and (not only_c1 or v.get("cat1_hits", 0) >= 1)]
-        if aa2.button(f"➕ Ajouter {len(auto_c)} artiste(s) en catégorie 1",
-                      type="primary", disabled=not auto_c):
-            merged = {cid: list(cfg().get("artist_categories", {}).get(cid, []))
-                      for cid in ("1", "2", "3")}
-            for k, v in auto_c:
-                merged["1"].append(v["name"])
-            set_artist_categories(merged)
-            for cid in ("1", "2", "3"):
-                st.session_state.pop(f"_artcat_shadow_{cid}", None)
-            st.success(f"{len(auto_c)} artiste(s) ajoutés en catégorie 1. "
-                       "Reconstruis le graphe pour propager l'effet.")
-            st.rerun()
-        if auto_c:
-            aa1.caption("Seront ajoutés : "
-                        + ", ".join(v["name"] for _, v in auto_c[:15])
-                        + (f" … +{len(auto_c) - 15}" if len(auto_c) > 15 else ""))
-
-        st.markdown("**Artistes proches** — candidats à ajouter à ta liste")
-        for k, v in cand_all[:40]:
-            gc1, gc2, gc3, gc4 = st.columns([5, 1, 1, 1])
-            star = "⭐ " if v.get("cat1_hits") else ""
-            gc1.markdown(f"{star}**{v['name']}** · {v['score']}  \n"
-                         f"<span class='rc-style'>{' · '.join(v.get('why', []))}</span>",
-                         unsafe_allow_html=True)
-            for lab, col, cid in (("→1", gc2, "1"), ("→2", gc3, "2"), ("→3", gc4, "3")):
-                if col.button(lab, key=f"g_add_{cid}_{k}"):
-                    cur = {c: list(cfg().get("artist_categories", {}).get(c, []))
-                           for c in ("1", "2", "3")}
-                    cur[cid].append(v["name"])
-                    set_artist_categories(cur)
-                    for c in ("1", "2", "3"):
-                        st.session_state.pop(f"_artcat_shadow_{c}", None)
-                    st.rerun()
-
-        gl = sorted(_grr.get("labels", {}).values(),
-                    key=lambda v: v.get("score", 0), reverse=True)
-        base_keys_now = {normalize_label(x) for x in cfg().get("labels", [])}
-
-        def _in_base(v):
-            return v.get("in_base") or normalize_label(v["name"]) in base_keys_now
-
-        n_new = sum(1 for v in gl if not _in_base(v))
-        if gl:
-            with st.expander(f"Labels candidats du graphe ({len(gl)} · {n_new} absents de ta base)"):
-                st.markdown("**Ajout automatique à ma base**")
-                st.caption("Critère : nombre de tes artistes-graines (liste manuelle + corpus + "
-                           "collection) qui ont sorti un disque chez ce label.")
-                la1, la2 = st.columns([2, 2])
-                min_seeds = la1.slider("≥ N de mes artistes ont sorti chez ce label", 1, 6, 2,
-                                       key="gl_auto_seeds")
-                min_score = la1.slider("… et score du label ≥", 0.0, 25.0, 0.0, 0.5,
-                                       key="gl_auto_score")
-                need_cat1 = la2.checkbox("… dont au moins un en catégorie 1", value=False,
-                                         key="gl_auto_cat1")
-                targets = [v for v in gl if not _in_base(v)
-                           and v.get("n_seeds", 0) >= min_seeds and v.get("score", 0) >= min_score
-                           and (not need_cat1 or v.get("cat1_seeds", 0) >= 1)]
-                if la2.button(f"➕ Ajouter {len(targets)} label(s) à ma base",
-                              type="primary", disabled=not targets):
-                    names = [v["name"] for v in targets]
-                    set_labels(list(st.session_state.labels) + names)
-                    res = st.session_state.resolved
-                    for v in targets:
-                        k = normalize_label(v["name"])
-                        if k not in res or res[k].get("status") not in ("exact", "confirmed"):
-                            res[k] = {"original": v["name"], "discogs_name": v["name"],
-                                      "discogs_id": None, "status": "confirmed",
-                                      "reviewed_by": "graph"}
-                    save_resolved(res)
-                    st.success(f"{len(names)} label(s) ajoutés à ta base "
-                               "(marqués résolus). Pense à les profiler.")
-                    st.rerun()
-                if targets:
-                    la2.caption("Ex. : " + ", ".join(v["name"] for v in targets[:12])
-                                + (f" … +{len(targets) - 12}" if len(targets) > 12 else ""))
-
-                st.divider()
-                only_new = st.checkbox("Masquer ceux déjà en base", value=True, key="gl_only_new")
-                for v in gl[:80]:
-                    in_base = _in_base(v)
-                    if only_new and in_base:
-                        continue
-                    lc1, lc2 = st.columns([5, 1])
-                    tag = "✅ base" if in_base else "🆕"
-                    star = "⭐" if v.get("cat1_seeds") else ""
-                    lc1.write(f"{star}**{v['name']}** · score {v['score']} · "
-                              f"{v.get('n_seeds', 0)} artiste(s) · {tag} — "
-                              f"{', '.join(v.get('seeds', []))}")
-                    if not v.get("in_watchlist") and lc2.button(
-                            "+ veille", key=f"g_wl_{normalize_label(v['name'])}"):
-                        add_watch(v["name"])
-                        if not in_base:
-                            set_labels(list(st.session_state.labels) + [v["name"]])
-                        st.rerun()
 
 # ---------------------------------------------------------------- Tab: Sources & reco
 
@@ -3393,7 +3122,8 @@ if _nav == "🎛️ Réglages" and _set_sub == "Scoring":
     for cid in ("1", "2", "3"):
         W["taste_tiers"][cid] = g1.slider(f"Style — {CAT_LABELS[cid]}", 0.0, 1.0,
                                           float(S["taste_tiers"][cid]), 0.05, key=f"sc_tt_{cid}")
-        W["artist_tiers"][cid] = g2.slider(f"Artiste — {CAT_LABELS[cid]}", 0.0, 1.0,
+    for cid in ("1", "2"):
+        W["artist_tiers"][cid] = g2.slider(f"Artiste — {ARTIST_CAT_LABELS[cid]}", 0.0, 1.0,
                                            float(S["artist_tiers"][cid]), 0.05, key=f"sc_at_{cid}")
 
     st.subheader("Score label (reco)")

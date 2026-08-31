@@ -439,11 +439,16 @@ def reco_artists_frag(request: Request):
 @app.get("/univers", response_class=HTMLResponse)
 def univers_page(request: Request, tab: str = "labels"):
     c = Ctx()
+    g = c.graph or {}
+    ac = c.cfg.get("artist_categories", {})
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
-                  n_labels=len(c.cfg.get("labels", [])),
-                  n_profiled=len(c.profile),
-                  n_artists=sum(len(v) for v in c.cfg.get("artist_categories", {}).values()),
-                  n_sets=len([r for r in c.corpus if r.get("source") == "djset"]))
+                  n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
+                  n_artists=sum(len(v) for v in ac.values()),
+                  n_sets=len([r for r in c.corpus if r.get("source") == "djset"]),
+                  graph_meta={"built_at": g.get("built_at", ""), "mode": g.get("mode", ""),
+                              "n_seeds": len(g.get("seeds", {})), "n_edges": len(g.get("edges", {}))},
+                  coeur="\n".join(ac.get("1", [])),
+                  coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])))
 
 
 @app.get("/univers/labels", response_class=HTMLResponse)
@@ -514,6 +519,29 @@ def univers_artist_set(name: str = Form(""), cat: str = Form("")):
         save(PENDING_ENRICH, q)
     store.save_config(c)
     return HTMLResponse("<span class='small ok'>✓</span>")
+
+
+@app.post("/univers/graph/build", response_class=HTMLResponse)
+async def univers_graph_build(request: Request):
+    f = await request.form()
+    mode = f.get("mode", "top")
+    try:
+        pages = max(1, min(3, int(f.get("pages") or 2)))
+    except ValueError:
+        pages = 2
+    params = {"pages": pages, "incremental": f.get("incremental") == "on"}
+    if mode == "global":
+        params["mode"] = "global"
+    elif mode == "seeds":
+        params["seed_names"] = [x.strip() for x in f.get("seed_names", "").splitlines() if x.strip()]
+    else:
+        params["mode"] = "top"
+        try:
+            params["seeds"] = max(5, min(400, int(f.get("top_n") or 40)))
+        except ValueError:
+            params["seeds"] = 40
+    jobs.launch("build_graph", params)
+    return job_status_frag("build_graph")
 
 
 @app.get("/univers/sets", response_class=HTMLResponse)

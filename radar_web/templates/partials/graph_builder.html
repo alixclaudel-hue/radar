@@ -1,0 +1,27 @@
+<details class="acc">
+  <summary>🕸️ Constructeur de graphe
+    <span class="tag">{% if graph_meta.built_at %}{{ graph_meta.n_seeds }} graines · {{ graph_meta.n_edges }} arêtes · {{ graph_meta.built_at.replace('T',' ') }}{% else %}jamais construit{% endif %}</span>
+  </summary>
+  <div class="acc__body">
+    <p class="small muted">Interroge la discographie des artistes-graines et remonte les co-crédités et co-labels. Recalcul instantané quand tu recatégorises — reconstruis seulement pour ajouter des graines.</p>
+    <form hx-post="/univers/graph/build" hx-target="#job-build_graph" hx-swap="outerHTML">
+      <div class="field"><label>Graines</label>
+        <label class="small"><input type="radio" name="mode" value="global" style="width:auto" checked> Graphe global — tous mes artistes résolus (long)</label><br>
+        <label class="small"><input type="radio" name="mode" value="top" style="width:auto"> Top <input name="top_n" value="40" style="width:60px;padding:2px 5px"> mieux notés</label><br>
+        <label class="small"><input type="radio" name="mode" value="seeds" style="width:auto"> Graines choisies :</label>
+      </div>
+      <textarea name="seed_names" rows="4" placeholder="un nom d'artiste par ligne">{{ coeur }}</textarea>
+      <div style="margin:4px 0">
+        <button type="button" class="small" onclick="this.closest('form').seed_names.value=this.dataset.v" data-v="{{ coeur }}">mes Cœur</button>
+        <button type="button" class="small" onclick="this.closest('form').seed_names.value=this.dataset.v" data-v="{{ coeur_aimes }}">Cœur + Aimés</button>
+      </div>
+      <div class="row" style="align-items:end">
+        <div class="field" style="flex:0 0 130px"><label>Pages / graine</label><input name="pages" value="2" style="width:70px"></div>
+        <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
+          <label class="small"><input type="checkbox" name="incremental" style="width:auto"> incrémental (ajouter seulement les nouvelles)</label></div>
+      </div>
+      <button class="primary" type="submit">Construire</button>
+    </form>
+    <div id="job-build_graph" hx-get="/jobs/build_graph/status" hx-trigger="load" class="small" style="margin-top:8px"></div>
+  </div>
+</details>

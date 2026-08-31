@@ -1796,18 +1796,22 @@ h1{ font-weight:800 !important; }
   letter-spacing:.14em; font-size:10.5px; color:var(--soft); margin:4px 0 0; }
 
 /* navigation = pastilles */
-[data-testid="stRadio"] > label{ display:none; }
 [data-testid="stRadio"] [role="radiogroup"]{ gap:6px; flex-wrap:wrap; }
 [data-testid="stRadio"] [role="radiogroup"] label{
   border:1px solid var(--line); border-radius:999px; padding:5px 14px; margin:0;
   background:var(--surface); transition:all .12s ease; cursor:pointer;
+  display:flex; align-items:center;
 }
 [data-testid="stRadio"] [role="radiogroup"] label:hover{ border-color:var(--ink); }
 [data-testid="stRadio"] [role="radiogroup"] label:has(input:checked){
   background:var(--pin); border-color:var(--pin);
 }
-[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) *{ color:var(--paper) !important; }
-[data-testid="stRadio"] [role="radiogroup"] label div:first-child{ display:none; }  /* rond radio */
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) [data-testid="stMarkdownContainer"] p{
+  color:var(--paper) !important;
+}
+/* masque juste le rond du radio, garde le texte */
+[data-testid="stRadio"] [role="radiogroup"] label > div:first-child:not([data-testid]){ display:none; }
+[data-testid="stRadio"] [role="radiogroup"] label [data-testid="stMarkdownContainer"] p{ margin:0; font-size:13px; }
 
 /* boutons = pastilles */
 .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button{

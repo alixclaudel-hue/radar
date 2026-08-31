@@ -1646,7 +1646,7 @@ def render_new_inbox(items, path, id_field, key_ns, source_field=None, source_la
 
 # ---------------------------------------------------------------- UI
 
-st.set_page_config(page_title="Crate Radar", page_icon="🎛️", layout="wide")
+st.set_page_config(page_title="Radar", page_icon="📡", layout="wide")
 
 
 def _require_login():
@@ -1657,7 +1657,7 @@ def _require_login():
         return
     if st.session_state.get("_authed"):
         return
-    st.markdown("### 🔒 Crate Radar")
+    st.markdown("### 🔒 Radar")
     got = st.text_input("Mot de passe", type="password", key="_login_pw")
     if got and hashlib.sha256(got.encode()).digest() == hashlib.sha256(pw.encode()).digest():
         st.session_state["_authed"] = True
@@ -1770,21 +1770,91 @@ _auto_background()
 
 st.markdown("""
 <style>
-    .crate-title { font-family: Georgia, serif; font-weight: 700; font-size: 34px; margin-bottom: 0; }
-    .crate-title span { color: #B7311E; }
-    .crate-sub { font-family: monospace; text-transform: uppercase; letter-spacing: 0.05em;
-                 color: #5B564A; font-size: 12px; margin-top: 0; }
-    .catno-tag { font-family: monospace; background: #C98A2C; color: #2a1c02; padding: 2px 6px;
-                 border-radius: 3px; font-size: 11px; white-space: nowrap; }
-    .rc-meta { margin: -2px 0 2px; line-height: 1.6; }
-    .rc-style { color: #5B564A; font-size: 12px; }
-    .album-badge { background: #2E7D32; color: #fff; font-weight: 700; font-family: monospace;
-                   padding: 1px 7px; border-radius: 3px; font-size: 13px; }
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --paper:#F4F3EF; --surface:#FFFFFF; --ink:#121212; --soft:#6C6C66;
+  --line:#E3E2DB; --pin:#1C4A3E; --clay:#C36B4B;
+}
+html, body, [class*="css"], .stApp, [data-testid="stAppViewContainer"]{
+  font-family:'Work Sans', system-ui, sans-serif;
+}
+.stApp{ background:var(--paper); }
+.block-container{ max-width:1120px; padding-top:2.2rem; padding-bottom:4rem; }
+
+/* titres */
+h1,h2,h3,h4, [data-testid="stHeading"]{
+  font-family:'Syne','Work Sans',sans-serif !important;
+  font-weight:700 !important; letter-spacing:-.02em; color:var(--ink);
+}
+h1{ font-weight:800 !important; }
+
+.radar-title{ font-family:'Syne',sans-serif; font-weight:800; font-size:40px;
+  letter-spacing:-.04em; color:var(--ink); line-height:1; margin:0; }
+.radar-title b{ color:var(--pin); }
+.radar-sub{ font-family:'Work Sans',sans-serif; text-transform:uppercase;
+  letter-spacing:.14em; font-size:10.5px; color:var(--soft); margin:4px 0 0; }
+
+/* navigation = pastilles */
+[data-testid="stRadio"] > label{ display:none; }
+[data-testid="stRadio"] [role="radiogroup"]{ gap:6px; flex-wrap:wrap; }
+[data-testid="stRadio"] [role="radiogroup"] label{
+  border:1px solid var(--line); border-radius:999px; padding:5px 14px; margin:0;
+  background:var(--surface); transition:all .12s ease; cursor:pointer;
+}
+[data-testid="stRadio"] [role="radiogroup"] label:hover{ border-color:var(--ink); }
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked){
+  background:var(--pin); border-color:var(--pin);
+}
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) *{ color:var(--paper) !important; }
+[data-testid="stRadio"] [role="radiogroup"] label div:first-child{ display:none; }  /* rond radio */
+
+/* boutons = pastilles */
+.stButton > button, .stDownloadButton > button, .stFormSubmitButton > button{
+  border-radius:999px; border:1.5px solid var(--ink); background:var(--surface);
+  color:var(--ink); font-weight:600; padding:.4rem 1.1rem; transition:all .12s ease;
+}
+.stButton > button:hover{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+.stButton > button[kind="primary"], .stButton > button[data-testid="baseButton-primary"]{
+  background:var(--pin); border-color:var(--pin); color:var(--paper);
+}
+.stButton > button[kind="primary"]:hover{ background:#123329; border-color:#123329; }
+
+/* champs */
+.stTextInput input, .stNumberInput input, .stTextArea textarea,
+[data-baseweb="select"] > div, [data-baseweb="input"] > div{
+  border-radius:10px !important; border-color:var(--line) !important; background:var(--surface) !important;
+}
+
+/* expanders */
+[data-testid="stExpander"]{ border:1px solid var(--line); border-radius:14px; background:var(--surface); }
+[data-testid="stExpander"] summary{ font-family:'Work Sans'; font-weight:600; }
+
+/* metrics */
+[data-testid="stMetricValue"]{ font-family:'Syne',sans-serif; font-weight:800; color:var(--ink); }
+[data-testid="stMetricLabel"] p{ text-transform:uppercase; letter-spacing:.1em; font-size:10.5px; color:var(--soft); }
+
+/* captions & aides */
+[data-testid="stCaptionContainer"], .stCaption, small{ color:var(--soft) !important; font-size:12px; }
+hr{ border-color:var(--line); }
+
+/* sliders */
+[data-testid="stSlider"] [role="slider"]{ background:var(--pin) !important; }
+[data-testid="stSlider"] [data-baseweb="slider"] div[style*="rgb"]{ background:var(--pin) !important; }
+
+/* pastilles internes (cartes, tracklists) */
+.catno-tag{ font-family:'Work Sans'; background:var(--surface); border:1px solid var(--line);
+  color:var(--soft); padding:2px 9px; border-radius:999px; font-size:11px; white-space:nowrap; }
+.rc-meta{ margin:-2px 0 2px; line-height:1.6; }
+.rc-style{ color:var(--soft); font-size:12px; }
+.album-badge{ background:var(--pin); color:var(--paper); font-weight:700;
+  font-family:'Syne',sans-serif; padding:1px 10px; border-radius:999px; font-size:13px; }
+.album-badge.clay{ background:var(--clay); }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<p class="crate-title">Crate <span>Radar</span></p>', unsafe_allow_html=True)
-st.markdown('<p class="crate-sub">Discogs × ta base de labels — version locale</p>', unsafe_allow_html=True)
+st.markdown('<p class="radar-title">Rada<b>r</b></p>', unsafe_allow_html=True)
+st.markdown('<p class="radar-sub">Discogs × ta base de labels</p>', unsafe_allow_html=True)
 
 _NAV = ["🔍 Recherche", "📻 Liste de veille", "🏪 Mes vendeurs", "🏷️ Mes labels",
         "🎧 Sources & reco", "🎤 Mes artistes", "🎚️ Mes sets", "🎛️ Réglages"]
@@ -1842,11 +1912,8 @@ if _nav == "🎛️ Réglages" and _set_sub == "Connexion & données":
 if _nav == "🎛️ Réglages" and _set_sub == "Nettoyage Discogs":
     with st.expander("🧹 Noms canoniques Discogs (résolution & profilage)",
                      expanded=st.session_state.cleanup_open):
-        st.write(
-            "Depuis maintenant, **chaque label / artiste ajouté est résolu et profilé "
-            "automatiquement en arrière-plan** (job `enrich`) — plus rien à lancer à la main. "
-            "Le bouton ci-dessous fait la passe unique sur l'existant."
-        )
+        st.caption("Chaque ajout est résolu + profilé en arrière-plan. Le bouton fait la "
+                   "passe unique sur l'existant.")
         _pend = load_json(PENDING_ENRICH_PATH, {})
         _npend = len(_pend.get("labels", [])) + len(_pend.get("artists", []))
         if _npend:
@@ -2346,9 +2413,7 @@ if _nav == "🎛️ Réglages" and _set_sub == "Nettoyage Discogs":
 # ---------------------------------------------------------------- Tab: Sets (DJ sets ingérés)
 
 if _nav == "🎚️ Mes sets":
-    st.write("Toutes les tracks extraites des DJ sets YouTube, par DJ puis par vidéo. "
-             "Liens cliquables pour écouter (la track si YouTube l'a identifiée, sinon "
-             "recherche YouTube ; + le set de provenance).")
+    st.caption("Tracks extraites des DJ sets, par DJ puis par vidéo — liens d'écoute et d'achat.")
     dj_rows = [r for r in st.session_state.corpus if r.get("source") == "djset"]
     if not dj_rows:
         st.info("Aucun set ingéré. Onglet **🎧 Sources & reco → DJ sets**.")
@@ -2466,12 +2531,8 @@ if _nav == "🎚️ Mes sets":
 # ---------------------------------------------------------------- Tab: Mes artistes
 
 if _nav == "🎤 Mes artistes":
-    st.write(
-        "Deux niveaux&nbsp;: **Cœur** (tes références, quelques noms) et **Aimés** (ceux que tu "
-        "aimes bien). Ils pilotent le **score d'artiste**, qui remonte ensuite dans la reco et "
-        "le score album. Le tableau liste tous les artistes déjà repérés (catégories + corpus + "
-        "collection + graphe de producteurs) avec leur **note** ; règle la catégorie d'un clic."
-    )
+    st.caption("**Cœur** (tes références) et **Aimés** — ils pilotent le score d'artiste. "
+               "Règle la catégorie d'un clic dans le tableau.")
 
     _scores = artist_scores()
     _tiers = artist_tier_map()
@@ -2556,9 +2617,7 @@ if _nav == "🎤 Mes artistes":
 # ---------------------------------------------------------------- Tab: Sources & reco
 
 if _nav == "🎧 Sources & reco":
-    st.write("Analyse ta **collection** et ta **wantlist** Discogs pour recommander des labels "
-             "à suivre. Les IDs de labels viennent directement de Discogs — aucune résolution, "
-             "coût ≈ `nb_disques / 100` appels.")
+    st.caption("Collection + wantlist Discogs → labels à suivre.")
 
     ccache = st.session_state.collection
     if ccache.get("fetched_at"):
@@ -2800,15 +2859,8 @@ if _nav == "🎧 Sources & reco":
 # ---------------------------------------------------------------- Tab: Profilage des labels
 
 if _nav == "🎛️ Réglages" and _set_sub == "Goût & profilage":
-    st.write(
-        "Analyse les styles des sorties de chaque label de ta base pour lui donner un **score "
-        "d'affinité** avec tes goûts. Ensuite, l'onglet Recherche peut ne cibler que les labels "
-        "au-dessus d'un seuil, au lieu de balayer toute la base."
-    )
-
-    st.markdown("**Mes 3 catégories de styles** — le score d'affinité pondère chaque tag de style "
-                "d'un label selon la catégorie où tu l'as rangé. Les **poids** des rangs et le "
-                "**seuil d'affinité global** sont dans l'onglet **🎛️ Réglages**.")
+    st.caption("Profile les labels par style → **score d'affinité**. Range tes styles en 3 "
+               "catégories ci-dessous ; poids & seuil dans **Scoring**.")
     cats_cfg = cfg().get("taste_categories", DEFAULT_TASTE_CATEGORIES)
     _tw = scoring()["taste_tiers"]
     tc1, tc2, tc3 = st.columns(3)
@@ -2891,11 +2943,7 @@ if _nav == "🎛️ Réglages" and _set_sub == "Goût & profilage":
 # ---------------------------------------------------------------- Tab: Mes labels
 
 if _nav == "🏷️ Mes labels":
-    st.write(
-        "Ta base de labels sert de filtre pour la recherche et la veille. Alimente-la par import "
-        "CSV (fusion ou remplacement) et ajuste-la à la main ici — tout est sauvegardé dans "
-        "`crate_radar_config.json`."
-    )
+    st.caption("Base de labels = filtre pour la recherche et la veille. Import CSV ou édition à la main.")
 
     st.subheader("Importer un CSV")
     up = st.file_uploader("CSV — 1re colonne = nom du label, 1re ligne ignorée (en-tête)", type=["csv"])
@@ -3197,12 +3245,8 @@ if _nav == "🔍 Recherche":
 # ---------------------------------------------------------------- Tab: Liste de veille
 
 if _nav == "📻 Liste de veille":
-    st.write(
-        "La veille surveille en continu ce qui **correspond à des critères** que tu définis "
-        "(styles, genres, années, format, labels ou artistes précis). Un scan de fond compare "
-        "les sorties Discogs à l'état du dernier passage et remplit la boîte **Nouveautés**, "
-        "notée avec le score album. Le 1ᵉʳ passage d'une règle sert de référence."
-    )
+    st.caption("Des **règles de critères** (styles, années, format, labels…) → un scan de fond "
+               "remplit la boîte **Nouveautés**, notée. 1ᵉʳ passage = référence.")
 
     _nnew_v = len(load_json(VEILLE_NEW_PATH, []))
     if _nnew_v:
@@ -3277,12 +3321,8 @@ if _nav == "📻 Liste de veille":
 # ---------------------------------------------------------------- Tab: Mes vendeurs
 
 if _nav == "🏪 Mes vendeurs":
-    st.write(
-        "Suis des vendeurs Discogs et scanne leur inventaire en vente. "
-        "Ajoute-les à la main, ou tente l'import depuis ton historique de commandes "
-        "(⚠️ l'API `/marketplace/orders` ne renvoie que les commandes où **tu es vendeur** — "
-        "si tu n'as jamais vendu, elle est vide ; dans ce cas, saisie manuelle)."
-    )
+    st.caption("Suis des vendeurs Discogs et scanne leur inventaire. Ajout manuel "
+               "(l'import depuis les commandes ne marche que si tu as déjà **vendu**).")
     _nnew = len(load_json(SELLERS_NEW_PATH, []))
     if _nnew:
         st.success(f"🆕 **{_nnew}** nouvelle(s) annonce(s) en attente chez tes vendeurs "
@@ -3529,15 +3569,8 @@ if _nav == "🎛️ Réglages" and _set_sub == "Scoring":
 # ---------------------------------------------------------------- Tab: Apprentissage (étape 7)
 
 if _nav == "🎛️ Réglages" and _set_sub == "Apprentissage":
-    st.write(
-        "Boucle de feedback. Chaque **👍 / 👎** posé sur une reco est journalisé avec les "
-        "sous-signaux qui ont produit son score, au moment du clic :\n"
-        "- **labels** recommandés (onglet 🎧) — + base / + veille = 👍, bouton 👎 ;\n"
-        "- **résultats de recherche** (onglet 🔍 via 🎧) et **tracks de sets** (onglet 🎚️) — 👍 / 👎 sous chaque carte.\n\n"
-        "Au-delà d'un minimum de retours, on ajuste les poids correspondants pour coller à tes "
-        "décisions — régression logistique **régularisée vers les poids actuels** (un coup de "
-        "pouce, pas un remplacement)."
-    )
+    st.caption("Tes 👍 / 👎 sur les recos sont journalisés avec leurs sous-signaux. Au-delà "
+               "d'un minimum, on ajuste les poids vers tes décisions (sans tout remplacer).")
     MIN_FB = int(scoring()["learn"]["min_feedback"])
     MIN_CLS = int(scoring()["learn"]["min_per_class"])
 

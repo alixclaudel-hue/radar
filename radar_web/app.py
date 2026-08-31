@@ -264,6 +264,46 @@ def search_page(request: Request):
                   year_min=SEARCH_MIN_YEAR, year_max=int(time.strftime("%Y")))
 
 
+def _base_labels_ranked(c):
+    """Labels de la base -> nom canonique + affinité. Tri : affinité de style
+    décroissante, départagée par le score de reco (collection + corpus + artistes),
+    puis alpha. Dédoublonné par nom canonique."""
+    ridx = c.reco_index
+    rows, seen = [], set()
+    for name in c.cfg.get("labels", []):
+        key = store.normalize_label(name)
+        res = c.resolved.get(key) or {}
+        disp = res.get("discogs_name") or res.get("original") or name
+        aff = c.affinity_score(c.profile.get(key)) if c.profile.get(key) else None
+        rows.append({"disp": disp, "norm": store.normalize_label(disp),
+                     "aff": aff, "_reco": ridx.get(key, 0)})
+    rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
+    uniq = []
+    for r in rows:
+        if r["norm"] in seen:
+            continue
+        seen.add(r["norm"])
+        uniq.append(r)
+    return uniq
+
+
+@app.get("/search/labels", response_class=HTMLResponse)
+def search_labels(request: Request, label: str = "", q: str = ""):
+    c = Ctx()
+    term = store.normalize_label(label or q)
+    ranked = _base_labels_ranked(c)
+    matched = [r for r in ranked if term and term in r["norm"]]
+    no_match = bool(term) and not matched
+    if matched:
+        header = f"{len(matched)} correspondance" + ("s" if len(matched) > 1 else "")
+    elif no_match:
+        header = "Aucun label reconnu — ta base, classée par affinité"
+    else:
+        header = "Tes labels, classés par affinité"
+    return frag(request, "partials/label_suggest.html",
+                rows=(matched or ranked)[:60], header=header)
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),

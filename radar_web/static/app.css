@@ -85,6 +85,22 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
   cursor:grab; pointer-events:auto;
 }
 .yrange input[type=range]::-moz-range-track{ background:none; border:none; }
+
+/* combobox label */
+.combo{ position:relative; }
+.lbl-suggest{
+  position:absolute; left:0; right:0; top:100%; z-index:30; margin-top:4px;
+  max-height:290px; overflow-y:auto; background:var(--surface);
+  border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12);
+}
+.lbl-suggest__head{ padding:6px 10px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--surface); }
+.lbl-opt{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  width:100%; text-align:left; background:none; border:none; border-radius:0;
+  font-weight:400; padding:.5rem .7rem; color:var(--ink);
+}
+.lbl-opt:hover, .lbl-opt:focus{ background:var(--paper); color:var(--ink); }
+.lbl-opt__name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 .field{ margin-bottom:12px; }
 .row{ display:flex; gap:12px; flex-wrap:wrap; }

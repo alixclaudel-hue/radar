@@ -4,6 +4,7 @@ Lancement :  uvicorn radar_web.app:app --reload --port 8600
 Nav : 🧠 Ma patte musicale · 🔍 Recherche ciblée · 📻 Veille Discogs · 🌐 Mon univers · 🎛️ Réglages
 """
 import hashlib
+import html
 import io
 import os
 import re
@@ -13,7 +14,7 @@ from urllib.parse import quote_plus
 
 import requests
 from fastapi import FastAPI, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -693,7 +694,7 @@ def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
         note = asc.get(ck, 0)
         if not t and note == 0:
             continue
-        rows.append({"name": name, "note": note, "cat": catn[t]})
+        rows.append({"name": name, "note": note, "cat": catn.get(t, "—")})
     rows.sort(key=lambda r: -r["note"])
     return frag(request, "partials/artists_table.html", rows=rows[:250], n=len(rows))
 
@@ -778,6 +779,29 @@ async def univers_labels_import(request: Request, file: UploadFile, replace: str
     return univers_labels(request)
 
 
+def _csv_cell(s):
+    s = str(s).replace('"', '""')
+    return f'"{s}"'
+
+
+@app.get("/univers/labels/export")
+def univers_labels_export():
+    lines = ["name"] + [_csv_cell(l) for l in _cfg().get("labels", [])]
+    return Response("\n".join(lines) + "\n", media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=radar_labels.csv"})
+
+
+@app.get("/univers/artists/export")
+def univers_artists_export():
+    ac = _cfg().get("artist_categories", {})
+    rows = ["name,categorie"]
+    for cid, cat in (("1", "Coeur"), ("2", "Aime")):
+        for n in ac.get(cid, []):
+            rows.append(f"{_csv_cell(n)},{cat}")
+    return Response("\n".join(rows) + "\n", media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=radar_artists.csv"})
+
+
 # ============================================================ jobs
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
@@ -809,13 +833,14 @@ def job_status_frag(name: str):
     done, total = s.get("done", 0), s.get("total", 0) or 1
     pct = min(100, round(100 * done / total))
     run, err = s.get("running"), s.get("error")
+    msg = html.escape(str(s.get("message") or ""))
     if err:
-        inner = f"<span class='notice warn small'>{err}</span>"
+        inner = f"<span class='notice warn small'>{html.escape(str(err))}</span>"
     elif run:
-        inner = (f"<span class='small muted'>⏳ {s.get('message') or ''} · {done}/{s.get('total', 0)}</span>"
+        inner = (f"<span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>"
                  f"<div class='progress'><i style='width:{pct}%'></i></div>")
     else:
-        inner = f"<span class='small muted'>✓ {s.get('message') or 'terminé'}</span>"
+        inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"
     poll = f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'" if run else ""
     return HTMLResponse(f"<div id='job-{name}' {poll}>{inner}</div>")
 

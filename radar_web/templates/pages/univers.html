@@ -23,13 +23,14 @@
            hx-trigger="input changed delay:250ms" hx-swap="innerHTML"></div>
   <div id="label-list" hx-get="/univers/labels" hx-trigger="load"></div>
   <hr>
-  <details><summary class="small">Importer un CSV</summary>
+  <details><summary class="small">Importer / exporter un CSV</summary>
     <form hx-post="/univers/labels/import" hx-target="#label-list" hx-swap="innerHTML"
           hx-encoding="multipart/form-data" style="margin-top:10px">
       <input type="file" name="file" accept=".csv" required>
       <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer toute la base</label>
       <button type="submit">Importer</button>
     </form>
+    <p style="margin-top:8px"><a class="small" href="/univers/labels/export">⬇ Exporter la base ({{ n_labels }} labels)</a></p>
   </details>
   <hr>
   {% include "partials/graph_builder.html" %}
@@ -47,6 +48,7 @@
         hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>
   </div>
   <div id="atable" hx-get="/univers/artists/table" hx-trigger="load"></div>
+  <p style="margin-top:6px"><a class="small" href="/univers/artists/export">⬇ Exporter les artistes classés (CSV)</a></p>
   <hr>
   {% include "partials/graph_builder.html" %}
   <div class="section-title" style="margin-top:10px"><h3 style="font-size:1rem">Résolution des artistes</h3>

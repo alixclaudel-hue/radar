@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import discogs, jobs, store
+from .radar import discogs, jobs, learn, store
 from .radar.paths import (CORPUS, PENDING_ENRICH, SELLERS_NEW, SELLERS_SEEN,
                           VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
@@ -271,10 +271,10 @@ def _inbox(request, path, source_key, key_ns, mins=30):
     c = Ctx()
     scored = []
     for it in items:
-        sc, _ = c.album_score({"title": f"{it.get('artist','')} - {it.get('title','')}",
-                               "label": [it["label"]] if it.get("label") else [],
-                               "style": it.get("style") or []})
-        scored.append({"it": it, "score": sc, "src": it.get(source_key)})
+        sc, det = c.album_score({"title": f"{it.get('artist','')} - {it.get('title','')}",
+                                 "label": [it["label"]] if it.get("label") else [],
+                                 "style": it.get("style") or []})
+        scored.append({"it": it, "score": sc, "det": det, "src": it.get(source_key)})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     rows = [r for r in scored if (r["score"] or 0) >= mins]
     return frag(request, "partials/inbox.html", rows=rows[:150], key_ns=key_ns, mins=mins,
@@ -594,6 +594,38 @@ def job_status_frag(name: str):
 def settings_page(request: Request, saved: int = 0):
     c = _cfg()
     return render(request, "pages/settings.html", active="settings", cfg=c, sc=c["scoring"], saved=saved)
+
+
+@app.post("/feedback", response_class=HTMLResponse)
+def feedback(kind: str = Form("album"), key: str = Form(""), name: str = Form(""),
+             verdict: str = Form(""), score: str = Form(""),
+             f_label: str = Form("0"), f_artist: str = Form("0"), f_style: str = Form("0"),
+             f_collection: str = Form("0"), f_corpus: str = Form("0"), f_affinity: str = Form("0")):
+    feat = {"label": f_label, "artist": f_artist, "style": f_style,
+            "collection": f_collection, "corpus": f_corpus, "affinity": f_affinity}
+    try:
+        sc = int(float(score)) if score else None
+    except ValueError:
+        sc = None
+    learn.log(kind, key, name, verdict, sc, {k: float(v or 0) for k, v in feat.items()})
+    return HTMLResponse("<span class='small ok'>👍 noté</span>" if verdict == "up"
+                        else "<span class='small ok'>👎 noté</span>")
+
+
+@app.get("/settings/learn", response_class=HTMLResponse)
+def settings_learn(request: Request):
+    return frag(request, "partials/learn.html", data=learn.summary(_cfg()["scoring"]))
+
+
+@app.post("/settings/learn/apply")
+def settings_learn_apply(kind: str = Form("")):
+    d = learn.summary(_cfg()["scoring"]).get(kind)
+    if d and d.get("proposal"):
+        c = _cfg()
+        for row in d["proposal"]:
+            c["scoring"][d["subkey"]][row["k"]] = row["new"]
+        store.save_config(c)
+    return RedirectResponse("/settings", status_code=303)
 
 
 @app.post("/settings")

@@ -1,0 +1,31 @@
+<p class="small muted">Tes 👍/👎 sur les résultats et nouveautés sont journalisés avec les sous-signaux qui ont produit le score. Au-delà d'un minimum, on ajuste les poids vers tes décisions (régularisé — un coup de pouce, pas un remplacement).</p>
+{% for kind, d in data.items() %}
+<div class="notice" style="margin-bottom:12px">
+  <b>{{ 'Poids score label' if kind=='label' else 'Poids score album' }}</b>
+  <span class="small muted"> — {{ d.n }} retours · 👍 {{ d.up }} · 👎 {{ d.down }}</span>
+  {% if d.n %}
+  <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="text-align:left;color:var(--soft)"><th style="padding:4px 8px">signal</th><th style="padding:4px 8px">moy. 👍</th><th style="padding:4px 8px">moy. 👎</th><th style="padding:4px 8px">écart</th>
+      {% if d.proposal %}<th style="padding:4px 8px">actuel</th><th style="padding:4px 8px">proposé</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for f in d.feat %}
+    {% set p = (d.proposal or [])|selectattr('k','equalto',f.k)|first %}
+    <tr style="border-top:1px solid var(--line)">
+      <td style="padding:4px 8px">{{ f.k }}</td><td style="padding:4px 8px">{{ f.up }}</td>
+      <td style="padding:4px 8px">{{ f.down }}</td>
+      <td style="padding:4px 8px">{{ '%+.3f'|format(f.gap) }}</td>
+      {% if d.proposal %}<td style="padding:4px 8px">{{ p.cur }}</td><td style="padding:4px 8px"><b>{{ p.new }}</b> <span class="muted">({{ '%+.3f'|format(p.d) }})</span></td>{% endif %}
+    </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% endif %}
+  {% if d.proposal %}
+    <form method="post" action="/settings/learn/apply" style="margin-top:8px">
+      <input type="hidden" name="kind" value="{{ kind }}">
+      <button class="primary" type="submit">✅ Appliquer ces poids</button>
+    </form>
+  {% elif d.need %}
+    <p class="small muted">Encore ~{{ d.need }} retour(s) (≥ 3 de chaque type) avant une proposition.</p>
+  {% endif %}
+</div>
+{% endfor %}

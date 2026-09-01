@@ -7,7 +7,7 @@
   <tbody>
   {% for r in rows %}
   <tr style="border-top:1px solid var(--line)">
-    <td style="padding:6px 8px">{{ r.name }}</td>
+    <td style="padding:6px 8px"><a href="/disco?kind=artist&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.name }}</a></td>
     <td style="padding:6px 8px">
       <div class="progress" style="height:6px"><i style="width:{{ r.note }}%"></i></div>
       <span class="small muted">{{ r.note }}</span>

@@ -37,18 +37,22 @@ def release(release_id, token=""):
 
 def search_label_releases(token, label, genre="", style="", fmt="", year="", max_pages=3):
     """Sorties d'un label filtrées (pagination). Retourne la liste brute des résultats."""
+    return _paged_release_search(token, "label", label, genre, style, fmt, year, max_pages)
+
+
+def search_artist_releases(token, artist, genre="", style="", fmt="", year="", max_pages=3):
+    """Sorties créditées à un artiste (pagination). Liste brute des résultats."""
+    return _paged_release_search(token, "artist", artist, genre, style, fmt, year, max_pages)
+
+
+def _paged_release_search(token, field, value, genre="", style="", fmt="", year="", max_pages=3):
     out, page = [], 1
     while page <= max_pages:
-        p = {"label": label, "per_page": 100, "page": page,
+        p = {field: value, "per_page": 100, "page": page,
              "sort": "year", "sort_order": "desc"}
-        if genre:
-            p["genre"] = genre
-        if style:
-            p["style"] = style
-        if fmt:
-            p["format"] = fmt
-        if year:
-            p["year"] = year
+        for k, v in (("genre", genre), ("style", style), ("format", fmt), ("year", year)):
+            if v:
+                p[k] = v
         d = search(token=token, **p)
         res = d.get("results", [])
         out += res

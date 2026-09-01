@@ -20,7 +20,10 @@
     <tbody>
       {% for r in rows %}
       <tr style="border-top:1px solid var(--line)">
-        <td style="padding:6px 8px"><a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.disp }}</a></td>
+        <td style="padding:6px 8px">
+          <a href="/disco?kind=label&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.disp }}</a>
+          <a href="{{ r.url }}" target="_blank" rel="noopener" class="small muted" title="fiche Discogs">↗</a>
+        </td>
         <td style="padding:6px 8px">
           {% if r.aff is not none %}
           <div class="progress" style="height:6px"><i style="width:{{ r.aff }}%"></i></div>

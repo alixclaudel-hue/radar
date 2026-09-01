@@ -532,6 +532,46 @@ def suggest_base_artists(request: Request, q: str = ""):
                 empty="Aucun artiste connu ne correspond.")
 
 
+_DISCOGS_SUGGEST_CACHE = {}  # (type, term) -> (ts, rows)
+
+
+@app.get("/suggest/discogs", response_class=HTMLResponse)
+def suggest_discogs(request: Request, q: str = "", type: str = "label"):
+    dtype = "artist" if type == "artist" else "label"
+    term = (q or "").strip()
+    if len(term) < 3:
+        return frag(request, "partials/suggest.html", rows=[],
+                    empty="Tape au moins 3 lettres pour interroger Discogs.")
+    token = _cfg().get("token", "")
+    if not token:
+        return frag(request, "partials/suggest.html", rows=[],
+                    empty="Token Discogs manquant (Ma patte → Connexions).")
+    key = (dtype, term.lower())
+    hit = _DISCOGS_SUGGEST_CACHE.get(key)
+    if hit and time.time() - hit[0] < 300:
+        rows = hit[1]
+    else:
+        try:
+            res = discogs.search(token=token, type=dtype, q=term, per_page=12).get("results", [])
+        except discogs.DiscogsError as e:
+            return frag(request, "partials/suggest.html", rows=[], empty=str(e))
+        seen, rows = set(), []
+        for r in res:
+            name = (r.get("title") or "").strip()
+            nk = name.lower()
+            if not name or nk in seen:
+                continue
+            seen.add(nk)
+            rows.append({"v": name, "meta": str(r.get("id") or ""), "dim": True})
+        if len(_DISCOGS_SUGGEST_CACHE) > 200:
+            _DISCOGS_SUGGEST_CACHE.clear()
+        _DISCOGS_SUGGEST_CACHE[key] = (time.time(), rows)
+    label = "label" if dtype == "label" else "artiste"
+    header = f"Discogs — {len(rows)} {label}{'s' if len(rows) != 1 else ''}"
+    return frag(request, "partials/suggest.html", rows=rows, header=header,
+                empty=f"Aucun {label} Discogs pour « {term} ».")
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),

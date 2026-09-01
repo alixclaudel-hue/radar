@@ -31,8 +31,18 @@
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
                   hx-trigger="focus, keyup changed delay:220ms">{{ r.genres|join('\n') }}</textarea>
         <div id="sug-vge-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
-      <div class="field"><label>Labels précis</label><textarea name="labels_{{ loop.index0 }}" rows="2">{{ r.labels|join('\n') }}</textarea></div>
-      <div class="field"><label>Artistes précis</label><textarea name="artists_{{ loop.index0 }}" rows="2">{{ r.artists|join('\n') }}</textarea></div>
+      <div class="field combo"><label>Labels précis <span class="muted">· propositions Discogs</span></label>
+        <textarea name="labels_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/discogs?type=label" hx-target="#sug-vlb-{{ loop.index0 }}" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="keyup changed delay:350ms">{{ r.labels|join('\n') }}</textarea>
+        <div id="sug-vlb-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
+      <div class="field combo"><label>Artistes précis <span class="muted">· propositions Discogs</span></label>
+        <textarea name="artists_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/discogs?type=artist" hx-target="#sug-var-{{ loop.index0 }}" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="keyup changed delay:350ms">{{ r.artists|join('\n') }}</textarea>
+        <div id="sug-var-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
     </div>
     <button type="submit" name="_action" value="del:{{ loop.index0 }}">🗑 Supprimer</button>
   </div>

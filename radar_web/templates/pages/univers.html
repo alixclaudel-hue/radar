@@ -21,8 +21,12 @@
     <div class="acc__body">
       <form hx-post="/univers/labels/add" hx-target="#add-label-msg" hx-swap="innerHTML"
             hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:480px">
-        <div class="field" style="flex:1;margin:0"><label>Nom du label</label>
-          <input name="name" placeholder="ex. Aim Records"></div>
+        <div class="field combo" style="flex:1;margin:0"><label>Nom du label <span class="muted">· propositions Discogs</span></label>
+          <input name="name" placeholder="ex. Aim Records" data-combo="set" autocomplete="off"
+                 hx-get="/suggest/discogs?type=label" hx-target="#sug-add-label" hx-swap="innerHTML"
+                 hx-vals='js:{q: event.target.value}'
+                 hx-trigger="keyup changed delay:350ms">
+          <div id="sug-add-label" class="lbl-suggest" hidden></div></div>
         <button class="primary" type="submit">Ajouter</button>
       </form>
       <p id="add-label-msg" class="small" style="margin-top:8px"></p>

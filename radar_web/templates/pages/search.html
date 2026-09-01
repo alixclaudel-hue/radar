@@ -80,12 +80,6 @@
   </div>
 </details>
 {% endif %}
-<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0">
-  <button type="button" class="small" hx-post="/jobs/market_fr/launch"
-          hx-target="#job-market_fr" hx-swap="outerHTML"
-          title="Scrape le nb d'annonces localisées en France pour les disques déjà consultés — lent et faillible (Cloudflare)">🇫🇷 Compléter dispos France · exp.</button>
-  <span id="job-market_fr" class="small muted"></span>
-</div>
 <div id="results"
      {% if last_id %}hx-get="/search/replay/{{ last_id }}" hx-trigger="load" hx-swap="innerHTML"{% endif %}>
   {% if not last_id %}{% include "partials/results.html" %}{% endif %}

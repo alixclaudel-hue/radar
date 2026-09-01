@@ -19,9 +19,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, learn, store, vocab
-from .radar.paths import (CORPUS, DISCOGS_STATE, PENDING_ENRICH, RELEASE_META,
-                          SEARCH_HIST, SELLERS_NEW, SELLERS_SEEN, SPOTIFY_META,
-                          VEILLE_NEW, VEILLE_SEEN, YOUTUBE_META)
+from .radar.paths import (CORPUS, PENDING_ENRICH, RELEASE_META, SEARCH_HIST,
+                          SELLERS_NEW, SELLERS_SEEN, SPOTIFY_META, VEILLE_NEW,
+                          VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -850,7 +850,7 @@ def univers_artists_export():
 # ============================================================ jobs
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
-              "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "market_fr"}
+              "ingest_djsets", "resolve_artists", "canonicalize", "enrich"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 
@@ -891,52 +891,10 @@ def job_status_frag(name: str):
 
 
 # ============================================================ 🎛️ Réglages
-def _discogs_sess():
-    try:
-        mt = os.stat(DISCOGS_STATE).st_mtime
-    except OSError:
-        return {"present": False}
-    cookies = (load(DISCOGS_STATE, {}) or {}).get("cookies", [])
-    exp = [c["expires"] for c in cookies
-           if c.get("name") in ("sgp", "session") and (c.get("expires") or 0) > 0]
-    return {"present": True, "cookies": len(cookies),
-            "mtime": time.strftime("%Y-%m-%d %H:%M", time.localtime(mt)),
-            "expires": time.strftime("%Y-%m-%d", time.localtime(min(exp))) if exp else ""}
-
-
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, saved: int = 0):
     c = _cfg()
-    return render(request, "pages/settings.html", active="settings", cfg=c, sc=c["scoring"],
-                  saved=saved, sess=_discogs_sess())
-
-
-@app.post("/settings/discogs-session", response_class=HTMLResponse)
-async def discogs_session_set(request: Request, file: UploadFile = None):
-    ok, msg = False, "Aucun fichier."
-    if file is not None:
-        import json as _json
-        try:
-            d = _json.loads((await file.read()).decode("utf-8", "ignore"))
-            n = len(d.get("cookies", []))
-            if n and any("discogs.com" in c.get("domain", "") for c in d["cookies"]):
-                save(DISCOGS_STATE, d)
-                ok, msg = True, f"Session chargée — {n} cookies."
-            else:
-                msg = "Pas de cookie discogs.com dans ce fichier."
-        except ValueError:
-            msg = "JSON invalide."
-    return frag(request, "partials/discogs_session.html", sess=_discogs_sess(), msg=msg, ok=ok)
-
-
-@app.post("/settings/discogs-session/clear", response_class=HTMLResponse)
-def discogs_session_clear(request: Request):
-    try:
-        os.remove(DISCOGS_STATE)
-    except OSError:
-        pass
-    return frag(request, "partials/discogs_session.html", sess=_discogs_sess(),
-                msg="Session supprimée.", ok=True)
+    return render(request, "pages/settings.html", active="settings", cfg=c, sc=c["scoring"], saved=saved)
 
 
 @app.post("/feedback", response_class=HTMLResponse)

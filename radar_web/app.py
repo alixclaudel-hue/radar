@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, learn,
-                    paths, store, vocab, ytcache)
+                    paths, sellers, store, vocab, ytcache)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -884,6 +884,20 @@ def cart_remove(request: Request, rid: str = Form("")):
     return frag(request, "partials/cart.html", cart=cart)
 
 
+@app.get("/cart/sellers", response_class=HTMLResponse)
+def cart_sellers_frag(request: Request):
+    cart = load(_pu().cart, [])
+    titles = {str(x.get("id")): x for x in cart}
+    cov = sellers.cart_coverage(titles.keys())
+    rows = [{"u": u, "name": e.get("name", u), "country": e.get("country", ""),
+             "n": len(hits), "items": [titles[h] for h in hits if h in titles]}
+            for u, e, hits in cov[:20]]
+    cat = sellers.load_catalog()
+    scanned = sum(1 for e in cat.values() if e.get("last_scan"))
+    return frag(request, "partials/cart_sellers.html", rows=rows, n_cart=len(cart),
+                n_catalog=len(cat), n_scanned=scanned)
+
+
 def _toks(s):
     return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
 
@@ -1454,7 +1468,7 @@ def univers_artists_export():
 # ============================================================ jobs
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
-              "ingest_djsets", "resolve_artists", "canonicalize", "enrich"}
+              "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 
@@ -1511,6 +1525,45 @@ def settings_page(request: Request, saved: int = 0):
                               "n_seeds": len(g.get("seeds", {})), "n_edges": len(g.get("edges", {}))},
                   coeur="\n".join(ac.get("1", [])),
                   coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])))
+
+
+def _catalog_rows():
+    cat = sellers.ensure_seeded()
+    rows = [dict(u=u, **e) for u, e in cat.items()]
+    rows.sort(key=lambda r: (not r.get("active"), r.get("country", ""),
+                             (r.get("name") or r["u"]).lower()))
+    return rows, cat
+
+
+@app.get("/sellers/catalog", response_class=HTMLResponse)
+def sellers_catalog_frag(request: Request):
+    rows, cat = _catalog_rows()
+    return frag(request, "partials/sellers_catalog.html", rows=rows,
+                n_active=sum(1 for r in rows if r.get("active")),
+                n_scanned=sum(1 for r in rows if r.get("last_scan")),
+                job=jobs.status("scan_catalog"))
+
+
+@app.post("/sellers/catalog/toggle", response_class=HTMLResponse)
+def sellers_catalog_toggle(request: Request, u: str = Form("")):
+    cat = sellers.load_catalog()
+    if u in cat:
+        cat[u]["active"] = not cat[u].get("active")
+        cat[u].pop("fails", None)
+        sellers.save_catalog(cat)
+    return sellers_catalog_frag(request)
+
+
+@app.post("/sellers/catalog/add", response_class=HTMLResponse)
+def sellers_catalog_add(request: Request, u: str = Form(""), name: str = Form("")):
+    u = u.strip().lstrip("@")
+    cat = sellers.load_catalog()
+    if u and u not in cat:
+        cat[u] = {"name": name.strip() or u, "country": "", "city": "", "focus": "",
+                  "type": "custom", "source": "manuel", "active": True, "verified": None,
+                  "n_items": None, "n_new": None, "last_scan": None}
+        sellers.save_catalog(cat)
+    return sellers_catalog_frag(request)
 
 
 @app.post("/feedback", response_class=HTMLResponse)

@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Mieux connaître ton univers</h1>
 <p class="muted small">Une section par source : identifiants + import + résultat au même endroit. Chaque plateforme s'importe séparément.</p>
+{% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
 <form method="post" action="/patte">
 
@@ -138,6 +139,11 @@
       </div>
     </div>
   </details>
+
+  <div class="btnrow" style="margin-top:14px">
+    <button class="primary" type="submit">💾 Tout enregistrer</button>
+    <span class="small muted">les boutons de section enregistrent déjà tout le formulaire</span>
+  </div>
 </form>
 
 <!-- ============ DJ sets (hors du formulaire principal) ============ -->

@@ -34,7 +34,8 @@
         <td style="padding:6px 8px" class="small muted">{{ r.owned or '—' }}</td>
         <td style="padding:6px 8px">
           <button class="small" title="retirer de la base"
-                  hx-post="/univers/labels/remove" hx-target="#labels-table" hx-swap="outerHTML"
+                  hx-post="/univers/labels/remove" hx-confirm="Retirer « {{ r.disp }} » de ta base ?"
+                  hx-target="#labels-table" hx-swap="outerHTML"
                   hx-vals='{"name": {{ r.disp|tojson }}, "flt": {{ flt|tojson }}, "page": "{{ page }}"}'>✕</button>
         </td>
       </tr>

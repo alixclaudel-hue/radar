@@ -231,3 +231,24 @@ a.chip:hover{ border-color:var(--pin); }
 .htmx-indicator{ opacity:0; }
 .htmx-request .htmx-indicator{ opacity:1; }
 .htmx-request.htmx-indicator{ opacity:1; }
+
+/* retour visuel « occupé » sur toute action htmx */
+button.htmx-request, .htmx-request > button[type=submit]{ opacity:.5; pointer-events:none; }
+form.htmx-request{ opacity:.7; }
+
+/* messages de confirmation / erreur hors accordéon */
+.ok{ color:var(--pin); font-weight:600; }
+.msg-err{ color:var(--clay); font-weight:600; }
+
+/* focus clavier visible */
+button:focus-visible, .lbl-opt:focus-visible, a.chip:focus-visible{
+  outline:2px solid var(--pin); outline-offset:2px;
+}
+
+/* mobile */
+@media (max-width:640px){
+  input, select, textarea, button{ font-size:16px; }   /* pas de zoom auto iOS */
+}
+@media (max-width:520px){
+  .grid{ grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:8px; }
+}

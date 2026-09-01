@@ -2,13 +2,7 @@
 {% block title %}Mieux connaître ton univers · Radar{% endblock %}
 {% block content %}
 <h1>Mieux connaître ton univers</h1>
-<p class="muted small">Tout ce qui te définit musicalement, une section par source : identifiants + import + résultat au même endroit.</p>
-{% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
-
-<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
-  <button type="button" class="primary" hx-post="/patte/sync-all" hx-target="#sync-all" hx-swap="innerHTML">🔄 Tout synchroniser</button>
-  <span id="sync-all" class="small muted"></span>
-</div>
+<p class="muted small">Une section par source : identifiants + import + résultat au même endroit. Chaque plateforme s'importe séparément.</p>
 
 <form method="post" action="/patte">
 
@@ -17,13 +11,17 @@
     <summary>
       <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>
       Discogs
-      <span class="tag">{% if cfg.token %}<span class="ok">✓ connecté</span>{% else %}token manquant{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants</span>
+      <span class="tag">{% if cfg.token %}<span class="ok">✓ connecté</span>{% else %}token manquant{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants{% if coll.fetched_at %} · importé {{ coll.fetched_at.replace('T',' ')[:16] }}{% endif %}</span>
     </summary>
     <div class="acc__body">
       <div class="field"><label>Token d'accès personnel</label>
         <input type="password" name="token" value="{{ cfg.token or '' }}"></div>
-      <p class="small muted">{% if coll.fetched_at %}Collection chargée le {{ coll.fetched_at.replace('T',' ') }}.{% else %}Collection jamais chargée.{% endif %} Sert aux recommandations de labels.</p>
-      <button type="button" class="small" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">Charger / rafraîchir collection + wantlist</button>
+      <p class="small muted">Sert aux recommandations de labels.</p>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-discogs" hx-swap="innerHTML">💾 Enregistrer</button>
+        <button type="button" class="small" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">⬇ Importer collection + wantlist</button>
+        <span id="save-discogs" class="small ok"></span>
+      </div>
       <div id="job-fetch_collection" hx-get="/jobs/fetch_collection/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
     </div>
   </details>
@@ -33,7 +31,7 @@
     <summary>
       <svg class="logo" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0000"/><path d="M10 9l6 3-6 3z" fill="#fff"/></svg>
       YouTube
-      <span class="tag">{% if cfg.youtube_api_key %}<span class="ok">✓ clé</span>{% else %}clé manquante{% endif %} · {{ pl_urls|length }} playlist{{ 's' if pl_urls|length>1 }} · {{ pl_meta|length }} importée{{ 's' if pl_meta|length>1 }}</span>
+      <span class="tag">{% if cfg.youtube_api_key %}<span class="ok">✓ clé</span>{% else %}clé manquante{% endif %} · {{ pl_urls|length }} playlist{{ 's' if pl_urls|length>1 }}{% if last.ingest_youtube %} · importé {{ last.ingest_youtube }}{% endif %}</span>
     </summary>
     <div class="acc__body">
       <div class="field"><label>Clé API YouTube Data v3</label>
@@ -48,7 +46,11 @@
         {% endif %}
       </div>
       {% endfor %}
-      <button type="button" class="small" hx-post="/patte/run/ingest_youtube" hx-include="closest form" hx-target="#job-ingest_youtube" hx-swap="outerHTML">Importer les playlists</button>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-youtube" hx-swap="innerHTML">💾 Enregistrer</button>
+        <button type="button" class="small" hx-post="/patte/run/ingest_youtube" hx-include="closest form" hx-target="#job-ingest_youtube" hx-swap="outerHTML">⬇ Importer les playlists</button>
+        <span id="save-youtube" class="small ok"></span>
+      </div>
       <div id="job-ingest_youtube" hx-get="/jobs/ingest_youtube/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
     </div>
   </details>
@@ -58,10 +60,10 @@
     <summary>
       <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.5c3.2-1 7-.7 10 1M7.5 12.5c2.6-.8 5.7-.5 8 1M8 15.3c2-.6 4.4-.4 6 .8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
       Spotify
-      <span class="tag">{% if cfg.spotify_client_id %}<span class="ok">✓ clé</span>{% else %}clé manquante{% endif %} · {{ sp_urls|length }} playlist{{ 's' if sp_urls|length>1 }} · {{ src.get('spotify', 0) }} tracks</span>
+      <span class="tag">{% if cfg.spotify_client_id %}<span class="ok">✓ clé</span>{% else %}clé manquante{% endif %} · {{ sp_urls|length }} playlist{{ 's' if sp_urls|length>1 }} · {{ src.get('spotify', 0) }} tracks{% if last.ingest_spotify %} · importé {{ last.ingest_spotify }}{% endif %}</span>
     </summary>
     <div class="acc__body">
-      <p class="small muted">API Spotify → <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> → crée une app → récupère <em>Client ID</em> + <em>Client Secret</em>. Playlists publiques uniquement.</p>
+      <p class="small muted">API Spotify → <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> → crée une app → <em>Client ID</em> + <em>Client Secret</em>. Playlists publiques uniquement.</p>
       <div class="row">
         <div class="field"><label>Client ID</label>
           <input name="spotify_client_id" value="{{ cfg.spotify_client_id or '' }}"></div>
@@ -78,7 +80,11 @@
         {% endif %}
       </div>
       {% endfor %}
-      <button type="button" class="small" hx-post="/patte/run/ingest_spotify" hx-include="closest form" hx-target="#job-ingest_spotify" hx-swap="outerHTML">Importer les playlists</button>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-spotify" hx-swap="innerHTML">💾 Enregistrer</button>
+        <button type="button" class="small" hx-post="/patte/run/ingest_spotify" hx-include="closest form" hx-target="#job-ingest_spotify" hx-swap="outerHTML">⬇ Importer les playlists</button>
+        <span id="save-spotify" class="small ok"></span>
+      </div>
       <div id="job-ingest_spotify" hx-get="/jobs/ingest_spotify/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
     </div>
   </details>
@@ -88,7 +94,7 @@
     <summary>
       <svg class="logo" viewBox="0 0 24 24"><path d="M3 16l6-9h12l-6 9z" fill="#1DA0C3"/></svg>
       Bandcamp
-      <span class="tag">{% if cfg.bandcamp_sub_user %}<span class="ok">✓ connecté</span>{% else %}non connecté{% endif %} · {{ src.get('bandcamp', 0) }} tracks</span>
+      <span class="tag">{% if cfg.bandcamp_sub_user %}<span class="ok">✓ connecté</span>{% else %}non connecté{% endif %} · {{ src.get('bandcamp', 0) }} tracks{% if last.ingest_bandcamp %} · importé {{ last.ingest_bandcamp }}{% endif %}</span>
     </summary>
     <div class="acc__body">
       <p class="small muted">Bandcamp → réglages → <em>Subsonic</em> : génère un identifiant + mot de passe.</p>
@@ -98,19 +104,27 @@
         <div class="field"><label>Mot de passe</label>
           <input type="password" name="bandcamp_sub_pass" value="{{ cfg.bandcamp_sub_pass or '' }}"></div>
       </div>
-      <button type="button" class="small" hx-post="/patte/run/ingest_bandcamp" hx-include="closest form" hx-target="#job-ingest_bandcamp" hx-swap="outerHTML">Importer ma collection Bandcamp</button>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-bandcamp" hx-swap="innerHTML">💾 Enregistrer</button>
+        <button type="button" class="small" hx-post="/patte/run/ingest_bandcamp" hx-include="closest form" hx-target="#job-ingest_bandcamp" hx-swap="outerHTML">⬇ Importer ma collection</button>
+        <span id="save-bandcamp" class="small ok"></span>
+      </div>
       <div id="job-ingest_bandcamp" hx-get="/jobs/ingest_bandcamp/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
     </div>
   </details>
 
   <!-- ============ DJ sets ============ -->
   <details class="acc">
-    <summary>🎧 DJ sets à dépouiller <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
+    <summary>🎧 DJ sets à dépouiller <span class="tag">{{ src.get('djset', 0) }} tracks extraites{% if last.ingest_djsets %} · importé {{ last.ingest_djsets }}{% endif %}</span></summary>
     <div class="acc__body">
       <p class="small muted">Noms de DJ / émissions dont extraire les tracks jouées. Résultats dans <a href="/univers?tab=sets">Mon univers → Mes sets</a>.</p>
       <div class="field"><label>Un par ligne (nom, @handle ou URL de chaîne)</label>
         <textarea name="djset_sources" rows="5">{{ cfg.djset_sources or '' }}</textarea></div>
-      <button type="button" class="small" hx-post="/patte/run/ingest_djsets" hx-include="closest form" hx-target="#job-ingest_djsets" hx-swap="outerHTML">Enregistrer &amp; lancer l'extraction</button>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-djsets" hx-swap="innerHTML">💾 Enregistrer</button>
+        <button type="button" class="small" hx-post="/patte/run/ingest_djsets" hx-include="closest form" hx-target="#job-ingest_djsets" hx-swap="outerHTML">⬇ Lancer l'extraction</button>
+        <span id="save-djsets" class="small ok"></span>
+      </div>
       <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
     </div>
   </details>
@@ -126,10 +140,12 @@
         <div class="field"><label>Aimés (poids {{ sc.taste_tiers['2'] }})</label>
           <textarea name="styles_2" rows="7">{{ (cats.get('2') or [])|join('\n') }}</textarea></div>
       </div>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-styles" hx-swap="innerHTML">💾 Enregistrer</button>
+        <span id="save-styles" class="small ok"></span>
+      </div>
     </div>
   </details>
-
-  <div style="margin-top:12px"><button class="primary" type="submit">💾 Enregistrer tout</button></div>
 </form>
 
 <!-- ============ Import CSV (hors du formulaire principal) ============ -->

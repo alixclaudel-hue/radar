@@ -239,8 +239,10 @@ def home():
 
 
 # ============================================================ 🧠 Mieux connaître ton univers
-SYNC_ALL_JOBS = ["fetch_collection", "ingest_youtube", "ingest_spotify",
-                 "ingest_bandcamp", "merge_corpus"]
+def _last_import(job):
+    s = jobs.status(job)
+    fa = s.get("finished_at") if s else None
+    return fa.replace("T", " ")[:16] if fa else None
 
 
 @app.get("/patte", response_class=HTMLResponse)
@@ -248,11 +250,13 @@ def patte_page(request: Request, saved: int = 0):
     c = Ctx()
     pl_urls = [u for u in (c.cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
+    last = {j: _last_import(j) for j in
+           ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
     return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
-                  src=c.corpus_by_source(), st=c.stats(), saved=saved)
+                  src=c.corpus_by_source(), st=c.stats(), saved=saved, last=last)
 
 
 def _apply_patte_form(f):
@@ -278,18 +282,19 @@ async def patte_save(request: Request):
     return RedirectResponse("/patte?saved=1", status_code=303)
 
 
+@app.post("/patte/save", response_class=HTMLResponse)
+async def patte_save_frag(request: Request):
+    """Enregistre les champs de la section (fragment, reste sur place)."""
+    _apply_patte_form(await request.form())
+    return HTMLResponse(f"<span class='small ok'>✓ enregistré {time.strftime('%H:%M')}</span>")
+
+
 @app.post("/patte/run/{job}", response_class=HTMLResponse)
 async def patte_run(request: Request, job: str):
     """Enregistre les identifiants/champs saisis PUIS lance le job (pour que le job
     utilise bien ce qui vient d'être tapé, sans étape « Enregistrer » séparée)."""
     _apply_patte_form(await request.form())
     return job_launch(job)
-
-
-@app.post("/patte/sync-all", response_class=HTMLResponse)
-def patte_sync_all():
-    n = sum(1 for j in SYNC_ALL_JOBS if jobs.launch(j))
-    return HTMLResponse(f"<span class='small ok'>{n} tâche(s) lancée(s) — voir l'avancement par rubrique.</span>")
 
 
 @app.post("/patte/import-csv", response_class=HTMLResponse)

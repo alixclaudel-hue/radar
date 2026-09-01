@@ -11,6 +11,9 @@ __pycache__/
 jobs/
 *.json
 !requirements*.txt
-DEPLOY.md
+
 .venv/
 venv/
+
+# ancienne appli Streamlit archivée
+archive/

@@ -4,10 +4,12 @@ Lancement :  uvicorn radar_web.app:app --reload --port 8600
 Nav : 🧠 Ma patte musicale · 🔍 Recherche ciblée · 📻 Veille Discogs · 🌐 Mon univers · 🎛️ Réglages
 """
 import hashlib
+import hmac
 import html
 import io
 import os
 import re
+import secrets
 import time
 from typing import List
 from urllib.parse import quote_plus
@@ -18,7 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import discogs, jobs, learn, paths, store, vocab
+from .radar import accounts, discogs, jobs, learn, paths, store, vocab
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -60,25 +62,51 @@ CURRENT_YEAR = time.gmtime().tm_year
 
 
 # --------------------------------------------------------------------- auth
-def _pw():
-    return os.environ.get("APP_PASSWORD", "")
+def _session_secret():
+    v = os.environ.get("APP_SESSION_SECRET")
+    if v:
+        return v.encode()
+    p = os.path.join(paths.DATA, ".session_secret")
+    if not os.path.isfile(p):
+        with open(p, "w") as f:
+            f.write(secrets.token_hex(32))
+        os.chmod(p, 0o600)
+    with open(p) as f:
+        return f.read().strip().encode()
 
 
-def _token(exp):
+SESSION_SECRET = _session_secret()
+accounts.bootstrap()
+
+
+def _dev_mode():
+    """Ni APP_PASSWORD ni compte -> pas d'authentification (CI, dev local)."""
+    return not os.environ.get("APP_PASSWORD") and accounts.count() == 0
+
+
+def _make_token(uid, exp):
     exp = int(exp)
-    return f"{exp}.{hashlib.sha256(f'{_pw()}|{exp}'.encode()).hexdigest()[:20]}"
+    sig = hmac.new(SESSION_SECRET, f"{uid}|{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{uid}.{exp}.{sig}"
 
 
-def _token_ok(tok):
+def _parse_token(tok):
     try:
-        exp = int((tok or "").split(".", 1)[0])
+        uid, exp, sig = (tok or "").split(".")
+        exp = int(exp)
     except ValueError:
-        return False
-    return time.time() < exp and _token(exp) == tok
+        return None
+    good = hmac.new(SESSION_SECRET, f"{uid}|{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    if not hmac.compare_digest(sig, good) or time.time() >= exp:
+        return None
+    return uid
 
 
-def _authed(request):
-    return not _pw() or _token_ok(request.cookies.get(COOKIE, ""))
+def _req_uid(request):
+    if _dev_mode():
+        return paths.DEFAULT_UID
+    uid = _parse_token(request.cookies.get(COOKIE, ""))
+    return uid if uid and accounts.get(uid) else None
 
 
 @app.middleware("http")
@@ -86,17 +114,16 @@ async def _guard(request: Request, call_next):
     p = request.url.path
     if p.startswith("/static") or p in ("/login", "/health"):
         return await call_next(request)
-    if not _authed(request):
+    uid = _req_uid(request)
+    if not uid:
         if request.headers.get("hx-request"):
             return HTMLResponse("Session expirée — <a href='/login'>reconnexion</a>", status_code=401)
         return RedirectResponse("/login", status_code=303)
-    # utilisateur de la requête -> lu par store.load_config() / Ctx() / _pu() / jobs.launch()
-    # (étape 2b : résoudre le vrai uid depuis le cookie ; ici, propriétaire unique)
-    store.set_current_uid(paths.DEFAULT_UID)
+    store.set_current_uid(uid)          # lu par load_config() / Ctx() / _pu() / jobs.launch()
     resp = await call_next(request)
-    if _pw() and _token_ok(request.cookies.get(COOKIE, "")):
-        resp.set_cookie(COOKIE, _token(time.time() + AUTH_TTL), max_age=AUTH_TTL,
-                        httponly=True, samesite="lax")
+    if not _dev_mode():
+        resp.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL),
+                        max_age=AUTH_TTL, httponly=True, samesite="lax")
     return resp
 
 
@@ -107,31 +134,42 @@ def health():
 
 @app.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, bad: int = 0):
-    if _authed(request):
+    if _req_uid(request):
         return RedirectResponse("/", status_code=303)
-    msg = "<p class='notice warn'>Mot de passe incorrect.</p>" if bad else ""
+    msg = "<p class='notice warn'>Identifiants incorrects.</p>" if bad else ""
     return HTMLResponse(f"""<!doctype html><meta charset=utf-8>
 <link rel=stylesheet href=/static/app.css><div class=wrap style='max-width:360px'>
 <p class=brand style='font-size:32px'>Rada<b>r</b></p>{msg}
 <form method=post action=/login>
-  <div class=field><label>Mot de passe</label><input type=password name=pw autofocus></div>
+  <div class=field><label>Identifiant</label><input name=username autofocus autocapitalize=off></div>
+  <div class=field><label>Mot de passe</label><input type=password name=pw></div>
   <button class=primary type=submit>Entrer</button>
 </form></div>""")
 
 
 @app.post("/login")
-def login(pw: str = Form("")):
-    if _pw() and hashlib.sha256(pw.encode()).digest() == hashlib.sha256(_pw().encode()).digest():
+def login(username: str = Form(""), pw: str = Form("")):
+    uid = accounts.verify(username, pw)
+    if uid:
         r = RedirectResponse("/", status_code=303)
-        r.set_cookie(COOKIE, _token(time.time() + AUTH_TTL), max_age=AUTH_TTL,
-                     httponly=True, samesite="lax")
+        r.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL),
+                     max_age=AUTH_TTL, httponly=True, samesite="lax")
         return r
     return RedirectResponse("/login?bad=1", status_code=303)
+
+
+@app.get("/logout")
+@app.post("/logout")
+def logout():
+    r = RedirectResponse("/login", status_code=303)
+    r.delete_cookie(COOKIE)
+    return r
 
 
 # --------------------------------------------------------------------- helpers
 def render(request, tpl, **ctx):
     ctx.setdefault("has_token", bool(store.load_config().get("token")))
+    ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
 
 

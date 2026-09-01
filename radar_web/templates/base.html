@@ -11,7 +11,8 @@
   <div class="wrap">
     <div class="topbar">
       <a class="brand" href="/">Rada<b>r</b></a>
-      <span class="brand-sub">nouvelle interface</span>
+      {% if me %}<span class="brand-sub">{{ me }} · <a href="/logout">déconnexion</a></span>
+      {% else %}<span class="brand-sub">nouvelle interface</span>{% endif %}
     </div>
     <nav class="nav">
       {% set cur = active|default('') %}

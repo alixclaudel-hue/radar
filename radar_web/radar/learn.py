@@ -11,8 +11,12 @@ FEAT = {"label": ("collection", "corpus", "artist", "affinity"),
 SUBKEY = {"label": "reco", "album": "album"}
 
 
+def _fb_path():
+    return paths.user_paths(store.current_uid()).feedback
+
+
 def log(kind, key, name, verdict, score, feat):
-    fb = store.load(paths.FEEDBACK, [])
+    fb = store.load(_fb_path(), [])
     for e in reversed(fb):
         if e.get("kind") == kind and e.get("key") == key:
             if e.get("verdict") == verdict:
@@ -23,7 +27,7 @@ def log(kind, key, name, verdict, score, feat):
                "kind": kind, "key": key, "name": name, "verdict": verdict,
                "score_shown": score,
                "feat": {k: round(float((feat or {}).get(k) or 0.0), 4) for k in keys}})
-    store.save(paths.FEEDBACK, fb)
+    store.save(_fb_path(), fb)
 
 
 def _sig(z):
@@ -57,7 +61,7 @@ def fit(X, y, prior, l2=2.0, iters=600, lr=0.4):
 
 
 def summary(scoring, min_fb=12, min_cls=3):
-    fb = store.load(paths.FEEDBACK, [])
+    fb = store.load(_fb_path(), [])
     out = {}
     for kind, keys in FEAT.items():
         latest = {}

@@ -377,6 +377,10 @@ def _hist_summary(p):
         bits.append(yr)
     if p.get("vinyl"):
         bits.append("vinyle")
+    if p.get("base_metric"):
+        lbl = {"aff": "affinité", "reco": "reco", "owned": "collection"}.get(p["base_metric"], p["base_metric"])
+        bits.append(f"mes labels ({lbl}"
+                    + (f"≥{p['base_min']}" if p.get("base_min") else "") + ")")
     return " · ".join(bits) or "tous filtres vides"
 
 
@@ -399,7 +403,8 @@ def search_replay(request: Request, sid: str):
     entry = next((e for e in load(_pu().search_hist, []) if e.get("id") == sid), None)
     if not entry:
         return frag(request, "partials/results.html", results=[])
-    return frag(request, "partials/results.html", results=entry.get("results", []))
+    return frag(request, "partials/results.html", results=entry.get("results", []),
+                searched=entry.get("searched", []))
 
 
 def _base_labels_ranked(c):
@@ -407,6 +412,7 @@ def _base_labels_ranked(c):
     décroissante, départagée par le score de reco (collection + corpus + artistes),
     puis alpha. Dédoublonné par nom canonique."""
     ridx = c.reco_index
+    lc = c.collection.get("label_counts", {})
     rows, seen = [], set()
     for name in c.cfg.get("labels", []):
         key = store.normalize_label(name)
@@ -414,7 +420,7 @@ def _base_labels_ranked(c):
         disp = res.get("discogs_name") or res.get("original") or name
         aff = c.affinity_score(c.profile.get(key)) if c.profile.get(key) else None
         rows.append({"disp": disp, "norm": store.normalize_label(disp),
-                     "aff": aff, "_reco": ridx.get(key, 0)})
+                     "aff": aff, "_reco": ridx.get(key, 0), "owned": lc.get(key, 0)})
     rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
     uniq = []
     for r in rows:
@@ -423,6 +429,27 @@ def _base_labels_ranked(c):
         seen.add(r["norm"])
         uniq.append(r)
     return uniq
+
+
+_BASE_METRIC = {"aff": "aff", "reco": "_reco", "owned": "owned"}
+
+
+def _pick_base_labels(c, metric, minv, topn):
+    """Noms des labels de la base classés selon `metric` (aff|reco|owned),
+    filtrés par seuil `minv`, limités à `topn` (borne dure 12)."""
+    field = _BASE_METRIC.get(metric)
+    if not field:
+        return []
+
+    def val(r):
+        v = r.get(field)
+        return -1.0 if v is None else float(v)
+
+    rows = _base_labels_ranked(c)
+    if minv is not None:
+        rows = [r for r in rows if val(r) >= minv]
+    rows.sort(key=lambda r: -val(r))
+    return [r["disp"] for r in rows[:max(1, min(12, topn))]]
 
 
 @app.get("/search/labels", response_class=HTMLResponse)
@@ -446,7 +473,9 @@ def search_labels(request: Request, label: str = "", q: str = ""):
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
                year_from: str = Form(""), year_to: str = Form(""),
-               vinyl: str = Form(""), pages: str = Form("2")):
+               vinyl: str = Form(""), pages: str = Form("2"),
+               base_metric: str = Form(""), base_min: str = Form(""),
+               base_top: str = Form("12")):
     c = Ctx()
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
@@ -457,15 +486,33 @@ def search_run(request: Request, label: str = Form(""),
         npages = max(1, min(4, int(pages or 2)))
     except ValueError:
         npages = 2
-    # produit genres × styles (sémantique OU) ; borné pour ménager l'API
-    combos = [(g, s) for g in (genres or [""]) for s in (styles or [""])][:8]
+
+    # mode « chercher dans mes labels » : prend le pas sur le label unique
+    base_metric = (base_metric or "").strip()
+    try:
+        b_min = float(base_min) if str(base_min).strip() else None
+    except ValueError:
+        b_min = None
+    try:
+        b_top = max(1, min(12, int(base_top or 12)))
+    except ValueError:
+        b_top = 12
+    base_labels = _pick_base_labels(c, base_metric, b_min, b_top) if base_metric else []
+
+    gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
+    if base_labels:
+        npages = min(npages, 1)                       # N labels -> 1 page chacun
+        combos = [(lab, g, s) for lab in base_labels for (g, s) in gs][:12]
+    else:
+        combos = [(label.strip() or None, g, s) for (g, s) in gs][:8]
+
     raw, seen_ids = [], set()
     try:
-        for i, (g, s) in enumerate(combos):
+        for i, (lab, g, s) in enumerate(combos):
             if i:
                 time.sleep(1.0)
-            if label.strip():
-                part = discogs.search_label_releases(token, label.strip(), genre=g,
+            if lab:
+                part = discogs.search_label_releases(token, lab, genre=g,
                                                      style=s, fmt=fmt, year=year, max_pages=npages)
             else:
                 part = []
@@ -505,13 +552,15 @@ def search_run(request: Request, label: str = Form(""),
     scored = scored[:48]
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
-              "vinyl": bool(vinyl), "pages": npages}
+              "vinyl": bool(vinyl), "pages": npages,
+              "base_metric": base_metric, "base_min": str(base_min or "").strip(),
+              "base_top": b_top}
     hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
-                    "n": len(scored), "results": scored})
+                    "n": len(scored), "results": scored, "searched": base_labels})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
-    return frag(request, "partials/results.html", results=scored)
+    return frag(request, "partials/results.html", results=scored, searched=base_labels)
 
 
 def _toks(s):

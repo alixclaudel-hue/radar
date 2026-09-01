@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import discogs, jobs, learn, store, vocab
+from .radar import discogs, jobs, learn, paths, store, vocab
 from .radar.paths import (CORPUS, PENDING_ENRICH, RELEASE_META, SEARCH_HIST,
                           SELLERS_NEW, SELLERS_SEEN, SPOTIFY_META, VEILLE_NEW,
                           VEILLE_SEEN, YOUTUBE_META)
@@ -41,6 +41,14 @@ def _sp_id(url):
 
 templates.env.filters["pl_id"] = _pl_id
 templates.env.filters["sp_id"] = _sp_id
+
+# migration douce : <DATA>/*.json -> users/owner/ + shared/  (idempotent, no-op si déjà fait)
+_migrated = paths.migrate_layout()
+if _migrated:
+    import sys as _sys
+    print(f"[radar] layout migré vers users/{paths.DEFAULT_UID}/ + shared/ : "
+          f"{len(_migrated)} fichier(s)", file=_sys.stderr)
+
 app = FastAPI(title="Radar")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 

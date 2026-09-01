@@ -1,6 +1,6 @@
 <div class="cover-meta">
   {% if m.rating %}<span class="cm cm--star" title="{{ m.rcount or 0 }} votes Discogs">★ {{ '%.2f'|format(m.rating) }}</span>{% endif %}
-  {% if m.low %}<span class="cm">dès {{ m.low|round(0)|int }} €</span>{% endif %}
+  {% if m.low %}<span class="cm" title="prix article le plus bas, hors frais de port (Discogs n'expose pas le port hors session connectée)">dès {{ m.low|round(0)|int }} € <span style="opacity:.7">hors&nbsp;port</span></span>{% endif %}
   {% if m.nfs is not none %}<span class="cm">{{ m.nfs }} en vente</span>{% endif %}
   {% if m.get('fr') is not none %}
     <a class="cm cm--fr" href="https://www.discogs.com/sell/release/{{ rid }}?ships_from=France"

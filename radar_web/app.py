@@ -19,9 +19,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, learn, store, vocab
-from .radar.paths import (CORPUS, PENDING_ENRICH, RELEASE_META, SELLERS_NEW,
-                          SELLERS_SEEN, SPOTIFY_META, VEILLE_NEW, VEILLE_SEEN,
-                          YOUTUBE_META)
+from .radar.paths import (CORPUS, PENDING_ENRICH, RELEASE_META, SEARCH_HIST,
+                          SELLERS_NEW, SELLERS_SEEN, SPOTIFY_META, VEILLE_NEW,
+                          VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -259,13 +259,45 @@ def _search_styles(c):
     return mine, more
 
 
+SEARCH_HIST_MAX = 20
+
+
+def _hist_summary(p):
+    bits = []
+    if p.get("label"):
+        bits.append(p["label"])
+    if p.get("genre"):
+        bits.append(" / ".join(p["genre"]))
+    if p.get("style"):
+        bits.append(" / ".join(p["style"]))
+    yr = _year_param(p.get("year_from", ""), p.get("year_to", ""))
+    if yr:
+        bits.append(yr)
+    if p.get("vinyl"):
+        bits.append("vinyle")
+    return " · ".join(bits) or "tous filtres vides"
+
+
 @app.get("/search", response_class=HTMLResponse)
-def search_page(request: Request):
+def search_page(request: Request, sid: str = ""):
     c = Ctx()
     styles_mine, styles_more = _search_styles(c)
-    return render(request, "pages/search.html", active="search", q={},
+    hist = load(SEARCH_HIST, [])
+    entry = next((e for e in hist if e.get("id") == sid), hist[0] if hist else None)
+    return render(request, "pages/search.html", active="search",
+                  q=(entry or {}).get("params", {}), last_id=(entry or {}).get("id", ""),
+                  history=[{"id": e["id"], "ts": e.get("ts", ""), "n": e.get("n", 0),
+                            "summary": _hist_summary(e.get("params", {}))} for e in hist],
                   genres=vocab.GENRES, styles_mine=styles_mine, styles_more=styles_more,
                   year_min=SEARCH_MIN_YEAR, year_max=int(time.strftime("%Y")))
+
+
+@app.get("/search/replay/{sid}", response_class=HTMLResponse)
+def search_replay(request: Request, sid: str):
+    entry = next((e for e in load(SEARCH_HIST, []) if e.get("id") == sid), None)
+    if not entry:
+        return frag(request, "partials/results.html", results=[])
+    return frag(request, "partials/results.html", results=entry.get("results", []))
 
 
 def _base_labels_ranked(c):
@@ -359,12 +391,25 @@ def search_run(request: Request, label: str = Form(""),
             continue
         seen.add(rid)
         sc, det = c.album_score(r)
-        # cover_image (~500 px) est bien meilleure que thumb (150 px)
-        r["thumb"] = r.get("cover_image") or r.get("thumb")
-        r["label1"] = next((x for x in (r.get("label") or []) if x), "")
-        scored.append({"raw": r, "score": sc, "detail": det})
+        thumb = r.get("cover_image") or r.get("thumb")
+        lab1 = next((x for x in (r.get("label") or []) if x), "")
+        scored.append({"raw": {"id": rid, "title": r.get("title", ""), "label1": lab1,
+                               "style": r.get("style") or [], "catno": r.get("catno", ""),
+                               "year": r.get("year", ""), "thumb": thumb, "uri": r.get("uri", "")},
+                       "score": sc,
+                       "detail": {"label": det.get("label"), "artist": det.get("artist"),
+                                  "style": det.get("style")}})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
-    return frag(request, "partials/results.html", results=scored[:48])
+    scored = scored[:48]
+    params = {"label": label.strip(), "genre": genres, "style": styles,
+              "year_from": year_from.strip(), "year_to": year_to.strip(),
+              "vinyl": bool(vinyl), "pages": npages}
+    hist = [e for e in load(SEARCH_HIST, []) if e.get("params") != params]
+    hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
+                    "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
+                    "n": len(scored), "results": scored})
+    save(SEARCH_HIST, hist[:SEARCH_HIST_MAX])
+    return frag(request, "partials/results.html", results=scored)
 
 
 def _toks(s):

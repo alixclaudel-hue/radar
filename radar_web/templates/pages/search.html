@@ -18,7 +18,7 @@
     <div class="field">
       <label>Genre <span class="muted">· choix multiple</span></label>
       <select name="genre" multiple size="6">
-        {% for g in genres %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+        {% for g in genres %}<option value="{{ g }}" {{ 'selected' if g in (q.genre or []) }}>{{ g }}</option>{% endfor %}
       </select>
     </div>
     <div class="field">
@@ -26,11 +26,11 @@
       <select name="style" multiple size="8">
         {% if styles_mine %}
         <optgroup label="Mes catégories">
-          {% for s in styles_mine %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          {% for s in styles_mine %}<option value="{{ s }}" {{ 'selected' if s in (q.style or []) }}>{{ s }}</option>{% endfor %}
         </optgroup>
         {% endif %}
         <optgroup label="Autres styles Discogs">
-          {% for s in styles_more %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+          {% for s in styles_more %}<option value="{{ s }}" {{ 'selected' if s in (q.style or []) }}>{{ s }}</option>{% endfor %}
         </optgroup>
       </select>
     </div>
@@ -40,9 +40,9 @@
     <div class="yrange" id="yrange" data-min="{{ year_min }}" data-max="{{ year_max }}">
       <div class="yrange__rail"><div class="yrange__fill" id="yr-fill"></div></div>
       <input type="range" name="year_from" id="yr-from"
-             min="{{ year_min }}" max="{{ year_max }}" value="{{ year_min }}" step="1">
+             min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_from or year_min }}" step="1">
       <input type="range" name="year_to" id="yr-to"
-             min="{{ year_min }}" max="{{ year_max }}" value="{{ year_max }}" step="1">
+             min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
     </div>
   </div>
   <p class="muted small">Plusieurs styles = union (l'un OU l'autre). Ctrl/⌘ ou appui long pour en sélectionner plusieurs.</p>
@@ -64,14 +64,31 @@
 </form>
 
 <hr>
-<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+{% if history %}
+<details class="acc" {{ 'open' if not last_id }}>
+  <summary>🕘 Recherches récentes <span class="tag">{{ history|length }}</span></summary>
+  <div class="acc__body">
+    {% for h in history %}
+    <div class="inbox-row" style="padding:6px 2px">
+      <a href="/search?sid={{ h.id }}" class="txt" style="text-decoration:none;color:var(--ink)">
+        <b>{{ h.summary }}</b>
+        <div class="sub">{{ h.ts }} · {{ h.n }} résultat{{ 's' if h.n > 1 }}</div>
+      </a>
+      {% if h.id == last_id %}<span class="chip">en cours</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0">
   <button type="button" class="small" hx-post="/jobs/market_fr/launch"
           hx-target="#job-market_fr" hx-swap="outerHTML"
           title="Scrape le nb d'annonces localisées en France pour les disques déjà consultés — lent et faillible (Cloudflare)">🇫🇷 Compléter dispos France · exp.</button>
   <span id="job-market_fr" class="small muted"></span>
 </div>
-<div id="results">
-  {% include "partials/results.html" %}
+<div id="results"
+     {% if last_id %}hx-get="/search/replay/{{ last_id }}" hx-trigger="load" hx-swap="innerHTML"{% endif %}>
+  {% if not last_id %}{% include "partials/results.html" %}{% endif %}
 </div>
 
 <script>

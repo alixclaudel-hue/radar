@@ -12,7 +12,7 @@ import re
 import secrets
 import time
 from typing import List
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlencode
 
 import requests
 from fastapi import FastAPI, Form, Request, UploadFile
@@ -20,7 +20,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import accounts, artistgraph, discogs, jobs, labelgraph, learn, paths, store, vocab, ytcache
+from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, learn,
+                    paths, store, vocab, ytcache)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -884,8 +885,9 @@ def tracklist(request: Request, rid: int):
         else:
             q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
             play, kind = "/yt/first?q=" + quote_plus(q), "yt"
+        bc = "/bc/go?" + urlencode({"a": tart, "t": ttl, "l": label1, "kind": "t"})
         rows.append({"pos": (t.get("position") or "").strip(), "title": ttl,
-                     "play": play, "kind": kind})
+                     "play": play, "kind": kind, "bc": bc})
     return frag(request, "partials/tracklist.html", tracks=rows)
 
 
@@ -903,6 +905,20 @@ def yt_first(q: str = ""):
     except (ytcache.QuotaExhausted, RuntimeError, requests.RequestException):
         pass
     return RedirectResponse(yt_search_url(q), status_code=302)
+
+
+@app.get("/bc/go")
+def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
+    """Redirige vers LA page Bandcamp la plus pertinente (API d'autocomplétion),
+    sinon vers la page de recherche Bandcamp."""
+    kind = "a" if kind == "a" else "t"
+    try:
+        hit = bandcamp.search(a, t, kind=kind, label=l)
+        if hit and hit.get("url"):
+            return RedirectResponse(hit["url"], status_code=302)
+    except Exception:                       # noqa: BLE001 — repli toujours possible
+        pass
+    return RedirectResponse(bandcamp.search_url(a, t, kind), status_code=302)
 
 
 RELEASE_META_TTL = 86400

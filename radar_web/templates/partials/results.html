@@ -38,7 +38,7 @@
         <div class="buys">
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs&nbsp;↗</a>{% endif %}
           <a href="https://www.discogs.com/sell/release/{{ rr.id }}?sort=price&sort_order=asc" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
-          <a href="https://bandcamp.com/search?q={{ ((artist ~ ' ' ~ album) if sep else rr.title) | urlencode }}" target="_blank" rel="noopener">Bandcamp</a>
+          <a href="/bc/go?a={{ (artist if sep else '')|urlencode }}&t={{ (album if sep else rr.title)|urlencode }}&l={{ (rr.label1 or '')|urlencode }}&kind=a" target="_blank" rel="noopener">Bandcamp</a>
         </div>
         <div class="foot">
           {% if r.score is not none %}

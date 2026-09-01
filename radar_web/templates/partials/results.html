@@ -4,11 +4,13 @@
   <p class="muted small">Aucune recherche lancée.</p>
 {% elif not results %}
   <p class="muted small">Aucun résultat pour ces filtres.</p>
+  {% if searched %}<p class="muted small">Labels cherchés : {{ searched|join(', ') }}</p>{% endif %}
 {% else %}
   <div class="section-title">
     <h3>{{ results|length }} résultat{{ 's' if results|length > 1 }}</h3>
     <span class="muted small">triés par score album</span>
   </div>
+  {% if searched %}<p class="muted small">Labels cherchés ({{ searched|length }}) : {{ searched|join(', ') }}</p>{% endif %}
   <div class="grid">
   {% for r in results %}
     {% set rr = r.raw %}

@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import accounts, discogs, jobs, labelgraph, learn, paths, store, vocab, ytcache
+from .radar import accounts, artistgraph, discogs, jobs, labelgraph, learn, paths, store, vocab, ytcache
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -317,6 +317,7 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
         q = load(_pu().pending_enrich, {})
         q.setdefault("artists", []).extend(names)
         save(_pu().pending_enrich, q)
+        jobs.launch("enrich")
         store.save_config(c)
         return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
     if replace:
@@ -775,6 +776,7 @@ def reco_label(name: str = Form(""), dest: str = Form("base")):
         q = load(_pu().pending_enrich, {})
         q.setdefault("labels", []).append(name)
         save(_pu().pending_enrich, q)
+        jobs.launch("enrich")
         store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
@@ -791,12 +793,12 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
             q = load(_pu().pending_enrich, {})
             q.setdefault("artists", []).append(name)
             save(_pu().pending_enrich, q)
+            jobs.launch("enrich")
             store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
 
 # --------------------------------------------------------------------- recos (dans Mon univers)
-@app.get("/univers/reco/labels", response_class=HTMLResponse)
 def _label_discogs_url(c, key, name):
     did = ((c.resolved.get(key) or {}).get("discogs_id")
            or (c.collection.get("label_ids", {}).get(key) or {}).get("id"))
@@ -805,6 +807,7 @@ def _label_discogs_url(c, key, name):
     return f"https://www.discogs.com/search/?q={quote_plus(name)}&type=label"
 
 
+@app.get("/univers/reco/labels", response_class=HTMLResponse)
 def reco_labels_frag(request: Request):
     c = Ctx()
     base = {normalize_label(x) for x in c.cfg.get("labels", [])}
@@ -826,16 +829,18 @@ def reco_labels_frag(request: Request):
                 graph_reco=graph_rows[:30], n_reco=len(rows), n_graph=len(graph_rows))
 
 
+def _artist_discogs_url(name, artist_id=None):
+    if artist_id:
+        return f"https://www.discogs.com/artist/{artist_id}"
+    return f"https://www.discogs.com/search/?q={quote_plus(name)}&type=artist"
+
+
 @app.get("/univers/reco/artists", response_class=HTMLResponse)
 def reco_artists_frag(request: Request):
     c = Ctx()
     g = c.graph_rescore()["artists"]
-    disp = {}
-    for cid, names in c.cfg.get("artist_categories", {}).items():
-        for n in names:
-            disp[c.canon_artist_key(n)] = c.canon_artist_name(n)
     rows = [{"name": v["name"], "prox": round(v["score"]), "note": c.ascore.get(k, 0),
-             "why": ", ".join(v["why"])}
+             "why": ", ".join(v["why"]), "url": _artist_discogs_url(v["name"], v.get("id"))}
             for k, v in list(g.items())[:40] if not str(v["name"]).startswith("id:")]
     return frag(request, "partials/reco_artists.html", reco=rows, n_reco=len(g))
 
@@ -847,6 +852,12 @@ def univers_page(request: Request, tab: str = "labels"):
     g = c.graph or {}
     ac = c.cfg.get("artist_categories", {})
     label_graphs = load(_pu().label_graphs, [])
+    artist_graphs = load(_pu().artist_graphs, [])
+    disp, tiers = c.artist_disp(), c.artist_tier_map()
+    classified_artists = sorted(
+        ({"key": ck, "name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
+         if not str(disp.get(ck, ck)).startswith("id:")),
+        key=lambda r: r["name"].lower())
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
@@ -856,6 +867,8 @@ def univers_page(request: Request, tab: str = "labels"):
                   coeur="\n".join(ac.get("1", [])),
                   coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])),
                   label_graphs=label_graphs,
+                  artist_graphs=artist_graphs,
+                  classified_artists=classified_artists,
                   top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
                   top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 
@@ -894,6 +907,7 @@ def univers_labels_add(request: Request, name: str = Form("")):
             q = load(_pu().pending_enrich, {})
             q.setdefault("labels", []).append(name)
             save(_pu().pending_enrich, q)
+            jobs.launch("enrich")
             store.save_config(c)
             ok, msg = True, f"✓ « {name} » ajouté."
     return HTMLResponse(f"<span class='small {'ok' if ok else 'notice warn'}'>{html.escape(msg)}</span>")
@@ -987,8 +1001,45 @@ def univers_artist_set(name: str = Form(""), cat: str = Form("")):
         q = load(_pu().pending_enrich, {})
         q.setdefault("artists", []).append(name)
         save(_pu().pending_enrich, q)
+        jobs.launch("enrich")
     store.save_config(c)
     return HTMLResponse("<span class='small ok'>✓</span>")
+
+
+def _artist_graph_render(request, entry):
+    pos = labelgraph.layout(entry["nodes"])
+    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos)
+
+
+@app.post("/univers/artists/graph/build", response_class=HTMLResponse)
+async def univers_artist_graph_build(request: Request):
+    f = await request.form()
+    seed_keys = f.getlist("seeds")
+    if not seed_keys:
+        return HTMLResponse("<p class='notice warn small'>Choisis au moins un artiste de départ.</p>")
+    c = Ctx()
+    disp = c.artist_disp()
+    seed_items = [(k, disp.get(k, k)) for k in seed_keys]
+    built = artistgraph.build(c.graph or {}, seed_items)
+    if len(built["nodes"]) <= len(seed_items):
+        return HTMLResponse(
+            "<p class='notice warn small'>Aucun voisin trouvé — reconstruis d'abord le graphe producteur "
+            "avec ces graines (Constructeur de graphe ci-dessus), ou choisis d'autres graines.</p>")
+    entry = {"id": hashlib.md5(f"{time.time()}{seed_keys}".encode()).hexdigest()[:10],
+             "ts": time.strftime("%Y-%m-%d %H:%M"), "depth": 1, "min_shared": None,
+             **built}
+    hist = load(_pu().artist_graphs, [])
+    hist.insert(0, entry)
+    save(_pu().artist_graphs, hist[:15])
+    return _artist_graph_render(request, entry)
+
+
+@app.get("/univers/artists/graph/{gid}", response_class=HTMLResponse)
+def univers_artist_graph_show(request: Request, gid: str):
+    entry = next((e for e in load(_pu().artist_graphs, []) if e.get("id") == gid), None)
+    if not entry:
+        return HTMLResponse("<p class='muted small'>Graphe introuvable (supprimé ?).</p>")
+    return _artist_graph_render(request, entry)
 
 
 @app.post("/univers/graph/build", response_class=HTMLResponse)

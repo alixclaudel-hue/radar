@@ -80,14 +80,29 @@ accounts.bootstrap()
 
 
 def _dev_mode():
-    """Ni APP_PASSWORD ni compte -> pas d'authentification (CI, dev local)."""
-    return not os.environ.get("APP_PASSWORD") and accounts.count() == 0
+    """Authentification désactivée UNIQUEMENT sur demande explicite (CI, dev local).
+
+    `RADAR_NO_AUTH=1` est obligatoire : sans lui, un accounts.json illisible ou un
+    volume mal monté ferait passer `accounts.count()` à 0 et ouvrirait l'appli en
+    grand sur Internet avec les droits du propriétaire."""
+    return (os.environ.get("RADAR_NO_AUTH") == "1"
+            and not os.environ.get("APP_PASSWORD") and accounts.count() == 0)
+
+
+def _pw_epoch(uid):
+    """Extrait du hash du mot de passe : change à chaque changement de mot de passe,
+    ce qui invalide les sessions existantes (seule voie de révocation)."""
+    return ((accounts.get(uid) or {}).get("pw", ""))[-16:]
+
+
+def _sign(uid, exp):
+    return hmac.new(SESSION_SECRET, f"{uid}|{exp}|{_pw_epoch(uid)}".encode(),
+                    hashlib.sha256).hexdigest()[:32]
 
 
 def _make_token(uid, exp):
     exp = int(exp)
-    sig = hmac.new(SESSION_SECRET, f"{uid}|{exp}".encode(), hashlib.sha256).hexdigest()[:32]
-    return f"{uid}.{exp}.{sig}"
+    return f"{uid}.{exp}.{_sign(uid, exp)}"
 
 
 def _https(request):
@@ -95,8 +110,9 @@ def _https(request):
 
 
 def _set_session(resp, uid, request):
+    secure = os.environ.get("RADAR_SECURE_COOKIE") == "1" or _https(request)
     resp.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL), max_age=AUTH_TTL,
-                    httponly=True, samesite="lax", secure=_https(request))
+                    httponly=True, samesite="lax", secure=secure)
 
 
 def _parse_token(tok):
@@ -105,8 +121,7 @@ def _parse_token(tok):
         exp = int(exp)
     except ValueError:
         return None
-    good = hmac.new(SESSION_SECRET, f"{uid}|{exp}".encode(), hashlib.sha256).hexdigest()[:32]
-    if not hmac.compare_digest(sig, good) or time.time() >= exp:
+    if not hmac.compare_digest(sig, _sign(uid, exp)) or time.time() >= exp:
         return None
     return uid
 
@@ -118,11 +133,22 @@ def _req_uid(request):
     return uid if uid and accounts.get(uid) else None
 
 
+def _bad_origin(request):
+    """Défense en profondeur CSRF : le cookie est déjà SameSite=lax et toutes les
+    mutations sont des POST, mais on refuse en plus une origine étrangère."""
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return False
+    origin = request.headers.get("origin")
+    return bool(origin) and origin.rstrip("/") != str(request.base_url).rstrip("/")
+
+
 @app.middleware("http")
 async def _guard(request: Request, call_next):
     p = request.url.path
     if p.startswith("/static") or p in ("/login", "/health", "/register"):
         return await call_next(request)
+    if _bad_origin(request):
+        return HTMLResponse("Origine invalide.", status_code=403)
     uid = _req_uid(request)
     if not uid:
         if request.headers.get("hx-request"):
@@ -130,7 +156,8 @@ async def _guard(request: Request, call_next):
         return RedirectResponse("/login", status_code=303)
     store.set_current_uid(uid)          # lu par load_config() / Ctx() / _pu() / jobs.launch()
     resp = await call_next(request)
-    if not _dev_mode():
+    # surtout pas sur /logout : le middleware réécrirait le cookie qu'on vient d'effacer
+    if not _dev_mode() and p != "/logout":
         _set_session(resp, uid, request)
     return resp
 
@@ -144,7 +171,8 @@ def health():
 def login_form(request: Request, bad: int = 0):
     if _req_uid(request):
         return RedirectResponse("/", status_code=303)
-    msg = "<p class='notice warn'>Identifiants incorrects.</p>" if bad else ""
+    msg = ("<p class='notice warn'>Trop de tentatives — réessaie dans une minute.</p>"
+           if bad == 2 else "<p class='notice warn'>Identifiants incorrects.</p>" if bad else "")
     return HTMLResponse(f"""<!doctype html><meta charset=utf-8>
 <link rel=stylesheet href=/static/app.css><div class=wrap style='max-width:360px'>
 <p class=brand style='font-size:32px'>Rada<b>r</b></p>{msg}
@@ -155,9 +183,37 @@ def login_form(request: Request, bad: int = 0):
 </form></div>""")
 
 
+_LOGIN_FAILS = {}          # ip -> [nb d'échecs, bloqué jusqu'à]
+LOGIN_MAX_FAILS = 5
+LOGIN_BLOCK_S = 60
+
+
+def _login_blocked(ip):
+    n, until = _LOGIN_FAILS.get(ip, (0, 0))
+    return time.time() < until
+
+
+def _login_note(ip, ok):
+    if ok:
+        _LOGIN_FAILS.pop(ip, None)
+        return
+    n, until = _LOGIN_FAILS.get(ip, (0, 0))
+    n += 1
+    if len(_LOGIN_FAILS) > 500:
+        _LOGIN_FAILS.clear()
+    _LOGIN_FAILS[ip] = (n, time.time() + LOGIN_BLOCK_S if n >= LOGIN_MAX_FAILS else until)
+    if n >= LOGIN_MAX_FAILS:
+        _LOGIN_FAILS[ip] = (0, time.time() + LOGIN_BLOCK_S)
+
+
 @app.post("/login")
 def login(request: Request, username: str = Form(""), pw: str = Form("")):
+    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+          or (request.client.host if request.client else "?"))
+    if _login_blocked(ip):
+        return RedirectResponse("/login?bad=2", status_code=303)
     uid = accounts.verify(username, pw)
+    _login_note(ip, bool(uid))
     if uid:
         r = RedirectResponse("/", status_code=303)
         _set_session(r, uid, request)
@@ -165,7 +221,6 @@ def login(request: Request, username: str = Form(""), pw: str = Form("")):
     return RedirectResponse("/login?bad=1", status_code=303)
 
 
-@app.get("/logout")
 @app.post("/logout")
 def logout():
     r = RedirectResponse("/login", status_code=303)
@@ -179,7 +234,7 @@ _REG_PAGE = """<!doctype html><meta charset=utf-8>
 <form method=post action=/register>
   <input type=hidden name=invite value="{tok}">
   <div class=field><label>Choisis un identifiant</label><input name=username autofocus autocapitalize=off required></div>
-  <div class=field><label>Mot de passe (6+ caractères)</label><input type=password name=pw required minlength=6></div>
+  <div class=field><label>Mot de passe (10+ caractères)</label><input type=password name=pw required minlength=10></div>
   <button class=primary type=submit>Créer mon compte</button>
 </form></div>"""
 
@@ -210,6 +265,9 @@ def register(request: Request, invite: str = Form(""), username: str = Form(""),
 
 @app.post("/account/invite", response_class=HTMLResponse)
 def account_invite(request: Request):
+    if store.current_uid() != paths.DEFAULT_UID:
+        return HTMLResponse("<p class='notice warn small'>Réservé au propriétaire.</p>",
+                            status_code=403)
     tok = accounts.create_invite(store.current_uid())
     url = str(request.base_url).rstrip("/") + "/register?invite=" + tok
     return HTMLResponse(
@@ -221,6 +279,7 @@ def account_invite(request: Request):
 def render(request, tpl, **ctx):
     ctx.setdefault("has_token", bool(store.load_config().get("token")))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
+    ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
     return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
 
 

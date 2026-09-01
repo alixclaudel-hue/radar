@@ -63,7 +63,11 @@ _LEGACY_NAMES = {**_PER_USER, **_SHARED}
 
 
 def _valid_uid(uid):
-    uid = (uid or DEFAULT_UID).strip()
+    if uid is None:
+        raise RuntimeError(
+            "uid courant absent : requête hors du middleware d'authentification "
+            "(fail-closed volontaire — ne jamais retomber sur le propriétaire).")
+    uid = str(uid).strip()
     if not uid or "/" in uid or uid.startswith(".") or "\x00" in uid:
         raise ValueError(f"uid invalide : {uid!r}")
     return uid

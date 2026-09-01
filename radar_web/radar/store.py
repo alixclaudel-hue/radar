@@ -8,11 +8,13 @@ import tempfile
 from . import paths
 
 # --- utilisateur courant (posé par le middleware d'auth, une valeur par requête) ---
-_current_uid = contextvars.ContextVar("radar_uid", default=paths.DEFAULT_UID)
+# Défaut `None` volontaire : si une requête échappait au middleware, on veut une
+# erreur bruyante et non un repli silencieux sur les données du propriétaire.
+_current_uid = contextvars.ContextVar("radar_uid", default=None)
 
 
 def set_current_uid(uid):
-    _current_uid.set(uid or paths.DEFAULT_UID)
+    _current_uid.set(uid or None)
 
 
 def current_uid():
@@ -161,9 +163,13 @@ def load_config(uid=None):
         cc.pop("3", None)
         for k in ("1", "2"):
             cc.setdefault(k, [])
-    for key, env in _ENV_SECRETS:
-        if not data.get(key) and os.environ.get(env):
-            data[key] = os.environ[env]
+    # Les secrets d'environnement amorcent UNIQUEMENT le compte propriétaire :
+    # sinon le .env du VPS fuiterait le token Discogs (etc.) dans le compte de
+    # chaque invité, et jusque dans le HTML de « Ma patte ».
+    if (uid or current_uid()) == paths.DEFAULT_UID:
+        for key, env in _ENV_SECRETS:
+            if not data.get(key) and os.environ.get(env):
+                data[key] = os.environ[env]
     return data
 
 

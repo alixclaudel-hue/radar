@@ -10,6 +10,8 @@ import hashlib
 import hmac
 import os
 import secrets
+import threading
+import time
 from datetime import datetime, timezone
 
 from . import paths, store
@@ -18,6 +20,12 @@ ACCOUNTS_PATH = os.path.join(paths.DATA, "accounts.json")
 INVITES_PATH = os.path.join(paths.DATA, "invites.json")
 _SCRYPT = dict(n=2 ** 14, r=8, p=1)          # ~50-100 ms
 _DKLEN = 32
+MIN_PW_LEN = 10
+INVITE_TTL_S = 48 * 3600
+
+# create()/consume_invite() font lire-modifier-écrire : sérialise-les pour ne pas
+# perdre un compte ni consommer deux fois la même invitation.
+_WRITE_LOCK = threading.Lock()
 
 
 def _now():
@@ -84,7 +92,12 @@ def _seed_user_dir(uid):
     store.save_config(store.load_config(uid), uid)
 
 
-def create(username, password, invited_by=None, is_owner=False, min_len=6):
+def create(username, password, invited_by=None, is_owner=False, min_len=MIN_PW_LEN):
+    with _WRITE_LOCK:
+        return _create_locked(username, password, invited_by, is_owner, min_len)
+
+
+def _create_locked(username, password, invited_by, is_owner, min_len):
     accts = load_accounts()
     username = (username or "").strip()
     if not username or len(password or "") < min_len:
@@ -120,24 +133,33 @@ def load_invites():
 
 
 def create_invite(by_uid):
-    inv = load_invites()
-    token = secrets.token_urlsafe(16)
-    inv[token] = {"created_by": by_uid, "created_at": _now(), "used_by": None}
-    store.save(INVITES_PATH, inv)
-    return token
+    with _WRITE_LOCK:
+        inv = load_invites()
+        token = secrets.token_urlsafe(16)
+        inv[token] = {"created_by": by_uid, "created_at": _now(), "used_by": None,
+                      "expires_at": time.time() + INVITE_TTL_S}
+        store.save(INVITES_PATH, inv)
+        return token
+
+
+def _invite_live(e):
+    if not e or e.get("used_by"):
+        return False
+    exp = e.get("expires_at")
+    return not (exp and time.time() >= exp)
 
 
 def invite_ok(token):
-    e = load_invites().get(token or "")
-    return bool(e) and not e.get("used_by")
+    return _invite_live(load_invites().get(token or ""))
 
 
 def consume_invite(token, username, password):
-    inv = load_invites()
-    e = inv.get(token or "")
-    if not e or e.get("used_by"):
-        raise ValueError("invitation invalide ou déjà utilisée")
-    uid = create(username, password, invited_by=e.get("created_by"))
-    e["used_by"] = uid
-    store.save(INVITES_PATH, inv)
-    return uid
+    with _WRITE_LOCK:
+        inv = load_invites()
+        e = inv.get(token or "")
+        if not _invite_live(e):
+            raise ValueError("invitation invalide, expirée ou déjà utilisée")
+        uid = _create_locked(username, password, e.get("created_by"), False, MIN_PW_LEN)
+        e["used_by"] = uid
+        store.save(INVITES_PATH, inv)
+        return uid

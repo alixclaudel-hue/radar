@@ -110,8 +110,13 @@ def save_json(path, data):
 
 
 def cfg_load():
-    """Config + secrets d'environnement (déploiement)."""
+    """Config + secrets d'environnement (déploiement).
+
+    Les secrets du .env n'amorcent QUE le compte propriétaire : un job lancé pour
+    un invité ne doit jamais tourner avec le token Discogs du propriétaire."""
     d = load_json(CONFIG_PATH, {})
+    if RADAR_UID != "owner":
+        return d
     for key, env in (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY"),
                      ("spotify_client_id", "SPOTIFY_CLIENT_ID"),
                      ("spotify_client_secret", "SPOTIFY_CLIENT_SECRET"),

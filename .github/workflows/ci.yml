@@ -29,6 +29,7 @@ jobs:
       - name: Balayage des routes
         env:
           CRATE_DATA_DIR: ${{ runner.temp }}/data
+          RADAR_NO_AUTH: "1"     # mode sans auth explicite (cf. app._dev_mode)
         run: |
           mkdir -p "$CRATE_DATA_DIR"
           python -m uvicorn radar_web.app:app --port 8600 --log-level warning &

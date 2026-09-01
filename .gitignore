@@ -41,3 +41,7 @@ canonicalize.state.json
 # session navigateur capturée (secrets)
 discogs_state.json
 discogs_profile/
+
+# le jeu de données exemple est versionné, lui
+!/data.sample/
+!/data.sample/**

@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install (deps minimales — pas de playwright/yt-dlp)
+        run: pip install "fastapi>=0.115" "uvicorn[standard]>=0.30" "jinja2>=3.1" "python-multipart>=0.0.9" "requests>=2.28"
+
+      - name: Compile
+        run: |
+          python -m py_compile crate_jobs.py
+          find radar_web -name "*.py" -print0 | xargs -0 python -m py_compile
+
+      - name: Import de l'appli
+        run: python -c "import radar_web.app"
+
+      - name: Balayage des routes
+        env:
+          CRATE_DATA_DIR: ${{ runner.temp }}/data
+        run: |
+          mkdir -p "$CRATE_DATA_DIR"
+          python -m uvicorn radar_web.app:app --port 8600 --log-level warning &
+          pid=$!
+          for i in $(seq 1 20); do
+            curl -sf -o /dev/null http://127.0.0.1:8600/health && break
+            sleep 1
+          done
+          fail=0
+          check() {  # $1 = path, $2 = codes acceptés (regex)
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8600$1")
+            if echo "$code" | grep -qE "$2"; then
+              echo "  OK   $1 -> $code"
+            else
+              echo "  FAIL $1 -> $code"; fail=1
+            fi
+          }
+          check /health           '200'
+          check /login            '200|303'
+          check /                 '200|303'
+          check /patte            '200|303'
+          check /search           '200|303'
+          check /veille           '200|303'
+          check /univers          '200|303'
+          check '/univers?tab=artists' '200|303'
+          check '/univers?tab=sets'    '200|303'
+          check /settings         '200|303'
+          kill $pid 2>/dev/null || true
+          exit $fail

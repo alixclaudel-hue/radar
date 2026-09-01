@@ -1,0 +1,26 @@
+{
+  "token": "",
+  "labels": [
+    "Aim Records",
+    "Peacefrog Records",
+    "Prescription",
+    "Guidance Recordings",
+    "Naked Music Recordings"
+  ],
+  "taste_categories": {
+    "1": ["Deep House", "House", "Tech House"],
+    "2": ["Downtempo", "Disco", "Nu-Disco", "Broken Beat", "Minimal"]
+  },
+  "artist_categories": { "1": [], "2": [] },
+  "watchlist": [],
+  "sellers": [],
+  "veille_rules": [],
+  "youtube_api_key": "",
+  "youtube_playlists": "",
+  "spotify_client_id": "",
+  "spotify_client_secret": "",
+  "spotify_playlists": "",
+  "bandcamp_sub_user": "",
+  "bandcamp_sub_pass": "",
+  "djset_sources": ""
+}

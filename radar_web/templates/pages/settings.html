@@ -80,12 +80,15 @@
 </div>
 <p id="labels-csv-msg" class="small" style="margin-top:6px"></p>
 
+{% if is_owner %}
 <hr>
 <h3>Inviter quelqu'un <span class="muted small">· crée son propre univers, isolé du tien</span></h3>
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:560px">
   <button hx-post="/account/invite" hx-target="#invite-link" hx-swap="innerHTML">Générer un lien d'invitation</button>
 </div>
+<p class="small muted">Lien à usage unique, valable 48 h.</p>
 <div id="invite-link" style="margin-top:8px;max-width:560px"></div>
+{% endif %}
 
 <hr>
 <h3>Apprentissage</h3>

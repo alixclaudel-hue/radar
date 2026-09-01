@@ -11,7 +11,9 @@
   <div class="wrap">
     <div class="topbar">
       <a class="brand" href="/">Rada<b>r</b></a>
-      {% if me %}<span class="brand-sub">{{ me }} · <a href="/logout">déconnexion</a></span>
+      {% if me %}<span class="brand-sub">{{ me }} ·
+        <form method="post" action="/logout" style="display:inline">
+          <button type="submit" class="linklike">déconnexion</button></form></span>
       {% else %}<span class="brand-sub">nouvelle interface</span>{% endif %}
     </div>
     <nav class="nav">

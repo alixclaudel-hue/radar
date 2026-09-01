@@ -1,0 +1,25 @@
+<div id="cart-list">
+  {% if not cart %}
+    <p class="muted small">Panier vide. Ajoute des vinyles depuis la Recherche ou une discographie
+      (bouton « ➕ panier » sur les pochettes).</p>
+  {% else %}
+    <p class="small muted">{{ cart|length }} vinyle{{ 's' if cart|length > 1 }} — objectif : regrouper
+      l'achat chez un même vendeur (le croisement avec les vendeurs suivis arrive).</p>
+    <div class="lrows">
+      {% for x in cart %}
+      <div class="lrow">
+        {% if x.thumb %}<img src="{{ x.thumb }}" alt="" width="34" height="34"
+             style="border-radius:4px;object-fit:cover;flex:0 0 34px">{% endif %}
+        <a class="lrow__name" href="https://www.discogs.com/release/{{ x.id }}"
+           target="_blank" rel="noopener">{{ (x.artist ~ ' — ') if x.artist }}{{ x.title }}</a>
+        <span class="lrow__meta">{{ x.label }}{% if x.added_at %} · ajouté {{ x.added_at }}{% endif %}</span>
+        <a class="small" href="https://www.discogs.com/sell/release/{{ x.id }}?sort=price&sort_order=asc"
+           target="_blank" rel="noopener" title="annonces, prix croissant">🛒</a>
+        <button class="small" hx-post="/cart/remove" hx-vals='{"rid": "{{ x.id }}"}'
+                hx-target="#cart-list" hx-swap="outerHTML"
+                hx-confirm="Retirer « {{ x.title }} » du panier ?">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

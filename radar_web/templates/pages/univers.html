@@ -7,6 +7,7 @@
   <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">🏷️ Base de labels ({{ n_labels }})</a>
   <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}">🎤 Base d'artistes ({{ n_artists }})</a>
   <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}">🎚️ Mes sets ({{ n_sets }})</a>
+  <a href="/univers?tab=cart"    class="{{ 'active' if tab=='cart' }}">🛒 Panier ({{ n_cart }})</a>
 </div>
 <hr>
 
@@ -154,5 +155,10 @@
   <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mieux connaître ton univers</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
   <hr>
   <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
+
+{% elif tab == 'cart' %}
+  <p class="muted small">Les vinyles que tu veux acheter. But : regrouper la commande chez
+    un même vendeur pour ne pas multiplier les frais de port.</p>
+  <div hx-get="/cart" hx-trigger="load"></div>
 {% endif %}
 {% endblock %}

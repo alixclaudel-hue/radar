@@ -526,7 +526,7 @@ def search_replay(request: Request, sid: str):
     if not entry:
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
-                searched=entry.get("searched", []), voted=_voted_map())
+                searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids())
 
 
 def _base_labels_ranked(c):
@@ -761,7 +761,7 @@ def search_run(request: Request, label: str = Form(""),
                     "n": len(scored), "results": scored, "searched": base_labels})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
     return frag(request, "partials/results.html", results=scored,
-                searched=base_labels, voted=_voted_map())
+                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids())
 
 
 _DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
@@ -848,7 +848,40 @@ def disco_page(request: Request, kind: str = "artist", key: str = "",
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
                   results=scored[:120], mystyles=_disco_taste_styles(c), sel=sel,
-                  voted=_voted_map(), total_raw=len(raw))
+                  voted=_voted_map(), in_cart=_cart_ids(), total_raw=len(raw))
+
+
+# ---------------------------------------------------------------- panier interne
+def _cart_ids():
+    return {str(x.get("id")) for x in load(_pu().cart, [])}
+
+
+@app.get("/cart", response_class=HTMLResponse)
+def cart_frag(request: Request):
+    return frag(request, "partials/cart.html", cart=load(_pu().cart, []))
+
+
+@app.post("/cart/add", response_class=HTMLResponse)
+def cart_add(rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
+             thumb: str = Form(""), label: str = Form("")):
+    rid = (rid or "").strip()
+    if not rid:
+        return HTMLResponse("<span class='small msg-err'>id manquant</span>")
+    cart = load(_pu().cart, [])
+    if rid not in {str(x.get("id")) for x in cart}:
+        cart.insert(0, {"id": rid, "title": title.strip(), "artist": artist.strip(),
+                        "thumb": thumb.strip(), "label": label.strip(),
+                        "added_at": time.strftime("%Y-%m-%d")})
+        save(_pu().cart, cart)
+    return HTMLResponse("<span class='small ok'>✓ au panier</span>")
+
+
+@app.post("/cart/remove", response_class=HTMLResponse)
+def cart_remove(request: Request, rid: str = Form("")):
+    rid = (rid or "").strip()
+    cart = [x for x in load(_pu().cart, []) if str(x.get("id")) != rid]
+    save(_pu().cart, cart)
+    return frag(request, "partials/cart.html", cart=cart)
 
 
 def _toks(s):
@@ -1151,6 +1184,7 @@ def univers_page(request: Request, tab: str = "labels"):
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
                   n_sets=len([r for r in c.corpus if r.get("source") == "djset"]),
+                  n_cart=len(load(_pu().cart, [])),
                   label_graphs=label_graphs,
                   artist_graphs=artist_graphs,
                   classified_artists=classified_artists,

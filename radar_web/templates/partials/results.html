@@ -40,6 +40,20 @@
           <a href="https://www.discogs.com/sell/release/{{ rr.id }}?sort=price&sort_order=asc" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
           <a href="/bc/go?a={{ (artist if sep else '')|urlencode }}&t={{ (album if sep else rr.title)|urlencode }}&l={{ (rr.label1 or '')|urlencode }}&kind=a" target="_blank" rel="noopener">Bandcamp</a>
         </div>
+        <div class="btnrow" style="margin-top:2px">
+          {% if in_cart and (rr.id | string) in in_cart %}
+            <span class="small ok">✓ au panier</span>
+          {% else %}
+          <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
+            <input type="hidden" name="rid" value="{{ rr.id }}">
+            <input type="hidden" name="title" value="{{ rr.title }}">
+            <input type="hidden" name="artist" value="{{ artist if sep else '' }}">
+            <input type="hidden" name="label" value="{{ rr.label1 or '' }}">
+            <input type="hidden" name="thumb" value="{{ rr.thumb or '' }}">
+            <button type="submit" class="small">➕ panier</button>
+          </form>
+          {% endif %}
+        </div>
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge">🎯 {{ r.score }}</span>

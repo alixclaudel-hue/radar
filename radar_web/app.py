@@ -704,6 +704,93 @@ def search_run(request: Request, label: str = Form(""),
                 searched=base_labels, voted=_voted_map())
 
 
+_DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
+
+
+def _disco_taste_styles(c):
+    cats = c.cfg.get("taste_categories", {})
+    out, seen = [], set()
+    for cid in ("1", "2"):
+        for s in cats.get(cid, []):
+            s = (s or "").strip()
+            if s and s.lower() not in seen:
+                seen.add(s.lower())
+                out.append(s)
+    return out
+
+
+def _disco_resolve(c, kind, key):
+    """-> (nom d'affichage, valeur de requête Discogs)."""
+    if kind == "label":
+        res = c.resolved.get(key) or {}
+        name = res.get("discogs_name") or res.get("original") or key
+        return name, name
+    if key.startswith("id:"):
+        name = c.artist_disp().get(key, key)
+        return (name, name) if not str(name).startswith("id:") else (key, key[3:])
+    e = c.artists_res.get(key) or {}
+    name = e.get("discogs_name") or key
+    return name, name
+
+
+@app.get("/disco", response_class=HTMLResponse)
+def disco_page(request: Request, kind: str = "artist", key: str = "",
+               styles: str = "", pages: str = "3"):
+    if kind not in ("artist", "label") or not key:
+        return render(request, "pages/disco.html", active="", name="?", kind=kind, key=key,
+                      results=None, mystyles=[], sel=[], error="Entité inconnue.")
+    c = Ctx()
+    token = c.cfg.get("token", "")
+    name, qval = _disco_resolve(c, kind, key)
+    try:
+        npages = max(1, min(5, int(pages or 3)))
+    except ValueError:
+        npages = 3
+    ck = (kind, key)
+    hit = _DISCO_CACHE.get(ck)
+    if hit and time.time() - hit[0] < 300:
+        raw = hit[1]
+    elif not token:
+        return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
+                      results=None, mystyles=[], sel=[],
+                      error="Token Discogs manquant (Ma patte → Connexions).")
+    else:
+        try:
+            fn = discogs.search_label_releases if kind == "label" else discogs.search_artist_releases
+            raw = fn(token, qval, fmt="Vinyl", max_pages=npages)
+        except discogs.DiscogsError as e:
+            return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
+                          results=None, mystyles=[], sel=[], error=str(e))
+        if len(_DISCO_CACHE) > 60:
+            _DISCO_CACHE.clear()
+        _DISCO_CACHE[ck] = (time.time(), raw)
+
+    sel = [s for s in (styles or "").split(",") if s.strip()]
+    sel_lc = {s.lower() for s in sel}
+    seen, scored = set(), []
+    for r in raw:
+        rid = r.get("id")
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        rstyles = r.get("style") or []
+        if sel_lc and not any((s or "").lower() in sel_lc for s in rstyles):
+            continue
+        sc, det = c.album_score(r)
+        thumb = r.get("cover_image") or r.get("thumb")
+        lab1 = next((x for x in (r.get("label") or []) if x), "")
+        scored.append({"raw": {"id": rid, "title": r.get("title", ""), "label1": lab1,
+                               "style": rstyles, "catno": r.get("catno", ""),
+                               "year": r.get("year", ""), "thumb": thumb, "uri": r.get("uri", "")},
+                       "score": sc,
+                       "detail": {"label": det.get("label"), "artist": det.get("artist"),
+                                  "style": det.get("style")}})
+    scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
+    return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
+                  results=scored[:120], mystyles=_disco_taste_styles(c), sel=sel,
+                  voted=_voted_map(), total_raw=len(raw))
+
+
 def _toks(s):
     return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
 
@@ -1107,7 +1194,7 @@ def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
         note = asc.get(ck, 0)
         if not t and note == 0:
             continue
-        rows.append({"name": name, "note": note, "cat": catn.get(t, "—")})
+        rows.append({"name": name, "note": note, "cat": catn.get(t, "—"), "key": ck})
     rows.sort(key=lambda r: -r["note"])
     return frag(request, "partials/artists_table.html", rows=rows[:250], n=len(rows))
 

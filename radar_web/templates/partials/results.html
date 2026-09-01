@@ -37,7 +37,7 @@
         </div>
         <div class="buys">
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs&nbsp;↗</a>{% endif %}
-          <a href="https://www.discogs.com/sell/release/{{ rr.id }}" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
+          <a href="https://www.discogs.com/sell/release/{{ rr.id }}?sort=price&sort_order=asc" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
           <a href="https://bandcamp.com/search?q={{ ((artist ~ ' ' ~ album) if sep else rr.title) | urlencode }}" target="_blank" rel="noopener">Bandcamp</a>
         </div>
         <div class="foot">
@@ -47,9 +47,14 @@
             <span class="badge ghost">—</span>
           {% endif %}
           {% if r.score is not none %}
+          {% set v = (voted or {}).get(rr.id) %}
           <span class="vote" hx-swap="outerHTML" style="margin-left:auto">
+            {% if v %}
+              <span class="small muted">{{ '👍' if v == 'up' else '👎' }} noté</span>
+            {% else %}
             <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👍</button>
             <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👎</button>
+            {% endif %}
           </span>
           {% endif %}
         </div>

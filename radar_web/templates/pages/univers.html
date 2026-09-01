@@ -151,10 +151,7 @@
   <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
 
 {% elif tab == 'sets' %}
-  <div class="section-title"><h3>Extraire des DJ sets</h3>
-    <button hx-post="/jobs/ingest_djsets/launch" hx-target="#job-ingest_djsets" hx-swap="outerHTML" class="primary">Lancer l'extraction</button></div>
-  <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
-  <p class="small muted">Sources DJ dans « Mieux connaître ton univers → DJ sets ». {{ n_sets }} tracks extraites.</p>
+  <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mieux connaître ton univers</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
   <hr>
   <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
 {% endif %}

@@ -113,22 +113,6 @@
     </div>
   </details>
 
-  <!-- ============ DJ sets ============ -->
-  <details class="acc">
-    <summary>🎧 DJ sets à dépouiller <span class="tag">{{ src.get('djset', 0) }} tracks extraites{% if last.ingest_djsets %} · importé {{ last.ingest_djsets }}{% endif %}</span></summary>
-    <div class="acc__body">
-      <p class="small muted">Noms de DJ / émissions dont extraire les tracks jouées. Résultats dans <a href="/univers?tab=sets">Mon univers → Mes sets</a>.</p>
-      <div class="field"><label>Un par ligne (nom, @handle ou URL de chaîne)</label>
-        <textarea name="djset_sources" rows="5">{{ cfg.djset_sources or '' }}</textarea></div>
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-djsets" hx-swap="innerHTML">💾 Enregistrer</button>
-        <button type="button" class="small" hx-post="/patte/run/ingest_djsets" hx-include="closest form" hx-target="#job-ingest_djsets" hx-swap="outerHTML">⬇ Lancer l'extraction</button>
-        <span id="save-djsets" class="small ok"></span>
-      </div>
-      <div id="job-ingest_djsets" hx-get="/jobs/ingest_djsets/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-    </div>
-  </details>
-
   <!-- ============ Styles ============ -->
   <details class="acc">
     <summary>🎚️ Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
@@ -155,6 +139,25 @@
     </div>
   </details>
 </form>
+
+<!-- ============ DJ sets (hors du formulaire principal) ============ -->
+<details class="acc" style="margin-top:10px">
+  <summary>🎧 DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
+  <div class="acc__body">
+    <p class="small muted">Scanne les sets/podcasts YouTube d'un DJ et verse les tracks jouées dans
+      ton corpus. Résultats dans <a href="/univers?tab=sets">Mon univers → Mes sets</a>.</p>
+    <form hx-post="/patte/djset/scan" hx-target="#djset-panel" hx-swap="outerHTML"
+          hx-on::after-request="this.reset()" class="row combo" style="align-items:end;max-width:520px">
+      <div class="field" style="flex:1;margin:0"><label>Prochain DJ à scanner <span class="muted">· propositions Discogs</span></label>
+        <input name="name" placeholder="ex. Gilles Peterson" data-combo="set" autocomplete="off"
+               hx-get="/suggest/discogs?type=artist" hx-target="#sug-djset" hx-swap="innerHTML"
+               hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:350ms">
+        <div id="sug-djset" class="lbl-suggest" hidden></div></div>
+      <button class="primary" type="submit">Scanner</button>
+    </form>
+    <div id="djset-panel" hx-get="/patte/djset/panel" hx-trigger="load"></div>
+  </div>
+</details>
 
 <!-- ============ Import CSV (hors du formulaire principal) ============ -->
 <details class="acc" style="margin-top:10px">

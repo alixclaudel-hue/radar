@@ -58,13 +58,13 @@ class Ctx:
         if not total:
             return 0
         weighted = sum(n * self.wmap.get(style_key(s), 0.0) for s, n in sc.items())
-        return round(100 * weighted / total)
+        return min(100, round(100 * weighted / total))
 
     def style_affinity_of(self, styles):
         styles = [s for s in (styles or []) if s]
         if not styles:
             return None
-        return round(100 * sum(self.wmap.get(style_key(s), 0.0) for s in styles) / len(styles))
+        return min(100, round(100 * sum(self.wmap.get(style_key(s), 0.0) for s in styles) / len(styles)))
 
     # -------------------------------------------------------------- artistes
     def canon_artist_key(self, name):
@@ -197,10 +197,10 @@ class Ctx:
             for k in set(tiers) | set(corpus_c) | set(coll_c) | set(graph):
                 tier = tiers.get(k)
                 manual = float(aw.get(tier, 0)) if tier else 0.0
-                out[k] = round(100 * (sw.get("manual", 0.5) * manual
+                out[k] = min(100, round(100 * (sw.get("manual", 0.5) * manual
                                       + sw.get("corpus", 0.18) * corpus_c.get(k, 0) / mc
                                       + sw.get("collection", 0.1) * coll_c.get(k, 0) / ml
-                                      + sw.get("graph", 0.14) * graph.get(k, 0) / mg))
+                                      + sw.get("graph", 0.14) * graph.get(k, 0) / mg)))
             self._ascore = out
         return self._ascore
 
@@ -296,8 +296,8 @@ class Ctx:
                     "corpus": cs.get(k, 0) / max_corp,
                     "artist": art_val / max_art,
                     "affinity": (aff / 100) if aff is not None else 0}
-            score = round(100 * (w_coll * feat["collection"] + w_corp * feat["corpus"]
-                                 + w_art * feat["artist"] + w_aff * feat["affinity"]))
+            score = min(100, round(100 * (w_coll * feat["collection"] + w_corp * feat["corpus"]
+                                 + w_art * feat["artist"] + w_aff * feat["affinity"])))
             rows.append({"key": k, "name": info.get("name") or k, "score": score,
                          "owned": lc.get(k, 0), "want": wc.get(k, 0),
                          "corpus": round(cs.get(k, 0), 1), "aff": aff, "artists": art_n,
@@ -330,7 +330,7 @@ class Ctx:
         tot = sum(t[0] for t in terms)
         if not tot:
             return None, {}
-        return (round(sum(t[0] * t[1] for t in terms) / tot),
+        return (min(100, round(sum(t[0] * t[1] for t in terms) / tot)),
                 {"label": lscore, "artist": a_term, "style": s_term})
 
 

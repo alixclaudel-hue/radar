@@ -86,6 +86,17 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
 }
 .yrange input[type=range]::-moz-range-track{ background:none; border:none; }
 
+/* contrôle segmenté (pills radio) */
+.seg{ display:inline-flex; flex-wrap:wrap; gap:6px; }
+.seg label{
+  margin:0; cursor:pointer; border:1px solid var(--line); border-radius:999px;
+  padding:5px 14px; font-size:13px; color:var(--ink); background:var(--surface);
+  user-select:none; transition:all .12s ease;
+}
+.seg label:hover{ border-color:var(--ink); }
+.seg input{ position:absolute; opacity:0; width:0; height:0; }
+.seg label:has(input:checked){ background:var(--pin); border-color:var(--pin); color:var(--paper); }
+
 /* combobox label */
 .combo{ position:relative; }
 .lbl-suggest{

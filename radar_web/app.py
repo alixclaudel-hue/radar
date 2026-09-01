@@ -398,13 +398,26 @@ def search_page(request: Request, sid: str = ""):
                   year_min=SEARCH_MIN_YEAR, year_max=int(time.strftime("%Y")))
 
 
+def _voted_map():
+    """{release_id (int): 'up'|'down'} d'après le feedback de l'utilisateur courant."""
+    out = {}
+    for e in load(_pu().feedback, []):
+        k = str(e.get("key", ""))
+        if e.get("kind") == "album" and k.startswith("rid:"):
+            try:
+                out[int(k[4:])] = e.get("verdict")
+            except ValueError:
+                pass
+    return out
+
+
 @app.get("/search/replay/{sid}", response_class=HTMLResponse)
 def search_replay(request: Request, sid: str):
     entry = next((e for e in load(_pu().search_hist, []) if e.get("id") == sid), None)
     if not entry:
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
-                searched=entry.get("searched", []))
+                searched=entry.get("searched", []), voted=_voted_map())
 
 
 def _base_labels_ranked(c):
@@ -474,8 +487,7 @@ def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
                year_from: str = Form(""), year_to: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2"),
-               base_metric: str = Form(""), base_min: str = Form(""),
-               base_top: str = Form("12")):
+               base_metric: str = Form(""), base_min: str = Form("")):
     c = Ctx()
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
@@ -493,11 +505,7 @@ def search_run(request: Request, label: str = Form(""),
         b_min = float(base_min) if str(base_min).strip() else None
     except ValueError:
         b_min = None
-    try:
-        b_top = max(1, min(12, int(base_top or 12)))
-    except ValueError:
-        b_top = 12
-    base_labels = _pick_base_labels(c, base_metric, b_min, b_top) if base_metric else []
+    base_labels = _pick_base_labels(c, base_metric, b_min, 12) if base_metric else []
 
     gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
     if base_labels:
@@ -553,14 +561,14 @@ def search_run(request: Request, label: str = Form(""),
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
               "vinyl": bool(vinyl), "pages": npages,
-              "base_metric": base_metric, "base_min": str(base_min or "").strip(),
-              "base_top": b_top}
+              "base_metric": base_metric, "base_min": str(base_min or "").strip()}
     hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
                     "n": len(scored), "results": scored, "searched": base_labels})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
-    return frag(request, "partials/results.html", results=scored, searched=base_labels)
+    return frag(request, "partials/results.html", results=scored,
+                searched=base_labels, voted=_voted_map())
 
 
 def _toks(s):

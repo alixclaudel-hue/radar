@@ -18,26 +18,17 @@
   <details class="acc" {{ 'open' if q.base_metric }}>
     <summary>🏷️ ou : chercher dans mes labels {% if q.base_metric %}<span class="tag">actif</span>{% endif %}</summary>
     <div class="acc__body">
-      <p class="small muted">Lance la recherche sur plusieurs labels de ta base à la fois
-        (les mieux classés selon le critère, max 12). Prend le pas sur le label unique ci-dessus.</p>
-      <div class="row">
-        <div class="field">
-          <label>Classer par</label>
-          <select name="base_metric">
-            <option value="" {{ 'selected' if not q.base_metric }}>— désactivé —</option>
-            <option value="aff"   {{ 'selected' if q.base_metric == 'aff' }}>affinité de style</option>
-            <option value="reco"  {{ 'selected' if q.base_metric == 'reco' }}>score de recommandation</option>
-            <option value="owned" {{ 'selected' if q.base_metric == 'owned' }}>nombre dans ma collection</option>
-          </select>
-        </div>
-        <div class="field" style="flex:0 0 auto">
-          <label>Note minimale <span class="muted">optionnel</span></label>
-          <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}" style="width:120px">
-        </div>
-        <div class="field" style="flex:0 0 auto">
-          <label>Garder au max</label>
-          <input name="base_top" inputmode="numeric" value="{{ q.base_top or 12 }}" style="width:80px">
-        </div>
+      <p class="small muted">Recherche sur mes labels les mieux classés (12 max). Remplace le label unique.</p>
+      <label>Classer par</label>
+      <div class="seg">
+        <label><input type="radio" name="base_metric" value="" {{ 'checked' if not q.base_metric }}>aucun</label>
+        <label><input type="radio" name="base_metric" value="aff" {{ 'checked' if q.base_metric == 'aff' }}>affinité</label>
+        <label><input type="radio" name="base_metric" value="reco" {{ 'checked' if q.base_metric == 'reco' }}>reco</label>
+        <label><input type="radio" name="base_metric" value="owned" {{ 'checked' if q.base_metric == 'owned' }}>collection</label>
+      </div>
+      <div class="field" style="max-width:180px;margin-top:10px">
+        <label>Note minimale <span class="muted">optionnel</span></label>
+        <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
       </div>
     </div>
   </details>
@@ -72,7 +63,6 @@
              min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
     </div>
   </div>
-  <p class="muted small">Plusieurs styles = union (l'un OU l'autre). Ctrl/⌘ ou appui long pour en sélectionner plusieurs.</p>
   <div class="row">
     <div class="field" style="flex:0 0 auto">
       <label>&nbsp;</label>

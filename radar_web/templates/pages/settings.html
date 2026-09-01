@@ -59,6 +59,13 @@
 <p class="small muted">L'enrichissement (résolution + profilage) de chaque nouvel ajout se fait déjà en tâche de fond.</p>
 
 <hr>
+<h3>Inviter quelqu'un <span class="muted small">· crée son propre univers, isolé du tien</span></h3>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:560px">
+  <button hx-post="/account/invite" hx-target="#invite-link" hx-swap="innerHTML">Générer un lien d'invitation</button>
+</div>
+<div id="invite-link" style="margin-top:8px;max-width:560px"></div>
+
+<hr>
 <h3>Apprentissage</h3>
 <div hx-get="/settings/learn" hx-trigger="load"></div>
 {% endblock %}

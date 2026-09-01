@@ -1693,6 +1693,24 @@ _MKT_TOTAL_RE = re.compile(r'(\d[\d.,   ]*)\s+(?:de|of)\s+(\d[\d.,   ]*)',
 _MKT_PAGTOT_RE = re.compile(r'pagination_total["\s][^>]*>(.*?)</', re.S)
 
 
+DISCOGS_PROFILE = os.path.join(DATA, "discogs_profile")
+
+
+def _discogs_context(pw):
+    """(context, close_fn). Réutilise le profil connecté /data/discogs_profile s'il
+    existe (cf. tools/vnc_login.sh) — sinon contexte anonyme « furtif »."""
+    args = ["--no-sandbox", "--disable-blink-features=AutomationControlled"]
+    if os.path.isdir(DISCOGS_PROFILE) and os.listdir(DISCOGS_PROFILE):
+        ctx = pw.chromium.launch_persistent_context(
+            DISCOGS_PROFILE, headless=True, args=args, user_agent=_MKT_UA,
+            locale="fr-FR", viewport={"width": 1280, "height": 900})
+        return ctx, ctx.close, True
+    b = pw.chromium.launch(args=args)
+    ctx = b.new_context(user_agent=_MKT_UA, locale="fr-FR",
+                        viewport={"width": 1280, "height": 900})
+    return ctx, b.close, False
+
+
 def _is_cf(page):
     t = (page.title() or "").lower()
     if any(s in t for s in _MKT_CF):
@@ -1745,10 +1763,9 @@ def job_market_fr(job, params):
     job.st["total"] = len(todo)
     done = 0
     with sync_playwright() as pw:
-        b = pw.chromium.launch(args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
-        ctx = b.new_context(user_agent=_MKT_UA, locale="fr-FR",
-                            viewport={"width": 1280, "height": 900})
-        page = ctx.new_page()
+        ctx, close, authed = _discogs_context(pw)
+        job.msg("profil connecté" if authed else "profil anonyme")
+        page = ctx.pages[0] if ctx.pages else ctx.new_page()
         for rid in todo:
             if job.stopped():
                 break
@@ -1765,9 +1782,9 @@ def job_market_fr(job, params):
             if job.st["done"] % 10 == 0:
                 save_json(path, cache)
             time.sleep(0.5)
-        b.close()
+        close()
     save_json(path, cache)
-    job.finish(f"{done}/{len(todo)} sorties complétées (localisées en {country}).")
+    job.finish(f"{done}/{len(todo)} complétées ({'profil connecté' if authed else 'anonyme'}, {country}).")
 
 
 JOBS = {

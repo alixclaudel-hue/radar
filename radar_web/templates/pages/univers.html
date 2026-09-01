@@ -78,22 +78,62 @@
   <div hx-get="/univers/reco/labels" hx-trigger="load"></div>
 
 {% elif tab == 'artists' %}
-  <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. Règle la catégorie d'un clic.</p>
-  <div class="row" style="align-items:end;max-width:640px">
-    <div class="field"><label>Filtrer</label>
-      <input name="flt" placeholder="nom…" hx-get="/univers/artists/table" hx-target="#atable"
-             hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]"></div>
-    <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
-      <label class="small"><input type="checkbox" name="hide" style="width:auto"
-        hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>
-  </div>
-  <div id="atable" hx-get="/univers/artists/table" hx-trigger="load"></div>
-  <p style="margin-top:6px"><a class="small" href="/univers/artists/export">⬇ Exporter les artistes classés (CSV)</a></p>
+  <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. Règle la catégorie d'un clic.
+    Résolution Discogs faite automatiquement en fond à chaque ajout.</p>
+
+  <details class="acc">
+    <summary>🎤 Les artistes <span class="tag">{{ n_artists }}</span></summary>
+    <div class="acc__body">
+      <div class="row" style="align-items:end;max-width:640px">
+        <div class="field"><label>Filtrer</label>
+          <input name="flt" placeholder="nom…" hx-get="/univers/artists/table" hx-target="#atable"
+                 hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]"></div>
+        <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
+          <label class="small"><input type="checkbox" name="hide" style="width:auto"
+            hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>
+      </div>
+      <div id="atable" hx-get="/univers/artists/table" hx-trigger="load"></div>
+      <p style="margin-top:6px"><a class="small" href="/univers/artists/export">⬇ Exporter les artistes classés (CSV)</a></p>
+    </div>
+  </details>
+
   <hr>
   {% include "partials/graph_builder.html" %}
-  <div class="section-title" style="margin-top:10px"><h3 style="font-size:1rem">Résolution des artistes</h3>
-    <button hx-post="/jobs/resolve_artists/launch" hx-target="#job-resolve_artists" hx-swap="outerHTML">Lancer</button></div>
-  <div id="job-resolve_artists" hx-get="/jobs/resolve_artists/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
+
+  <hr>
+  <details class="acc" open>
+    <summary>🕸️ Graphe d'artistes <span class="tag">{{ artist_graphs|length }} sauvegardé{{ 's' if artist_graphs|length != 1 }}</span></summary>
+    <div class="acc__body">
+      <p class="small muted">Relie tes artistes-graines aux artistes qu'ils co-créditent, d'après le graphe
+        producteur ci-dessus. Un seul niveau de voisinage est possible ici (pas de lien graphe entre deux
+        candidats — reconstruis le graphe producteur avec plus de graines pour élargir le réseau).</p>
+      <form hx-post="/univers/artists/graph/build" hx-target="#artist-graph-out" hx-swap="innerHTML">
+        <div class="field"><label>Artistes de départ <span class="muted">choix multiple</span></label>
+          <select name="seeds" multiple size="8" style="height:auto">
+            {% for a in classified_artists %}
+            <option value="{{ a.key }}">{{ '💗 ' if a.tier == '1' else '' }}{{ a.name }}</option>
+            {% endfor %}
+          </select></div>
+        <button class="primary" type="submit">Construire</button>
+      </form>
+      <div id="artist-graph-out"></div>
+      {% if artist_graphs %}
+      <p class="small" style="margin-top:12px">Derniers graphes</p>
+      <div style="display:flex;flex-direction:column">
+        {% for g in artist_graphs %}
+        <div class="inbox-row" style="padding:5px 2px">
+          <a href="javascript:void(0)" class="txt" style="text-decoration:none;color:var(--ink)"
+             hx-get="/univers/artists/graph/{{ g.id }}" hx-target="#artist-graph-out" hx-swap="innerHTML">
+            <b>{{ g.seeds|join(', ') }}</b>
+            <div class="sub">{{ g.ts }} · {{ g.nodes|length }} artistes</div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </details>
+
   <hr>
   <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
 

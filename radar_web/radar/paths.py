@@ -51,6 +51,7 @@ _PER_USER = {
     "canon_state": "canonicalize.state.json",
     "search_results": "search_results.json",
     "label_graphs": "label_graphs.json",
+    "artist_graphs": "artist_graphs.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

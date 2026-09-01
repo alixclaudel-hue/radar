@@ -28,11 +28,12 @@ jobs:
           target=$(git rev-parse --short HEAD)
           sudo docker compose up -d --build --remove-orphans
 
+          # health-check DANS le conteneur (indépendant du binding de port hôte)
           ok=0
           for i in $(seq 1 20); do
-            h=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8600/health || true)
-            s=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8600/search || true)
-            [ "$h" = "200" ] && { [ "$s" = "200" ] || [ "$s" = "303" ]; } && { ok=1; break; }
+            if sudo docker compose exec -T radar-web python -c "import sys,urllib.request as u; sys.exit(0 if u.urlopen('http://localhost:8600/health',timeout=3).status==200 else 1)"; then
+              ok=1; break
+            fi
             sleep 3
           done
 

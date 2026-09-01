@@ -52,6 +52,7 @@ _PER_USER = {
     "search_results": "search_results.json",
     "label_graphs": "label_graphs.json",
     "artist_graphs": "artist_graphs.json",
+    "cart": "cart.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

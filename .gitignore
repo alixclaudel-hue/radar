@@ -37,3 +37,7 @@ veille_seen.json
 sellers_seen.json
 seller_new.json
 canonicalize.state.json
+
+# session navigateur capturée (secrets)
+discogs_state.json
+discogs_profile/

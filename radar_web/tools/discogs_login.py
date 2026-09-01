@@ -1,51 +1,54 @@
-"""Ouvre un Chromium visible (via VNC) sur la page de connexion Discogs, avec un
-profil PERSISTANT dans /data/discogs_profile. Tu te connectes une fois à la main
-(coche « Rester connecté »), puis tu fermes la fenêtre ou Ctrl-C.
+"""Capture une session Discogs connectée, une bonne fois.
 
-Ensuite les jobs headless réutilisent ce profil : plus de mot de passe stocké,
-plus de cookie à recoller — jusqu'à ce que Discogs invalide la session (rare).
+À lancer SUR TON MAC (pas sur le VPS). Ouvre un Chromium visible ; tu te
+connectes à la main (coche « Keep me logged in ») ; le script enregistre la
+session dans ./discogs_state.json.
 
-Lancé par tools/vnc_login.sh.
+Ensuite, envoie ce fichier à Radar :
+  - soit via Réglages → « Session Discogs » (upload dans l'appli), la plus simple ;
+  - soit :  scp discogs_state.json ubuntu@57.128.180.93:/tmp/discogs_state.json
+            ssh ubuntu@57.128.180.93 'sudo mv /tmp/discogs_state.json ~/radar/data/'
+
+Les jobs (market_fr, fenêtre marketplace) réutilisent la session tant qu'elle est
+valide — plusieurs semaines avec « keep me logged in ». À refaire seulement quand
+Discogs la coupe.
+
+Prérequis (Mac, une fois) :
+  python3 -m pip install --user "playwright==1.44.0"
+  python3 -m playwright install chromium
 """
-import os
 import sys
-import time
 
 from playwright.sync_api import sync_playwright
 
-PROFILE = os.environ.get("DISCOGS_PROFILE", "/data/discogs_profile")
+OUT = "discogs_state.json"
 
 
 def main():
-    os.makedirs(PROFILE, exist_ok=True)
     with sync_playwright() as p:
-        ctx = p.chromium.launch_persistent_context(
-            PROFILE, headless=False,
-            args=["--no-sandbox", "--disable-blink-features=AutomationControlled",
-                  "--start-maximized"],
-            viewport={"width": 1280, "height": 860},
-            locale="fr-FR",
-        )
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        b = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
+        ctx = b.new_context(locale="fr-FR", viewport={"width": 1280, "height": 860})
+        page = ctx.new_page()
         page.goto("https://www.discogs.com/login", wait_until="domcontentloaded")
-        print(">>> Connecte-toi dans la fenêtre (coche « Keep me logged in »).")
-        print(">>> Quand le menu de ton compte apparaît en haut à droite, tu peux "
-              "fermer la fenêtre ou faire Ctrl-C ici.", flush=True)
-        # attend soit la fermeture manuelle, soit la détection d'un cookie de session
+        print("\n>>> Connecte-toi dans la fenêtre Chromium (coche « Keep me logged in »).")
+        print(">>> Quand ton compte est connecté (menu en haut à droite), reviens ici")
+        print(">>> et appuie sur Entrée pour enregistrer la session.\n")
         try:
-            while True:
-                time.sleep(3)
-                names = {c["name"] for c in ctx.cookies()}
-                if {"sgp", "session"} & names or "__cf_bm" in names and len(names) > 6:
-                    print(">>> Session détectée. Encore 20 s pour finir, puis fermeture.",
-                          flush=True)
-                    time.sleep(20)
-                    break
-        except KeyboardInterrupt:
+            input()
+        except (EOFError, KeyboardInterrupt):
             pass
-        finally:
-            ctx.close()
-    print(">>> Profil enregistré dans", PROFILE)
+        # ne garde que discogs.com + cloudflare
+        state = ctx.storage_state()
+        state["cookies"] = [c for c in state.get("cookies", [])
+                            if "discogs.com" in c.get("domain", "")]
+        import json
+        with open(OUT, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2)
+        signed = any(c["name"] in ("sgp", "session") for c in state["cookies"])
+        print(f">>> Écrit {OUT} — {len(state['cookies'])} cookies discogs.com"
+              f"{' · session détectée ✅' if signed else ' · ⚠️ pas de cookie de session, tu étais peut-être pas connecté'}")
+        ctx.close()
+        b.close()
 
 
 if __name__ == "__main__":

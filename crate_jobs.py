@@ -1693,22 +1693,19 @@ _MKT_TOTAL_RE = re.compile(r'(\d[\d.,   ]*)\s+(?:de|of)\s+(\d[\d.,   ]*)',
 _MKT_PAGTOT_RE = re.compile(r'pagination_total["\s][^>]*>(.*?)</', re.S)
 
 
-DISCOGS_PROFILE = os.path.join(DATA, "discogs_profile")
+DISCOGS_STATE = os.path.join(DATA, "discogs_state.json")
 
 
 def _discogs_context(pw):
-    """(context, close_fn). Réutilise le profil connecté /data/discogs_profile s'il
-    existe (cf. tools/vnc_login.sh) — sinon contexte anonyme « furtif »."""
+    """(context, close_fn, authed). Réutilise la session Discogs capturée dans
+    /data/discogs_state.json (cf. tools/discogs_login.py) — sinon contexte anonyme."""
     args = ["--no-sandbox", "--disable-blink-features=AutomationControlled"]
-    if os.path.isdir(DISCOGS_PROFILE) and os.listdir(DISCOGS_PROFILE):
-        ctx = pw.chromium.launch_persistent_context(
-            DISCOGS_PROFILE, headless=True, args=args, user_agent=_MKT_UA,
-            locale="fr-FR", viewport={"width": 1280, "height": 900})
-        return ctx, ctx.close, True
     b = pw.chromium.launch(args=args)
+    authed = os.path.isfile(DISCOGS_STATE) and os.path.getsize(DISCOGS_STATE) > 2
     ctx = b.new_context(user_agent=_MKT_UA, locale="fr-FR",
-                        viewport={"width": 1280, "height": 900})
-    return ctx, b.close, False
+                        viewport={"width": 1280, "height": 900},
+                        storage_state=DISCOGS_STATE if authed else None)
+    return ctx, b.close, authed
 
 
 def _is_cf(page):

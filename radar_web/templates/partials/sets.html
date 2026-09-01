@@ -28,7 +28,7 @@
       {% if t.release_id or t.vinyl_release_id %}
         <a class="small" href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener">💿</a>
       {% endif %}
-      <a class="small" href="https://bandcamp.com/search?q={{ (t.artist ~ ' ' ~ t.title)|urlencode }}&item_type=t" target="_blank" rel="noopener">🛒</a>
+      <a class="small" href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">⬇</a>
     </div>
     {% endfor %}
     {% endfor %}

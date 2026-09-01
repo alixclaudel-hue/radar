@@ -1,7 +1,7 @@
 <div id="labels-table">
   <div class="field" style="max-width:320px">
     <label>Filtrer</label>
-    <input name="flt" value="{{ flt }}" placeholder="nom…"
+    <input name="flt" value="{{ flt }}" placeholder="nom…" list="dl-labels" autocomplete="off"
            hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
            hx-trigger="input changed delay:250ms" hx-include="this">
   </div>

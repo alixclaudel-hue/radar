@@ -516,6 +516,22 @@ def suggest_genres(request: Request, q: str = ""):
     return _suggest_vocab(request, vocab.GENRES, q, "genres")
 
 
+@app.get("/suggest/base-artists", response_class=HTMLResponse)
+def suggest_base_artists(request: Request, q: str = ""):
+    c = Ctx()
+    disp, tiers = c.artist_disp(), c.artist_tier_map()
+    names = sorted({v for k, v in disp.items() if not str(v).startswith("id:")},
+                   key=str.lower)
+    term = (q or "").strip().lower()
+    hits = [n for n in names if term in n.lower()] if term else names
+    tset = {disp.get(k) for k in tiers}
+    rows = [{"v": n, "meta": ("classé" if n in tset else None), "dim": True} for n in hits[:60]]
+    header = (f"{len(hits)} artiste" + ("s" if len(hits) != 1 else "")
+              if term else "Tes artistes connus")
+    return frag(request, "partials/suggest.html", rows=rows, header=header,
+                empty="Aucun artiste connu ne correspond.")
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
@@ -875,7 +891,6 @@ def reco_artists_frag(request: Request):
 @app.get("/univers", response_class=HTMLResponse)
 def univers_page(request: Request, tab: str = "labels"):
     c = Ctx()
-    g = c.graph or {}
     ac = c.cfg.get("artist_categories", {})
     label_graphs = load(_pu().label_graphs, [])
     artist_graphs = load(_pu().artist_graphs, [])
@@ -884,17 +899,17 @@ def univers_page(request: Request, tab: str = "labels"):
         ({"key": ck, "name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
          if not str(disp.get(ck, ck)).startswith("id:")),
         key=lambda r: r["name"].lower())
+    artist_names = sorted({v for v in disp.values() if not str(v).startswith("id:")},
+                          key=str.lower)
+    label_names = sorted({r["disp"] for r in _base_labels_ranked(c)}, key=str.lower)
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
                   n_sets=len([r for r in c.corpus if r.get("source") == "djset"]),
-                  graph_meta={"built_at": g.get("built_at", ""), "mode": g.get("mode", ""),
-                              "n_seeds": len(g.get("seeds", {})), "n_edges": len(g.get("edges", {}))},
-                  coeur="\n".join(ac.get("1", [])),
-                  coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])),
                   label_graphs=label_graphs,
                   artist_graphs=artist_graphs,
                   classified_artists=classified_artists,
+                  artist_names=artist_names, label_names=label_names,
                   top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
                   top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 
@@ -1208,8 +1223,15 @@ def job_status_frag(name: str):
 # ============================================================ 🎛️ Réglages
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, saved: int = 0):
-    c = _cfg()
-    return render(request, "pages/settings.html", active="settings", cfg=c, sc=c["scoring"], saved=saved)
+    c = Ctx()
+    g = c.graph or {}
+    ac = c.cfg.get("artist_categories", {})
+    return render(request, "pages/settings.html", active="settings", cfg=c.cfg,
+                  sc=c.scoring, saved=saved,
+                  graph_meta={"built_at": g.get("built_at", ""), "mode": g.get("mode", ""),
+                              "n_seeds": len(g.get("seeds", {})), "n_edges": len(g.get("edges", {}))},
+                  coeur="\n".join(ac.get("1", [])),
+                  coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])))
 
 
 @app.post("/feedback", response_class=HTMLResponse)

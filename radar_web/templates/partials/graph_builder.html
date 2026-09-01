@@ -10,7 +10,12 @@
         <label class="small"><input type="radio" name="mode" value="top" style="width:auto"> Top <input name="top_n" value="40" style="width:60px;padding:2px 5px"> mieux notés</label><br>
         <label class="small"><input type="radio" name="mode" value="seeds" style="width:auto"> Graines choisies :</label>
       </div>
-      <textarea name="seed_names" rows="4" placeholder="un nom d'artiste par ligne">{{ coeur }}</textarea>
+      <div class="field combo" style="margin:0">
+        <textarea name="seed_names" rows="4" placeholder="un nom d'artiste par ligne" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/base-artists" hx-target="#sug-pg-seeds" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ coeur }}</textarea>
+        <div id="sug-pg-seeds" class="lbl-suggest" hidden></div></div>
       <script>window._seeds = {c: {{ coeur|tojson }}, a: {{ coeur_aimes|tojson }}};</script>
       <div style="margin:4px 0">
         <button type="button" class="small" onclick="this.closest('form').seed_names.value=window._seeds.c">mes Cœur</button>

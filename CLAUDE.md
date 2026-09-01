@@ -14,12 +14,16 @@ cours).
 
 ## Où ça tourne / déploiement
 
-Édition en local → `git push` → GitHub (`alixclaudel-hue/radar`, privé) → le VPS OVH
-`ubuntu@57.128.180.93` fait `git pull` + rebuild Docker.
+Édition en local → `git push` → GitHub (`alixclaudel-hue/radar`) → un merge sur `main`
+déclenche le workflow `.github/workflows/deploy.yml` qui se connecte au VPS OVH, fait
+`git pull` + rebuild Docker + health-check (rollback si KO).
 
-Déployer :
+Coordonnées du VPS (hôte, utilisateur, clé de déploiement) : dans les *Secrets* Actions du
+repo (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY_B64`) et dans une note perso non versionnée.
+
+Déploiement manuel (dépannage, avec ta propre clé SSH) :
 ```
-ssh -i ~/.ssh/radar_vps ubuntu@57.128.180.93 \
+ssh -i ~/.ssh/<ta-cle> <user>@<vps-host> \
   'cd ~/radar && git fetch -q origin && git reset --hard origin/main -q \
    && sudo docker compose up -d --build radar-web'
 ```

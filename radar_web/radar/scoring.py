@@ -21,16 +21,18 @@ _SIDE_MARKER = re.compile(
 class Ctx:
     """Instantané des données. Recréer à chaque requête (peu coûteux, fichiers < 3 Mo)."""
 
-    def __init__(self):
-        self.cfg = store.load_config()
+    def __init__(self, uid=None):
+        self.uid = uid or store.current_uid()
+        self.P = paths.user_paths(self.uid)
+        self.cfg = store.load_config(self.uid)
         self.scoring = self.cfg["scoring"]
         # gros fichiers relus à chaque requête -> cache invalidé sur mtime
-        self.profile = store.load_cached(paths.PROFILE, {})
-        self.collection = store.load_cached(paths.COLLECTION, {})
-        self.corpus = store.load_cached(paths.CORPUS, [])
-        self.resolved = store.load_cached(paths.RESOLVED, {})
-        self.artists_res = store.load_cached(paths.ARTISTS_RES, {})
-        self.graph = store.load_cached(paths.GRAPH, {})
+        self.profile = store.load_cached(self.P.profile, {})
+        self.collection = store.load_cached(self.P.collection, {})
+        self.corpus = store.load_cached(self.P.corpus, [])
+        self.resolved = store.load_cached(self.P.resolved, {})
+        self.artists_res = store.load_cached(self.P.artists_res, {})
+        self.graph = store.load_cached(self.P.graph, {})
         self._wmap = None
         self._reco_idx = None
         self._ascore = None

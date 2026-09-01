@@ -19,11 +19,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import discogs, jobs, learn, paths, store, vocab
-from .radar.paths import (CORPUS, PENDING_ENRICH, RELEASE_META, SEARCH_HIST,
-                          SELLERS_NEW, SELLERS_SEEN, SPOTIFY_META, VEILLE_NEW,
-                          VEILLE_SEEN, YOUTUBE_META)
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
+
+
+def _pu():
+    """Chemins de données de l'utilisateur de la requête courante."""
+    return paths.user_paths(store.current_uid())
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
@@ -88,6 +90,9 @@ async def _guard(request: Request, call_next):
         if request.headers.get("hx-request"):
             return HTMLResponse("Session expirée — <a href='/login'>reconnexion</a>", status_code=401)
         return RedirectResponse("/login", status_code=303)
+    # utilisateur de la requête -> lu par store.load_config() / Ctx() / _pu() / jobs.launch()
+    # (étape 2b : résoudre le vrai uid depuis le cookie ; ici, propriétaire unique)
+    store.set_current_uid(paths.DEFAULT_UID)
     resp = await call_next(request)
     if _pw() and _token_ok(request.cookies.get(COOKIE, "")):
         resp.set_cookie(COOKIE, _token(time.time() + AUTH_TTL), max_age=AUTH_TTL,
@@ -156,8 +161,8 @@ def patte_page(request: Request, saved: int = 0):
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
     return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
-                  pl_urls=pl_urls, pl_meta=load(YOUTUBE_META, {}),
-                  sp_urls=sp_urls, sp_meta=load(SPOTIFY_META, {}),
+                  pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
+                  sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
                   src=c.corpus_by_source(), st=c.stats(), saved=saved)
 
 
@@ -215,9 +220,9 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
                 have.add(normalize_label(n))
                 ac.setdefault(t, []).append(n)
                 added += 1
-        q = load(PENDING_ENRICH, {})
+        q = load(_pu().pending_enrich, {})
         q.setdefault("artists", []).extend(names)
-        save(PENDING_ENRICH, q)
+        save(_pu().pending_enrich, q)
         store.save_config(c)
         return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
     if replace:
@@ -290,7 +295,7 @@ def _hist_summary(p):
 def search_page(request: Request, sid: str = ""):
     c = Ctx()
     styles_mine, styles_more = _search_styles(c)
-    hist = load(SEARCH_HIST, [])
+    hist = load(_pu().search_hist, [])
     entry = next((e for e in hist if e.get("id") == sid), hist[0] if hist else None)
     return render(request, "pages/search.html", active="search",
                   q=(entry or {}).get("params", {}), last_id=(entry or {}).get("id", ""),
@@ -302,7 +307,7 @@ def search_page(request: Request, sid: str = ""):
 
 @app.get("/search/replay/{sid}", response_class=HTMLResponse)
 def search_replay(request: Request, sid: str):
-    entry = next((e for e in load(SEARCH_HIST, []) if e.get("id") == sid), None)
+    entry = next((e for e in load(_pu().search_hist, []) if e.get("id") == sid), None)
     if not entry:
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []))
@@ -412,11 +417,11 @@ def search_run(request: Request, label: str = Form(""),
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
               "vinyl": bool(vinyl), "pages": npages}
-    hist = [e for e in load(SEARCH_HIST, []) if e.get("params") != params]
+    hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
                     "n": len(scored), "results": scored})
-    save(SEARCH_HIST, hist[:SEARCH_HIST_MAX])
+    save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
     return frag(request, "partials/results.html", results=scored)
 
 
@@ -488,7 +493,7 @@ RELEASE_META_TTL = 86400
 
 @app.get("/release/{rid}/meta", response_class=HTMLResponse)
 def release_meta(request: Request, rid: int):
-    cache = load(RELEASE_META, {})
+    cache = load(_pu().release_meta, {})
     ent = cache.get(str(rid))
     if not ent or time.time() - ent.get("ts", 0) > RELEASE_META_TTL:
         token = _cfg().get("token", "")
@@ -506,7 +511,7 @@ def release_meta(request: Request, rid: int):
         if len(cache) > 4000:
             for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
                 cache.pop(k, None)
-        save(RELEASE_META, cache)
+        save(_pu().release_meta, cache)
     return frag(request, "partials/release_meta.html", m=ent, rid=rid)
 
 
@@ -532,19 +537,19 @@ def _inbox(request, path, source_key, key_ns, mins=30):
 @app.get("/inbox/{kind}", response_class=HTMLResponse)
 def inbox(request: Request, kind: str, mins: int = 30):
     if kind == "veille":
-        return _inbox(request, VEILLE_NEW, "rule", "veille", mins)
-    return _inbox(request, SELLERS_NEW, "seller", "sellers", mins)
+        return _inbox(request, _pu().veille_new, "rule", "veille", mins)
+    return _inbox(request, _pu().sellers_new, "seller", "sellers", mins)
 
 
 @app.post("/inbox/{kind}/clear", response_class=HTMLResponse)
 def inbox_clear(request: Request, kind: str):
-    save(VEILLE_NEW if kind == "veille" else SELLERS_NEW, [])
+    save(_pu().veille_new if kind == "veille" else _pu().sellers_new, [])
     return inbox(request, kind)
 
 
 @app.post("/inbox/{kind}/dismiss", response_class=HTMLResponse)
 def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
-    path = VEILLE_NEW if kind == "veille" else SELLERS_NEW
+    path = _pu().veille_new if kind == "veille" else _pu().sellers_new
     idf = "release_id" if kind == "veille" else "listing_id"
     save(path, [x for x in load(path, []) if str(x.get(idf)) != rid])
     return inbox(request, kind)
@@ -556,8 +561,8 @@ def veille_page(request: Request):
     return render(request, "pages/veille.html", active="veille",
                   rules=c.get("veille_rules", []), watchlist=c.get("watchlist", []),
                   sellers=c.get("sellers", []), year=CURRENT_YEAR,
-                  v_last=max((v.get("last_scan", "") for v in load(VEILLE_SEEN, {}).values()), default=""),
-                  s_last=max((v.get("last_scan", "") for v in load(SELLERS_SEEN, {}).values()), default=""))
+                  v_last=max((v.get("last_scan", "") for v in load(_pu().veille_seen, {}).values()), default=""),
+                  s_last=max((v.get("last_scan", "") for v in load(_pu().sellers_seen, {}).values()), default=""))
 
 
 @app.post("/veille/rules")
@@ -622,9 +627,9 @@ def reco_label(name: str = Form(""), dest: str = Form("base")):
             c["labels"].append(name)
         if dest in ("veille", "both") and nk not in {normalize_label(x) for x in c.get("watchlist", [])}:
             c.setdefault("watchlist", []).append(name)
-        q = load(PENDING_ENRICH, {})
+        q = load(_pu().pending_enrich, {})
         q.setdefault("labels", []).append(name)
-        save(PENDING_ENRICH, q)
+        save(_pu().pending_enrich, q)
         store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
@@ -638,9 +643,9 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
         nk = normalize_label(name)
         if nk not in {normalize_label(x) for cid in ("1", "2") for x in ac.get(cid, [])}:
             ac.setdefault(tier, []).append(name)
-            q = load(PENDING_ENRICH, {})
+            q = load(_pu().pending_enrich, {})
             q.setdefault("artists", []).append(name)
-            save(PENDING_ENRICH, q)
+            save(_pu().pending_enrich, q)
             store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
@@ -714,9 +719,9 @@ def univers_labels_add(request: Request, name: str = Form("")):
     name = name.strip()
     if name and normalize_label(name) not in {normalize_label(x) for x in c["labels"]}:
         c["labels"].append(name)
-        q = load(PENDING_ENRICH, {})
+        q = load(_pu().pending_enrich, {})
         q.setdefault("labels", []).append(name)
-        save(PENDING_ENRICH, q)
+        save(_pu().pending_enrich, q)
         store.save_config(c)
     return univers_labels(request)
 
@@ -762,9 +767,9 @@ def univers_artist_set(name: str = Form(""), cat: str = Form("")):
     tgt = {"Cœur": "1", "Aimé": "2"}.get(cat)
     if tgt:
         ac.setdefault(tgt, []).append(name)
-        q = load(PENDING_ENRICH, {})
+        q = load(_pu().pending_enrich, {})
         q.setdefault("artists", []).append(name)
-        save(PENDING_ENRICH, q)
+        save(_pu().pending_enrich, q)
     store.save_config(c)
     return HTMLResponse("<span class='small ok'>✓</span>")
 

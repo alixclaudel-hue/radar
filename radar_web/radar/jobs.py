@@ -5,7 +5,7 @@ import subprocess
 import sys
 import time
 
-from . import paths
+from . import paths, store
 
 
 def _status_path(name):
@@ -30,8 +30,10 @@ def running(name):
     return bool(s and s.get("running"))
 
 
-def launch(name, params=None):
-    """Refuse si une exécution fraîche (< 150 s) tourne déjà."""
+def launch(name, params=None, uid=None):
+    """Refuse si une exécution fraîche (< 150 s) tourne déjà. Le job tourne pour
+    `uid` (défaut : l'utilisateur de la requête courante) via RADAR_UID."""
+    uid = uid or store.current_uid()
     s = status(name)
     if s and s.get("running") and s.get("_age", 999) < 150:
         return False
@@ -43,7 +45,7 @@ def launch(name, params=None):
         [sys.executable, paths.JOBS_SCRIPT, name, json.dumps(params or {})],
         cwd=os.path.dirname(paths.JOBS_SCRIPT),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        env={**os.environ, "CRATE_DATA_DIR": paths.DATA})
+        env={**os.environ, "CRATE_DATA_DIR": paths.DATA, "RADAR_UID": uid})
     return True
 
 

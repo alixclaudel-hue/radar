@@ -1,11 +1,22 @@
-"""Lecture/écriture des fichiers de données + config + paramètres de scoring.
-Aligné sur crate_radar.py (mêmes fichiers, même schéma)."""
+"""Lecture/écriture des fichiers de données + config + paramètres de scoring."""
+import contextvars
 import json
 import os
 import re
 import tempfile
 
 from . import paths
+
+# --- utilisateur courant (posé par le middleware d'auth, une valeur par requête) ---
+_current_uid = contextvars.ContextVar("radar_uid", default=paths.DEFAULT_UID)
+
+
+def set_current_uid(uid):
+    _current_uid.set(uid or paths.DEFAULT_UID)
+
+
+def current_uid():
+    return _current_uid.get()
 
 # ------------------------------------------------------------------ JSON atomique
 
@@ -116,8 +127,8 @@ _ENV_SECRETS = (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY
                 ("bandcamp_sub_pass", "BANDCAMP_SUB_PASS"))
 
 
-def load_config():
-    data = load(paths.CONFIG, {}) or {}
+def load_config(uid=None):
+    data = load(paths.user_paths(uid or current_uid()).config, {}) or {}
     data.setdefault("token", "")
     data.setdefault("labels", [])
     data.setdefault("watchlist", [])
@@ -156,5 +167,5 @@ def load_config():
     return data
 
 
-def save_config(cfg):
-    save(paths.CONFIG, cfg)
+def save_config(cfg, uid=None):
+    save(paths.user_paths(uid or current_uid()).config, cfg)

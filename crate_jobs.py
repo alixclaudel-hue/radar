@@ -1249,13 +1249,13 @@ def job_ingest_djsets(job, params):
     if not sources:
         return job.finish(error="Aucune source (DJ / émission / chaîne).")
 
-    job.msg("Listing des vidéos…")
+    job.msg("YouTube · recherche des sets…")
     vids = []
     for src in sources:
         try:
             got = _yt_video_ids(src, max_per, min_seconds, yt_keys, require_hint)
             vids += got
-            job.msg(f"{src} : {len(got)} vidéo(s)")
+            job.msg(f"YouTube · {src} : {len(got)} set(s) identifié(s)")
         except Exception as e:
             job.msg(f"{src} : erreur listing ({e})")
         if job.stopped():
@@ -1264,7 +1264,7 @@ def job_ingest_djsets(job, params):
     seen_vids = set(load_json(DJSET_SEEN_PATH, []))
     todo = [(v, dj, vt) for v, dj, vt in vids if v not in seen_vids]
     job.st["total"] = len(todo)
-    job.msg(f"{len(vids)} vidéos trouvées, {len(todo)} à traiter.")
+    job.msg(f"YouTube · {len(vids)} set(s) identifié(s), {len(todo)} à scanner")
     if not vids:
         return job.finish(error="Aucune vidéo trouvée pour ces sources. Essaie un @handle, "
                                 "une URL de chaîne, ou ajoute « set »/« boiler room » au nom.")
@@ -1310,7 +1310,8 @@ def job_ingest_djsets(job, params):
                                "set_title": vtitle, "track_url": track_url, "added_at": now})
                 added += 1
             seen_vids.add(vid)
-            job.tick(f"{dj} · {vid} → {len(tracks)} track(s) · +{added} au corpus")
+            job.tick(f"YouTube · {dj} · set {job.st['done'] + 1}/{len(todo)} · "
+                     f"{len(tracks)} track(s) · +{added} au corpus")
             if (i + 1) % 8 == 0:
                 save_json(CORPUS_PATH, corpus)
                 save_json(LOOKUP_CACHE_PATH, cache)

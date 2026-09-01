@@ -262,7 +262,7 @@ def patte_page(request: Request, saved: int = 0):
 def _apply_patte_form(f):
     c = _cfg()
     for k in ("token", "youtube_api_key", "spotify_client_id", "spotify_client_secret",
-              "bandcamp_sub_user", "bandcamp_sub_pass", "djset_sources"):
+              "bandcamp_sub_user", "bandcamp_sub_pass"):
         if k in f:
             c[k] = f.get(k, "").strip()
     if "yt_pl" in f:
@@ -295,6 +295,49 @@ async def patte_run(request: Request, job: str):
     utilise bien ce qui vient d'être tapé, sans étape « Enregistrer » séparée)."""
     _apply_patte_form(await request.form())
     return job_launch(job)
+
+
+def _scanned_djs(c):
+    by = {}
+    for r in c.corpus:
+        if r.get("source") != "djset":
+            continue
+        d = by.setdefault(r.get("dj") or "?", {"vids": set(), "tracks": 0, "last": ""})
+        d["vids"].add(r.get("video"))
+        d["tracks"] += 1
+        d["last"] = max(d["last"], r.get("added_at") or "")
+    return sorted(({"name": k, "sets": len(v["vids"]), "tracks": v["tracks"],
+                    "date": (v["last"] or "")[:10]} for k, v in by.items()),
+                  key=lambda x: x["name"].lower())
+
+
+@app.get("/patte/djset/panel", response_class=HTMLResponse)
+def patte_djset_panel(request: Request):
+    return frag(request, "partials/djset_panel.html",
+                scanned=_scanned_djs(Ctx()), job=jobs.status("ingest_djsets"))
+
+
+@app.post("/patte/djset/scan", response_class=HTMLResponse)
+def patte_djset_scan(request: Request, name: str = Form("")):
+    name = name.strip()
+    if not name:
+        return frag(request, "partials/djset_panel.html",
+                    scanned=_scanned_djs(Ctx()), job=jobs.status("ingest_djsets"),
+                    err="Renseigne le nom d'un DJ.")
+    c = _cfg()
+    have = [s.strip() for s in (c.get("djset_sources") or "").splitlines() if s.strip()]
+    if name.lower() not in {s.lower() for s in have}:
+        have.append(name)
+        c["djset_sources"] = "\n".join(have)
+        store.save_config(c)
+    d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
+    os.makedirs(d, exist_ok=True)
+    save(os.path.join(d, "djsets.input.json"),
+         {"sources": [name], "max_per_source": 25, "min_minutes": 35,
+          "require_hint": True, "deep": True})
+    jobs.launch("ingest_djsets")
+    return frag(request, "partials/djset_panel.html",
+                scanned=_scanned_djs(Ctx()), job=jobs.status("ingest_djsets"))
 
 
 @app.post("/patte/import-csv", response_class=HTMLResponse)

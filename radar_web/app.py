@@ -958,7 +958,9 @@ def job_launch(name: str):
         if not srcs:
             return HTMLResponse("<div id='job-ingest_djsets' class='notice warn small'>"
                                 "Aucune source DJ — renseigne-les dans « Mieux connaître ton univers → DJ sets ».</div>")
-        save(os.path.join(store.paths.JOBS_DIR, "djsets.input.json"),
+        d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
+        os.makedirs(d, exist_ok=True)
+        save(os.path.join(d, "djsets.input.json"),
              {"sources": srcs, "max_per_source": 25, "min_minutes": 35,
               "require_hint": True, "deep": True})
     if name in VALID_JOBS:
@@ -973,16 +975,19 @@ def job_status_frag(name: str):
         return HTMLResponse(f"<span id='job-{name}' class='muted small'>—</span>")
     done, total = s.get("done", 0), s.get("total", 0) or 1
     pct = min(100, round(100 * done / total))
-    run, err = s.get("running"), s.get("error")
+    run, err, queued = s.get("running"), s.get("error"), s.get("queued")
     msg = html.escape(str(s.get("message") or ""))
     if err:
         inner = f"<span class='notice warn small'>{html.escape(str(err))}</span>"
+    elif queued:
+        inner = f"<span class='small muted'>🕓 {msg}</span>"
     elif run:
         inner = (f"<span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>"
                  f"<div class='progress'><i style='width:{pct}%'></i></div>")
     else:
         inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"
-    poll = f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'" if run else ""
+    poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'"
+            if (run or queued) else "")
     return HTMLResponse(f"<div id='job-{name}' {poll}>{inner}</div>")
 
 

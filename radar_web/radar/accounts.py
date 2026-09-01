@@ -84,11 +84,11 @@ def _seed_user_dir(uid):
     store.save_config(store.load_config(uid), uid)
 
 
-def create(username, password, invited_by=None, is_owner=False):
+def create(username, password, invited_by=None, is_owner=False, min_len=6):
     accts = load_accounts()
     username = (username or "").strip()
-    if not username or len(password or "") < 6:
-        raise ValueError("identifiant vide ou mot de passe < 6 caractères")
+    if not username or len(password or "") < min_len:
+        raise ValueError(f"identifiant vide ou mot de passe < {min_len} caractères")
     if by_username(username)[0]:
         raise ValueError("identifiant déjà pris")
     uid = paths.DEFAULT_UID if (is_owner and not accts) else secrets.token_hex(6)
@@ -100,12 +100,18 @@ def create(username, password, invited_by=None, is_owner=False):
 
 
 def bootstrap():
-    """1er démarrage : si aucun compte et APP_PASSWORD défini, crée le propriétaire."""
+    """1er démarrage : si aucun compte et APP_PASSWORD défini, crée le propriétaire.
+    Ne doit jamais faire planter le démarrage."""
     if count():
         return
     pw = os.environ.get("APP_PASSWORD")
-    if pw:
-        create(os.environ.get("OWNER_USERNAME", "owner"), pw, is_owner=True)
+    if not pw:
+        return
+    try:
+        create(os.environ.get("OWNER_USERNAME", "owner"), pw, is_owner=True, min_len=1)
+    except Exception as e:                       # noqa: BLE001
+        import sys
+        print(f"[radar] bootstrap du compte owner impossible : {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------- invitations

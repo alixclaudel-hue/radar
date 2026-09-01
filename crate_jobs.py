@@ -33,7 +33,8 @@ RADAR_UID = (os.environ.get("RADAR_UID") or "owner").strip() or "owner"
 USER_DIR = os.path.join(DATA, "users", RADAR_UID)
 SHARED_DIR = os.path.join(DATA, "shared")
 JOBS_DIR = os.path.join(DATA, "jobs")
-for _d in (USER_DIR, SHARED_DIR, JOBS_DIR):
+JOBS_USER_DIR = os.path.join(JOBS_DIR, RADAR_UID)  # statuts/inputs par utilisateur (étape 3)
+for _d in (USER_DIR, SHARED_DIR, JOBS_DIR, JOBS_USER_DIR):
     os.makedirs(_d, exist_ok=True)
 
 
@@ -72,9 +73,9 @@ ARTISTS_RESOLVED_PATH = os.path.join(USER_DIR, "artists_resolved.json")
 PRODUCER_GRAPH_PATH = os.path.join(USER_DIR, "producer_graph.json")
 YOUTUBE_META_PATH = os.path.join(USER_DIR, "youtube_meta.json")
 SPOTIFY_META_PATH = os.path.join(USER_DIR, "spotify_meta.json")
-SEARCH_INPUT_PATH = os.path.join(DATA, "jobs", "search_base.input.json")
+SEARCH_INPUT_PATH = os.path.join(JOBS_USER_DIR, "search_base.input.json")
 SEARCH_RESULTS_PATH = os.path.join(USER_DIR, "search_results.json")
-DJSET_INPUT_PATH = os.path.join(DATA, "jobs", "djsets.input.json")
+DJSET_INPUT_PATH = os.path.join(JOBS_USER_DIR, "djsets.input.json")
 DJSET_SEEN_PATH = os.path.join(USER_DIR, "djset_seen.json")
 SELLERS_SEEN_PATH = os.path.join(USER_DIR, "sellers_seen.json")
 SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
@@ -134,10 +135,10 @@ class Job:
     """Écrit jobs/<name>.status.json et surveille jobs/<name>.stop."""
 
     def __init__(self, name, total=0):
-        os.makedirs(JOBS_DIR, exist_ok=True)
+        os.makedirs(JOBS_USER_DIR, exist_ok=True)
         self.name = name
-        self.status_path = os.path.join(JOBS_DIR, f"{name}.status.json")
-        self.stop_path = os.path.join(JOBS_DIR, f"{name}.stop")
+        self.status_path = os.path.join(JOBS_USER_DIR, f"{name}.status.json")
+        self.stop_path = os.path.join(JOBS_USER_DIR, f"{name}.stop")
         if os.path.exists(self.stop_path):
             os.remove(self.stop_path)
         self.st = {"job": name, "running": True, "done": 0, "total": total,

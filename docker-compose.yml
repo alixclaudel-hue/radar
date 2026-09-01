@@ -22,3 +22,14 @@ services:
     env_file: .env
     volumes:
       - ./data:/data
+
+  # Worker unique de la file d'attente des jobs (étape 3) — même image
+  radar-worker:
+    image: radar-web:latest
+    restart: unless-stopped
+    command: python -m radar_web.worker
+    depends_on:
+      - radar-web
+    env_file: .env
+    volumes:
+      - ./data:/data

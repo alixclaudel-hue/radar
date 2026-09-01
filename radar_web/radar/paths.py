@@ -50,6 +50,7 @@ _PER_USER = {
     "djset_seen": "djset_seen.json",
     "canon_state": "canonicalize.state.json",
     "search_results": "search_results.json",
+    "label_graphs": "label_graphs.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

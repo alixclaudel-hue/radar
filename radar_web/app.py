@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import accounts, discogs, jobs, learn, paths, store, vocab, ytcache
+from .radar import accounts, discogs, jobs, labelgraph, learn, paths, store, vocab, ytcache
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -431,14 +431,16 @@ def _base_labels_ranked(c):
     puis alpha. Dédoublonné par nom canonique."""
     ridx = c.reco_index
     lc = c.collection.get("label_counts", {})
+    lids = c.collection.get("label_ids", {})
     rows, seen = [], set()
     for name in c.cfg.get("labels", []):
         key = store.normalize_label(name)
         res = c.resolved.get(key) or {}
         disp = res.get("discogs_name") or res.get("original") or name
         aff = c.affinity_score(c.profile.get(key)) if c.profile.get(key) else None
-        rows.append({"disp": disp, "norm": store.normalize_label(disp),
-                     "aff": aff, "_reco": ridx.get(key, 0), "owned": lc.get(key, 0)})
+        did = res.get("discogs_id") or lids.get(key, {}).get("id")
+        rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key,
+                     "aff": aff, "_reco": ridx.get(key, 0), "owned": lc.get(key, 0), "id": did})
     rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
     uniq = []
     for r in rows:
@@ -795,14 +797,21 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
 
 # --------------------------------------------------------------------- recos (dans Mon univers)
 @app.get("/univers/reco/labels", response_class=HTMLResponse)
+def _label_discogs_url(c, key, name):
+    did = ((c.resolved.get(key) or {}).get("discogs_id")
+           or (c.collection.get("label_ids", {}).get(key) or {}).get("id"))
+    if did:
+        return f"https://www.discogs.com/label/{did}"
+    return f"https://www.discogs.com/search/?q={quote_plus(name)}&type=label"
+
+
 def reco_labels_frag(request: Request):
     c = Ctx()
     base = {normalize_label(x) for x in c.cfg.get("labels", [])}
-    watch = {normalize_label(x) for x in c.cfg.get("watchlist", [])}
     rows = []
     for r in c.reco_rows():
         if r["key"] not in base:
-            r["watched"] = r["key"] in watch
+            r["url"] = _label_discogs_url(c, r["key"], r["name"])
             rows.append(r)
     # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base)
     graph_rows = []
@@ -811,7 +820,7 @@ def reco_labels_frag(request: Request):
             continue
         graph_rows.append({"name": v["name"], "score": round(v["score"]), "aff": None,
                            "owned": 0, "want": 0, "corpus": 0, "artists": v["n_seeds"],
-                           "watched": lk in watch,
+                           "url": _label_discogs_url(c, lk, v["name"]),
                            "seeds": ", ".join(v["seeds"])})
     return frag(request, "partials/reco_labels.html", reco=rows[:30],
                 graph_reco=graph_rows[:30], n_reco=len(rows), n_graph=len(graph_rows))
@@ -837,6 +846,7 @@ def univers_page(request: Request, tab: str = "labels"):
     c = Ctx()
     g = c.graph or {}
     ac = c.cfg.get("artist_categories", {})
+    label_graphs = load(_pu().label_graphs, [])
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
@@ -844,37 +854,101 @@ def univers_page(request: Request, tab: str = "labels"):
                   graph_meta={"built_at": g.get("built_at", ""), "mode": g.get("mode", ""),
                               "n_seeds": len(g.get("seeds", {})), "n_edges": len(g.get("edges", {}))},
                   coeur="\n".join(ac.get("1", [])),
-                  coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])))
+                  coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])),
+                  label_graphs=label_graphs,
+                  top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
+                  top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 
 
-@app.get("/univers/labels", response_class=HTMLResponse)
-def univers_labels(request: Request, flt: str = ""):
-    c = _cfg()
-    labs = c.get("labels", [])
-    shown = [l for l in labs if flt.lower() in l.lower()] if flt else labs
-    return frag(request, "partials/labels_list.html", total=len(labs), shown=shown[:200],
-                n_shown=len(shown), flt=flt)
+LABELS_PAGE_SIZE = 25
+
+
+@app.get("/univers/labels/table", response_class=HTMLResponse)
+def univers_labels_table(request: Request, flt: str = "", page: int = 1):
+    c = Ctx()
+    rows = _base_labels_ranked(c)
+    if flt:
+        f = flt.lower()
+        rows = [r for r in rows if f in r["disp"].lower()]
+    total = len(rows)
+    pages = max(1, -(-total // LABELS_PAGE_SIZE))
+    page = max(1, min(page, pages))
+    shown = rows[(page - 1) * LABELS_PAGE_SIZE: page * LABELS_PAGE_SIZE]
+    for r in shown:
+        r["url"] = (f"https://www.discogs.com/label/{r['id']}" if r.get("id")
+                    else f"https://www.discogs.com/search/?q={quote_plus(r['disp'])}&type=label")
+    return frag(request, "partials/labels_table.html", rows=shown, total=total,
+                page=page, pages=pages, flt=flt)
 
 
 @app.post("/univers/labels/add", response_class=HTMLResponse)
 def univers_labels_add(request: Request, name: str = Form("")):
     c = _cfg()
     name = name.strip()
-    if name and normalize_label(name) not in {normalize_label(x) for x in c["labels"]}:
-        c["labels"].append(name)
-        q = load(_pu().pending_enrich, {})
-        q.setdefault("labels", []).append(name)
-        save(_pu().pending_enrich, q)
-        store.save_config(c)
-    return univers_labels(request)
+    ok, msg = False, "Identifiant vide."
+    if name:
+        if normalize_label(name) in {normalize_label(x) for x in c["labels"]}:
+            msg = f"« {name} » est déjà dans ta base."
+        else:
+            c["labels"].append(name)
+            q = load(_pu().pending_enrich, {})
+            q.setdefault("labels", []).append(name)
+            save(_pu().pending_enrich, q)
+            store.save_config(c)
+            ok, msg = True, f"✓ « {name} » ajouté."
+    return HTMLResponse(f"<span class='small {'ok' if ok else 'notice warn'}'>{html.escape(msg)}</span>")
 
 
 @app.post("/univers/labels/remove", response_class=HTMLResponse)
-def univers_labels_remove(request: Request, name: str = Form("")):
+def univers_labels_remove(request: Request, name: str = Form(""), flt: str = Form(""),
+                          page: int = Form(1)):
     c = _cfg()
     c["labels"] = [l for l in c["labels"] if l != name]
     store.save_config(c)
-    return univers_labels(request)
+    return univers_labels_table(request, flt=flt, page=page)
+
+
+def _label_graph_render(request, entry):
+    pos = labelgraph.layout(entry["nodes"])
+    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos)
+
+
+@app.post("/univers/labels/graph/build", response_class=HTMLResponse)
+async def univers_label_graph_build(request: Request):
+    f = await request.form()
+    seeds = [s.strip() for s in f.get("seeds", "").splitlines() if s.strip()]
+    if not seeds:
+        return HTMLResponse("<p class='notice warn small'>Au moins un label de départ.</p>")
+    try:
+        depth = max(1, min(2, int(f.get("depth") or 1)))
+    except ValueError:
+        depth = 1
+    try:
+        min_shared = max(1, int(f.get("min_shared") or 1))
+    except ValueError:
+        min_shared = 1
+    c = Ctx()
+    built = labelgraph.build(c.graph or {}, seeds, depth=depth, min_shared=min_shared)
+    if len(built["nodes"]) <= len(seeds):
+        return HTMLResponse(
+            "<p class='notice warn small'>Aucun voisin trouvé — ces labels n'ont pas (ou pas assez) "
+            "d'artistes en commun dans le graphe. Reconstruis le graphe producteur avec plus de graines "
+            "(onglet Base d'artistes), ou baisse le seuil.</p>")
+    entry = {"id": hashlib.md5(f"{time.time()}{seeds}".encode()).hexdigest()[:10],
+             "ts": time.strftime("%Y-%m-%d %H:%M"), "depth": depth, "min_shared": min_shared,
+             **built}
+    hist = load(_pu().label_graphs, [])
+    hist.insert(0, entry)
+    save(_pu().label_graphs, hist[:15])
+    return _label_graph_render(request, entry)
+
+
+@app.get("/univers/labels/graph/{gid}", response_class=HTMLResponse)
+def univers_label_graph_show(request: Request, gid: str):
+    entry = next((e for e in load(_pu().label_graphs, []) if e.get("id") == gid), None)
+    if not entry:
+        return HTMLResponse("<p class='muted small'>Graphe introuvable (supprimé ?).</p>")
+    return _label_graph_render(request, entry)
 
 
 @app.get("/univers/artists/table", response_class=HTMLResponse)
@@ -972,12 +1046,15 @@ async def univers_labels_import(request: Request, file: UploadFile, replace: str
     if replace:
         c["labels"] = []
     have = {normalize_label(x) for x in c["labels"]}
+    added = 0
     for n in names:
         if normalize_label(n) not in have:
             have.add(normalize_label(n))
             c["labels"].append(n)
+            added += 1
     store.save_config(c)
-    return univers_labels(request)
+    return HTMLResponse(f"<span class='small ok'>✓ {added} label(s) ajouté(s) "
+                        f"(base : {len(c['labels'])}).</span>")
 
 
 def _csv_cell(s):

@@ -59,6 +59,21 @@
 <p class="small muted">L'enrichissement (résolution + profilage) de chaque nouvel ajout se fait déjà en tâche de fond.</p>
 
 <hr>
+<h3>Base de labels — import / export CSV</h3>
+<div class="row" style="max-width:640px">
+  <form hx-post="/univers/labels/import" hx-target="#labels-csv-msg" hx-swap="innerHTML"
+        hx-encoding="multipart/form-data">
+    <label>Importer</label>
+    <input type="file" name="file" accept=".csv" required>
+    <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer toute la base</label>
+    <button type="submit" class="small">Importer</button>
+  </form>
+  <div class="field"><label>Exporter</label>
+    <a class="small" href="/univers/labels/export">⬇ Exporter la base (CSV)</a></div>
+</div>
+<p id="labels-csv-msg" class="small" style="margin-top:6px"></p>
+
+<hr>
 <h3>Inviter quelqu'un <span class="muted small">· crée son propre univers, isolé du tien</span></h3>
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:560px">
   <button hx-post="/account/invite" hx-target="#invite-link" hx-swap="innerHTML">Générer un lien d'invitation</button>

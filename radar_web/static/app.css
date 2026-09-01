@@ -88,6 +88,17 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
 
 .btnrow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px; }
 
+/* lignes condensées (recommandations labels) */
+.lrows{ display:flex; flex-direction:column; }
+.lrow{ display:flex; align-items:center; gap:8px; padding:5px 2px; border-top:1px solid var(--line); font-size:13px; }
+.lrow__name{ font-weight:600; color:var(--ink); text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; flex:0 1 auto; }
+.lrow__name:hover{ text-decoration:underline; }
+.lrow__meta{ flex:1; min-width:0; font-size:11px; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.badge.small{ font-size:11px; padding:1px 8px; }
+
+/* graphe de labels */
+.lgraph svg text{ pointer-events:none; }
+
 /* contrôle segmenté (pills radio) */
 .seg{ display:inline-flex; flex-wrap:wrap; gap:6px; }
 .seg label{

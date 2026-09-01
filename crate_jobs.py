@@ -23,25 +23,61 @@ from datetime import datetime
 import requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# Répertoire des données : partagé avec crate_radar.py via CRATE_DATA_DIR (volume
+# Répertoire des données : partagé avec radar_web via CRATE_DATA_DIR (volume
 # persistant en conteneur ; à côté du script en local).
 DATA = os.environ.get("CRATE_DATA_DIR") or HERE
-os.makedirs(os.path.join(DATA, "jobs"), exist_ok=True)
+# Multi-utilisateur (cf. docs/architecture.md étape 1) : chaque job tourne pour un
+# utilisateur (RADAR_UID, défaut "owner") — données sous users/<uid>/, caches
+# neutres sous shared/. Doit rester aligné avec radar_web/radar/paths.py.
+RADAR_UID = (os.environ.get("RADAR_UID") or "owner").strip() or "owner"
+USER_DIR = os.path.join(DATA, "users", RADAR_UID)
+SHARED_DIR = os.path.join(DATA, "shared")
 JOBS_DIR = os.path.join(DATA, "jobs")
-CONFIG_PATH = os.path.join(DATA, "crate_radar_config.json")
-CORPUS_PATH = os.path.join(DATA, "taste_corpus.json")
-LOOKUP_CACHE_PATH = os.path.join(DATA, "lookup_cache.json")
-RESOLVED_PATH = os.path.join(DATA, "labels_resolved.json")
-PROFILE_PATH = os.path.join(DATA, "labels_profile.json")
-COLLECTION_CACHE_PATH = os.path.join(DATA, "collection_cache.json")
-ARTISTS_RESOLVED_PATH = os.path.join(DATA, "artists_resolved.json")
-PRODUCER_GRAPH_PATH = os.path.join(DATA, "producer_graph.json")
+for _d in (USER_DIR, SHARED_DIR, JOBS_DIR):
+    os.makedirs(_d, exist_ok=True)
+
+
+def _migrate_layout():
+    """<DATA>/*.json -> users/<uid>/ + shared/. Idempotent."""
+    legacy_cfg = os.path.join(DATA, "crate_radar_config.json")
+    if not os.path.isfile(legacy_cfg):
+        return
+    per_user = ("crate_radar_config.json", "taste_corpus.json", "labels_resolved.json",
+                "labels_profile.json", "collection_cache.json", "artists_resolved.json",
+                "producer_graph.json", "search_history.json", "reco_feedback.json",
+                "scoring_profiles.json", "pending_enrich.json", "youtube_meta.json",
+                "spotify_meta.json", "radar_web_searches.json", "veille_new.json",
+                "veille_seen.json", "seller_new.json", "sellers_seen.json",
+                "djset_seen.json", "search_results.json", "canonicalize.state.json")
+    shared = ("lookup_cache.json", "release_meta_cache.json")
+    for fn in per_user:
+        s, d = os.path.join(DATA, fn), os.path.join(USER_DIR, fn)
+        if os.path.isfile(s) and not os.path.exists(d):
+            os.rename(s, d)
+    for fn in shared:
+        s, d = os.path.join(DATA, fn), os.path.join(SHARED_DIR, fn)
+        if os.path.isfile(s) and not os.path.exists(d):
+            os.rename(s, d)
+
+
+_migrate_layout()
+
+CONFIG_PATH = os.path.join(USER_DIR, "crate_radar_config.json")
+CORPUS_PATH = os.path.join(USER_DIR, "taste_corpus.json")
+LOOKUP_CACHE_PATH = os.path.join(SHARED_DIR, "lookup_cache.json")
+RESOLVED_PATH = os.path.join(USER_DIR, "labels_resolved.json")
+PROFILE_PATH = os.path.join(USER_DIR, "labels_profile.json")
+COLLECTION_CACHE_PATH = os.path.join(USER_DIR, "collection_cache.json")
+ARTISTS_RESOLVED_PATH = os.path.join(USER_DIR, "artists_resolved.json")
+PRODUCER_GRAPH_PATH = os.path.join(USER_DIR, "producer_graph.json")
+YOUTUBE_META_PATH = os.path.join(USER_DIR, "youtube_meta.json")
+SPOTIFY_META_PATH = os.path.join(USER_DIR, "spotify_meta.json")
 SEARCH_INPUT_PATH = os.path.join(DATA, "jobs", "search_base.input.json")
-SEARCH_RESULTS_PATH = os.path.join(DATA, "search_results.json")
+SEARCH_RESULTS_PATH = os.path.join(USER_DIR, "search_results.json")
 DJSET_INPUT_PATH = os.path.join(DATA, "jobs", "djsets.input.json")
-DJSET_SEEN_PATH = os.path.join(DATA, "djset_seen.json")
-SELLERS_SEEN_PATH = os.path.join(DATA, "sellers_seen.json")
-SELLERS_NEW_PATH = os.path.join(DATA, "seller_new.json")
+DJSET_SEEN_PATH = os.path.join(USER_DIR, "djset_seen.json")
+SELLERS_SEEN_PATH = os.path.join(USER_DIR, "sellers_seen.json")
+SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
 
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
@@ -369,7 +405,7 @@ def job_ingest_youtube(job, params):
     if not pids:
         return job.finish(error="Aucune playlist.")
     job.msg("Lecture des playlists…")
-    meta = load_json(os.path.join(DATA, "youtube_meta.json"), {})
+    meta = load_json(YOUTUBE_META_PATH, {})
     raw = []
     for url, pid in [(u, p) for u, p in pairs if p]:
         try:
@@ -388,7 +424,7 @@ def job_ingest_youtube(job, params):
                      "channel": sn.get("channelTitle") or "",
                      "n_items": len(items),
                      "imported_at": datetime.now().isoformat(timespec="seconds")}
-    save_json(os.path.join(DATA, "youtube_meta.json"), meta)
+    save_json(YOUTUBE_META_PATH, meta)
     cache = load_json(LOOKUP_CACHE_PATH, {})
     corpus = load_json(CORPUS_PATH, [])
     seen = {("youtube", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
@@ -438,7 +474,7 @@ def job_ingest_spotify(job, params):
         return job.finish(error=str(e))
     if not tok:
         return job.finish(error="Spotify : jeton d'accès vide (identifiants ?).")
-    meta = load_json(os.path.join(DATA, "spotify_meta.json"), {})
+    meta = load_json(SPOTIFY_META_PATH, {})
     raw = []
     for url, pid in pids:
         try:
@@ -455,7 +491,7 @@ def job_ingest_spotify(job, params):
         meta[pid] = {"url": url, "title": m["title"], "channel": m["channel"],
                      "n_items": len(items) or m["n_items"],
                      "imported_at": datetime.now().isoformat(timespec="seconds")}
-    save_json(os.path.join(DATA, "spotify_meta.json"), meta)
+    save_json(SPOTIFY_META_PATH, meta)
     cache = load_json(LOOKUP_CACHE_PATH, {})
     corpus = load_json(CORPUS_PATH, [])
     seen = {("spotify", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
@@ -1361,10 +1397,10 @@ def job_scan_sellers(job, params):
 
 # =================================================== enrichissement auto + canonique
 
-PENDING_ENRICH_PATH = os.path.join(DATA, "pending_enrich.json")
-CANON_STATE_PATH = os.path.join(DATA, "canonicalize.state.json")
-VEILLE_SEEN_PATH = os.path.join(DATA, "veille_seen.json")
-VEILLE_NEW_PATH = os.path.join(DATA, "veille_new.json")
+PENDING_ENRICH_PATH = os.path.join(USER_DIR, "pending_enrich.json")
+CANON_STATE_PATH = os.path.join(USER_DIR, "canonicalize.state.json")
+VEILLE_SEEN_PATH = os.path.join(USER_DIR, "veille_seen.json")
+VEILLE_NEW_PATH = os.path.join(USER_DIR, "veille_new.json")
 
 
 def _resolve_entity(token, name, kind):

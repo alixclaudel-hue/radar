@@ -1,5 +1,20 @@
 services:
-  # Interface FastAPI + HTMX — :8600
+  # Reverse-proxy + HTTPS Let's Encrypt (étape 4)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - radar-web
+
+  # Interface FastAPI + HTMX — :8600 (accessible seulement via Caddy et en local)
   # (l'ancienne appli Streamlit a été retirée, cf. archive/ + docs/architecture.md étape 7)
   radar-web:
     build:
@@ -8,7 +23,7 @@ services:
     image: radar-web:latest
     restart: unless-stopped
     ports:
-      - "8600:8600"
+      - "127.0.0.1:8600:8600"
     env_file: .env
     volumes:
       - ./data:/data
@@ -23,3 +38,7 @@ services:
     env_file: .env
     volumes:
       - ./data:/data
+
+volumes:
+  caddy_data:
+  caddy_config:

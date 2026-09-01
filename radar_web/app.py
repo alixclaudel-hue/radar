@@ -90,6 +90,15 @@ def _make_token(uid, exp):
     return f"{uid}.{exp}.{sig}"
 
 
+def _https(request):
+    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+
+
+def _set_session(resp, uid, request):
+    resp.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL), max_age=AUTH_TTL,
+                    httponly=True, samesite="lax", secure=_https(request))
+
+
 def _parse_token(tok):
     try:
         uid, exp, sig = (tok or "").split(".")
@@ -122,8 +131,7 @@ async def _guard(request: Request, call_next):
     store.set_current_uid(uid)          # lu par load_config() / Ctx() / _pu() / jobs.launch()
     resp = await call_next(request)
     if not _dev_mode():
-        resp.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL),
-                        max_age=AUTH_TTL, httponly=True, samesite="lax")
+        _set_session(resp, uid, request)
     return resp
 
 
@@ -148,12 +156,11 @@ def login_form(request: Request, bad: int = 0):
 
 
 @app.post("/login")
-def login(username: str = Form(""), pw: str = Form("")):
+def login(request: Request, username: str = Form(""), pw: str = Form("")):
     uid = accounts.verify(username, pw)
     if uid:
         r = RedirectResponse("/", status_code=303)
-        r.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL),
-                     max_age=AUTH_TTL, httponly=True, samesite="lax")
+        _set_session(r, uid, request)
         return r
     return RedirectResponse("/login?bad=1", status_code=303)
 
@@ -190,15 +197,14 @@ def register_form(request: Request, invite: str = "", bad: str = ""):
 
 
 @app.post("/register")
-def register(invite: str = Form(""), username: str = Form(""), pw: str = Form("")):
+def register(request: Request, invite: str = Form(""), username: str = Form(""), pw: str = Form("")):
     try:
         uid = accounts.consume_invite(invite, username, pw)
     except ValueError as e:
         return RedirectResponse(f"/register?invite={quote_plus(invite)}&bad={quote_plus(str(e))}",
                                 status_code=303)
     r = RedirectResponse("/", status_code=303)
-    r.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL),
-                 max_age=AUTH_TTL, httponly=True, samesite="lax")
+    _set_session(r, uid, request)
     return r
 
 

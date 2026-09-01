@@ -1,0 +1,6 @@
+# Reverse-proxy + HTTPS auto (Let's Encrypt). Le domaine vient de RADAR_DOMAIN
+# dans .env ; sans lui, Caddy sert en local (certif auto-signé) sans planter.
+{$RADAR_DOMAIN:localhost} {
+	encode zstd gzip
+	reverse_proxy radar-web:8600
+}

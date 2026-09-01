@@ -490,6 +490,32 @@ def search_labels(request: Request, label: str = "", q: str = ""):
                 rows=(matched or ranked)[:60], header=header)
 
 
+def _suggest_vocab(request, pool, q, label):
+    term = (q or "").strip().lower()
+    hits = [s for s in pool if term in s.lower()] if term else list(pool)
+    rows = [{"v": s} for s in hits[:60]]
+    header = (f"{len(hits)} {label}" if term else f"{label} — vocabulaire Discogs")
+    return frag(request, "partials/suggest.html", rows=rows, header=header,
+                empty=f"Aucun {label[:-1]} ne correspond.")
+
+
+@app.get("/suggest/styles", response_class=HTMLResponse)
+def suggest_styles(request: Request, q: str = ""):
+    c = Ctx()
+    mine, more = _search_styles(c)
+    seen, pool = set(), []
+    for s in mine + more:
+        if s.lower() not in seen:
+            seen.add(s.lower())
+            pool.append(s)
+    return _suggest_vocab(request, pool, q, "styles")
+
+
+@app.get("/suggest/genres", response_class=HTMLResponse)
+def suggest_genres(request: Request, q: str = ""):
+    return _suggest_vocab(request, vocab.GENRES, q, "genres")
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),

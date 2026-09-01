@@ -1,0 +1,11 @@
+{% if not rows %}
+  <div class="lbl-suggest__head small muted">{{ empty or "Aucune proposition." }}</div>
+{% else %}
+  {% if header %}<div class="lbl-suggest__head small muted">{{ header }}</div>{% endif %}
+  {% for r in rows %}
+  <button type="button" class="lbl-opt" data-v="{{ r.v }}">
+    <span class="lbl-opt__name">{{ r.label or r.v }}</span>
+    {% if r.meta %}<span class="badge {{ 'clay' if r.dim }}">{{ r.meta }}</span>{% endif %}
+  </button>
+  {% endfor %}
+{% endif %}

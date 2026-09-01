@@ -28,5 +28,50 @@
     {% endif %}
     {% block content %}{% endblock %}
   </div>
+
+  <script>
+  /* Combobox générique : tout contrôle [data-combo] dans un .combo, avec un
+     panneau frère .lbl-suggest rempli par htmx, reçoit des propositions
+     cliquables (.lbl-opt[data-v]). data-combo = "set" (remplace), "line"
+     (remplace la dernière ligne), "csv" (remplace le dernier terme). */
+  (function () {
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+      if (e.target.classList && e.target.classList.contains('lbl-suggest'))
+        e.target.hidden = !e.target.innerHTML.trim();
+    });
+    document.body.addEventListener('click', function (e) {
+      var opt = e.target.closest('.lbl-opt');
+      if (!opt) {
+        if (!e.target.closest('.combo'))
+          document.querySelectorAll('.lbl-suggest').forEach(function (p) { p.hidden = true; });
+        return;
+      }
+      var combo = opt.closest('.combo'),
+          ctl = combo && combo.querySelector('[data-combo]');
+      if (ctl) {
+        var v = opt.dataset.v, mode = ctl.dataset.combo || 'set';
+        if (mode === 'line') {
+          var ls = ctl.value.split('\n'); ls[ls.length - 1] = v;
+          ctl.value = ls.join('\n') + '\n';
+        } else if (mode === 'csv') {
+          var ps = ctl.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+          ps.pop(); ps.push(v); ctl.value = ps.join(', ') + ', ';
+        } else {
+          ctl.value = v;
+        }
+        ctl.focus();
+        ctl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      var panel = combo.querySelector('.lbl-suggest');
+      if (panel) panel.hidden = true;
+    });
+    document.body.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && e.target.closest('.combo')) {
+        var p = e.target.closest('.combo').querySelector('.lbl-suggest');
+        if (p) p.hidden = true;
+      }
+    });
+  })();
+  </script>
 </body>
 </html>

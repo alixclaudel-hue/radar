@@ -19,8 +19,18 @@
       <div class="field" style="flex:0 0 90px"><label>à</label><input name="yt_{{ loop.index0 }}" value="{{ r.year_to or year }}"></div>
     </div>
     <div class="row">
-      <div class="field"><label>Styles</label><textarea name="styles_{{ loop.index0 }}" rows="2">{{ r.styles|join('\n') }}</textarea></div>
-      <div class="field"><label>Genres</label><textarea name="genres_{{ loop.index0 }}" rows="2">{{ r.genres|join('\n') }}</textarea></div>
+      <div class="field combo"><label>Styles</label>
+        <textarea name="styles_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/styles" hx-target="#sug-vst-{{ loop.index0 }}" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ r.styles|join('\n') }}</textarea>
+        <div id="sug-vst-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
+      <div class="field combo"><label>Genres</label>
+        <textarea name="genres_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/genres" hx-target="#sug-vge-{{ loop.index0 }}" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ r.genres|join('\n') }}</textarea>
+        <div id="sug-vge-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
       <div class="field"><label>Labels précis</label><textarea name="labels_{{ loop.index0 }}" rows="2">{{ r.labels|join('\n') }}</textarea></div>
       <div class="field"><label>Artistes précis</label><textarea name="artists_{{ loop.index0 }}" rows="2">{{ r.artists|join('\n') }}</textarea></div>
     </div>

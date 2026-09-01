@@ -1730,7 +1730,99 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
+def job_scan_catalog(job, params):
+    """Parcourt le catalogue partagé de vendeurs Discogs (radar/sellers.py) :
+    vérifie chaque compte, prend un snapshot de son inventaire « For Sale »
+    (release_id -> prix/état), et compte les nouveautés vs le snapshot précédent.
+    Reprenable : on saute les vendeurs scannés il y a moins de `min_age_days`
+    sauf si `force`. Le catalogue est partagé -> tourne toujours en tant que owner.
+    """
+    from radar_web.radar import sellers as scat
+
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    if not token:
+        return job.finish(error="Pas de token Discogs.")
+    cat = scat.ensure_seeded()
+    force = bool(params.get("force"))
+    only = params.get("only")                       # 1 seul vendeur, pour test
+    max_pages = int(params.get("max_pages", 60))
+    min_age = float(params.get("min_age_days", 6))
+    now = datetime.now().isoformat(timespec="seconds")
+    cutoff = time.time() - min_age * 86400
+
+    targets = [u for u, e in cat.items()
+               if e.get("active") and (u == only if only else True)]
+    if not only:
+        def _due(u):
+            ls = cat[u].get("last_scan")
+            if force or not ls:
+                return True
+            try:
+                return datetime.fromisoformat(ls).timestamp() < cutoff
+            except ValueError:
+                return True
+        targets = [u for u in targets if _due(u)]
+
+    job.st["total"] = len(targets)
+    if not targets:
+        return job.finish("Catalogue à jour — rien à scanner.")
+    job.msg(f"{len(targets)} vendeur(s) à scanner")
+    total_new = 0
+
+    for u in targets:
+        if job.stopped():
+            break
+        e = cat.setdefault(u, {})
+        prev = scat.load_inventory(u)
+        snap, page, unreachable = {}, 1, False
+        while page <= max_pages:
+            d = discogs_get(token, f"/users/{u}/inventory",
+                            {"status": "For Sale", "per_page": 100, "page": page,
+                             "sort": "listed", "sort_order": "desc"})
+            if page == 1 and not d:                 # réponse vide = compte KO / 404
+                unreachable = True
+                break
+            got = d.get("listings", [])
+            for x in got:
+                rel = x.get("release") or {}
+                rid = rel.get("id")
+                if not rid:
+                    continue
+                pr = x.get("price") or {}
+                snap[str(rid)] = {"listing_id": x.get("id"),
+                                  "price": pr.get("value"), "currency": pr.get("currency"),
+                                  "condition": x.get("condition"),
+                                  "sleeve": x.get("sleeve_condition"),
+                                  "listed": x.get("posted")}
+            if page >= d.get("pagination", {}).get("pages", 1) or not got:
+                break
+            page += 1
+            time.sleep(1.1)
+
+        if unreachable:
+            fails = int(e.get("fails", 0)) + 1
+            e.update(verified=False, fails=fails, last_scan=now)
+            if fails >= 2:                          # KO deux fois de suite -> on désactive
+                e["active"] = False
+            job.msg(f"{u} : inventaire inaccessible ({fails})")
+        else:
+            n_new = len([r for r in snap if r not in prev])
+            scat.save_inventory(u, snap)
+            e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now)
+            total_new += n_new
+            job.msg(f"{u} : {len(snap)} article(s), +{n_new} nouveau(x)")
+        cat[u] = e
+        scat.save_catalog(cat)
+        job.tick(u)
+        time.sleep(0.5)
+
+    scat.save_catalog(cat)
+    job.finish(f"{job.st['done']} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.")
+
+
 JOBS = {
+    "scan_catalog": job_scan_catalog,
     "ingest_youtube": job_ingest_youtube,
     "ingest_spotify": job_ingest_spotify,
     "ingest_bandcamp": job_ingest_bandcamp,

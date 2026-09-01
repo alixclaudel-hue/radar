@@ -160,5 +160,8 @@
   <p class="muted small">Les vinyles que tu veux acheter. But : regrouper la commande chez
     un même vendeur pour ne pas multiplier les frais de port.</p>
   <div hx-get="/cart" hx-trigger="load"></div>
+  <hr>
+  <div class="section-title"><h3 style="font-size:1rem">Regrouper chez un vendeur</h3></div>
+  <div hx-get="/cart/sellers" hx-trigger="load"></div>
 {% endif %}
 {% endblock %}

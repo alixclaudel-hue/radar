@@ -1,0 +1,25 @@
+<div id="cart-sellers">
+  {% if n_scanned == 0 %}
+    <p class="small muted">Aucun inventaire de vendeur scanné pour l'instant.
+      Lance le scan du catalogue dans <a href="/settings">Réglages → Catalogue de vendeurs</a>
+      (long — à faire tourner une fois, puis chaque semaine).</p>
+  {% elif not rows %}
+    <p class="small muted">Aucun des {{ n_scanned }} vendeurs scannés n'a un des
+      {{ n_cart }} vinyles de ton panier en stock.</p>
+  {% else %}
+    <p class="small muted">Sur {{ n_scanned }}/{{ n_catalog }} vendeurs scannés — classés par
+      nombre d'articles du panier en stock (prix hors port).</p>
+    <div class="lrows">
+      {% for r in rows %}
+      <div class="lrow">
+        <span class="badge small {{ 'clay' if r.n < 2 }}">{{ r.n }}</span>
+        <a class="lrow__name" href="https://www.discogs.com/seller/{{ r.u }}/profile"
+           target="_blank" rel="noopener">{{ r.name }}</a>
+        <span class="lrow__meta">{{ r.country }} ·
+          {% for it in r.items[:6] %}{{ it.title }}{{ ', ' if not loop.last }}{% endfor %}{% if r.items|length > 6 %} …{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -14,10 +14,37 @@ import subprocess
 import sys
 import time
 
-from .radar import jobs, paths
+from .radar import jobs, paths, sellers
 
 POLL = 2.0
 JOB_TIMEOUT = 6 * 3600
+# Scan hebdo du catalogue de vendeurs : opt-in via RADAR_SELLER_SCAN=1.
+SELLER_SCAN_EVERY = 7 * 86400
+_last_seller_check = 0.0
+
+
+def _maybe_weekly_scan():
+    """Enfile scan_catalog (owner) si aucun vendeur n'a été scanné depuis 7 j."""
+    global _last_seller_check
+    if os.environ.get("RADAR_SELLER_SCAN") != "1":
+        return
+    if time.time() - _last_seller_check < 3600:
+        return
+    _last_seller_check = time.time()
+    try:
+        cat = sellers.load_catalog()
+        newest = max((e.get("last_scan") or "" for e in cat.values()), default="")
+        stale = True
+        if newest:
+            from datetime import datetime
+            stale = datetime.fromisoformat(newest).timestamp() < time.time() - SELLER_SCAN_EVERY
+        q = jobs.load_queue()
+        running = any(j["name"] == "scan_catalog" for j in q)
+        if stale and not running:
+            jobs.launch("scan_catalog", {}, uid=paths.DEFAULT_UID)
+            print("[worker] scan_catalog hebdo enfilé", file=sys.stderr, flush=True)
+    except Exception as e:                       # noqa: BLE001
+        print(f"[worker] weekly scan check : {e}", file=sys.stderr, flush=True)
 
 
 def _pick(q, last_uid):
@@ -49,6 +76,7 @@ def main():
         q = jobs.load_queue()
         job = _pick(q, last_uid)
         if not job:
+            _maybe_weekly_scan()
             time.sleep(POLL)
             continue
         job["state"] = "running"

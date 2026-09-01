@@ -165,16 +165,17 @@ remontée.
 Chacune = une branche + une PR. `main` protégé (PR + 1 review + CI verte) une fois la CI
 en place.
 
-| # | Étape | Touche | Bloquant pour |
-|---|---|---|---|
-| 0 | **Collaboration** : `CLAUDE.md`, CI (compile + imports + balayage des routes), `data.sample/`, protection de `main`, auto-deploy `main`→VPS avec health-check + rollback | `.github/`, racine | tout le reste (filet de sécurité) |
-| 1 | **Dossiers par utilisateur** : `paths.py`/`store.py` prennent un `uid`, `Ctx(uid)`, migration du `/data` actuel vers `/data/users/<uid=owner>/` + `/data/shared/`, `_LOAD_CACHE` keyé par chemin (déjà le cas) | `radar/*`, `crate_jobs.py` | 2,3,4 |
-| 2 | **Comptes applicatifs** : `accounts.json` argon2, login par compte, `_guard` résout `uid`, invitations, retrait de `APP_PASSWORD` | `app.py`, templates | 3 (OAuth par user) |
-| 3 | **File de jobs** : `jobs/queue.json`, worker unique round-robin, backoff rate-limit, UI « en file » | `crate_jobs.py`, `radar/jobs.py`, templates | — |
-| 4 | **HTTPS + domaine** : reverse-proxy Caddy, Let's Encrypt | `docker-compose.yml`, DNS | 5 |
-| 5 | **OAuth Discogs + Spotify** : enregistrement des apps, flux « Connecter X », stockage chiffré ; YouTube cascade quota + `youtube_cache.json` | `app.py`, `radar/`, `crate_jobs.py`, templates | — |
-| 6 | **Backups chiffrés** : cron `age`, rétention, copie hors-VPS, backup pré-job-destructeur, doc de restauration | scripts VPS, `crate_jobs.py` | — |
-| 7 | **Retrait de Streamlit** : `crate-radar` sorti du `docker-compose.yml`, `crate_radar.py` archivé | `docker-compose.yml` | — |
+| # | Étape | État |
+|---|---|---|
+| 0 | Collaboration : `CLAUDE.md`, CI, `data.sample/`, protection de `main`, auto-deploy + rollback | ✅ fait |
+| 1 | Dossiers par utilisateur : `users/<uid>/` + `shared/`, migration idempotente | ✅ fait (PR #1) |
+| 2 | Comptes : `accounts.json` (scrypt), login identifiant+mdp, cookie signé HMAC, invitations, `/logout` | ✅ fait (PR #2,3,4) |
+| 3 | File de jobs : `queue.json`, worker unique round-robin, statuts par utilisateur | ✅ fait (PR #5) |
+| 4 | HTTPS + domaine : reverse-proxy Caddy, Let's Encrypt | ⛔ **bloqué** : besoin d'un nom de domaine pointant sur le VPS |
+| 5a | YouTube : cache partagé `youtube_cache.json` + cascade de quota (perso → appli) | ✅ fait (PR #6) |
+| 5b | OAuth Discogs + Spotify (« Connecter X ») | ⛔ **bloqué** : besoin de l'étape 4 (redirect URI HTTPS) + apps développeur enregistrées |
+| 6 | Backups chiffrés : `scripts/backup.sh` (AES-256 openssl), cron 04:00 UTC, rétention 14 | ✅ fait (PR #7) — copie hors-VPS = TODO |
+| 7 | Retrait de Streamlit : `crate-radar` hors compose, `crate_radar.py` → `archive/` | ✅ fait |
 
 ---
 

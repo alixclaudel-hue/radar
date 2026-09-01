@@ -1,16 +1,6 @@
 services:
-  # Version Streamlit (référence, complète) — :8501
-  crate-radar:
-    build: .
-    image: crate-radar:latest
-    restart: unless-stopped
-    ports:
-      - "8501:8501"
-    env_file: .env
-    volumes:
-      - ./data:/data
-
-  # Version FastAPI + HTMX (en construction, parité en cours) — :8600
+  # Interface FastAPI + HTMX — :8600
+  # (l'ancienne appli Streamlit a été retirée, cf. archive/ + docs/architecture.md étape 7)
   radar-web:
     build:
       context: .

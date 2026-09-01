@@ -5,12 +5,13 @@ Spotify, Bandcamp, DJ sets), profile tes labels/artistes, et note des sorties Di
 selon ton goût. Voir `docs/architecture.md` pour la cible multi-utilisateur (chantier en
 cours).
 
-## Deux applis, une seule active
+## Structure
 
-- **`radar_web/`** — FastAPI + HTMX, port 8600. **C'est l'interface active.**
-- **`crate_radar.py`** — Streamlit, port 8501. **Gelée, référence historique.**
-  Ne PAS la maintenir en parallèle : seuls la couche de données JSON et `crate_jobs.py`
-  sont communs. (Retrait prévu, cf. `docs/architecture.md` étape 7.)
+- **`radar_web/`** — FastAPI + HTMX, port 8600. **L'interface.**
+- **`crate_jobs.py`** — worker des tâches longues, lancé par `radar_web/worker.py`
+  (file d'attente) ou en direct. Partagé, actif.
+- **`archive/`** — ancienne appli Streamlit (`crate_radar.py`), retirée le 2026-09-01.
+  Non maintenue. Ne pas y toucher.
 
 ## Où ça tourne / déploiement
 

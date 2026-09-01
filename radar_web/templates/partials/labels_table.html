@@ -1,0 +1,53 @@
+<div id="labels-table">
+  <div class="field" style="max-width:320px">
+    <label>Filtrer</label>
+    <input name="flt" value="{{ flt }}" placeholder="nom…"
+           hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
+           hx-trigger="input changed delay:250ms" hx-include="this">
+  </div>
+  <p class="small muted">{{ total }} label{{ 's' if total > 1 }} au total{% if flt %} (filtre « {{ flt }} »){% endif %} · page {{ page }}/{{ pages }} · triés par affinité</p>
+  {% if not rows %}
+    <p class="muted small">Aucun label.</p>
+  {% else %}
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="text-align:left;color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em">
+      <th style="padding:6px 8px">Label</th>
+      <th style="padding:6px 8px;width:90px">Affinité</th>
+      <th style="padding:6px 8px;width:60px">Reco</th>
+      <th style="padding:6px 8px;width:70px">Possédés</th>
+      <th></th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr style="border-top:1px solid var(--line)">
+        <td style="padding:6px 8px"><a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.disp }}</a></td>
+        <td style="padding:6px 8px">
+          {% if r.aff is not none %}
+          <div class="progress" style="height:6px"><i style="width:{{ r.aff }}%"></i></div>
+          <span class="small muted">{{ r.aff }}</span>
+          {% else %}<span class="small muted">—</span>{% endif %}
+        </td>
+        <td style="padding:6px 8px" class="small muted">{{ r._reco }}</td>
+        <td style="padding:6px 8px" class="small muted">{{ r.owned or '—' }}</td>
+        <td style="padding:6px 8px">
+          <button class="small" title="retirer de la base"
+                  hx-post="/univers/labels/remove" hx-target="#labels-table" hx-swap="outerHTML"
+                  hx-vals='{"name": {{ r.disp|tojson }}, "flt": {{ flt|tojson }}, "page": "{{ page }}"}'>✕</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="row" style="justify-content:center;gap:8px;margin-top:8px">
+    {% if page > 1 %}
+    <button class="small" hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
+            hx-vals='{"flt": {{ flt|tojson }}, "page": "{{ page - 1 }}"}'>‹ précédent</button>
+    {% endif %}
+    {% if page < pages %}
+    <button class="small" hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
+            hx-vals='{"flt": {{ flt|tojson }}, "page": "{{ page + 1 }}"}'>suivant ›</button>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

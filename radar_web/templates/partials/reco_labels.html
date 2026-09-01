@@ -1,26 +1,18 @@
-<div class="section-title"><h3>Recommandations — labels qui correspondent à tes goûts</h3></div>
+<div class="section-title"><h3>Recommandations</h3></div>
 {% if reco %}
 <p class="small muted">D'après ta collection / corpus / affinité — {{ n_reco }} candidat{{ 's' if n_reco>1 }}</p>
-<div style="display:flex;flex-direction:column">
+<div class="lrows">
   {% for r in reco %}
-  <div class="inbox-row">
-    <span class="badge {{ 'clay' if r.aff is none }}">{{ r.score }}</span>
-    <div class="txt"><b>{{ r.name }}</b>
-      <div class="sub">
-        {% if r.owned %}{{ r.owned }} possédé{{ 's' if r.owned>1 }} · {% endif %}
-        {% if r.want %}{{ r.want }} wantlist · {% endif %}
-        {% if r.corpus %}corpus {{ r.corpus }} · {% endif %}
-        {% if r.artists %}⭐ {{ r.artists }} artiste{{ 's' if r.artists>1 }} aimé{{ 's' if r.artists>1 }} ici · {% endif %}
-        {{ ('affinité ' ~ r.aff ~ '%') if r.aff is not none else 'non profilé' }}
-      </div></div>
+  <div class="lrow">
+    <span class="badge small {{ 'clay' if r.aff is none }}"
+          title="score de recommandation /100 (collection + corpus + affinité de style + artistes aimés qui y ont sorti)">{{ r.score }}</span>
+    <a href="{{ r.url }}" target="_blank" rel="noopener" class="lrow__name">{{ r.name }}</a>
+    <span class="lrow__meta">
+      {% if r.owned %}{{ r.owned }} poss.{% endif %}{% if r.want %} · {{ r.want }} want{% endif %}{% if r.corpus %} · corpus {{ r.corpus }}{% endif %}{% if r.artists %} · ⭐{{ r.artists }}{% endif %}{% if r.aff is not none %} · aff. {{ r.aff }}%{% endif %}
+    </span>
     <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="base">
       <button class="small">+ base</button></form>
-    {% if not r.watched %}
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
-      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="veille">
-      <button class="small">+ veille</button></form>
-    {% endif %}
     <span class="vote" hx-swap="outerHTML">
       <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"up","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👍</button>
       <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"down","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👎</button>
@@ -32,19 +24,15 @@
 
 {% if graph_reco %}
 <p class="small muted" style="margin-top:14px">Via le graphe — labels où tes artistes ont sorti, absents de ta base ({{ n_graph }})</p>
-<div style="display:flex;flex-direction:column">
+<div class="lrows">
   {% for r in graph_reco %}
-  <div class="inbox-row">
-    <span class="badge clay">{{ r.score }}</span>
-    <div class="txt"><b>{{ r.name }}</b><div class="sub">{{ r.artists }} de tes artistes · {{ r.seeds }}</div></div>
+  <div class="lrow">
+    <span class="badge small clay" title="score de proximité graphe (artistes en commun avec tes graines)">{{ r.score }}</span>
+    <a href="{{ r.url }}" target="_blank" rel="noopener" class="lrow__name">{{ r.name }}</a>
+    <span class="lrow__meta">{{ r.artists }} artiste{{ 's' if r.artists>1 }} · {{ r.seeds }}</span>
     <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="base">
       <button class="small">+ base</button></form>
-    {% if not r.watched %}
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
-      <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="veille">
-      <button class="small">+ veille</button></form>
-    {% endif %}
   </div>
   {% endfor %}
 </div>

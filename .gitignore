@@ -45,3 +45,5 @@ discogs_profile/
 # le jeu de données exemple est versionné, lui
 !/data.sample/
 !/data.sample/**
+
+.session_secret

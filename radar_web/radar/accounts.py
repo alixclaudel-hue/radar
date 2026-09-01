@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from . import paths, store
 
 ACCOUNTS_PATH = os.path.join(paths.DATA, "accounts.json")
+INVITES_PATH = os.path.join(paths.DATA, "invites.json")
 _SCRYPT = dict(n=2 ** 14, r=8, p=1)          # ~50-100 ms
 _DKLEN = 32
 
@@ -105,3 +106,32 @@ def bootstrap():
     pw = os.environ.get("APP_PASSWORD")
     if pw:
         create(os.environ.get("OWNER_USERNAME", "owner"), pw, is_owner=True)
+
+
+# ---------------------------------------------------------------- invitations
+def load_invites():
+    return store.load(INVITES_PATH, {}) or {}
+
+
+def create_invite(by_uid):
+    inv = load_invites()
+    token = secrets.token_urlsafe(16)
+    inv[token] = {"created_by": by_uid, "created_at": _now(), "used_by": None}
+    store.save(INVITES_PATH, inv)
+    return token
+
+
+def invite_ok(token):
+    e = load_invites().get(token or "")
+    return bool(e) and not e.get("used_by")
+
+
+def consume_invite(token, username, password):
+    inv = load_invites()
+    e = inv.get(token or "")
+    if not e or e.get("used_by"):
+        raise ValueError("invitation invalide ou déjà utilisée")
+    uid = create(username, password, invited_by=e.get("created_by"))
+    e["used_by"] = uid
+    store.save(INVITES_PATH, inv)
+    return uid

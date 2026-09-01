@@ -112,7 +112,7 @@ def _req_uid(request):
 @app.middleware("http")
 async def _guard(request: Request, call_next):
     p = request.url.path
-    if p.startswith("/static") or p in ("/login", "/health"):
+    if p.startswith("/static") or p in ("/login", "/health", "/register"):
         return await call_next(request)
     uid = _req_uid(request)
     if not uid:
@@ -164,6 +164,51 @@ def logout():
     r = RedirectResponse("/login", status_code=303)
     r.delete_cookie(COOKIE)
     return r
+
+
+_REG_PAGE = """<!doctype html><meta charset=utf-8>
+<link rel=stylesheet href=/static/app.css><div class=wrap style='max-width:360px'>
+<p class=brand style='font-size:32px'>Rada<b>r</b></p>{msg}
+<form method=post action=/register>
+  <input type=hidden name=invite value="{tok}">
+  <div class=field><label>Choisis un identifiant</label><input name=username autofocus autocapitalize=off required></div>
+  <div class=field><label>Mot de passe (6+ caractères)</label><input type=password name=pw required minlength=6></div>
+  <button class=primary type=submit>Créer mon compte</button>
+</form></div>"""
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_form(request: Request, invite: str = "", bad: str = ""):
+    if not accounts.invite_ok(invite):
+        return HTMLResponse(
+            "<!doctype html><meta charset=utf-8><link rel=stylesheet href=/static/app.css>"
+            "<div class=wrap style='max-width:360px'><p class=brand style='font-size:32px'>Rada<b>r</b></p>"
+            "<p class='notice warn'>Lien d'invitation invalide ou déjà utilisé.</p></div>",
+            status_code=403)
+    msg = f"<p class='notice warn'>{html.escape(bad)}</p>" if bad else ""
+    return HTMLResponse(_REG_PAGE.format(msg=msg, tok=html.escape(invite)))
+
+
+@app.post("/register")
+def register(invite: str = Form(""), username: str = Form(""), pw: str = Form("")):
+    try:
+        uid = accounts.consume_invite(invite, username, pw)
+    except ValueError as e:
+        return RedirectResponse(f"/register?invite={quote_plus(invite)}&bad={quote_plus(str(e))}",
+                                status_code=303)
+    r = RedirectResponse("/", status_code=303)
+    r.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL),
+                 max_age=AUTH_TTL, httponly=True, samesite="lax")
+    return r
+
+
+@app.post("/account/invite", response_class=HTMLResponse)
+def account_invite(request: Request):
+    tok = accounts.create_invite(store.current_uid())
+    url = str(request.base_url).rstrip("/") + "/register?invite=" + tok
+    return HTMLResponse(
+        f"<p class='small'>Lien d'invitation (à usage unique) :</p>"
+        f"<input readonly onclick='this.select()' value='{html.escape(url)}' style='width:100%'>")
 
 
 # --------------------------------------------------------------------- helpers

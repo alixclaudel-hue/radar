@@ -14,7 +14,9 @@ services:
     depends_on:
       - radar-web
 
-  # Interface FastAPI + HTMX — :8600 (accessible seulement via Caddy et en local)
+  # Interface FastAPI + HTMX — servie publiquement par Caddy (HTTPS).
+  # Le port 8600 n'est publié que sur RADAR_WEB_BIND (défaut 127.0.0.1 = local
+  # seulement ; sur le VPS on met l'IP Tailscale pour l'accès admin privé).
   # (l'ancienne appli Streamlit a été retirée, cf. archive/ + docs/architecture.md étape 7)
   radar-web:
     build:
@@ -23,7 +25,7 @@ services:
     image: radar-web:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8600:8600"
+      - "${RADAR_WEB_BIND:-127.0.0.1}:8600:8600"
     env_file: .env
     volumes:
       - ./data:/data

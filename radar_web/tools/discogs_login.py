@@ -1,52 +1,70 @@
 """Capture une session Discogs connectée, une bonne fois.
 
-À lancer SUR TON MAC (pas sur le VPS). Ouvre un Chromium visible ; tu te
+À lancer SUR TON MAC (pas sur le VPS). Ouvre un navigateur visible ; tu te
 connectes à la main (coche « Keep me logged in ») ; le script enregistre la
 session dans ./discogs_state.json.
 
-Ensuite, envoie ce fichier à Radar :
-  - soit via Réglages → « Session Discogs » (upload dans l'appli), la plus simple ;
-  - soit :  scp discogs_state.json ubuntu@57.128.180.93:/tmp/discogs_state.json
-            ssh ubuntu@57.128.180.93 'sudo mv /tmp/discogs_state.json ~/radar/data/'
+Il essaie d'abord de piloter ton **Google Chrome** installé (bien mieux vu par
+Cloudflare que le Chromium de Playwright), puis Edge, puis le Chromium fourni.
 
-Les jobs (market_fr, fenêtre marketplace) réutilisent la session tant qu'elle est
-valide — plusieurs semaines avec « keep me logged in ». À refaire seulement quand
-Discogs la coupe.
+Si la page « Vérification de sécurité » s'affiche :
+  - clique la case « Je ne suis pas un robot » si elle apparaît, puis patiente ;
+  - si elle boucle, ferme, relance, et va d'abord sur discogs.com (pas /login)
+    avant de te connecter.
 
-Prérequis (Mac, une fois) :
-  python3 -m pip install --user "playwright==1.44.0"
-  python3 -m playwright install chromium
+Ensuite : Réglages → « Session Discogs » → charge discogs_state.json.
+
+Prérequis (Mac) : python3 -m pip install --user "playwright==1.44.0"
+(pas besoin de « playwright install » si Chrome est présent.)
 """
+import json
 import sys
 
 from playwright.sync_api import sync_playwright
 
 OUT = "discogs_state.json"
+UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+
+
+def _launch(p):
+    for ch in ("chrome", "msedge", None):
+        try:
+            b = p.chromium.launch(channel=ch, headless=False) if ch \
+                else p.chromium.launch(headless=False)
+            print(f">>> Navigateur : {ch or 'chromium (fourni)'}")
+            return b
+        except Exception:
+            continue
+    raise SystemExit("Aucun navigateur lançable. Installe Chrome, ou : "
+                     "python3 -m playwright install chromium")
 
 
 def main():
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=False, args=["--disable-blink-features=AutomationControlled"])
-        ctx = b.new_context(locale="fr-FR", viewport={"width": 1280, "height": 860})
+        b = _launch(p)
+        ctx = b.new_context(locale="fr-FR", user_agent=UA,
+                            viewport={"width": 1280, "height": 860})
+        ctx.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
         page = ctx.new_page()
-        page.goto("https://www.discogs.com/login", wait_until="domcontentloaded")
-        print("\n>>> Connecte-toi dans la fenêtre Chromium (coche « Keep me logged in »).")
-        print(">>> Quand ton compte est connecté (menu en haut à droite), reviens ici")
-        print(">>> et appuie sur Entrée pour enregistrer la session.\n")
+        page.goto("https://www.discogs.com/", wait_until="domcontentloaded")
+        print("\n>>> 1) Si une page de vérification s'affiche, résous-la (case à cocher),")
+        print(">>>    attends qu'elle disparaisse.")
+        print(">>> 2) Connecte-toi à Discogs (menu en haut à droite), coche « Keep me logged in ».")
+        print(">>> 3) Reviens ici et appuie sur Entrée.\n")
         try:
             input()
         except (EOFError, KeyboardInterrupt):
             pass
-        # ne garde que discogs.com + cloudflare
         state = ctx.storage_state()
         state["cookies"] = [c for c in state.get("cookies", [])
                             if "discogs.com" in c.get("domain", "")]
-        import json
         with open(OUT, "w", encoding="utf-8") as f:
             json.dump(state, f, indent=2)
         signed = any(c["name"] in ("sgp", "session") for c in state["cookies"])
-        print(f">>> Écrit {OUT} — {len(state['cookies'])} cookies discogs.com"
-              f"{' · session détectée ✅' if signed else ' · ⚠️ pas de cookie de session, tu étais peut-être pas connecté'}")
+        print(f"\n>>> Écrit {OUT} — {len(state['cookies'])} cookies discogs.com"
+              + (" · session détectée ✅" if signed
+                 else " · ⚠️ pas de cookie de session — tu n'étais peut-être pas connecté"))
         ctx.close()
         b.close()
 

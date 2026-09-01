@@ -133,12 +133,20 @@
   <details class="acc">
     <summary>🎚️ Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
     <div class="acc__body">
-      <p class="small muted">Deux niveaux. Un style par ligne.</p>
+      <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
       <div class="row">
-        <div class="field"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})</label>
-          <textarea name="styles_1" rows="7">{{ (cats.get('1') or [])|join('\n') }}</textarea></div>
-        <div class="field"><label>Aimés (poids {{ sc.taste_tiers['2'] }})</label>
-          <textarea name="styles_2" rows="7">{{ (cats.get('2') or [])|join('\n') }}</textarea></div>
+        <div class="field combo"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})</label>
+          <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
+                    hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
+                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('1') or [])|join('\n') }}</textarea>
+          <div id="sug-styles-1" class="lbl-suggest" hidden></div></div>
+        <div class="field combo"><label>Aimés (poids {{ sc.taste_tiers['2'] }})</label>
+          <textarea name="styles_2" rows="7" data-combo="line" autocomplete="off"
+                    hx-get="/suggest/styles" hx-target="#sug-styles-2" hx-swap="innerHTML"
+                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('2') or [])|join('\n') }}</textarea>
+          <div id="sug-styles-2" class="lbl-suggest" hidden></div></div>
       </div>
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-styles" hx-swap="innerHTML">💾 Enregistrer</button>

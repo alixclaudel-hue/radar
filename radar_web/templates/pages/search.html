@@ -9,7 +9,7 @@
   <div class="field combo">
     <label for="f-label">Label <span class="muted">· propositions depuis ta base</span></label>
     <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"
-           autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false"
+           data-combo="set" autocomplete="off" role="combobox" aria-autocomplete="list"
            hx-get="/search/labels" hx-target="#label-suggest" hx-swap="innerHTML"
            hx-trigger="focus, keyup changed delay:220ms">
     <div id="label-suggest" class="lbl-suggest" hidden></div>
@@ -129,27 +129,6 @@
   lo.addEventListener('input', function () { clamp(lo); });
   hi.addEventListener('input', function () { clamp(hi); });
   draw();
-})();
-
-/* combobox label : propositions depuis la base */
-(function () {
-  var inp = document.getElementById('f-label'),
-      panel = document.getElementById('label-suggest');
-  if (!inp || !panel) return;
-  function show() { panel.hidden = !panel.innerHTML.trim(); inp.setAttribute('aria-expanded', String(!panel.hidden)); }
-  function hide() { panel.hidden = true; inp.setAttribute('aria-expanded', 'false'); }
-  panel.addEventListener('htmx:afterSwap', show);
-  panel.addEventListener('click', function (e) {
-    var b = e.target.closest('.lbl-opt');
-    if (!b) return;
-    inp.value = b.dataset.v;
-    hide();
-    inp.focus();
-  });
-  inp.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
-  document.addEventListener('click', function (e) {
-    if (!e.target.closest('.combo')) hide();
-  });
 })();
 </script>
 {% endblock %}

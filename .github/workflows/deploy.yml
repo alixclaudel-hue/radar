@@ -11,9 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Déploiement SSH + health-check + rollback
+        env:
+          # secret = clé privée encodée en base64 (évite tout souci de retours ligne)
+          VPS_SSH_KEY_B64: ${{ secrets.VPS_SSH_KEY_B64 }}
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id
+          echo "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id
           chmod 600 ~/.ssh/id
           ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" 'bash -s' <<'REMOTE'

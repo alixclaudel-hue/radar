@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import accounts, discogs, jobs, learn, paths, store, vocab
+from .radar import accounts, discogs, jobs, learn, paths, store, vocab, ytcache
 from .radar.scoring import Ctx, real_tracks, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -554,20 +554,12 @@ def yt_first(q: str = ""):
     q = (q or "").strip()
     if not q:
         return RedirectResponse("https://www.youtube.com", status_code=302)
-    key = _cfg().get("youtube_api_key", "")
-    if key:
-        try:
-            r = requests.get("https://www.googleapis.com/youtube/v3/search",
-                             params={"part": "id", "type": "video", "maxResults": 1,
-                                     "q": q, "key": key}, timeout=12)
-            if r.ok:
-                items = r.json().get("items", [])
-                vid = (items[0].get("id", {}) or {}).get("videoId") if items else ""
-                if vid:
-                    return RedirectResponse(f"https://www.youtube.com/watch?v={vid}",
-                                            status_code=302)
-        except (requests.RequestException, ValueError, KeyError, IndexError):
-            pass
+    try:
+        vid = ytcache.search_video(q, ytcache.youtube_keys(_cfg()))
+        if vid:
+            return RedirectResponse(f"https://www.youtube.com/watch?v={vid}", status_code=302)
+    except (ytcache.QuotaExhausted, RuntimeError, requests.RequestException):
+        pass
     return RedirectResponse(yt_search_url(q), status_code=302)
 
 

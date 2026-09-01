@@ -22,6 +22,8 @@ from datetime import datetime
 
 import requests
 
+from radar_web.radar import ytcache
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Répertoire des données : partagé avec radar_web via CRATE_DATA_DIR (volume
 # persistant en conteneur ; à côté du script en local).
@@ -270,16 +272,13 @@ def yt_playlist_id(u):
     return m.group(1) if m else (u or "").strip() or None
 
 
-def youtube_items(pid, key, max_pages=40):
+def youtube_items(pid, keys, max_pages=40):
     items, token = [], None
     for _ in range(max_pages):
-        params = {"part": "snippet", "playlistId": pid, "maxResults": 50, "key": key}
+        params = {"part": "snippet", "playlistId": pid, "maxResults": 50}
         if token:
             params["pageToken"] = token
-        r = requests.get(f"{YOUTUBE_API}/playlistItems", params=params, timeout=25)
-        if not r.ok:
-            raise RuntimeError(f"YouTube API {r.status_code}: {r.text[:200]}")
-        d = r.json()
+        d = ytcache.request("/playlistItems", params, keys)
         for it in d.get("items", []):
             sn = it.get("snippet", {})
             items.append({"title": sn.get("title", ""),
@@ -398,7 +397,7 @@ def corpus_merge(new_rows, source):
 def job_ingest_youtube(job, params):
     cfg = cfg_load()
     token = cfg.get("token", "")
-    key = params.get("api_key") or cfg.get("youtube_api_key", "")
+    keys = ytcache.youtube_keys(cfg) if not params.get("api_key") else [params["api_key"]]
     urls = params.get("urls") or [u for u in cfg.get("youtube_playlists", "").splitlines() if u.strip()]
     deep = params.get("deep", True)
     pairs = [(u, yt_playlist_id(u)) for u in urls]
@@ -410,12 +409,11 @@ def job_ingest_youtube(job, params):
     raw = []
     for url, pid in [(u, p) for u, p in pairs if p]:
         try:
-            r = requests.get(f"{YOUTUBE_API}/playlists",
-                             params={"part": "snippet", "id": pid, "key": key}, timeout=20)
-            sn = (r.json().get("items") or [{}])[0].get("snippet", {})
+            d = ytcache.request("/playlists", {"part": "snippet", "id": pid}, keys)
+            sn = (d.get("items") or [{}])[0].get("snippet", {})
         except Exception:
             sn = {}
-        items = youtube_items(pid, key)
+        items = youtube_items(pid, keys)
         for it in items:
             a, t = parse_yt_title(it["title"], it["channel"])
             if a or t:
@@ -1100,26 +1098,31 @@ _DJSET_HINT_RE = re.compile(
     r"in the mix|guest mix|resident)\b", re.I)
 
 
-def _yt_descriptions(ids, api_key):
-    """{video_id: description} via l'API YouTube Data (videos.list, 50 max/appel)."""
-    out = {}
-    if not api_key or not ids:
+def _yt_descriptions(ids, keys):
+    """{video_id: description} — cache partagé (30 j) + cascade de clés."""
+    out, miss = {}, []
+    for v in ids:
+        c = ytcache.cache_get("video:" + v, 30 * 86400)
+        if c is not None:
+            out[v] = c
+        else:
+            miss.append(v)
+    if not keys:
         return out
-    for i in range(0, len(ids), 50):
-        chunk = ids[i:i + 50]
+    for i in range(0, len(miss), 50):
+        chunk = miss[i:i + 50]
         try:
-            r = requests.get(f"{YOUTUBE_API}/videos",
-                             params={"part": "snippet", "id": ",".join(chunk), "key": api_key},
-                             timeout=20)
-            if r.ok:
-                for it in r.json().get("items", []):
-                    out[it["id"]] = it.get("snippet", {}).get("description", "")
+            d = ytcache.request("/videos", {"part": "snippet", "id": ",".join(chunk)}, keys)
         except Exception:
-            pass
+            continue
+        for it in d.get("items", []):
+            desc = it.get("snippet", {}).get("description", "")
+            out[it["id"]] = desc
+            ytcache.cache_put("video:" + it["id"], desc)
     return out
 
 
-def _yt_video_ids(source, max_n, min_seconds=2100, api_key="", require_hint=True):
+def _yt_video_ids(source, max_n, min_seconds=2100, keys=(), require_hint=True):
     """[(video_id, source_label)] pour une source. Filtres : durée ≥ min_seconds ;
     pour une recherche texte, le nom doit figurer dans le titre ; si `require_hint`,
     un mot-clé de set (set / mix / radio / boiler room / podcast / session…) doit
@@ -1178,7 +1181,7 @@ def _yt_video_ids(source, max_n, min_seconds=2100, api_key="", require_hint=True
     # 2) filtre "c'est bien un set" : mot-clé dans le titre OU la description
     #    (pour une recherche texte seulement ; une chaîne/@handle est déjà de confiance)
     if require_hint and is_text and cand:
-        descs = _yt_descriptions([v for v, _ in cand], api_key)
+        descs = _yt_descriptions([v for v, _ in cand], keys)
         cand = [(v, t) for v, t in cand
                 if _DJSET_HINT_RE.search(f"{t}\n{descs.get(v, '')}")]
 
@@ -1241,7 +1244,7 @@ def job_ingest_djsets(job, params):
     max_per = int(inp.get("max_per_source", 25))
     min_seconds = int(inp.get("min_minutes", 35)) * 60
     require_hint = bool(inp.get("require_hint", True))
-    api_key = cfg.get("youtube_api_key", "")
+    yt_keys = ytcache.youtube_keys(cfg)
     deep = bool(inp.get("deep", True))
     if not sources:
         return job.finish(error="Aucune source (DJ / émission / chaîne).")
@@ -1250,7 +1253,7 @@ def job_ingest_djsets(job, params):
     vids = []
     for src in sources:
         try:
-            got = _yt_video_ids(src, max_per, min_seconds, api_key, require_hint)
+            got = _yt_video_ids(src, max_per, min_seconds, yt_keys, require_hint)
             vids += got
             job.msg(f"{src} : {len(got)} vidéo(s)")
         except Exception as e:

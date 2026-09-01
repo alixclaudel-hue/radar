@@ -12,14 +12,15 @@
       </div>
       <div class="field combo" style="margin:0">
         <textarea name="seed_names" rows="4" placeholder="un nom d'artiste par ligne" data-combo="line" autocomplete="off"
+                  oninput="var m=this.closest('form').querySelector('[name=mode][value=seeds]'); if(m) m.checked=true;"
                   hx-get="/suggest/base-artists" hx-target="#sug-pg-seeds" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
                   hx-trigger="focus, keyup changed delay:220ms">{{ coeur }}</textarea>
         <div id="sug-pg-seeds" class="lbl-suggest" hidden></div></div>
       <script>window._seeds = {c: {{ coeur|tojson }}, a: {{ coeur_aimes|tojson }}};</script>
       <div style="margin:4px 0">
-        <button type="button" class="small" onclick="this.closest('form').seed_names.value=window._seeds.c">mes Cœur</button>
-        <button type="button" class="small" onclick="this.closest('form').seed_names.value=window._seeds.a">Cœur + Aimés</button>
+        <button type="button" class="small" onclick="var f=this.closest('form'); f.seed_names.value=window._seeds.c; f.querySelector('[name=mode][value=seeds]').checked=true;">mes Cœur</button>
+        <button type="button" class="small" onclick="var f=this.closest('form'); f.seed_names.value=window._seeds.a; f.querySelector('[name=mode][value=seeds]').checked=true;">Cœur + Aimés</button>
       </div>
       <div class="row" style="align-items:end">
         <div class="field" style="flex:0 0 130px"><label>Pages / graine</label><input name="pages" value="2" style="width:70px"></div>

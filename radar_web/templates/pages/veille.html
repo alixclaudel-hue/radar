@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Veille Discogs</h1>
 <p class="muted small">Règles de critères → scan de fond → boîte Nouveautés notée. 1ᵉʳ passage = référence.</p>
+{% if saved %}<p class="notice small">Règles enregistrées.</p>{% endif %}
 
 <h3>Règles</h3>
 {% if watchlist %}<p class="small muted">🏷️ Labels suivis ({{ watchlist|length }}) — règle implicite, scannée auto.</p>{% endif %}
@@ -44,7 +45,8 @@
                   hx-trigger="keyup changed delay:350ms">{{ r.artists|join('\n') }}</textarea>
         <div id="sug-var-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
     </div>
-    <button type="submit" name="_action" value="del:{{ loop.index0 }}">🗑 Supprimer</button>
+    <button type="submit" name="_action" value="del:{{ loop.index0 }}"
+            onclick="return confirm('Supprimer la règle « {{ r.name }} » ?')">🗑 Supprimer</button>
   </div>
   {% endfor %}
   <button class="primary" type="submit">💾 Enregistrer</button>

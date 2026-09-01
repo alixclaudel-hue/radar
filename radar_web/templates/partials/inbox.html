@@ -8,7 +8,8 @@
                hx-get="/inbox/{{ key_ns }}" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML"
                name="mins" hx-trigger="change"></div>
       <div class="field" style="flex:0 0 auto">
-        <button hx-post="/inbox/{{ key_ns }}/clear" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML">✓ Tout vu</button>
+        <button hx-post="/inbox/{{ key_ns }}/clear" hx-confirm="Marquer toutes les nouveautés comme vues ?"
+                hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML">✓ Tout vu</button>
       </div>
       <span class="small muted">{{ rows|length }} affichés · {{ n_total }} en attente</span>
     </div>

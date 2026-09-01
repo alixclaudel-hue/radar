@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ name }} — discographie · Radar{% endblock %}
 {% block content %}
-<p class="small"><a href="javascript:history.back()">‹ retour</a></p>
+<p class="small"><a href="/univers?tab={{ 'labels' if kind == 'label' else 'artists' }}">‹ retour à ma base</a></p>
 <h1>{{ name }}</h1>
 <p class="muted small">Discographie {{ 'du label' if kind == 'label' else "de l'artiste" }} ·
   vinyles uniquement{% if total_raw %} · {{ total_raw }} sortie{{ 's' if total_raw > 1 }} récupérée{{ 's' if total_raw > 1 }}{% endif %} ·

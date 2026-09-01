@@ -175,11 +175,12 @@ def login_form(request: Request, bad: int = 0):
     msg = ("<p class='notice warn'>Trop de tentatives — réessaie dans une minute.</p>"
            if bad == 2 else "<p class='notice warn'>Identifiants incorrects.</p>" if bad else "")
     return HTMLResponse(f"""<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1"><title>Radar</title>
 <link rel=stylesheet href=/static/app.css><div class=wrap style='max-width:360px'>
 <p class=brand style='font-size:32px'>Rada<b>r</b></p>{msg}
 <form method=post action=/login>
-  <div class=field><label>Identifiant</label><input name=username autofocus autocapitalize=off></div>
-  <div class=field><label>Mot de passe</label><input type=password name=pw></div>
+  <div class=field><label>Identifiant</label><input name=username autofocus autocapitalize=off autocomplete=username></div>
+  <div class=field><label>Mot de passe</label><input type=password name=pw autocomplete=current-password></div>
   <button class=primary type=submit>Entrer</button>
 </form></div>""")
 
@@ -230,12 +231,13 @@ def logout():
 
 
 _REG_PAGE = """<!doctype html><meta charset=utf-8>
+<meta name=viewport content="width=device-width, initial-scale=1"><title>Radar</title>
 <link rel=stylesheet href=/static/app.css><div class=wrap style='max-width:360px'>
 <p class=brand style='font-size:32px'>Rada<b>r</b></p>{msg}
 <form method=post action=/register>
   <input type=hidden name=invite value="{tok}">
-  <div class=field><label>Choisis un identifiant</label><input name=username autofocus autocapitalize=off required></div>
-  <div class=field><label>Mot de passe (10+ caractères)</label><input type=password name=pw required minlength=10></div>
+  <div class=field><label>Choisis un identifiant</label><input name=username autofocus autocapitalize=off autocomplete=username required></div>
+  <div class=field><label>Mot de passe (10+ caractères)</label><input type=password name=pw autocomplete=new-password required minlength=10></div>
   <button class=primary type=submit>Créer mon compte</button>
 </form></div>"""
 
@@ -1036,9 +1038,9 @@ def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
 
 
 @app.get("/veille", response_class=HTMLResponse)
-def veille_page(request: Request):
+def veille_page(request: Request, saved: int = 0):
     c = _cfg()
-    return render(request, "pages/veille.html", active="veille",
+    return render(request, "pages/veille.html", active="veille", saved=saved,
                   rules=c.get("veille_rules", []), watchlist=c.get("watchlist", []),
                   sellers=c.get("sellers", []), year=CURRENT_YEAR,
                   v_last=max((v.get("last_scan", "") for v in load(_pu().veille_seen, {}).values()), default=""),
@@ -1072,7 +1074,7 @@ async def veille_rules_save(request: Request):
             except ValueError:
                 pass
     store.save_config(c)
-    return RedirectResponse("/veille", status_code=303)
+    return RedirectResponse("/veille?saved=1", status_code=303)
 
 
 @app.post("/sellers/add")
@@ -1494,7 +1496,7 @@ def job_launch(name: str):
 def job_status_frag(name: str):
     s = jobs.status(name)
     if not s:
-        return HTMLResponse(f"<span id='job-{name}' class='muted small'>—</span>")
+        return HTMLResponse(f"<span id='job-{name}'></span>")
     done, total = s.get("done", 0), s.get("total", 0) or 1
     pct = min(100, round(100 * done / total))
     run, err, queued = s.get("running"), s.get("error"), s.get("queued")

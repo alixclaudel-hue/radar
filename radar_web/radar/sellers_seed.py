@@ -33,12 +33,14 @@ SEED = [
     {"u": "possession", "name": "Public Possession", "c": "DE", "city": "Munich", "f": "leftfield house/techno/disco", "t": "shop"},
     {"u": "runningback", "name": "Running Back", "c": "DE", "city": "Frankfurt", "f": "house/disco/techno", "t": "label"},
     {"u": "vinyl_delirium", "name": "vinyl_delirium", "c": "DE", "city": "", "f": "techno/house", "t": "webshop"},
+    {"u": "Fatplastics", "name": "Fatplastics", "c": "DE", "city": "Jena", "f": "techno/minimal/deep house", "t": "shop"},
     # --- Autriche
     {"u": "substance16", "name": "Substance", "c": "AT", "city": "Vienna", "f": "techno/electronica/experimental", "t": "shop"},
     {"u": "alt-neu.shop", "name": "Teuchtler / Alt & Neu", "c": "AT", "city": "Vienna", "f": "2nd hand all", "t": "shop"},
     {"u": "Black-Monk", "name": "Black Monk", "c": "AT", "city": "Vienna", "f": "2nd hand / collector", "t": "shop"},
     {"u": "3345recordsVienna", "name": "3345 Records", "c": "AT", "city": "Vienna", "f": "electronic/disco/house", "t": "shop"},
     {"u": "recordshop-austria", "name": "recordshop-austria", "c": "AT", "city": "", "f": "electronic/dance", "t": "webshop"},
+    {"u": "ApartmentAcht", "name": "Apartment Acht", "c": "AT", "city": "Vienna", "f": "broken beat/soul/house/hip-hop", "t": "shop"},
     # --- Suisse
     {"u": "plattfon_records", "name": "Plattfon", "c": "CH", "city": "Basel", "f": "bass/minimal/ambient/techno", "t": "shop"},
     {"u": "bpm.store", "name": "bpm.store", "c": "CH", "city": "Basel", "f": "house/techno", "t": "webshop"},
@@ -155,11 +157,13 @@ SEED = [
     {"u": "RadialStore", "name": "Radial Store", "c": "ES", "city": "Madrid", "f": "ambient/experimental/deep house/techno/jazz", "t": "shop"},
     {"u": "TotemTanz", "name": "TotemTanz", "c": "ES", "city": "Seville", "f": "all + electronic/breakbeat/house/dnb", "t": "shop"},
     {"u": "ARGONMENDIVALENCIA", "name": "Digital Records (Argon Mendi)", "c": "ES", "city": "Valencia", "f": "all + electronic", "t": "shop"},
+    {"u": "Palco", "name": "Palco", "c": "ES", "city": "Alicante", "f": "house/deep house/tech house", "t": "webshop"},
     # --- Portugal
     {"u": "carpetandsnares", "name": "Carpet & Snares", "c": "PT", "city": "Lisbon", "f": "house/techno/electronic/ambient/experimental", "t": "shop"},
     {"u": "FlurDiscos", "name": "Flur Discos", "c": "PT", "city": "Lisbon", "f": "electronica/experimental/techno/house/disco", "t": "shop"},
     {"u": "MateriaPrima", "name": "Matéria Prima", "c": "PT", "city": "Porto", "f": "electronica/leftfield/drone/noise", "t": "shop"},
     {"u": "CircusRecordShop", "name": "Circus Records", "c": "PT", "city": "Porto", "f": "house/techno + eclectic", "t": "shop"},
+    {"u": "BonesRecords", "name": "Bones Records", "c": "PT", "city": "Lisbon", "f": "deep house/house classics", "t": "webshop"},
     # --- Grèce
     {"u": "Homcore-Athens", "name": "Homcore", "c": "GR", "city": "Athens", "f": "electro/house/experimental/minimal/techno", "t": "shop"},
     {"u": "recordhazeathens", "name": "Geheimnis / RecordHaze", "c": "GR", "city": "Athens", "f": "wave/synth/electronic", "t": "webshop"},

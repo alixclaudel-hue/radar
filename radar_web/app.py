@@ -283,6 +283,7 @@ def render(request, tpl, **ctx):
     ctx.setdefault("has_token", bool(store.load_config().get("token")))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
+    ctx.setdefault("n_cart", len(load(_pu().cart, [])))
     return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
 
 

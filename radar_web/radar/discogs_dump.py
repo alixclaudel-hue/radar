@@ -210,11 +210,45 @@ def verify_checksum(date_str, file_path):
     return h.hexdigest() == expected
 
 
+def looks_like_gzip(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read(2) == b"\x1f\x8b"
+    except OSError:
+        return False
+
+
+def _diagnose_bad_download(date_str, file_path):
+    """Fichier téléchargé mais pas du gzip valide (mauvaise URL, page de
+    blocage Cloudflare...) : taille + aperçu du contenu + un HEAD frais sur
+    l'URL attendue pour voir ce que le serveur répond maintenant."""
+    try:
+        size = os.path.getsize(file_path)
+        with open(file_path, "rb") as f:
+            head = f.read(300)
+        preview = head.decode("utf-8", errors="replace").strip() or "(vide)"
+    except OSError as e:
+        size, preview = None, f"(illisible : {e})"
+    info = f"taille={size} octet(s), aperçu={preview!r}"
+    try:
+        r = requests.head(dump_url(date_str), headers={"User-Agent": UA}, timeout=15, allow_redirects=True)
+        info += f" — HEAD frais sur l'URL attendue : {r.status_code} ({r.headers.get('content-type', '?')})"
+    except requests.RequestException as e:
+        info += f" — HEAD frais échoué : {e}"
+    return info
+
+
 def download_dump(date_str, dest_path, progress_cb=None):
     """Téléchargement en flux (le fichier fait plusieurs Go) avec reprise
     simple : si un fichier partiel existe déjà et correspond en taille à un
-    téléchargement précédent interrompu, on ne repart pas de zéro (Range)."""
+    téléchargement précédent interrompu, on ne repart pas de zéro (Range).
+    Un partiel qui ne commence pas par la signature gzip (page d'erreur/de
+    blocage écrite là par une tentative précédente) est jeté avant de servir
+    de base à une reprise, sinon on ne ferait qu'empiler du contenu valide
+    après un en-tête déjà corrompu."""
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if os.path.exists(dest_path) and os.path.getsize(dest_path) >= 2 and not looks_like_gzip(dest_path):
+        os.remove(dest_path)
     url = dump_url(date_str)
     resume_from = os.path.getsize(dest_path) if os.path.exists(dest_path) else 0
     headers = {"User-Agent": UA}
@@ -229,6 +263,12 @@ def download_dump(date_str, dest_path, progress_cb=None):
             resume_from = 0
             mode = "wb"
         r.raise_for_status()
+        ctype = r.headers.get("content-type", "").lower()
+        if resume_from == 0 and "html" in ctype:
+            preview = next(r.iter_content(chunk_size=2048), b"")
+            raise RuntimeError(
+                f"réponse HTML au lieu du dump (content-type={ctype!r}) : {preview[:200]!r} — "
+                "probablement une page de blocage/erreur, pas le fichier attendu.")
         total = resume_from + int(r.headers.get("content-length", 0))
         done = resume_from
         with open(dest_path, mode) as f:
@@ -239,6 +279,15 @@ def download_dump(date_str, dest_path, progress_cb=None):
                 done += len(chunk)
                 if progress_cb:
                     progress_cb(done, total or done)
+        if total and done < total:               # connexion coupée en route (ex. reset côté serveur)
+            raise RuntimeError(f"téléchargement incomplet : {done}/{total} octets reçus.")
+    if resume_from == 0 and not looks_like_gzip(dest_path):
+        diag = _diagnose_bad_download(date_str, dest_path)
+        try:
+            os.remove(dest_path)
+        except OSError:
+            pass
+        raise RuntimeError(f"le fichier téléchargé n'est pas un gzip valide — {diag}")
 
 
 # --------------------------------------------------------------- parsing

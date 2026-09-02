@@ -5,6 +5,9 @@ Spotify, Bandcamp, DJ sets), profile tes labels/artistes, et note des sorties Di
 selon ton goût. Voir `docs/architecture.md` pour la cible multi-utilisateur (chantier en
 cours).
 
+**Reprise de contexte : lire `docs/etat.md`** — où en est le chantier, ce qui reste à
+faire (code + opérationnel), et les pièges déjà appris.
+
 ## Structure
 
 - **`radar_web/`** — FastAPI + HTMX, port 8600. **L'interface.**
@@ -85,6 +88,11 @@ l'environnement en **Custom** et ajouter `api.discogs.com`, `bandcamp.com`.
   côté serveur, challenge en boucle même avec le vrai Chrome piloté). Abandonné. On garde
   le lien `🇫🇷 voir` + la pastille API (note ★, « dès X € hors port », num_for_sale).
 - **Streamlit** : ne pas y reporter les évolutions de `radar_web`.
+- **Bandcamp** (`radar/bandcamp.py`) : s'appuie sur `bcsearch_public_api`, endpoint
+  **non documenté** — peut disparaître sans préavis. Le repli sur l'URL de recherche
+  couvre ; ne pas partir en quête d'une « vraie » API Bandcamp (il n'y en a plus depuis
+  2022).
+- `discogs_get()` **ne lève pas d'exception** : renvoie `{}` sur réponse non-ok.
 
 ## Le « cerveau »
 

@@ -1273,9 +1273,65 @@ def univers_labels_remove(request: Request, name: str = Form(""), flt: str = For
     return univers_labels_table(request, flt=flt, page=page)
 
 
+def _graph_link_facts(deg, weight, unit):
+    facts = []
+    if deg:
+        facts.append(f"{deg} lien{'s' if deg > 1 else ''} dans le graphe")
+    if weight:
+        facts.append(f"{weight} {unit}")
+    return facts
+
+
+def _graph_extras(entry, kind):
+    """(notes, infos) par nœud pour le rendu d'un graphe — notes /100 et détails
+    de la fiche plein écran. Uniquement des données déjà en cache : aucun appel API."""
+    c = Ctx()
+    nodes = entry.get("nodes") or {}
+    deg, weight = {}, {}
+    for e in entry.get("edges") or []:
+        for k in (e.get("a"), e.get("b")):
+            if k in nodes:
+                deg[k] = deg.get(k, 0) + 1
+                weight[k] = weight.get(k, 0) + int(e.get("w") or 0)
+    notes, infos = {}, {}
+    if kind == "label":
+        owned = c.collection.get("label_counts", {})
+        reco, gl = c.reco_index, c.graph_rescore()["labels"]
+        for k in nodes:
+            prof = c.profile.get(k)
+            notes[k] = c.affinity_score(prof) if prof else None
+            styles = sorted((prof or {}).get("style_counts", {}).items(), key=lambda kv: -kv[1])
+            facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "artiste(s) en commun")
+            if prof and prof.get("sampled"):
+                facts.append(f"{prof['sampled']} sorties profilées")
+            else:
+                facts.append("pas encore profilé")
+            if owned.get(k):
+                facts.append(f"{owned[k]} dans ta collection")
+            if reco.get(k):
+                facts.append(f"reco {reco[k]}/100")
+            seeds = (gl.get(k) or {}).get("seeds") or []
+            infos[k] = {"styles": [s for s, _ in styles[:5]], "facts": facts,
+                        "why": [f"tes artistes : {', '.join(seeds[:4])}"] if seeds else []}
+    else:
+        tiers, asc = c.artist_tier_map(), c.ascore
+        ga = c.graph_rescore()["artists"]
+        tname = {"1": "Cœur", "2": "Aimé"}
+        for k in nodes:
+            notes[k] = asc.get(k, 0)
+            facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "crédits partagés")
+            if tiers.get(k):
+                facts.insert(0, tname.get(tiers[k], ""))
+            infos[k] = {"styles": [], "facts": [f for f in facts if f],
+                        "why": (ga.get(k) or {}).get("why") or []}
+    return notes, infos
+
+
 def _label_graph_render(request, entry):
     pos = labelgraph.layout(entry["nodes"])
-    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos)
+    notes, infos = _graph_extras(entry, "label")
+    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos,
+                kind="label", notes=notes, infos=infos)
 
 
 @app.post("/univers/labels/graph/build", response_class=HTMLResponse)
@@ -1359,7 +1415,9 @@ def univers_artist_set(name: str = Form(""), cat: str = Form("")):
 
 def _artist_graph_render(request, entry):
     pos = labelgraph.layout(entry["nodes"])
-    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos)
+    notes, infos = _graph_extras(entry, "artist")
+    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos,
+                kind="artist", notes=notes, infos=infos)
 
 
 @app.post("/univers/artists/graph/build", response_class=HTMLResponse)

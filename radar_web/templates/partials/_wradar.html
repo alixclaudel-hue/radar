@@ -1,0 +1,7 @@
+{# Toile d'araignée d'un groupe de pondérations.
+   `axes` = liste de [nom du champ, étiquette courte]. Le conteneur est vide et
+   [hidden] : /static/wradar.js le remplit, donc sans JS il ne s'affiche pas et
+   seuls les champs chiffrés restent — le formulaire fonctionne à l'identique. #}
+{% macro toile(axes, step=0.05) -%}
+<div class="wradar" data-radar='{{ axes|tojson }}' data-step="{{ step }}" hidden></div>
+{%- endmacro %}

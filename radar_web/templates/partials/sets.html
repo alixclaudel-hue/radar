@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 {% if not groups %}
   <p class="small muted">Aucune track de set (lance une extraction dans « Mieux connaître ton univers → DJ sets »).</p>
 {% else %}
@@ -20,7 +21,7 @@
       <span class="small muted">· {{ v.tracks|length }} track(s)</span></p>
     {% for t in v.tracks %}
     <div class="inbox-row" style="padding:6px 2px">
-      {% if t._score is not none %}<span class="badge">{{ t._score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
+      {% if t._score is not none %}<span class="badge" title="Score album /100">{{ icons.album() }} {{ t._score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
       <div class="txt">
         <a href="{{ t.track_url or ('https://www.youtube.com/results?search_query=' ~ (t.artist ~ ' ' ~ t.title)|urlencode) }}" target="_blank" rel="noopener">{{ t.artist }} — {{ t.title }}</a>
         <span class="small muted">{% if t.label %} · {{ t.label }}{% endif %}{% if t.style %} · {{ t.style|join(', ') }}{% endif %}</span>
@@ -28,8 +29,12 @@
       {% if t.release_id or t.vinyl_release_id %}
         <a class="small" href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener">💿</a>
       {% endif %}
-      <a class="small" href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">⬇</a>
+      <a class="small" href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
+      <button type="button" class="small" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter au panier"
+              hx-get="/release_matches?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}"
+              hx-target="#rm-{{ v.vid }}-{{ loop.index }}" hx-swap="innerHTML">➕ panier</button>
     </div>
+    <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel" style="padding:0 2px 6px 30px"></div>
     {% endfor %}
     {% endfor %}
   </div>

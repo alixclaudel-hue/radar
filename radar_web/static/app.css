@@ -3,7 +3,7 @@
 
 :root{
   --paper:#F4F3EF; --surface:#FFFFFF; --ink:#121212; --soft:#6C6C66;
-  --line:#E3E2DB; --pin:#1C4A3E; --pin-dark:#123329; --clay:#C36B4B;
+  --line:#E3E2DB; --pin:#1C4A3E; --pin-dark:#123329; --clay:#C36B4B; --bandcamp:#1DA0C3;
   --radius:14px;
 }
 *{ box-sizing:border-box; }
@@ -170,10 +170,16 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 }
 .badge.clay{ background:var(--clay); }
 .badge.ghost{ background:transparent; color:var(--soft); border:1px solid var(--line); font-family:inherit; }
+.ic{ width:13px; height:13px; flex:none; vertical-align:-2px; }
+.badge .ic{ vertical-align:-2px; margin-right:1px; }
+.ic-lg{ width:18px; height:18px; }
+.ic-bandcamp{ color:var(--bandcamp); }
+a.tk-play .ic{ width:15px; height:15px; }
 .linklike{ background:none; border:none; padding:0; font:inherit; color:inherit;
   text-decoration:underline; cursor:pointer; }
 .chip{ font-size:11px; padding:2px 9px; border-radius:999px; border:1px solid var(--line); color:var(--ink); text-decoration:none; display:inline-block; }
 a.chip:hover{ border-color:var(--pin); }
+.cart-tab{ margin-left:auto; font-size:13px; padding:6px 15px; font-weight:600; }
 .catno{ font-size:11px; color:var(--soft); }
 
 .vote{ display:inline-flex; gap:5px; }

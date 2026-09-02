@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 {% if not rows %}
   <div class="lbl-suggest__head small muted">Aucun label dans ta base.</div>
 {% else %}
@@ -5,7 +6,7 @@
   {% for r in rows %}
   <button type="button" class="lbl-opt" data-v="{{ r.disp }}">
     <span class="lbl-opt__name">{{ r.disp }}</span>
-    {% if r.aff is not none %}<span class="badge {{ 'clay' if r.aff < 50 }}">{{ r.aff }}</span>{% endif %}
+    {% if r.aff is not none %}<span class="badge {{ 'clay' if r.aff < 50 }}">{{ icons.label() }} {{ r.aff }}</span>{% endif %}
   </button>
   {% endfor %}
 {% endif %}

@@ -172,6 +172,17 @@ class Job:
         self.st["message"] = m
         self.flush()
 
+    def sub(self, done=None, total=None, label=None):
+        """Sous-progression optionnelle (ex. articles du vendeur en cours dans
+        scan_catalog), affichée par job_status_frag en plus de done/total."""
+        if done is not None:
+            self.st["sub_done"] = done
+        if total is not None:
+            self.st["sub_total"] = total
+        if label is not None:
+            self.st["sub_label"] = label
+        self.flush()
+
     def finish(self, message="", error=None):
         self.st.update(running=False, message=message or self.st["message"],
                        error=error, finished_at=datetime.now().isoformat(timespec="seconds"))
@@ -1736,14 +1747,24 @@ def job_scan_catalog(job, params):
     (release_id -> prix/état), et compte les nouveautés vs le snapshot précédent.
     Reprenable : on saute les vendeurs scannés il y a moins de `min_age_days`
     sauf si `force`. Le catalogue est partagé -> tourne toujours en tant que owner.
+    Calcule aussi, par vendeur, une note d'affinité goût sur son stock 12" (pas
+    les 45 tours) via `sellers.seller_affinity` — cf. Ctx.ascore.
     """
     from radar_web.radar import sellers as scat
+    from radar_web.radar.scoring import Ctx
 
     cfg = cfg_load()
     token = cfg.get("token", "")
     if not token:
         return job.finish(error="Pas de token Discogs.")
     cat = scat.ensure_seeded()
+    for u in cfg.get("sellers", []):                # vendeurs suivis en veille
+        if u and u not in cat:
+            cat[u] = {"name": u, "country": "", "city": "", "focus": "",
+                      "type": "veille", "source": "veille", "active": True,
+                      "verified": None, "n_items": None, "n_new": None, "last_scan": None}
+    scat.save_catalog(cat)
+    ctx = Ctx(uid="owner")
     force = bool(params.get("force"))
     only = params.get("only")                       # 1 seul vendeur, pour test
     max_pages = int(params.get("max_pages", 60))
@@ -1775,7 +1796,7 @@ def job_scan_catalog(job, params):
             break
         e = cat.setdefault(u, {})
         prev = scat.load_inventory(u)
-        snap, page, unreachable = {}, 1, False
+        snap, page, unreachable, complete = {}, 1, False, False
         while page <= max_pages:
             d = discogs_get(token, f"/users/{u}/inventory",
                             {"status": "For Sale", "per_page": 100, "page": page,
@@ -1794,9 +1815,14 @@ def job_scan_catalog(job, params):
                                   "price": pr.get("value"), "currency": pr.get("currency"),
                                   "condition": x.get("condition"),
                                   "sleeve": x.get("sleeve_condition"),
-                                  "listed": x.get("posted")}
+                                  "listed": x.get("posted"),
+                                  "artist": rel.get("artist"), "format": rel.get("format")}
+            job.sub(done=len(snap), total=d.get("pagination", {}).get("items", len(snap)), label=u)
             if page >= d.get("pagination", {}).get("pages", 1) or not got:
+                complete = True
                 break
+            if job.stopped():                       # arrêt demandé : on coupe cette pagination
+                break                                # sans marquer le vendeur comme scanné (repris au prochain lancement)
             page += 1
             time.sleep(1.1)
 
@@ -1806,19 +1832,25 @@ def job_scan_catalog(job, params):
             if fails >= 2:                          # KO deux fois de suite -> on désactive
                 e["active"] = False
             job.msg(f"{u} : inventaire inaccessible ({fails})")
-        else:
+            cat[u] = e
+        elif complete:
             n_new = len([r for r in snap if r not in prev])
             scat.save_inventory(u, snap)
-            e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now)
+            e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now,
+                     **scat.seller_affinity(snap, ctx))
             total_new += n_new
             job.msg(f"{u} : {len(snap)} article(s), +{n_new} nouveau(x)")
-        cat[u] = e
+            cat[u] = e
+        else:
+            job.msg(f"{u} : arrêté en cours de scan — repris depuis le début au prochain lancement")
         scat.save_catalog(cat)
         job.tick(u)
         time.sleep(0.5)
 
     scat.save_catalog(cat)
-    job.finish(f"{job.st['done']} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.")
+    stopped = job.stopped()
+    suffix = " — arrêté, relance le scan pour continuer." if stopped else ""
+    job.finish(f"{job.st['done']}/{len(targets)} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.{suffix}")
 
 
 JOBS = {

@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 {% if error %}
   <span class="muted small">{{ error }}</span>
 {% elif not tracks %}
@@ -10,7 +11,7 @@
       <a class="tk-play" href="{{ t.play }}" target="_blank" rel="noopener"
          title="{{ 'Vidéo Discogs' if t.kind == 'discogs' else 'Meilleure vidéo YouTube' }}">▶</a>
       <a class="tk-play" href="{{ t.bc }}" target="_blank" rel="noopener"
-         title="Sur Bandcamp">⬇</a>
+         title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
     </div>
   {% endfor %}
 {% endif %}

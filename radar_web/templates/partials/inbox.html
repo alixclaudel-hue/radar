@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <div id="inbox-{{ key_ns }}">
   {% if not rows and n_total == 0 %}
     <p class="muted small">Rien de nouveau. Lance un scan.</p>
@@ -16,7 +17,7 @@
     {% for r in rows %}
       {% set it = r.it %}
       <div class="inbox-row">
-        {% if r.score is not none %}<span class="badge">🎯 {{ r.score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
+        {% if r.score is not none %}<span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
         <div class="txt">
           <a href="{{ it.uri or ('https://www.discogs.com/release/' ~ it.release_id) }}" target="_blank" rel="noopener">
             {{ it.artist }} — {{ it.title }}</a>

@@ -283,6 +283,7 @@ def render(request, tpl, **ctx):
     ctx.setdefault("has_token", bool(store.load_config().get("token")))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
+    ctx.setdefault("n_cart", len(load(_pu().cart, [])))
     return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
 
 
@@ -856,6 +857,26 @@ def disco_page(request: Request, kind: str = "artist", key: str = "",
 # ---------------------------------------------------------------- panier interne
 def _cart_ids():
     return {str(x.get("id")) for x in load(_pu().cart, [])}
+
+
+@app.get("/release_matches", response_class=HTMLResponse)
+def release_matches(request: Request, a: str = "", t: str = ""):
+    """Vinyles Discogs contenant cette track (une track peut être sortie sur
+    plusieurs sorties — VA, rééditions...) — pour l'ajout au panier depuis un
+    DJ set, où on n'a résolu qu'un seul release_id à l'ingestion."""
+    a, t = a.strip(), t.strip()
+    token = _cfg().get("token", "")
+    if not token:
+        return HTMLResponse("<p class='small msg-err'>Token Discogs manquant.</p>")
+    try:
+        res = discogs.search(token, artist=a, track=t, per_page=25).get("results", [])
+    except discogs.DiscogsError as e:
+        return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
+    vinyl = [r for r in res if "vinyl" in " ".join(r.get("format") or []).lower()]
+    rows = [{"id": r.get("id"), "title": r.get("title"), "label": r.get("label") or [],
+             "year": r.get("year"), "format": r.get("format") or [],
+             "thumb": r.get("cover_image") or r.get("thumb")} for r in vinyl[:12]]
+    return frag(request, "partials/release_matches.html", rows=rows, a=a, t=t, in_cart=_cart_ids())
 
 
 @app.get("/cart", response_class=HTMLResponse)
@@ -1492,6 +1513,13 @@ def job_launch(name: str):
     return job_status_frag(name)
 
 
+@app.post("/jobs/{name}/stop", response_class=HTMLResponse)
+def job_stop(name: str):
+    if name in VALID_JOBS:
+        jobs.stop(name)
+    return job_status_frag(name)
+
+
 @app.get("/jobs/{name}/status", response_class=HTMLResponse)
 def job_status_frag(name: str):
     s = jobs.status(name)
@@ -1501,13 +1529,24 @@ def job_status_frag(name: str):
     pct = min(100, round(100 * done / total))
     run, err, queued = s.get("running"), s.get("error"), s.get("queued")
     msg = html.escape(str(s.get("message") or ""))
+    stopbtn = (f"<button type='button' class='small' hx-post='/jobs/{name}/stop' "
+               f"hx-target='#job-{name}' hx-swap='outerHTML' hx-confirm='Arrêter ce job ?' "
+               f"style='margin-left:8px'>■ arrêter</button>")
     if err:
         inner = f"<span class='notice warn small'>{html.escape(str(err))}</span>"
     elif queued:
-        inner = f"<span class='small muted'>🕓 {msg}</span>"
+        inner = f"<span class='small muted'>🕓 {msg}</span>{stopbtn}"
     elif run:
-        inner = (f"<span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>"
-                 f"<div class='progress'><i style='width:{pct}%'></i></div>")
+        subbar = ""
+        sub_total = s.get("sub_total")
+        if sub_total:
+            sub_done = s.get("sub_done", 0)
+            spct = min(100, round(100 * sub_done / sub_total))
+            sub_label = html.escape(str(s.get("sub_label") or ""))
+            subbar = (f"<div class='small muted' style='margin-top:4px'>{sub_label} · {sub_done}/{sub_total} article(s)</div>"
+                      f"<div class='progress'><i style='width:{spct}%'></i></div>")
+        inner = (f"<span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>{stopbtn}"
+                 f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}")
     else:
         inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"
     poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'"

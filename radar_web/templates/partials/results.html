@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 {% if error %}
   <p class="notice warn">{{ error }}</p>
 {% elif results is not defined %}
@@ -26,7 +27,7 @@
         <span class="title">{{ album if sep else rr.title }}</span>
         <span class="meta">
           {{ rr.label1 or '—' }}
-          {% if r.detail.label is not none %} · aff. label {{ r.detail.label }}{% endif %}
+          {% if r.detail.label is not none %} · <span title="Affinité label /100">{{ icons.label() }} {{ r.detail.label }}</span>{% endif %}
         </span>
         <span class="meta">{{ (rr.style or [])|join(', ') }}</span>
         <span class="catno">{{ rr.catno }}{% if rr.catno and rr.year %} · {% endif %}{{ rr.year }}</span>
@@ -38,7 +39,6 @@
         <div class="buys">
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs&nbsp;↗</a>{% endif %}
           <a href="https://www.discogs.com/sell/release/{{ rr.id }}?sort=price&sort_order=asc" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
-          <a href="/bc/go?a={{ (artist if sep else '')|urlencode }}&t={{ (album if sep else rr.title)|urlencode }}&l={{ (rr.label1 or '')|urlencode }}&kind=a" target="_blank" rel="noopener">Bandcamp</a>
         </div>
         <div class="btnrow" style="margin-top:2px">
           {% if in_cart and (rr.id | string) in in_cart %}
@@ -56,7 +56,7 @@
         </div>
         <div class="foot">
           {% if r.score is not none %}
-            <span class="badge">🎯 {{ r.score }}</span>
+            <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
           {% else %}
             <span class="badge ghost">—</span>
           {% endif %}

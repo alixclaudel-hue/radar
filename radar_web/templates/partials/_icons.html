@@ -1,0 +1,27 @@
+{# Système d'icônes homogène pour les 3 scores + le bouton Bandcamp.
+   Un seul endroit à modifier si le dessin doit changer. #}
+
+{% macro label(cls="") -%}
+<svg class="ic {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M5 11 12 4 19 11"/><path
+     d="M6 10.3V20h12v-9.7"/><circle cx="12" cy="16.2" r="2.1"/><circle cx="12" cy="16.2" r=".5"
+     fill="currentColor" stroke="none"/></svg>
+{%- endmacro %}
+
+{% macro album(cls="") -%}
+<svg class="ic {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><circle cx="12" cy="12"
+     r="1" fill="currentColor" stroke="none"/></svg>
+{%- endmacro %}
+
+{% macro artist(cls="") -%}
+<svg class="ic {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 9.6V8a4 4 0 0 1 8 0v1.6"/><rect
+     x="6.3" y="8.8" width="2.3" height="3.6" rx="1.1"/><rect x="15.4" y="8.8" width="2.3" height="3.6"
+     rx="1.1"/><circle cx="12" cy="9.8" r="2.9"/><path d="M5.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/></svg>
+{%- endmacro %}
+
+{% macro bandcamp(cls="") -%}
+<svg class="ic ic-bandcamp {{ cls }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path
+     d="M4 16.5 10.2 6h9.8l-6.2 10.5z"/></svg>
+{%- endmacro %}

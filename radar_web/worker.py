@@ -71,6 +71,9 @@ def _run(job):
 
 def main():
     print("[worker] démarré", file=sys.stderr, flush=True)
+    for j in jobs.reap_orphans():
+        print(f"[worker] job orphelin nettoyé (redéploiement pendant l'exécution) : "
+              f"{j['uid']}/{j['name']}", file=sys.stderr, flush=True)
     last_uid = None
     while True:
         q = jobs.load_queue()

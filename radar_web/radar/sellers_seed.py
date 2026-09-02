@@ -43,6 +43,7 @@ SEED = [
     {"u": "plattfon_records", "name": "Plattfon", "c": "CH", "city": "Basel", "f": "bass/minimal/ambient/techno", "t": "shop"},
     {"u": "bpm.store", "name": "bpm.store", "c": "CH", "city": "Basel", "f": "house/techno", "t": "webshop"},
     {"u": "Bongo_Joe_Shop", "name": "Bongo Joe", "c": "CH", "city": "Geneva", "f": "leftfield/world/electronic", "t": "shop"},
+    {"u": "HouseShop", "name": "HouseShop", "c": "CH", "city": "", "f": "house/deep house/tech house/minimal", "t": "webshop"},
     # --- Pays-Bas
     {"u": "RushHour", "name": "Rush Hour", "c": "NL", "city": "Amsterdam", "f": "house/techno/disco/afro", "t": "shop"},
     {"u": "clone.nl", "name": "Clone", "c": "NL", "city": "Rotterdam", "f": "electro/techno/house/experimental", "t": "shop"},
@@ -158,13 +159,17 @@ SEED = [
     {"u": "carpetandsnares", "name": "Carpet & Snares", "c": "PT", "city": "Lisbon", "f": "house/techno/electronic/ambient/experimental", "t": "shop"},
     {"u": "FlurDiscos", "name": "Flur Discos", "c": "PT", "city": "Lisbon", "f": "electronica/experimental/techno/house/disco", "t": "shop"},
     {"u": "MateriaPrima", "name": "Matéria Prima", "c": "PT", "city": "Porto", "f": "electronica/leftfield/drone/noise", "t": "shop"},
+    {"u": "CircusRecordShop", "name": "Circus Records", "c": "PT", "city": "Porto", "f": "house/techno + eclectic", "t": "shop"},
     # --- Grèce
     {"u": "Homcore-Athens", "name": "Homcore", "c": "GR", "city": "Athens", "f": "electro/house/experimental/minimal/techno", "t": "shop"},
     {"u": "recordhazeathens", "name": "Geheimnis / RecordHaze", "c": "GR", "city": "Athens", "f": "wave/synth/electronic", "t": "webshop"},
     {"u": "harmonic", "name": "Vinyl Salvation", "c": "GR", "city": "Thessaloniki", "f": "house/techno/disco/edits/boogie/funk", "t": "shop"},
     # --- Europe de l'Est / centrale
     {"u": "SideOne", "name": "Side One", "c": "PL", "city": "Warsaw", "f": "house/nu-disco/minimal/tech-house/techno/electro", "t": "shop"},
+    {"u": "polishculture.shop", "name": "Eudezet Records", "c": "PL", "city": "Łódź", "f": "house/techno (gros stock)", "t": "webshop"},
+    {"u": "Acid-Works", "name": "Acid-Works", "c": "PL", "city": "", "f": "jungle/drum & bass", "t": "webshop"},
     {"u": "deeprecordstore", "name": "Deep", "c": "HU", "city": "Budapest", "f": "house/techno/dnb/dubstep/deep electronica", "t": "shop"},
+    {"u": "Aktrecords_Budapest", "name": "Akt Records", "c": "HU", "city": "Budapest", "f": "techno/house/melodic techno", "t": "shop"},
     {"u": "MisBitsRecordSHop", "name": "Misbits Record Shop", "c": "RO", "city": "Bucharest", "f": "deep house/techno/dub techno/electro", "t": "shop"},
     {"u": "Pulz", "name": "Pulz", "c": "SI", "city": "Ljubljana", "f": "techno/house/minimal/electro/dub techno/UK garage/IDM", "t": "shop"},
     # --- Labels / distributeurs / rééditions

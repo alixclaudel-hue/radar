@@ -45,40 +45,9 @@
 </form>
 
 <hr>
-<h3>Graphe producteur <span class="muted small">· alimente le classement de la base d'artistes / labels</span></h3>
-<p class="small muted">Interroge la discographie de tes artistes-graines chez Discogs et remonte co-crédités
-  et co-labels. Le résultat sert au ranking (proximité) dans Mon univers. Recalcul instantané
-  quand tu recatégorises — reconstruis seulement pour ajouter des graines.</p>
-{% include "partials/graph_builder.html" %}
-
-<hr>
-<h3>Nettoyage canonique Discogs</h3>
-<div style="display:flex;flex-direction:column;gap:8px;max-width:520px">
-  <div style="display:flex;gap:10px;align-items:center">
-    <button hx-post="/jobs/canonicalize/launch" hx-target="#job-canonicalize" hx-swap="outerHTML">Grand nettoyage (labels + artistes + corpus)</button>
-    <div id="job-canonicalize" hx-get="/jobs/canonicalize/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
-  </div>
-  <div style="display:flex;gap:10px;align-items:center">
-    <button hx-post="/jobs/profile_labels/launch" hx-target="#job-profile_labels" hx-swap="outerHTML">Profiler les labels (par tranches)</button>
-    <div id="job-profile_labels" hx-get="/jobs/profile_labels/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
-  </div>
-</div>
-<p class="small muted">L'enrichissement (résolution + profilage) de chaque nouvel ajout se fait déjà en tâche de fond.</p>
-
-<hr>
-<h3>Base de labels — import / export CSV</h3>
-<div class="row" style="max-width:640px">
-  <form hx-post="/univers/labels/import" hx-target="#labels-csv-msg" hx-swap="innerHTML"
-        hx-encoding="multipart/form-data">
-    <label>Importer</label>
-    <input type="file" name="file" accept=".csv" required>
-    <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer toute la base</label>
-    <button type="submit" class="small">Importer</button>
-  </form>
-  <div class="field"><label>Exporter</label>
-    <a class="small" href="/univers/labels/export">⬇ Exporter la base (CSV)</a></div>
-</div>
-<p id="labels-csv-msg" class="small" style="margin-top:6px"></p>
+<h3>Base de labels — export CSV <span class="muted small">· import : Mieux connaître ton univers</span></h3>
+<div class="field" style="max-width:320px"><label>Exporter</label>
+  <a class="small" href="/univers/labels/export">⬇ Exporter la base (CSV)</a></div>
 
 <hr>
 <h3>Catalogue de vendeurs <span class="muted small">· pour le panier — « regrouper chez un vendeur »</span></h3>

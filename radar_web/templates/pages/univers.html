@@ -1,13 +1,13 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Mon univers · Radar{% endblock %}
 {% block content %}
 <h1>Mon univers</h1>
 
 <div class="nav" style="margin-top:0">
-  <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">🏷️ Base de labels ({{ n_labels }})</a>
-  <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}">🎤 Base d'artistes ({{ n_artists }})</a>
+  <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">{{ icons.label() }} Base de labels ({{ n_labels }})</a>
+  <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}">{{ icons.artist() }} Base d'artistes ({{ n_artists }})</a>
   <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}">🎚️ Mes sets ({{ n_sets }})</a>
-  <a href="/univers?tab=cart"    class="{{ 'active' if tab=='cart' }}">🛒 Panier ({{ n_cart }})</a>
 </div>
 <hr>
 
@@ -46,7 +46,7 @@
     <summary>🕸️ Graphe de labels <span class="tag">{{ label_graphs|length }} sauvegardé{{ 's' if label_graphs|length != 1 }}</span></summary>
     <div class="acc__body">
       <p class="small muted">Relie les labels qui partagent des artistes, d'après le graphe producteur
-        (onglet Base d'artistes → Constructeur de graphe). Niveau 1 = liens directs avec tes graines,
+        (reconstruit automatiquement en fond une fois par mois). Niveau 1 = liens directs avec tes graines,
         niveau 2 = liens de leurs voisins.</p>
       <form hx-post="/univers/labels/graph/build" hx-target="#label-graph-out" hx-swap="innerHTML">
         <div class="field combo"><label>Labels de départ <span class="muted">un par ligne — propositions depuis ta base</span></label>
@@ -118,9 +118,8 @@
     <summary>🕸️ Graphe d'artistes <span class="tag">{{ artist_graphs|length }} sauvegardé{{ 's' if artist_graphs|length != 1 }}</span></summary>
     <div class="acc__body">
       <p class="small muted">Relie tes artistes-graines aux artistes qu'ils co-créditent, d'après le graphe
-        producteur (construit dans <a href="/settings">Réglages → Graphe producteur</a>). Un seul niveau
-        de voisinage est possible ici (pas de lien graphe entre deux candidats — reconstruis le graphe
-        producteur avec plus de graines pour élargir le réseau).</p>
+        producteur (reconstruit automatiquement en fond une fois par mois). Un seul niveau
+        de voisinage est possible ici (pas de lien graphe entre deux candidats).</p>
       <form hx-post="/univers/artists/graph/build" hx-target="#artist-graph-out" hx-swap="innerHTML">
         <div class="field"><label>Artistes de départ <span class="muted">choix multiple</span></label>
           <select name="seeds" multiple size="8" style="height:auto">

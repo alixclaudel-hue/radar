@@ -112,6 +112,16 @@ table entière (pas de delta, un dump mensuel est toujours un instantané comple
 manuel dans Réglages ; veille automatique mensuelle via `RADAR_DISCOGS_DUMP_SYNC=1` (à poser
 sur le `.env` du service `radar-worker` sur le VPS, comme `RADAR_SELLER_SCAN=1`).
 
+## Entretien de fond (plus de boutons dans Réglages)
+
+`RADAR_AUTO_MAINTENANCE=1` (même `.env` du service `radar-worker`) enfile automatiquement,
+chacun à sa propre cadence : `canonicalize` (résolution canonique labels/artistes/corpus,
+hebdo), `profile_labels` (profilage genre/style par label via l'API, hebdo), `build_graph`
+en mode `global` (graphe producteur complet, alimente le ranking labels/artistes de Mon
+univers, mensuel). Ces trois tâches n'ont plus de bouton dans l'interface — un utilisateur
+n'a plus rien à cliquer. Cadence mémorisée dans `jobs/auto_maintenance.json` (survit aux redémarrages
+du worker, donc aux déploiements).
+
 `sellers.seller_affinity()` interroge ce référentiel (`lookup_release(release_id)`) pour le
 genre/style réel de chaque sortie déjà repérée en inventaire vendeur (le `release_id` est
 déjà connu gratuitement, aucun appel API en plus) ; repli sur le profilage label existant si

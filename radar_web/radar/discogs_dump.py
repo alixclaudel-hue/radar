@@ -521,3 +521,31 @@ def search_by_label(label_name, limit=2000):
         con.close()
     keys = ("id", "title", "artist", "year", "format", "genres", "styles")
     return [dict(zip(keys, r)) for r in rows]
+
+
+def suggest_labels(prefix, limit=12):
+    """Noms de labels du référentiel local dont la clé normalisée commence par
+    `prefix` — typeahead d'ajout de label sans appel API Discogs. Sur-échantillonne
+    puis déduplique en Python (une même clé normalisée peut avoir plusieurs graphies
+    selon les sorties : casse, variantes)."""
+    if not available():
+        return []
+    norm = normalize_label(prefix).replace("%", "").replace("_", "")
+    if not norm:
+        return []
+    con = sqlite3.connect(DB_PATH)
+    try:
+        rows = con.execute(
+            "SELECT label, label_key FROM releases WHERE label_key LIKE ? AND label IS NOT NULL "
+            "ORDER BY label_key LIMIT ?", (norm + "%", limit * 8)).fetchall()
+    finally:
+        con.close()
+    seen, out = set(), []
+    for label, lk in rows:
+        if lk in seen:
+            continue
+        seen.add(lk)
+        out.append(label)
+        if len(out) >= limit:
+            break
+    return out

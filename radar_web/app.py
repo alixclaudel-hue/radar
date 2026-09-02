@@ -622,22 +622,6 @@ def suggest_genres(request: Request, q: str = ""):
     return _suggest_vocab(request, vocab.GENRES, q, "genres")
 
 
-@app.get("/suggest/base-artists", response_class=HTMLResponse)
-def suggest_base_artists(request: Request, q: str = ""):
-    c = Ctx()
-    disp, tiers = c.artist_disp(), c.artist_tier_map()
-    names = sorted({v for k, v in disp.items() if not str(v).startswith("id:")},
-                   key=str.lower)
-    term = (q or "").strip().lower()
-    hits = [n for n in names if term in n.lower()] if term else names
-    tset = {disp.get(k) for k in tiers}
-    rows = [{"v": n, "meta": ("classé" if n in tset else None), "dim": True} for n in hits[:60]]
-    header = (f"{len(hits)} artiste" + ("s" if len(hits) != 1 else "")
-              if term else "Tes artistes connus")
-    return frag(request, "partials/suggest.html", rows=rows, header=header,
-                empty="Aucun artiste connu ne correspond.")
-
-
 _DISCOGS_SUGGEST_CACHE = {}  # (type, term) -> (ts, rows)
 
 
@@ -645,6 +629,17 @@ _DISCOGS_SUGGEST_CACHE = {}  # (type, term) -> (ts, rows)
 def suggest_discogs(request: Request, q: str = "", type: str = "label"):
     dtype = "artist" if type == "artist" else "label"
     term = (q or "").strip()
+    if dtype == "label":
+        from .radar import discogs_dump as dd
+        if dd.available():
+            if len(term) < 2:
+                return frag(request, "partials/suggest.html", rows=[],
+                            empty="Tape au moins 2 lettres.")
+            names = dd.suggest_labels(term, limit=12)
+            rows = [{"v": n, "meta": "", "dim": True} for n in names]
+            header = f"Référentiel local — {len(rows)} label{'s' if len(rows) != 1 else ''}"
+            return frag(request, "partials/suggest.html", rows=rows, header=header,
+                        empty=f"Aucun label du référentiel local pour « {term} ».")
     if len(term) < 3:
         return frag(request, "partials/suggest.html", rows=[],
                     empty="Tape au moins 3 lettres pour interroger Discogs.")
@@ -1156,14 +1151,6 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
 
 
 # --------------------------------------------------------------------- recos (dans Mon univers)
-def _label_discogs_url(c, key, name):
-    did = ((c.resolved.get(key) or {}).get("discogs_id")
-           or (c.collection.get("label_ids", {}).get(key) or {}).get("id"))
-    if did:
-        return f"https://www.discogs.com/label/{did}"
-    return f"https://www.discogs.com/search/?q={quote_plus(name)}&type=label"
-
-
 @app.get("/univers/reco/labels", response_class=HTMLResponse)
 def reco_labels_frag(request: Request):
     c = Ctx()
@@ -1171,33 +1158,25 @@ def reco_labels_frag(request: Request):
     rows = []
     for r in c.reco_rows():
         if r["key"] not in base:
-            r["url"] = _label_discogs_url(c, r["key"], r["name"])
             rows.append(r)
     # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base)
     graph_rows = []
     for lk, v in c.graph_rescore()["labels"].items():
         if lk in base:
             continue
-        graph_rows.append({"name": v["name"], "score": round(v["score"]), "aff": None,
+        graph_rows.append({"name": v["name"], "key": lk, "score": round(v["score"]), "aff": None,
                            "owned": 0, "want": 0, "corpus": 0, "artists": v["n_seeds"],
-                           "url": _label_discogs_url(c, lk, v["name"]),
                            "seeds": ", ".join(v["seeds"])})
     return frag(request, "partials/reco_labels.html", reco=rows[:30],
                 graph_reco=graph_rows[:30], n_reco=len(rows), n_graph=len(graph_rows))
-
-
-def _artist_discogs_url(name, artist_id=None):
-    if artist_id:
-        return f"https://www.discogs.com/artist/{artist_id}"
-    return f"https://www.discogs.com/search/?q={quote_plus(name)}&type=artist"
 
 
 @app.get("/univers/reco/artists", response_class=HTMLResponse)
 def reco_artists_frag(request: Request):
     c = Ctx()
     g = c.graph_rescore()["artists"]
-    rows = [{"name": v["name"], "prox": round(v["score"]), "note": c.ascore.get(k, 0),
-             "why": ", ".join(v["why"]), "url": _artist_discogs_url(v["name"], v.get("id"))}
+    rows = [{"name": v["name"], "key": k, "prox": round(v["score"]), "note": c.ascore.get(k, 0),
+             "why": ", ".join(v["why"])}
             for k, v in list(g.items())[:40] if not str(v["name"]).startswith("id:")]
     return frag(request, "partials/reco_artists.html", reco=rows, n_reco=len(g))
 
@@ -1559,14 +1538,8 @@ def job_status_frag(name: str):
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, saved: int = 0):
     c = Ctx()
-    g = c.graph or {}
-    ac = c.cfg.get("artist_categories", {})
     return render(request, "pages/settings.html", active="settings", cfg=c.cfg,
-                  sc=c.scoring, saved=saved,
-                  graph_meta={"built_at": g.get("built_at", ""), "mode": g.get("mode", ""),
-                              "n_seeds": len(g.get("seeds", {})), "n_edges": len(g.get("edges", {}))},
-                  coeur="\n".join(ac.get("1", [])),
-                  coeur_aimes="\n".join(ac.get("1", []) + ac.get("2", [])))
+                  sc=c.scoring, saved=saved)
 
 
 def _catalog_rows():

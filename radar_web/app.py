@@ -1491,7 +1491,8 @@ def univers_artists_export():
 # ============================================================ jobs
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
-              "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog"}
+              "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog",
+              "import_discogs_dump"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 
@@ -1574,6 +1575,12 @@ def _catalog_rows():
     rows.sort(key=lambda r: (not r.get("active"), r.get("country", ""),
                              (r.get("name") or r["u"]).lower()))
     return rows, cat
+
+
+@app.get("/discogs_dump", response_class=HTMLResponse)
+def discogs_dump_frag(request: Request):
+    from .radar import discogs_dump as dd
+    return frag(request, "partials/discogs_dump.html", meta=dd.get_meta())
 
 
 @app.get("/sellers/catalog", response_class=HTMLResponse)

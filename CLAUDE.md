@@ -94,6 +94,34 @@ l'environnement en **Custom** et ajouter `api.discogs.com`, `bandcamp.com`.
   2022).
 - `discogs_get()` **ne lève pas d'exception** : renvoie `{}` sur réponse non-ok.
 
+## Référentiel Discogs local (dump mensuel)
+
+`radar_web/radar/discogs_dump.py` — index SQLite local (`discogs_dump.sqlite3` sous
+`SHARED_DIR`, pas de serveur, un fichier comme les autres) construit à partir du dump
+mensuel officiel Discogs (`data.discogs.com/data/{year}/discogs_{date}_releases.xml.gz`) :
+catalogue (titre, artiste, label, catno, année, pays, formats, genres, styles, master_id),
+**pas le marketplace** (vendeurs/prix/inventaire — ça n'existe pas dans le dump, reste
+toujours en API live via `sellers.py`). Filtré au vinyle 12"/LP uniquement (`_is_vinyl`),
+~18-20M sorties tous formats dans le dump réduites à un sous-ensemble gérable.
+
+Rempli par le job `import_discogs_dump` (`crate_jobs.py`) : télécharge (reprise via
+`Range` si interrompu), vérifie la somme de contrôle (`CHECKSUM.txt`, best-effort — absence
+n'empêche pas l'import), parse en flux (`ET.iterparse`, `root.clear()` **et** `elem.clear()`
+après chaque `<release>` — memory-leak sinon sur un fichier de cette taille), reconstruit la
+table entière (pas de delta, un dump mensuel est toujours un instantané complet). Bouton
+manuel dans Réglages ; veille automatique mensuelle via `RADAR_DISCOGS_DUMP_SYNC=1` (à poser
+sur le `.env` du service `radar-worker` sur le VPS, comme `RADAR_SELLER_SCAN=1`).
+
+`sellers.seller_affinity()` interroge ce référentiel (`lookup_release(release_id)`) pour le
+genre/style réel de chaque sortie déjà repérée en inventaire vendeur (le `release_id` est
+déjà connu gratuitement, aucun appel API en plus) ; repli sur le profilage label existant si
+la sortie n'est pas encore dans l'index (pas encore importé, ou trop récente).
+
+**Non testé en conditions réelles** : le listing/téléchargement de `data.discogs.com` n'a
+jamais pu être exercé en dev cloud (réseau bloqué, cf. section Session cloud) — la chaîne de
+repli (`find_latest_dump_date` : XML S3 → HTML → sondage mensuel) n'a été validée que sur
+fixtures synthétiques. Premier lancement réel à surveiller sur le VPS.
+
 ## Le « cerveau »
 
 `radar_web/radar/scoring.py` — classe `Ctx` : affinités de style, `album_score`,

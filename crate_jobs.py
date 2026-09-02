@@ -1874,8 +1874,79 @@ def job_scan_catalog(job, params):
     job.finish(f"{job.st['done']}/{len(targets)} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.{suffix}")
 
 
+def job_import_discogs_dump(job, params):
+    """Télécharge le dernier dump mensuel officiel Discogs (Releases) et
+    reconstruit le référentiel local SQLite (radar/discogs_dump.py) — filtré
+    au vinyle 12"/LP, avec genre/style/label/artiste. Ne concerne QUE le
+    catalogue (données stables) ; le marketplace (vendeurs, prix, inventaire)
+    n'existe pas dans ce dump et reste toujours en API live.
+
+    Un dump mensuel est un instantané complet, jamais un delta : "actualiser"
+    retélécharge et reconstruit l'index en entier (peut prendre longtemps
+    selon la bande passante et la taille du fichier — plusieurs Go).
+    """
+    from radar_web.radar import discogs_dump as dd
+
+    force = bool(params.get("force"))
+    job.msg("Recherche du dernier dump Discogs disponible…")
+    try:
+        latest = dd.find_latest_dump_date()
+    except Exception as e:                       # noqa: BLE001
+        return job.finish(error=f"Impossible de lister les dumps Discogs : {e}")
+
+    meta = dd.get_meta()
+    if meta.get("dump_date") == latest and not force:
+        return job.finish(f"Déjà à jour (dump du {latest}).")
+
+    gz_path = os.path.join(dd.RAW_DIR, f"discogs_{latest}_releases.xml.gz")
+    job.msg(f"Téléchargement du dump {latest}…")
+
+    def dl_progress(done, total):
+        job.sub(done=done, total=total, label="téléchargement")
+        if job.stopped():
+            raise InterruptedError("stop demandé pendant le téléchargement")
+
+    try:
+        dd.download_dump(latest, gz_path, progress_cb=dl_progress)
+    except InterruptedError:
+        return job.finish("Arrêté pendant le téléchargement — fichier partiel conservé, reprise au prochain lancement.")
+    except Exception as e:                        # noqa: BLE001
+        return job.finish(error=f"Téléchargement échoué : {e}")
+
+    job.msg("Vérification de l'intégrité du fichier…")
+    ok = dd.verify_checksum(latest, gz_path)
+    if ok is False:
+        try:
+            os.remove(gz_path)
+        except OSError:
+            pass
+        return job.finish(error="Somme de contrôle invalide — fichier corrompu, relance le job.")
+    # ok is None : CHECKSUM.txt indisponible, on ne bloque pas l'import dessus.
+
+    job.msg(f"Import du dump {latest} dans l'index local…")
+    est_total = meta.get("n_total") or 20_000_000
+
+    def import_progress(done):
+        job.sub(done=done, total=max(est_total, done), label="import des sorties")
+
+    try:
+        n_total, n_vinyl = dd.import_releases(gz_path, progress_cb=import_progress)
+    except Exception as e:                        # noqa: BLE001
+        return job.finish(error=f"Import échoué : {e}")
+
+    try:
+        os.remove(gz_path)                        # pas besoin de garder le .gz une fois importé
+    except OSError:
+        pass
+
+    dd.save_meta({"dump_date": latest, "imported_at": datetime.now().isoformat(timespec="seconds"),
+                  "n_total": n_total, "n_vinyl": n_vinyl})
+    job.finish(f"Dump {latest} importé : {n_vinyl} sortie(s) vinyle 12\"/LP retenue(s) sur {n_total} au total.")
+
+
 JOBS = {
     "scan_catalog": job_scan_catalog,
+    "import_discogs_dump": job_import_discogs_dump,
     "ingest_youtube": job_ingest_youtube,
     "ingest_spotify": job_ingest_spotify,
     "ingest_bandcamp": job_ingest_bandcamp,

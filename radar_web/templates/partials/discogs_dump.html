@@ -1,0 +1,24 @@
+<div id="discogs-dump">
+  <p class="small muted">
+    Référentiel local des sorties vinyle (12"/LP) — labels, artistes, genre, style — construit à partir
+    du dump mensuel officiel de Discogs (<code>data.discogs.com</code>), pas le marketplace (vendeurs,
+    prix : ça reste toujours en API). Premier import long (téléchargement de plusieurs Go + traitement).
+  </p>
+  {% if meta.dump_date %}
+    <p class="small">Dump du <b>{{ meta.dump_date[:4] }}-{{ meta.dump_date[4:6] }}-{{ meta.dump_date[6:] }}</b>
+      · {{ "{:,}".format(meta.n_vinyl).replace(",", " ") }} sortie(s) vinyle retenue(s) sur
+      {{ "{:,}".format(meta.n_total).replace(",", " ") }} au total
+      · importé le {{ (meta.imported_at or "")[:10] }}</p>
+  {% else %}
+    <p class="small muted">Aucun import encore fait.</p>
+  {% endif %}
+  <div class="btnrow">
+    <button hx-post="/jobs/import_discogs_dump/launch" hx-target="#job-import_discogs_dump" hx-swap="outerHTML">
+      {{ "Mettre à jour" if meta.dump_date else "Importer le dernier dump" }}</button>
+    {% if meta.dump_date %}
+    <button hx-post="/jobs/import_discogs_dump/launch" hx-vals='{"force": "1"}'
+            hx-target="#job-import_discogs_dump" hx-swap="outerHTML" class="small">forcer (réimporter)</button>
+    {% endif %}
+  </div>
+  <div id="job-import_discogs_dump" hx-get="/jobs/import_discogs_dump/status" hx-trigger="load" class="small"></div>
+</div>

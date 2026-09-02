@@ -63,11 +63,9 @@ def _is_vinyl(fmt_names, fmt_descriptions):
 
 # --------------------------------------------------------------- SQLite
 
-def _connect():
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
+def _create_schema(con):
     con.execute("""
-        CREATE TABLE IF NOT EXISTS releases (
+        CREATE TABLE releases (
             id INTEGER PRIMARY KEY,
             title TEXT,
             artist TEXT,
@@ -83,9 +81,21 @@ def _connect():
             master_id INTEGER
         )
     """)
-    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_label_key ON releases(label_key)")
-    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_artist_key ON releases(artist_key)")
-    return con
+    # table à part (pas de LIKE '%…%' possible sur la colonne styles jointe par
+    # virgule -> jamais indexable) : une ligne par (release_id, style), pour
+    # pouvoir interroger un style précis par index plutôt que par SCAN complet.
+    con.execute("CREATE TABLE release_styles (release_id INTEGER, style TEXT)")
+
+
+def _create_indexes(con):
+    """Appelé une fois la table remplie, jamais avant : indexer une table déjà
+    pleine évite de mettre à jour les arbres B à chaque ligne insérée pendant
+    tout l'import (facteur 2-3 sur la durée, cf. diagnostic D1)."""
+    con.execute("CREATE INDEX idx_releases_label_key ON releases(label_key)")
+    con.execute("CREATE INDEX idx_releases_artist_key ON releases(artist_key)")
+    con.execute("CREATE INDEX idx_releases_year ON releases(year)")
+    con.execute("CREATE INDEX idx_rs_style ON release_styles(style)")
+    con.execute("CREATE INDEX idx_rs_release ON release_styles(release_id)")
 
 
 def get_meta():
@@ -370,26 +380,42 @@ def _detect_needs_wrap(gz_path):
 
 def import_releases(gz_path, progress_cb=None, batch_size=5000):
     """Parse en flux le dump releases.xml.gz, ne garde que le vinyle, insère
-    en base par lots. Reconstruit la table entière (DELETE puis re-remplit
-    dans la même transaction que l'insertion, pas de table à part swap-in
-    pour rester simple — le temps d'indisponibilité pendant un import est
-    acceptable vu la cadence mensuelle). Retourne (n_total_vu, n_vinyle)."""
+    en base par lots.
+
+    Reconstruit dans un fichier à part (`DB_PATH + ".new"`), jamais dans
+    `DB_PATH` lui-même : l'appli continue de lire l'ancienne base, valide,
+    jusqu'à la bascule atomique (`os.replace`) tout à la fin. Plus de fenêtre
+    où `available()` mentirait (base présente mais vide/partielle pendant
+    ~1h45 d'import), et un import interrompu ne détruit jamais l'existant.
+    Les index sont créés APRÈS le remplissage (facteur 2-3 sur la durée d'un
+    import sur une table déjà indexée). Retourne (n_total_vu, n_vinyle)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path)
-    con = _connect()
-    con.execute("DELETE FROM releases")
-    n_total, n_vinyl, batch = 0, 0, []
+    os.makedirs(paths.SHARED_DIR, exist_ok=True)
+    new_path = DB_PATH + ".new"
+    if os.path.exists(new_path):
+        os.remove(new_path)              # reliquat d'un import précédent interrompu
+    con = sqlite3.connect(new_path)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=OFF")     # base jetable jusqu'à la bascule : la durabilité
+    con.execute("PRAGMA temp_store=MEMORY")   # de ce fichier temporaire n'a pas d'importance
+    con.execute("PRAGMA cache_size=-131072")  # 128 Mo
+    _create_schema(con)
+    n_total, n_vinyl, batch, style_rows = 0, 0, [], []
 
     def flush():
-        if not batch:
-            return
-        con.executemany(
-            "INSERT OR REPLACE INTO releases "
-            "(id, title, artist, artist_key, label, label_key, catno, year, country, format, genres, styles, master_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+        if batch:
+            con.executemany(
+                "INSERT OR REPLACE INTO releases "
+                "(id, title, artist, artist_key, label, label_key, catno, year, country, format, genres, styles, master_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+            batch.clear()
+        if style_rows:
+            con.executemany(
+                "INSERT INTO release_styles (release_id, style) VALUES (?,?)", style_rows)
+            style_rows.clear()
         con.commit()
-        batch.clear()
 
     with gzip.open(gz_path, "rb") as raw:
         stream = io.BufferedReader(_RootWrappedStream(raw, needs_wrap, skip_bytes))
@@ -399,31 +425,44 @@ def import_releases(gz_path, progress_cb=None, batch_size=5000):
             if event != "end" or elem.tag != "release":
                 continue
             n_total += 1
-            row = _parse_release_elem(elem)
+            parsed = _parse_release_elem(elem)
             elem.clear()
             root.clear()                 # `elem.clear()` seul ne suffit pas : la racine garde
                                           # une référence sur chaque enfant traité (fuite mémoire
                                           # sur 18-20M sorties sans ce clear-là aussi)
-            if row is not None:
+            if parsed is not None:
+                row, styles_list = parsed
                 n_vinyl += 1
                 batch.append(row)
+                style_rows.extend((row[0], s) for s in styles_list)
                 if len(batch) >= batch_size:
                     flush()
             if progress_cb and n_total % 20000 == 0:
                 progress_cb(n_total)
     flush()
-    con.close()
     if progress_cb:
         progress_cb(n_total)
+    _create_indexes(con)
+    con.execute("ANALYZE")
+    con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    con.close()
+    for suffix in ("-wal", "-shm"):               # compagnons WAL du fichier temporaire
+        try:
+            os.remove(new_path + suffix)
+        except OSError:
+            pass
+    os.replace(new_path, DB_PATH)
     return n_total, n_vinyl
 
 
 def _parse_release_elem(elem):
-    """None si pas vinyle. À valider/ajuster contre un vrai fichier — écrit
-    d'après la structure documentée des dumps Discogs (artists/artist,
-    labels/label, formats/format/descriptions/description, genres/genre,
-    styles/style, master_id) ; utilise findtext/attrib défensivement pour ne
-    pas planter tout l'import sur une variation ponctuelle."""
+    """(row_releases, styles_list) ou None si pas vinyle. À valider/ajuster
+    contre un vrai fichier — écrit d'après la structure documentée des dumps
+    Discogs (artists/artist, labels/label, formats/format/descriptions/description,
+    genres/genre, styles/style, master_id) ; utilise findtext/attrib
+    défensivement pour ne pas planter tout l'import sur une variation
+    ponctuelle. `styles_list` : liste brute (avant jointure), pour peupler
+    `release_styles` sans avoir à re-découper la chaîne jointe."""
     rid = elem.get("id")
     if not rid:
         return None
@@ -460,7 +499,8 @@ def _parse_release_elem(elem):
     catno = catnos[0] if catnos else None
 
     genres = ", ".join(g.text for g in elem.findall("./genres/genre") if g.text)
-    styles = ", ".join(s.text for s in elem.findall("./styles/style") if s.text)
+    styles_list = [s.text for s in elem.findall("./styles/style") if s.text]
+    styles = ", ".join(styles_list)
 
     year = None
     released = elem.findtext("released") or ""
@@ -475,11 +515,12 @@ def _parse_release_elem(elem):
 
     title = (elem.findtext("title") or "").strip() or None
 
-    return (
+    row = (
         int(rid), title, artist, normalize_label(artist) if artist else None,
         label, normalize_label(label) if label else None, catno, year,
         elem.findtext("country"), fmt_descriptions, genres, styles, master_id,
     )
+    return row, styles_list
 
 
 # --------------------------------------------------------------- lookup (lecture, utilisé par l'appli)
@@ -536,17 +577,24 @@ def suggest_labels(prefix, limit=12):
     """Noms de labels du référentiel local dont la clé normalisée commence par
     `prefix` — typeahead d'ajout de label sans appel API Discogs. Sur-échantillonne
     puis déduplique en Python (une même clé normalisée peut avoir plusieurs graphies
-    selon les sorties : casse, variantes)."""
+    selon les sorties : casse, variantes).
+
+    Bornes de plage plutôt que `LIKE 'prefix%'` : un `LIKE` sur une colonne
+    insensible à la casse par défaut ne peut pas servir de borne d'index —
+    `EXPLAIN QUERY PLAN` le confirme (SCAN, pas SEARCH, malgré l'index
+    présent). `>= norm AND < norm + '\\uffff'` transforme la requête en une
+    vraie recherche par index, sur une table de plusieurs millions de lignes."""
     if not available():
         return []
-    norm = normalize_label(prefix).replace("%", "").replace("_", "")
+    norm = normalize_label(prefix)
     if not norm:
         return []
     con = sqlite3.connect(DB_PATH)
     try:
         rows = con.execute(
-            "SELECT label, label_key FROM releases WHERE label_key LIKE ? AND label IS NOT NULL "
-            "ORDER BY label_key LIMIT ?", (norm + "%", limit * 8)).fetchall()
+            "SELECT label, label_key FROM releases "
+            "WHERE label_key >= ? AND label_key < ? AND label IS NOT NULL "
+            "ORDER BY label_key LIMIT ?", (norm, norm + "￿", limit * 8)).fetchall()
     finally:
         con.close()
     seen, out = set(), []

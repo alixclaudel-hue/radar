@@ -107,10 +107,22 @@ toujours en API live via `sellers.py`). Filtré au vinyle 12"/LP uniquement (`_i
 Rempli par le job `import_discogs_dump` (`crate_jobs.py`) : télécharge (reprise via
 `Range` si interrompu), vérifie la somme de contrôle (`CHECKSUM.txt`, best-effort — absence
 n'empêche pas l'import), parse en flux (`ET.iterparse`, `root.clear()` **et** `elem.clear()`
-après chaque `<release>` — memory-leak sinon sur un fichier de cette taille), reconstruit la
-table entière (pas de delta, un dump mensuel est toujours un instantané complet). Bouton
-manuel dans Réglages ; veille automatique mensuelle via `RADAR_DISCOGS_DUMP_SYNC=1` (à poser
-sur le `.env` du service `radar-worker` sur le VPS, comme `RADAR_SELLER_SCAN=1`).
+après chaque `<release>` — memory-leak sinon sur un fichier de cette taille), reconstruit
+l'index en entier (pas de delta, un dump mensuel est toujours un instantané complet) dans
+`discogs_dump.sqlite3.new`, jamais dans le fichier servi par l'appli : les index ne sont créés
+qu'une fois la table remplie (`ANALYZE` ensuite), puis bascule atomique (`os.replace`) à la
+toute fin. L'appli lit l'ancienne base valide jusqu'à la dernière seconde — pas de fenêtre où
+`available()` mentirait pendant les ~1h45 que dure un import. `journal_mode=WAL` posé à la
+création (persistant dans le fichier). Bouton manuel dans Réglages ; veille automatique
+mensuelle via `RADAR_DISCOGS_DUMP_SYNC=1` (à poser sur le `.env` du service `radar-worker` sur
+le VPS, comme `RADAR_SELLER_SCAN=1`).
+
+Table `release_styles` (`release_id`, `style`) à part, indexée : la colonne `releases.styles`
+(genres/styles joints par virgule) n'est interrogeable qu'en `LIKE '%…%'`, jamais par index.
+`suggest_labels()` interroge `label_key` par plage (`>= préfixe AND < préfixe + '￿'`), pas
+par `LIKE 'préfixe%'` — un `LIKE` sur une colonne insensible à la casse ne peut pas servir de
+borne d'index (confirmé à l'`EXPLAIN QUERY PLAN` : `SCAN`, pas `SEARCH`, malgré l'index
+présent).
 
 ## Entretien de fond (plus de boutons dans Réglages)
 

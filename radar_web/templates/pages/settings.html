@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% import "partials/_wradar.html" as wr %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Réglages · Radar{% endblock %}
 {% block content %}
 <h1>Réglages</h1>
@@ -6,43 +8,62 @@
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
 <form method="post" action="/settings">
-  <h3>Score label (reco)</h3>
-  <div class="row">
-    {% for k in ['collection','corpus','artist','affinity','want_factor'] %}
-    <div class="field"><label>{{ k }}</label>
-      <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></div>
-    {% endfor %}
-  </div>
-  <div class="field" style="max-width:280px"><label>Seuil d'affinité label (0 = off)</label>
-    <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></div>
-
-  <h3>Score album</h3>
-  <div class="row">
-    {% for k in ['label','artist','style','artist_max_vs_mean'] %}
-    <div class="field"><label>{{ k }}</label>
-      <input name="album__{{ k }}" type="number" step="0.05" value="{{ sc.album[k] }}"></div>
-    {% endfor %}
+  <h3>{{ icons.label() }} Score label (reco)</h3>
+  <div class="wgroup">
+    {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
+                 ['reco__artist','artiste'], ['reco__affinity','affinité'],
+                 ['reco__want_factor','want']]) }}
+    <div class="row wgroup__fields">
+      {% for k in ['collection','corpus','artist','affinity','want_factor'] %}
+      <div class="field"><label>{{ k }}</label>
+        <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></div>
+      {% endfor %}
+      <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)</label>
+        <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></div>
+    </div>
   </div>
 
-  <h3>Score artiste</h3>
-  <div class="row">
-    {% for k in ['manual','corpus','collection','graph','djset'] %}
-    <div class="field"><label>{{ k }}</label>
-      <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></div>
-    {% endfor %}
+  <h3>{{ icons.album() }} Score album</h3>
+  <div class="wgroup">
+    {{ wr.toile([['album__label','label'], ['album__artist','artiste'],
+                 ['album__style','style'], ['album__artist_max_vs_mean','max/moy.']]) }}
+    <div class="row wgroup__fields">
+      {% for k in ['label','artist','style','artist_max_vs_mean'] %}
+      <div class="field"><label>{{ k }}</label>
+        <input name="album__{{ k }}" type="number" step="0.05" value="{{ sc.album[k] }}"></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <h3>{{ icons.artist() }} Score artiste</h3>
+  <div class="wgroup">
+    {{ wr.toile([['artist_score__manual','manuel'], ['artist_score__corpus','corpus'],
+                 ['artist_score__collection','collection'], ['artist_score__graph','graphe'],
+                 ['artist_score__djset','djset']]) }}
+    <div class="row wgroup__fields">
+      {% for k in ['manual','corpus','collection','graph','djset'] %}
+      <div class="field"><label>{{ k }}</label>
+        <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></div>
+      {% endfor %}
+    </div>
   </div>
 
   <h3>Rangs (Cœur / Aimés)</h3>
-  <div class="row">
-    <div class="field"><label>Style — Cœur</label><input name="taste_tiers__1" type="number" step="0.05" value="{{ sc.taste_tiers['1'] }}"></div>
-    <div class="field"><label>Style — Aimés</label><input name="taste_tiers__2" type="number" step="0.05" value="{{ sc.taste_tiers['2'] }}"></div>
-    <div class="field"><label>Artiste — Cœur</label><input name="artist_tiers__1" type="number" step="0.05" value="{{ sc.artist_tiers['1'] }}"></div>
-    <div class="field"><label>Artiste — Aimés</label><input name="artist_tiers__2" type="number" step="0.05" value="{{ sc.artist_tiers['2'] }}"></div>
+  <div class="wgroup">
+    {{ wr.toile([['taste_tiers__1','style ♥'], ['artist_tiers__1','artiste ♥'],
+                 ['taste_tiers__2','style +'], ['artist_tiers__2','artiste +']]) }}
+    <div class="row wgroup__fields">
+      <div class="field"><label>Style — Cœur</label><input name="taste_tiers__1" type="number" step="0.05" value="{{ sc.taste_tiers['1'] }}"></div>
+      <div class="field"><label>Style — Aimés</label><input name="taste_tiers__2" type="number" step="0.05" value="{{ sc.taste_tiers['2'] }}"></div>
+      <div class="field"><label>Artiste — Cœur</label><input name="artist_tiers__1" type="number" step="0.05" value="{{ sc.artist_tiers['1'] }}"></div>
+      <div class="field"><label>Artiste — Aimés</label><input name="artist_tiers__2" type="number" step="0.05" value="{{ sc.artist_tiers['2'] }}"></div>
+    </div>
   </div>
 
   <hr>
   <button class="primary" type="submit">💾 Enregistrer</button>
 </form>
+<script src="/static/wradar.js" defer></script>
 
 <hr>
 <h3>Base de labels — export CSV <span class="muted small">· import : Mieux connaître ton univers</span></h3>

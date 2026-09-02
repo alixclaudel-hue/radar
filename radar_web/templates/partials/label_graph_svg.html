@@ -1,29 +1,152 @@
-<div class="lgraph">
-  <p class="small muted">
-    {{ graph.seeds|join(', ') }} · niveau {{ graph.depth }} · {{ graph.nodes|length }} labels · {{ graph.edges|length }} liens
-    {% if graph.min_shared %}· ≥{{ graph.min_shared }} artiste(s) commun(s){% endif %}
-  </p>
-  <svg viewBox="0 0 560 560" width="100%" style="max-width:560px;display:block;margin:0 auto">
-    {% for e in graph.edges %}
-      {% if pos.get(e.a) and pos.get(e.b) %}
-      <line x1="{{ pos[e.a][0] }}" y1="{{ pos[e.a][1] }}" x2="{{ pos[e.b][0] }}" y2="{{ pos[e.b][1] }}"
-            stroke="var(--line)" stroke-width="{{ [1 + e.w, 5]|min }}" opacity="0.7"></line>
-      {% endif %}
-    {% endfor %}
-    {% for k, n in graph.nodes.items() %}
-      {% if pos.get(k) %}
-      {% set p = pos[k] %}
-      {% set r = 9 if n.level == 0 else (6 if n.level == 1 else 4) %}
-      <circle cx="{{ p[0] }}" cy="{{ p[1] }}" r="{{ r }}"
+{% import "partials/_icons.html" as icons %}
+{# Rendu partagé par le graphe de labels et le graphe d'artistes : `kind` ('label'
+   ou 'artist') décide de la cible /disco et de l'icône de note. `notes` = {clé: /100
+   ou None}, `infos` = {clé: {styles, facts, why}} — tout est calculé côté serveur,
+   la vue plein écran ne fait que dévoiler la fiche déjà rendue. #}
+
+{% macro node_badge(k) %}
+  {% set nt = (notes or {}).get(k) %}
+  <span class="badge small {{ 'ghost' if nt is none }}"
+        title="{{ "note d'artiste /100" if (kind or 'label') == 'artist' else 'affinité de style /100' }}"
+        >{{ icons.artist() if (kind or 'label') == 'artist' else icons.label() }} {{ '—' if nt is none else nt }}</span>
+{% endmacro %}
+
+{% macro disco_href(k) %}/disco?kind={{ kind or 'label' }}&amp;key={{ k|urlencode }}{% endmacro %}
+
+{% macro graph_svg(full) %}
+<svg class="gsvg {{ 'gsvg--full' if full }}" viewBox="0 0 560 560" preserveAspectRatio="xMidYMid meet">
+  {% for e in graph.edges %}
+    {% if pos.get(e.a) and pos.get(e.b) %}
+    <line x1="{{ pos[e.a][0] }}" y1="{{ pos[e.a][1] }}" x2="{{ pos[e.b][0] }}" y2="{{ pos[e.b][1] }}"
+          stroke="var(--line)" stroke-width="{{ [1 + e.w, 5]|min }}" opacity="0.7"></line>
+    {% endif %}
+  {% endfor %}
+  {% for k, n in graph.nodes.items() if pos.get(k) %}
+    {% set p = pos[k] %}
+    {% set r = 9 if n.level == 0 else (6 if n.level == 1 else 4) %}
+    {% set nt = (notes or {}).get(k) %}
+    {% if full %}
+    <g class="gnode" data-gnode data-key="{{ k }}" tabindex="0" role="button"
+       aria-label="{{ n.name }} — voir la fiche">
+    {% else %}
+    <a class="gnode" href="{{ disco_href(k) }}" aria-label="Discographie de {{ n.name }}">
+    {% endif %}
+      {# cible tactile élargie : le point visible seul est trop petit au doigt #}
+      <circle cx="{{ p[0] }}" cy="{{ p[1] }}" r="{{ r + (16 if full else 9) }}" fill="transparent"></circle>
+      <circle class="gnode__dot" cx="{{ p[0] }}" cy="{{ p[1] }}" r="{{ r }}"
               fill="{{ 'var(--pin)' if n.level == 0 else ('var(--clay)' if n.level == 1 else 'var(--soft)') }}"></circle>
-      <text x="{{ p[0] }}" y="{{ p[1] - r - 4 }}" font-size="{{ 11 if n.level < 2 else 9 }}"
+      <text class="gnode__name" x="{{ p[0] }}" y="{{ p[1] - r - 5 }}" font-size="{{ 11 if n.level < 2 else 9 }}"
             text-anchor="middle" fill="var(--ink)" font-family="inherit">{{ n.name[:24] }}</text>
-      {% endif %}
-    {% endfor %}
-  </svg>
+      <text class="gnode__note" x="{{ p[0] }}" y="{{ p[1] + r + 11 }}" font-size="9" text-anchor="middle"
+            fill="{{ 'var(--soft)' if nt is none else 'var(--pin)' }}" font-family="inherit">{{ '—' if nt is none else nt }}</text>
+    {% if full %}</g>{% else %}</a>{% endif %}
+  {% endfor %}
+</svg>
+{% endmacro %}
+
+{% set lvl_names = ['graine', 'niveau 1', 'niveau 2'] %}
+
+<div class="lgraph">
+  <div class="lgraph__head">
+    <p class="small muted" style="margin:0;flex:1;min-width:0">
+      {{ graph.seeds|join(', ') }} · niveau {{ graph.depth }} · {{ graph.nodes|length }}
+      {{ 'artistes' if (kind or 'label') == 'artist' else 'labels' }} · {{ graph.edges|length }} liens
+      {% if graph.min_shared %}· ≥{{ graph.min_shared }} artiste(s) commun(s){% endif %}
+    </p>
+    <button type="button" class="small" data-gopen>⛶ Plein écran</button>
+  </div>
+
+  {{ graph_svg(false) }}
+
   <p class="small muted" style="text-align:center">
     <span style="color:var(--pin)">●</span> graine
     <span style="color:var(--clay)">●</span> niveau 1
     {% if graph.depth > 1 %}<span style="color:var(--soft)">●</span> niveau 2{% endif %}
+    · chiffre sous le nœud = note /100, clic = discographie
   </p>
+
+  <div class="gfull" hidden role="dialog" aria-modal="true">
+    <div class="gfull__bar">
+      <h4>{{ "Graphe d'artistes" if (kind or 'label') == 'artist' else 'Graphe de labels' }}</h4>
+      <button type="button" data-gclose>✕ Fermer</button>
+    </div>
+    <div class="gfull__stage">{{ graph_svg(true) }}</div>
+    <div class="gfull__sheet">
+      <div class="gcard" data-gcard="">
+        <p class="small muted" style="margin:0">Touche un nœud (ou un nom ci-dessous) pour voir sa fiche.
+          <span style="color:var(--pin)">●</span> graine ·
+          <span style="color:var(--clay)">●</span> niveau 1{% if graph.depth > 1 %} ·
+          <span style="color:var(--soft)">●</span> niveau 2{% endif %}</p>
+      </div>
+      {% for k, n in graph.nodes.items() %}
+      {% set inf = (infos or {}).get(k) or {} %}
+      <div class="gcard" data-gcard="{{ k }}" hidden>
+        <div class="gcard__head">
+          {{ node_badge(k) }}
+          <strong>{{ n.name }}</strong>
+          <span class="chip">{{ lvl_names[n.level] if n.level < 3 else 'niveau ' ~ n.level }}</span>
+        </div>
+        {% if inf.styles %}
+        <div class="gcard__chips">{% for s in inf.styles %}<span class="chip">{{ s }}</span>{% endfor %}</div>
+        {% endif %}
+        {% if inf.facts %}<p class="small" style="margin:6px 0">{{ inf.facts|join(' · ') }}</p>{% endif %}
+        {% if inf.why %}<p class="small muted" style="margin:6px 0">{{ inf.why|join(' · ') }}</p>{% endif %}
+        <a class="chip gcard__go" href="{{ disco_href(k) }}">Voir la discographie →</a>
+      </div>
+      {% endfor %}
+      <div class="gnodes">
+        {% for k, n in graph.nodes.items() %}
+        <button type="button" class="chip gnodes__item" data-gnode data-key="{{ k }}"
+          >{{ n.name[:28] }} <b>{{ '—' if (notes or {}).get(k) is none else notes[k] }}</b></button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+/* Vue plein écran des graphes : un seul écouteur délégué, installé une fois
+   pour toutes (le fragment est ré-injecté par htmx à chaque graphe affiché). */
+if (!window.__radarGraphFull) {
+  window.__radarGraphFull = true;
+  var gfClose = function (box) {
+    if (!box) return;
+    box.hidden = true;
+    if (!document.querySelector('.gfull:not([hidden])'))
+      document.body.classList.remove('gfull-on');
+  };
+  document.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var open = t.closest('[data-gopen]');
+    if (open) {
+      var box = open.closest('.lgraph').querySelector('.gfull');
+      if (box) { box.hidden = false; document.body.classList.add('gfull-on'); }
+      return;
+    }
+    if (t.closest('[data-gclose]')) { gfClose(t.closest('.gfull')); return; }
+    var node = t.closest('[data-gnode]');
+    if (!node) return;
+    var root = node.closest('.gfull');
+    if (!root) return;
+    var key = node.getAttribute('data-key');
+    root.querySelectorAll('[data-gcard]').forEach(function (c) {
+      c.hidden = c.getAttribute('data-gcard') !== key;
+    });
+    root.querySelectorAll('[data-gnode]').forEach(function (x) {
+      x.classList.toggle('on', x.getAttribute('data-key') === key);
+    });
+    var sheet = root.querySelector('.gfull__sheet');
+    if (sheet) sheet.scrollTop = 0;
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') {
+      document.querySelectorAll('.gfull:not([hidden])').forEach(gfClose);
+      return;
+    }
+    var node = (ev.key === 'Enter' || ev.key === ' ') && ev.target && ev.target.closest
+      && ev.target.closest('g[data-gnode]');
+    if (node) { ev.preventDefault(); node.dispatchEvent(new MouseEvent('click', {bubbles: true})); }
+  });
+}
+</script>

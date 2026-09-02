@@ -96,8 +96,44 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
 .lrow__meta{ flex:1; min-width:0; font-size:11px; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .badge.small{ font-size:11px; padding:1px 8px; }
 
-/* graphe de labels */
+/* graphes (labels et artistes : même rendu) */
 .lgraph svg text{ pointer-events:none; }
+.lgraph__head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.gsvg{ display:block; margin:0 auto; width:100%; max-width:560px; }
+.gnode{ cursor:pointer; }
+.gnode .gnode__dot{ transition:stroke-width .12s ease; }
+.gnode:hover .gnode__dot, .gnode:focus .gnode__dot,
+.gnode.on .gnode__dot{ stroke:var(--ink); stroke-width:2.5; }
+.gnode:focus{ outline:none; }
+
+.gfull[hidden], .gcard[hidden]{ display:none; }
+body.gfull-on{ overflow:hidden; }
+.gfull{
+  position:fixed; inset:0; z-index:60; background:var(--paper); display:flex; flex-direction:column;
+  padding:max(10px,env(safe-area-inset-top)) 12px 0;
+}
+.gfull__bar{ display:flex; align-items:center; gap:10px; }
+.gfull__bar h4{ margin:0; font-size:15px; flex:1; min-width:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.gfull__stage{ flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
+.gfull__stage .gsvg{ max-width:none; width:100%; height:100%; }
+.gsvg--full .gnode__name{ font-size:13px; }
+.gsvg--full .gnode__note{ font-size:11px; }
+.gfull__sheet{
+  flex:0 0 auto; max-height:46vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  margin:0 -12px; padding:10px 14px max(14px,env(safe-area-inset-bottom));
+  background:var(--surface); border-top:1px solid var(--line);
+  border-radius:var(--radius) var(--radius) 0 0;
+}
+.gcard__head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.gcard__chips{ display:flex; flex-wrap:wrap; gap:5px; margin:6px 0; }
+.gnodes{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; border-top:1px solid var(--line); padding-top:10px; }
+.gnodes .gnodes__item{ font-weight:400; padding:3px 10px; border-color:var(--line); }
+.gnodes .gnodes__item b{ color:var(--pin); font-weight:600; }
+.gnodes .gnodes__item:hover b, .gnodes .gnodes__item.on b{ color:inherit; }
+.gnodes .gnodes__item.on{ background:var(--ink); color:var(--paper); border-color:var(--ink); }
+.gcard .gcard__go{ background:var(--pin); border-color:var(--pin); color:var(--paper);
+  font-size:12px; padding:5px 14px; margin-top:4px; }
 
 /* contrôle segmenté (pills radio) */
 .seg{ display:inline-flex; flex-wrap:wrap; gap:6px; }
@@ -265,6 +301,21 @@ form.htmx-request{ opacity:.7; }
 button:focus-visible, .lbl-opt:focus-visible, a.chip:focus-visible{
   outline:2px solid var(--pin); outline-offset:2px;
 }
+
+/* toile d'araignée des pondérations (Réglages) */
+.wgroup{ display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap; margin-bottom:6px; }
+.wgroup__fields{ flex:1 1 300px; min-width:240px; }
+.wradar{
+  flex:0 0 auto; width:280px; max-width:100%;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:8px 10px 4px;
+}
+.wradar svg{
+  display:block; width:100%; height:auto; cursor:pointer;
+  touch-action:none;                       /* sinon le doigt fait défiler la page */
+  -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+}
+.wradar__scale, .wradar__hint{ margin:0 0 4px; text-align:center; }
 
 /* mobile */
 @media (max-width:640px){

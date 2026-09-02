@@ -1749,6 +1749,14 @@ def job_scan_catalog(job, params):
     sauf si `force`. Le catalogue est partagé -> tourne toujours en tant que owner.
     Calcule aussi, par vendeur, une note d'affinité goût sur son stock 12" (pas
     les 45 tours) via `sellers.seller_affinity` — cf. Ctx.ascore.
+
+    Priorise et espace les rescans avec cette note (impossible de filtrer les
+    disques par genre côté API — cf. discussion : l'inventaire Discogs ne
+    donne ni genre ni style, seulement artiste/format) : les vendeurs à faible
+    affinité goût (déjà scannés, mais peu ou pas d'artiste connu sur leur
+    stock 12") sont espacés à 30 jours au lieu de `min_age_days`, et les
+    vendeurs jamais scannés ou à bonne affinité passent en premier dans
+    l'ordre du scan.
     """
     from radar_web.radar import sellers as scat
     from radar_web.radar.scoring import Ctx
@@ -1770,20 +1778,33 @@ def job_scan_catalog(job, params):
     max_pages = int(params.get("max_pages", 60))
     min_age = float(params.get("min_age_days", 6))
     now = datetime.now().isoformat(timespec="seconds")
-    cutoff = time.time() - min_age * 86400
+    now_ts = time.time()
+
+    def _rescan_interval_days(e):
+        """30 j pour un vendeur déjà scanné à faible affinité goût (note basse,
+        ou du stock 12" mais aucun artiste connu dedans), min_age_days sinon —
+        y compris les vendeurs jamais scannés, qui ont besoin d'un 1er passage."""
+        if not e.get("last_scan"):
+            return min_age
+        note = e.get("note")
+        low = (note is not None and note < 40) or (note is None and e.get("n_12in"))
+        return max(min_age, 30) if low else min_age
 
     targets = [u for u, e in cat.items()
                if e.get("active") and (u == only if only else True)]
     if not only:
         def _due(u):
-            ls = cat[u].get("last_scan")
+            e = cat[u]
+            ls = e.get("last_scan")
             if force or not ls:
                 return True
             try:
-                return datetime.fromisoformat(ls).timestamp() < cutoff
+                return datetime.fromisoformat(ls).timestamp() < now_ts - _rescan_interval_days(e) * 86400
             except ValueError:
                 return True
         targets = [u for u in targets if _due(u)]
+        # priorité : jamais scannés d'abord (1er passage), puis meilleure affinité goût
+        targets.sort(key=lambda u: (bool(cat[u].get("last_scan")), -(cat[u].get("note") or 0)))
 
     job.st["total"] = len(targets)
     if not targets:

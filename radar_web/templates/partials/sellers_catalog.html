@@ -1,7 +1,8 @@
 {% import "partials/_icons.html" as icons %}
 <div id="sellers-catalog">
   <p class="small muted">{{ rows|length }} vendeurs ({{ n_active }} actifs) · {{ n_scanned }} scannés.
-    Le scan interroge l'API Discogs (long : ~1 h au premier passage). À relancer chaque semaine.</p>
+    Le scan interroge l'API Discogs (long : ~1 h au premier passage). À relancer chaque semaine —
+    ensuite, les vendeurs à faible affinité goût (colonne « Goût ») ne sont rescannés qu'une fois par mois.</p>
 
   <div class="btnrow">
     <button hx-post="/jobs/scan_catalog/launch" hx-target="#job-scan_catalog" hx-swap="outerHTML">

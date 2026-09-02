@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <p class="small muted">{{ rows|length }} affichés sur {{ n }} — triés par note. Change la catégorie d'un clic.</p>
 <div style="overflow-x:auto">
 <table style="width:100%;border-collapse:collapse;font-size:13px">
@@ -10,7 +11,7 @@
     <td style="padding:6px 8px"><a href="/disco?kind=artist&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.name }}</a></td>
     <td style="padding:6px 8px">
       <div class="progress" style="height:6px"><i style="width:{{ r.note }}%"></i></div>
-      <span class="small muted">{{ r.note }}</span>
+      <span class="small muted">{{ icons.artist() }} {{ r.note }}</span>
     </td>
     <td style="padding:6px 8px">
       <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"

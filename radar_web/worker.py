@@ -28,6 +28,15 @@ _last_seller_check = 0.0
 DUMP_SYNC_CHECK_EVERY = 86400
 _last_dump_check = 0.0
 
+# Entretien de fond (nettoyage canonique, profilage des labels, graphe
+# producteur global) : opt-in via RADAR_AUTO_MAINTENANCE=1, pour ne plus
+# dépendre de boutons dans Réglages. Cadence par job mémorisée dans un
+# fichier marqueur (survit aux redémarrages du worker, un déploiement en
+# provoque un à chaque fois).
+AUTO_MAINT_PATH = os.path.join(paths.JOBS_DIR, "auto_maintenance.json")
+AUTO_MAINT_EVERY = {"canonicalize": 7 * 86400, "profile_labels": 7 * 86400, "build_graph": 30 * 86400}
+_last_auto_maint_check = 0.0
+
 
 def _maybe_weekly_scan():
     """Enfile scan_catalog (owner) si aucun vendeur n'a été scanné depuis 7 j."""
@@ -76,6 +85,50 @@ def _maybe_monthly_dump_sync():
         print(f"[worker] monthly dump check : {e}", file=sys.stderr, flush=True)
 
 
+def _load_auto_maint():
+    try:
+        with open(AUTO_MAINT_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_auto_maint(d):
+    tmp = AUTO_MAINT_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(tmp, AUTO_MAINT_PATH)
+
+
+def _maybe_auto_maintenance():
+    """Enfile canonicalize / profile_labels / build_graph (owner) chacun selon
+    sa propre cadence, sans action de l'utilisateur — remplace les boutons
+    manuels retirés de Réglages."""
+    global _last_auto_maint_check
+    if os.environ.get("RADAR_AUTO_MAINTENANCE") != "1":
+        return
+    if time.time() - _last_auto_maint_check < 3600:
+        return
+    _last_auto_maint_check = time.time()
+    try:
+        marks = _load_auto_maint()
+        queued_names = {j["name"] for j in jobs.load_queue()}
+        now, changed = time.time(), False
+        for name, params in (("canonicalize", {"scope": "corpus"}),
+                              ("profile_labels", {"limit": 150}),
+                              ("build_graph", {"mode": "global"})):
+            if name in queued_names or now - marks.get(name, 0) < AUTO_MAINT_EVERY[name]:
+                continue
+            jobs.launch(name, params, uid=paths.DEFAULT_UID)
+            marks[name] = now
+            changed = True
+            print(f"[worker] entretien de fond enfilé : {name}", file=sys.stderr, flush=True)
+        if changed:
+            _save_auto_maint(marks)
+    except Exception as e:                       # noqa: BLE001
+        print(f"[worker] auto maintenance check : {e}", file=sys.stderr, flush=True)
+
+
 def _pick(q, last_uid):
     pend = [j for j in q if j["state"] == "queued"]
     if not pend:
@@ -110,6 +163,7 @@ def main():
         if not job:
             _maybe_weekly_scan()
             _maybe_monthly_dump_sync()
+            _maybe_auto_maintenance()
             time.sleep(POLL)
             continue
         job["state"] = "running"

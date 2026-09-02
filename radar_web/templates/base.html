@@ -8,6 +8,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.4/htmx.min.js" defer></script>
 </head>
 <body>
+  {% import "partials/_icons.html" as icons %}
   <div class="wrap">
     <div class="topbar">
       <a class="brand" href="/">Rada<b>r</b></a>
@@ -15,7 +16,7 @@
         <form method="post" action="/logout" style="display:inline">
           <button type="submit" class="linklike">déconnexion</button></form></span>
       {% else %}<span class="brand-sub">nouvelle interface</span>{% endif %}
-      <a class="chip cart-tab" href="/univers?tab=cart" title="Panier Discogs">🛒 Panier{% if n_cart %} · {{ n_cart }}{% endif %}</a>
+      <a class="chip cart-tab" href="/univers?tab=cart" title="Panier">{{ icons.cart("ic-lg") }}{% if n_cart %} {{ n_cart }}{% endif %}</a>
     </div>
     <nav class="nav">
       {% set cur = active|default('') %}

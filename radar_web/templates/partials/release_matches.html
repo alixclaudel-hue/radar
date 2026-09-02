@@ -1,0 +1,28 @@
+{% if not rows %}
+  <p class="small muted" style="margin:4px 0">Aucun vinyle trouvé sur Discogs pour « {{ a }} — {{ t }} ».</p>
+{% else %}
+  <div class="lrows">
+  {% for r in rows %}
+    <div class="lrow">
+      {% if r.thumb %}<img src="{{ r.thumb }}" alt="" width="30" height="30"
+           style="border-radius:4px;object-fit:cover;flex:0 0 30px">{% endif %}
+      <a class="lrow__name" href="https://www.discogs.com/release/{{ r.id }}" target="_blank" rel="noopener">{{ r.title }}</a>
+      <span class="lrow__meta">
+        {{ (r.label or [])|join(', ') }}{% if r.year %} · {{ r.year }}{% endif %}{% if r.format %} · {{ r.format|join(', ') }}{% endif %}
+      </span>
+      {% if r.id|string in in_cart %}
+        <span class="small ok">✓ au panier</span>
+      {% else %}
+      <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="rid" value="{{ r.id }}">
+        <input type="hidden" name="title" value="{{ r.title }}">
+        <input type="hidden" name="artist" value="{{ a }}">
+        <input type="hidden" name="label" value="{{ (r.label or [''])[0] }}">
+        <input type="hidden" name="thumb" value="{{ r.thumb or '' }}">
+        <button type="submit" class="small">➕ panier</button>
+      </form>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+{% endif %}

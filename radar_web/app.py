@@ -859,6 +859,26 @@ def _cart_ids():
     return {str(x.get("id")) for x in load(_pu().cart, [])}
 
 
+@app.get("/release_matches", response_class=HTMLResponse)
+def release_matches(request: Request, a: str = "", t: str = ""):
+    """Vinyles Discogs contenant cette track (une track peut être sortie sur
+    plusieurs sorties — VA, rééditions...) — pour l'ajout au panier depuis un
+    DJ set, où on n'a résolu qu'un seul release_id à l'ingestion."""
+    a, t = a.strip(), t.strip()
+    token = _cfg().get("token", "")
+    if not token:
+        return HTMLResponse("<p class='small msg-err'>Token Discogs manquant.</p>")
+    try:
+        res = discogs.search(token, artist=a, track=t, per_page=25).get("results", [])
+    except discogs.DiscogsError as e:
+        return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
+    vinyl = [r for r in res if "vinyl" in " ".join(r.get("format") or []).lower()]
+    rows = [{"id": r.get("id"), "title": r.get("title"), "label": r.get("label") or [],
+             "year": r.get("year"), "format": r.get("format") or [],
+             "thumb": r.get("cover_image") or r.get("thumb")} for r in vinyl[:12]]
+    return frag(request, "partials/release_matches.html", rows=rows, a=a, t=t, in_cart=_cart_ids())
+
+
 @app.get("/cart", response_class=HTMLResponse)
 def cart_frag(request: Request):
     return frag(request, "partials/cart.html", cart=load(_pu().cart, []))

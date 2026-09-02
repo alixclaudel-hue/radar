@@ -30,7 +30,11 @@
         <a class="small" href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener">💿</a>
       {% endif %}
       <a class="small" href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
+      <button type="button" class="small" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter au panier"
+              hx-get="/release_matches?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}"
+              hx-target="#rm-{{ v.vid }}-{{ loop.index }}" hx-swap="innerHTML">➕ panier</button>
     </div>
+    <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel" style="padding:0 2px 6px 30px"></div>
     {% endfor %}
     {% endfor %}
   </div>

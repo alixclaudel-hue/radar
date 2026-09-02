@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <div id="sellers-catalog">
   <p class="small muted">{{ rows|length }} vendeurs ({{ n_active }} actifs) · {{ n_scanned }} scannés.
     Le scan interroge l'API Discogs (long : ~1 h au premier passage). À relancer chaque semaine.</p>
@@ -39,7 +40,7 @@
           <td style="padding:5px 6px">
             {% if r.get('note') is not none %}
             <span class="badge small {{ 'clay' if r.note < 50 }}"
-                  title="{{ r.n_matched }} article(s) 12\" d'artiste(s) connu(s) sur {{ r.n_12in }} au total">{{ r.note }}</span>
+                  title="{{ r.n_matched }} article(s) 12\" d'artiste(s) connu(s) sur {{ r.n_12in }} au total">{{ icons.artist() }} {{ r.note }}</span>
             {% if r.get('top_styles') %}<span class="small muted"> · {{ r.top_styles|join(', ') }}</span>{% endif %}
             {% elif r.get('n_12in') %}<span class="small muted">{{ r.n_12in }} × 12" · goût inconnu</span>
             {% else %}<span class="small muted">—</span>{% endif %}

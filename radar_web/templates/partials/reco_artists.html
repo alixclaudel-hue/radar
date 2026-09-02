@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <div class="section-title"><h3>Recommandations — artistes proches de tes Cœur / Aimés</h3></div>
 {% if not reco %}
   <p class="small muted">Construis d'abord le graphe producteur (<a href="/settings">Réglages → Graphe producteur</a>).</p>
@@ -7,7 +8,7 @@
   {% for r in reco %}
   <div class="lrow">
     <span class="badge small {{ 'clay' if not r.note }}"
-          title="note d'artiste /100 (proximité graphe = {{ r.prox }})">{{ r.note }}</span>
+          title="note d'artiste /100 (proximité graphe = {{ r.prox }})">{{ icons.artist() }} {{ r.note }}</span>
     <a href="{{ r.url }}" target="_blank" rel="noopener" class="lrow__name">{{ r.name }}</a>
     <span class="lrow__meta">{{ r.why }}</span>
     <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">

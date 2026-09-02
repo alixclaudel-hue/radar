@@ -53,3 +53,6 @@ discogs_profile/
 !/data.sample/**
 
 .session_secret
+
+# worktrees des sub-agents Claude Code (session cloud) — jamais du contenu à versionner
+.claude/worktrees/

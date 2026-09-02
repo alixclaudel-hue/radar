@@ -38,12 +38,40 @@ ajouter `--force-recreate`. Un `curl` non authentifié renvoie 303 → `/login` 
 corpus, graphe, profils, `crate_radar_config.json` (contient le token Discogs, saisi via
 l'UI). **Rien de tout ça n'est dans git.** En local : `export CRATE_DATA_DIR=$PWD/data`.
 
+## Session cloud (Claude Code sur le web / mobile)
+
+Pilotable depuis le téléphone, indépendant du Mac. La session tourne sur une VM
+Ubuntu jetable, dépôt cloné frais depuis GitHub. `scripts/cloud-setup.sh` (câblé en
+hook `SessionStart` dans `.claude/settings.json`, gardé par `CLAUDE_CODE_REMOTE`)
+installe la stack FastAPI au démarrage — sans effet en local.
+
+Ce qui marche : éditer le code, `py_compile`, le smoke test des routes, ouvrir des
+PR. Le déploiement se fait tout seul au merge sur `main` (workflow GitHub Actions),
+rien à pousser à la main.
+
+Ce qui n'est PAS là : `/data`, `.env`, le token Discogs → les jobs qui appellent
+Discogs / YouTube / Bandcamp ne tournent pas ici ; Playwright + yt-dlp non installés
+(extraction DJ sets KO) ; pas d'accès SSH au VPS ; la mémoire perso de Claude Code
+(`~/.claude/`) n'est pas clonée — ce fichier et `docs/` sont la source de vérité.
+
+Smoke test (comme la CI, sans `/data`) :
+```bash
+CRATE_DATA_DIR=$(mktemp -d) RADAR_NO_AUTH=1 \
+  python -m uvicorn radar_web.app:app --port 8600 --log-level warning &
+curl -sf localhost:8600/health && for r in / /search /univers /settings /veille /patte; do
+  curl -s -o /dev/null -w "%{http_code} $r\n" "localhost:8600$r"; done   # attendu 200/303
+```
+
+Réseau : niveau **Trusted** de l'environnement cloud = registres de paquets + GitHub,
+suffisant pour développer. Pour tester en vrai un appel Discogs/Bandcamp, passer
+l'environnement en **Custom** et ajouter `api.discogs.com`, `bandcamp.com`.
+
 ## Conventions
 
 - **Avant chaque push** : `python3 -m py_compile` sur les fichiers touchés, puis lancer
   uvicorn en local (`CRATE_DATA_DIR` pointé sur un `data/` local) et `curl` les routes
-  modifiées — vérifier 200/303, pas de traceback. C'est le filet principal tant que la CI
-  n'est pas en place.
+  modifiées — vérifier 200/303, pas de traceback. Double du filet CI
+  (`.github/workflows/ci.yml`), qui rejoue py_compile + import + balayage des routes.
 - **Jamais `git add -A`** (a déjà committé un fichier de session par erreur). Ajouter les
   fichiers nommément. Relire `git status` avant de commiter.
 - Commits, commentaires, messages : **en français**.

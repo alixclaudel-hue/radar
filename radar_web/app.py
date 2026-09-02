@@ -673,12 +673,21 @@ def suggest_discogs(request: Request, q: str = "", type: str = "label"):
                 empty=f"Aucun {label} Discogs pour « {term} ».")
 
 
+def _score_min(raw):
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return v if v > 0 else None
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
                year_from: str = Form(""), year_to: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2"),
-               base_metric: str = Form(""), base_min: str = Form("")):
+               base_metric: str = Form(""), base_min: str = Form(""),
+               label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form("")):
     c = Ctx()
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
@@ -747,12 +756,18 @@ def search_run(request: Request, label: str = Form(""),
                        "score": sc,
                        "detail": {"label": det.get("label"), "artist": det.get("artist"),
                                   "style": det.get("style")}})
+    mins = {"label": _score_min(label_min), "artist": _score_min(artist_min), "style": _score_min(style_min)}
+    if any(v is not None for v in mins.values()):
+        scored = [x for x in scored if all(
+            v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     scored = scored[:48]
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
               "vinyl": bool(vinyl), "pages": npages,
-              "base_metric": base_metric, "base_min": str(base_min or "").strip()}
+              "base_metric": base_metric, "base_min": str(base_min or "").strip(),
+              "label_min": str(label_min or "").strip(), "artist_min": str(artist_min or "").strip(),
+              "style_min": str(style_min or "").strip()}
     hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,

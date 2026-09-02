@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Recherche · Radar{% endblock %}
 {% block content %}
 
@@ -32,6 +33,19 @@
       </div>
     </div>
   </details>
+
+  <div class="field" style="margin-top:10px">
+    <label>Score minimum par critère <span class="muted">· ne garde que les albums qui passent tous les seuils renseignés</span></label>
+    <div class="row">
+      <div class="field"><label>{{ icons.label() }} Label</label>
+        <input name="label_min" inputmode="numeric" placeholder="ex. 60" value="{{ q.label_min or '' }}"></div>
+      <div class="field"><label>{{ icons.artist() }} Artiste</label>
+        <input name="artist_min" inputmode="numeric" placeholder="ex. 60" value="{{ q.artist_min or '' }}"></div>
+      <div class="field"><label>🎚️ Style</label>
+        <input name="style_min" inputmode="numeric" placeholder="ex. 60" value="{{ q.style_min or '' }}"></div>
+    </div>
+  </div>
+
   <div class="row">
     <div class="field">
       <label>Genre <span class="muted">· choix multiple</span></label>

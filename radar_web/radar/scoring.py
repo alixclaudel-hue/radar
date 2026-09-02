@@ -43,7 +43,7 @@ class Ctx:
     def __init__(self, uid=None):
         self.uid = uid or store.current_uid()
         self.P = paths.user_paths(self.uid)
-        self.cfg = store.load_config(self.uid)
+        self.cfg = store.read_config(self.uid)
         self.scoring = self.cfg["scoring"]
         # gros fichiers relus à chaque requête -> cache invalidé sur mtime
         self.profile = store.load_cached(self.P.profile, {})

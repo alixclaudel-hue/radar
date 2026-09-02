@@ -1772,6 +1772,7 @@ def job_scan_catalog(job, params):
                       "type": "veille", "source": "veille", "active": True,
                       "verified": None, "n_items": None, "n_new": None, "last_scan": None}
     scat.save_catalog(cat)
+    idx = scat.load_index() if os.path.isfile(scat.INDEX_PATH) else scat.rebuild_index(cat)
     ctx = Ctx(uid="owner")
     force = bool(params.get("force"))
     only = params.get("only")                       # 1 seul vendeur, pour test
@@ -1857,6 +1858,7 @@ def job_scan_catalog(job, params):
         elif complete:
             n_new = len([r for r in snap if r not in prev])
             scat.save_inventory(u, snap)
+            scat.update_index(idx, u, snap)
             e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now,
                      **scat.seller_affinity(snap, ctx))
             total_new += n_new
@@ -1865,6 +1867,7 @@ def job_scan_catalog(job, params):
         else:
             job.msg(f"{u} : arrêté en cours de scan — repris depuis le début au prochain lancement")
         scat.save_catalog(cat)
+        scat.save_index(idx)
         job.tick(u)
         time.sleep(0.5)
 

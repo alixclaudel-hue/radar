@@ -16,7 +16,7 @@ import json
 import os
 
 from . import paths, sellers_seed
-from .store import normalize_label
+from .store import load_cached, normalize_label
 
 _NOT_12IN = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD")
 
@@ -129,19 +129,61 @@ def save_inventory(username, data):
     os.replace(tmp, inv_file(username))
 
 
+INDEX_PATH = os.path.join(paths.SHARED_DIR, "seller_index.json")
+
+
+def load_index():
+    return load_cached(INDEX_PATH, {})
+
+
+def save_index(idx):
+    os.makedirs(paths.SHARED_DIR, exist_ok=True)
+    tmp = INDEX_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(idx, f)
+    os.replace(tmp, INDEX_PATH)
+
+
+def update_index(idx, username, inv):
+    """Met à jour idx (`{release_id: [username, …]}`) en place pour un vendeur :
+    retire ses anciennes entrées, les réajoute d'après le nouveau snapshot."""
+    for rid, users in list(idx.items()):
+        if username in users:
+            users.remove(username)
+            if not users:
+                del idx[rid]
+    for rid in inv:
+        idx.setdefault(rid, [])
+        if username not in idx[rid]:
+            idx[rid].append(username)
+
+
+def rebuild_index(usernames):
+    """Reconstruction complète (backfill initial, ou si l'index a été perdu) —
+    relit tous les inventaires. Coûteux (28 Mo) : à réserver au job de fond."""
+    idx = {}
+    for u in usernames:
+        update_index(idx, u, load_inventory(u))
+    return idx
+
+
 def cart_coverage(cart_ids):
-    """[(username, entry, [release_id présents], top_prix)] trié par couverture."""
+    """[(username, entry, [release_id présents])] trié par couverture, via
+    l'index inversé (pas de lecture des inventaires détaillés)."""
     want = {str(x) for x in cart_ids}
     if not want:
         return []
     cat = load_catalog()
+    idx = load_index()
+    hits_by_user = {}
+    for rid in want:
+        for u in idx.get(rid, []):
+            hits_by_user.setdefault(u, []).append(rid)
     out = []
-    for u, e in cat.items():
-        if not e.get("active"):
+    for u, hits in hits_by_user.items():
+        e = cat.get(u)
+        if not e or not e.get("active"):
             continue
-        inv = load_inventory(u)
-        hits = [rid for rid in want if rid in inv]
-        if hits:
-            out.append((u, e, hits))
+        out.append((u, e, hits))
     out.sort(key=lambda t: (-len(t[2]), t[1].get("name", t[0]).lower()))
     return out

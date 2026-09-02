@@ -280,7 +280,7 @@ def account_invite(request: Request):
 
 # --------------------------------------------------------------------- helpers
 def render(request, tpl, **ctx):
-    ctx.setdefault("has_token", bool(store.load_config().get("token")))
+    ctx.setdefault("has_token", bool(store.read_config().get("token")))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
     ctx.setdefault("n_cart", len(load(_pu().cart, [])))
@@ -1208,9 +1208,6 @@ def univers_page(request: Request, tab: str = "labels"):
         ({"key": ck, "name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
          if not str(disp.get(ck, ck)).startswith("id:")),
         key=lambda r: r["name"].lower())
-    artist_names = sorted({v for v in disp.values() if not str(v).startswith("id:")},
-                          key=str.lower)
-    label_names = sorted({r["disp"] for r in _base_labels_ranked(c)}, key=str.lower)
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
@@ -1219,7 +1216,6 @@ def univers_page(request: Request, tab: str = "labels"):
                   label_graphs=label_graphs,
                   artist_graphs=artist_graphs,
                   classified_artists=classified_artists,
-                  artist_names=artist_names, label_names=label_names,
                   top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
                   top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 

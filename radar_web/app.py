@@ -1507,8 +1507,16 @@ def job_status_frag(name: str):
     elif queued:
         inner = f"<span class='small muted'>🕓 {msg}</span>"
     elif run:
+        subbar = ""
+        sub_total = s.get("sub_total")
+        if sub_total:
+            sub_done = s.get("sub_done", 0)
+            spct = min(100, round(100 * sub_done / sub_total))
+            sub_label = html.escape(str(s.get("sub_label") or ""))
+            subbar = (f"<div class='small muted' style='margin-top:4px'>{sub_label} · {sub_done}/{sub_total} article(s)</div>"
+                      f"<div class='progress'><i style='width:{spct}%'></i></div>")
         inner = (f"<span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>"
-                 f"<div class='progress'><i style='width:{pct}%'></i></div>")
+                 f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}")
     else:
         inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"
     poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'"

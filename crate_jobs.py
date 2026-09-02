@@ -172,6 +172,17 @@ class Job:
         self.st["message"] = m
         self.flush()
 
+    def sub(self, done=None, total=None, label=None):
+        """Sous-progression optionnelle (ex. articles du vendeur en cours dans
+        scan_catalog), affichée par job_status_frag en plus de done/total."""
+        if done is not None:
+            self.st["sub_done"] = done
+        if total is not None:
+            self.st["sub_total"] = total
+        if label is not None:
+            self.st["sub_label"] = label
+        self.flush()
+
     def finish(self, message="", error=None):
         self.st.update(running=False, message=message or self.st["message"],
                        error=error, finished_at=datetime.now().isoformat(timespec="seconds"))
@@ -1806,6 +1817,7 @@ def job_scan_catalog(job, params):
                                   "sleeve": x.get("sleeve_condition"),
                                   "listed": x.get("posted"),
                                   "artist": rel.get("artist"), "format": rel.get("format")}
+            job.sub(done=len(snap), total=d.get("pagination", {}).get("items", len(snap)), label=u)
             if page >= d.get("pagination", {}).get("pages", 1) or not got:
                 break
             page += 1

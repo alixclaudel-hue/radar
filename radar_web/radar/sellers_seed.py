@@ -132,6 +132,12 @@ SEED = [
     {"u": "Kako_Records_Store", "name": "Kako Records Store", "c": "FR", "city": "Marseille", "f": "all + electronic", "t": "shop"},
     {"u": "extendandplay", "name": "Extend & Play", "c": "FR", "city": "Marseille", "f": "disco/rave/techno/house", "t": "shop"},
     {"u": "besides-records", "name": "Besides Records", "c": "FR", "city": "Lille", "f": "new & 2nd hand vinyl + electronic", "t": "shop"},
+    {"u": "unite-centrale", "name": "Unité Centrale", "c": "FR", "city": "Lyon", "f": "techno/house/electro 12\"", "t": "shop"},
+    {"u": "Willgroove", "name": "Willgroove", "c": "FR", "city": "", "f": "house/tech house/electro 12\"", "t": "webshop"},
+    {"u": "EuropeVinylRecords", "name": "Breizh Tek Shop", "c": "FR", "city": "Rennes", "f": "techno/minimal/electro", "t": "webshop"},
+    {"u": "identitydiffusion", "name": "Identity Diffusion", "c": "FR", "city": "Seine-Saint-Denis", "f": "techno/electro 12\"", "t": "shop"},
+    {"u": "MusicHouseParis", "name": "Music House Paris", "c": "FR", "city": "Paris", "f": "house/techno 12\"", "t": "shop"},
+    {"u": "dizonord.marseille", "name": "Dizonord", "c": "FR", "city": "Marseille", "f": "généraliste + electronic (occasion)", "t": "shop"},
     # --- Italie
     {"u": "serendeepity", "name": "Serendeepity", "c": "IT", "city": "Milan", "f": "techno/house/disco/bass/experimental", "t": "shop"},
     {"u": "totalrecords", "name": "Ultrasuoni Records", "c": "IT", "city": "Rome", "f": "techno/house/ambient/electro/wave/italo", "t": "shop"},

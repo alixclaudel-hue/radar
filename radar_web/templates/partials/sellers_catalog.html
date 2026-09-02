@@ -26,6 +26,7 @@
         <thead><tr style="text-align:left;color:var(--soft);font-size:11px;text-transform:uppercase">
           <th style="padding:5px 6px">Vendeur</th><th style="padding:5px 6px">Pays</th>
           <th style="padding:5px 6px">Focus</th><th style="padding:5px 6px;width:70px">Articles</th>
+          <th style="padding:5px 6px;width:110px">Goût (12")</th>
           <th style="padding:5px 6px;width:90px">Dernier scan</th><th></th></tr></thead>
         <tbody>
         {% for r in rows %}
@@ -35,6 +36,14 @@
           <td style="padding:5px 6px">{{ r.country }}</td>
           <td style="padding:5px 6px" class="small muted">{{ r.focus }}</td>
           <td style="padding:5px 6px">{{ r.n_items if r.n_items is not none else '—' }}</td>
+          <td style="padding:5px 6px">
+            {% if r.get('note') is not none %}
+            <span class="badge small {{ 'clay' if r.note < 50 }}"
+                  title="{{ r.n_matched }} article(s) 12\" d'artiste(s) connu(s) sur {{ r.n_12in }} au total">{{ r.note }}</span>
+            {% if r.get('top_styles') %}<span class="small muted"> · {{ r.top_styles|join(', ') }}</span>{% endif %}
+            {% elif r.get('n_12in') %}<span class="small muted">{{ r.n_12in }} × 12" · goût inconnu</span>
+            {% else %}<span class="small muted">—</span>{% endif %}
+          </td>
           <td style="padding:5px 6px" class="small muted">{{ (r.last_scan or '')[:10] or '—' }}</td>
           <td style="padding:5px 6px">
             <button class="small" hx-post="/sellers/catalog/toggle" hx-vals='{"u": {{ r.u|tojson }} }'

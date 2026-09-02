@@ -1,9 +1,13 @@
 """Catalogue partagé de vendeurs Discogs + snapshots d'inventaire.
 
 - `sellers_catalog.json` : {username: {name, country, city, focus, type, source,
-  active, verified, n_items, n_new, last_scan}} — donnée publique, mutualisée.
+  active, verified, n_items, n_new, last_scan, note, n_12in, n_matched,
+  top_styles}} — donnée publique, mutualisée. `note`/`n_matched`/`top_styles`
+  sont calculés par `seller_affinity()` à partir du goût du propriétaire.
 - `seller_inventory/<username>.json` : {release_id: {listing_id, price, currency,
-  condition, sleeve, listed}} — snapshot « For Sale » du dernier scan.
+  condition, sleeve, listed, artist, format}} — snapshot « For Sale » du dernier
+  scan. `artist`/`format` viennent gratuitement de l'inventaire Discogs (pas
+  d'appel supplémentaire).
 
 Aucun appel API ici : la lecture est instantanée. Le remplissage se fait par le
 job `scan_catalog` (crate_jobs.py).
@@ -12,6 +16,46 @@ import json
 import os
 
 from . import paths, sellers_seed
+from .store import normalize_label
+
+_NOT_12IN = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD")
+
+
+def _is_12in(fmt):
+    """Heuristique sur la chaîne `format` de Discogs (ex. '12", EP', 'LP, Album, RE',
+    '7", Single') : exclut explicitement les formats non-12", le reste (LP ou 12"
+    explicite) est du 12"."""
+    f = fmt or ""
+    if any(x in f for x in _NOT_12IN):
+        return False
+    return "LP" in f or '12"' in f
+
+
+def seller_affinity(inv, ctx):
+    """Aperçu goût d'un vendeur sur son stock 12" uniquement (pas les 45 tours) :
+    note = affinité moyenne (façon album_score) des artistes déjà connus dans
+    `ctx.ascore`, sur les articles où au moins un artiste crédité est reconnu.
+    `top_styles` est estimé via les labels déjà profilés par l'utilisateur (pas
+    d'appel Discogs supplémentaire — le style/genre n'est pas dans l'inventaire)."""
+    bl = float(ctx.scoring["album"].get("artist_max_vs_mean", 0.6))
+    item_scores, style_hits, n_12in = [], {}, 0
+    for item in inv.values():
+        if not _is_12in(item.get("format")):
+            continue
+        n_12in += 1
+        arts = ctx.split_credit_artists(item.get("artist") or "")
+        known = [ctx.ascore[k] for a in arts
+                 if (k := ctx.canon_artist_key(a)) in ctx.ascore]
+        if known:
+            item_scores.append(bl * max(known) + (1 - bl) * (sum(known) / len(known)))
+        lab = item.get("label")
+        prof = ctx.profile.get(normalize_label(lab)) if lab else None
+        for s, n in ((prof or {}).get("style_counts") or {}).items():
+            style_hits[s] = style_hits.get(s, 0) + n
+    return {"n_12in": n_12in,
+            "n_matched": len(item_scores),
+            "note": round(sum(item_scores) / len(item_scores)) if item_scores else None,
+            "top_styles": sorted(style_hits, key=style_hits.get, reverse=True)[:3]}
 
 CATALOG_PATH = os.path.join(paths.SHARED_DIR, "sellers_catalog.json")
 INV_DIR = os.path.join(paths.SHARED_DIR, "seller_inventory")

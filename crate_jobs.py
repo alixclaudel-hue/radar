@@ -1736,14 +1736,24 @@ def job_scan_catalog(job, params):
     (release_id -> prix/état), et compte les nouveautés vs le snapshot précédent.
     Reprenable : on saute les vendeurs scannés il y a moins de `min_age_days`
     sauf si `force`. Le catalogue est partagé -> tourne toujours en tant que owner.
+    Calcule aussi, par vendeur, une note d'affinité goût sur son stock 12" (pas
+    les 45 tours) via `sellers.seller_affinity` — cf. Ctx.ascore.
     """
     from radar_web.radar import sellers as scat
+    from radar_web.radar.scoring import Ctx
 
     cfg = cfg_load()
     token = cfg.get("token", "")
     if not token:
         return job.finish(error="Pas de token Discogs.")
     cat = scat.ensure_seeded()
+    for u in cfg.get("sellers", []):                # vendeurs suivis en veille
+        if u and u not in cat:
+            cat[u] = {"name": u, "country": "", "city": "", "focus": "",
+                      "type": "veille", "source": "veille", "active": True,
+                      "verified": None, "n_items": None, "n_new": None, "last_scan": None}
+    scat.save_catalog(cat)
+    ctx = Ctx(uid="owner")
     force = bool(params.get("force"))
     only = params.get("only")                       # 1 seul vendeur, pour test
     max_pages = int(params.get("max_pages", 60))
@@ -1794,7 +1804,8 @@ def job_scan_catalog(job, params):
                                   "price": pr.get("value"), "currency": pr.get("currency"),
                                   "condition": x.get("condition"),
                                   "sleeve": x.get("sleeve_condition"),
-                                  "listed": x.get("posted")}
+                                  "listed": x.get("posted"),
+                                  "artist": rel.get("artist"), "format": rel.get("format")}
             if page >= d.get("pagination", {}).get("pages", 1) or not got:
                 break
             page += 1
@@ -1809,7 +1820,8 @@ def job_scan_catalog(job, params):
         else:
             n_new = len([r for r in snap if r not in prev])
             scat.save_inventory(u, snap)
-            e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now)
+            e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now,
+                     **scat.seller_affinity(snap, ctx))
             total_new += n_new
             job.msg(f"{u} : {len(snap)} article(s), +{n_new} nouveau(x)")
         cat[u] = e

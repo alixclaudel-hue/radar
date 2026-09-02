@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <div id="labels-table">
   <div class="field" style="max-width:320px">
     <label>Filtrer</label>
@@ -27,7 +28,7 @@
         <td style="padding:6px 8px">
           {% if r.aff is not none %}
           <div class="progress" style="height:6px"><i style="width:{{ r.aff }}%"></i></div>
-          <span class="small muted">{{ r.aff }}</span>
+          <span class="small muted">{{ icons.label() }} {{ r.aff }}</span>
           {% else %}<span class="small muted">—</span>{% endif %}
         </td>
         <td style="padding:6px 8px" class="small muted">{{ r._reco }}</td>

@@ -1796,7 +1796,7 @@ def job_scan_catalog(job, params):
             break
         e = cat.setdefault(u, {})
         prev = scat.load_inventory(u)
-        snap, page, unreachable = {}, 1, False
+        snap, page, unreachable, complete = {}, 1, False, False
         while page <= max_pages:
             d = discogs_get(token, f"/users/{u}/inventory",
                             {"status": "For Sale", "per_page": 100, "page": page,
@@ -1819,7 +1819,10 @@ def job_scan_catalog(job, params):
                                   "artist": rel.get("artist"), "format": rel.get("format")}
             job.sub(done=len(snap), total=d.get("pagination", {}).get("items", len(snap)), label=u)
             if page >= d.get("pagination", {}).get("pages", 1) or not got:
+                complete = True
                 break
+            if job.stopped():                       # arrêt demandé : on coupe cette pagination
+                break                                # sans marquer le vendeur comme scanné (repris au prochain lancement)
             page += 1
             time.sleep(1.1)
 
@@ -1829,20 +1832,25 @@ def job_scan_catalog(job, params):
             if fails >= 2:                          # KO deux fois de suite -> on désactive
                 e["active"] = False
             job.msg(f"{u} : inventaire inaccessible ({fails})")
-        else:
+            cat[u] = e
+        elif complete:
             n_new = len([r for r in snap if r not in prev])
             scat.save_inventory(u, snap)
             e.update(verified=True, fails=0, n_items=len(snap), n_new=n_new, last_scan=now,
                      **scat.seller_affinity(snap, ctx))
             total_new += n_new
             job.msg(f"{u} : {len(snap)} article(s), +{n_new} nouveau(x)")
-        cat[u] = e
+            cat[u] = e
+        else:
+            job.msg(f"{u} : arrêté en cours de scan — repris depuis le début au prochain lancement")
         scat.save_catalog(cat)
         job.tick(u)
         time.sleep(0.5)
 
     scat.save_catalog(cat)
-    job.finish(f"{job.st['done']} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.")
+    stopped = job.stopped()
+    suffix = " — arrêté, relance le scan pour continuer." if stopped else ""
+    job.finish(f"{job.st['done']}/{len(targets)} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.{suffix}")
 
 
 JOBS = {

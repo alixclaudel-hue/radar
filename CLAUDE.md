@@ -124,6 +124,37 @@ par `LIKE 'préfixe%'` — un `LIKE` sur une colonne insensible à la casse ne p
 borne d'index (confirmé à l'`EXPLAIN QUERY PLAN` : `SCAN`, pas `SEARCH`, malgré l'index
 présent).
 
+Le job télécharge aussi les dumps `labels` et `artists` (86 Mo + 474 Mo, contre 10+ Go pour
+`releases` — négligeable en plus) et les importe dans la MÊME base (`open_new_db()` /
+`finalize_new_db()` : une seule bascule atomique à la fin, jamais de base à moitié à jour) :
+
+- `labels` (`id`, `name`, `name_key`, `parent`) — le lien parent/sous-label n'existe dans le
+  dump que dans un sens (`<sublabels><label id="X">` posé sur l'entrée du PARENT) ;
+  `import_labels()` accumule id→nom et enfant→id_parent en mémoire pendant le flux et résout
+  `parent` en un seul `UPDATE` à la fin.
+- `artists` (`id`, `name`, `name_key`, `real_name`) + `artist_aliases` (`name_key`,
+  `artist_id`) pour les `namevariations` (variantes de graphie du même artiste — les
+  `<aliases>` du dump, autres identités avec leur propre entrée `<artist>` ailleurs dans le
+  même dump, n'ont pas besoin d'un lien de plus : chercher leur nom résout déjà directement
+  sur leur propre id via `artists`).
+- `release_artists` (`release_id`, `artist_id`, `role`) — crédits par sortie, limités aux
+  rôles qui pèsent dans le scoring (`Main`, `Producer`, `Remix`, `Written-By`, `Featuring`),
+  remplie pendant le parsing des sorties (`<artists>` + `<extraartists>` filtrés). Rend
+  possible un vrai graphe de co-crédits par jointure SQL (`JOIN release_artists ON
+  release_id` en s'excluant soi-même) au lieu d'un appel API par graine — **pas encore
+  branché** : `job_build_graph`/`canonicalize` continuent d'interroger l'API pour l'instant.
+- `resolve_name(name, kind, con=None)` — résolution de nom vers id Discogs canonique sans
+  appel API (`name_key` direct, puis repli `artist_aliases` pour un artiste). **Encore
+  inutilisée** par les jobs de résolution — prochaine étape (cf. `docs/etat.md`).
+- `<label>`/`<artist>` en tags XML réapparaissent imbriqués dans le dump lui-même
+  (`<sublabels><label id="X">`) : un compteur de profondeur dans `import_labels()`/
+  `import_artists()` ignore les balises refermées à une profondeur non nulle (référence
+  imbriquée), ne traite que celles qui reviennent à 0 (enregistrement racine).
+- Champs XML des dumps labels/artists non vérifiés contre un vrai fichier (accès réseau à
+  `data.discogs.com` indisponible depuis le sandbox de dev cloud, cf. plus haut) — écrits
+  d'après le schéma documenté des dumps Discogs, à l'instar du parsing releases existant. À
+  confirmer/ajuster au premier import réel sur le VPS.
+
 ## Entretien de fond (plus de boutons dans Réglages)
 
 `RADAR_AUTO_MAINTENANCE=1` (même `.env` du service `radar-worker`) enfile automatiquement,

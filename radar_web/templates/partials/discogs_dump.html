@@ -8,6 +8,8 @@
     <p class="small">Dump du <b>{{ meta.dump_date[:4] }}-{{ meta.dump_date[4:6] }}-{{ meta.dump_date[6:] }}</b>
       · {{ "{:,}".format(meta.n_vinyl).replace(",", " ") }} sortie(s) vinyle retenue(s) sur
       {{ "{:,}".format(meta.n_total).replace(",", " ") }} au total
+      {% if meta.n_labels %}· {{ "{:,}".format(meta.n_labels).replace(",", " ") }} label(s){% endif %}
+      {% if meta.n_artists %}· {{ "{:,}".format(meta.n_artists).replace(",", " ") }} artiste(s){% endif %}
       · importé le {{ (meta.imported_at or "")[:10] }}</p>
   {% else %}
     <p class="small muted">Aucun import encore fait.</p>

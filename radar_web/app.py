@@ -1524,13 +1524,12 @@ def job_status_frag(name: str):
     pct = min(100, round(100 * done / total))
     run, err, queued = s.get("running"), s.get("error"), s.get("queued")
     msg = html.escape(str(s.get("message") or ""))
-    stopbtn = (f"<button type='button' class='small' hx-post='/jobs/{name}/stop' "
-               f"hx-target='#job-{name}' hx-swap='outerHTML' hx-confirm='Arrêter ce job ?' "
-               f"style='margin-left:8px'>■ arrêter</button>")
+    stopbtn = (f"<button type='button' class='small btn-stop' hx-post='/jobs/{name}/stop' "
+               f"hx-target='#job-{name}' hx-swap='outerHTML' hx-confirm='Arrêter ce job ?'>■ arrêter</button>")
     if err:
         inner = f"<span class='notice warn small'>{html.escape(str(err))}</span>"
     elif queued:
-        inner = f"<span class='small muted'>🕓 {msg}</span>{stopbtn}"
+        inner = f"<div class='job-status'><span class='small muted'>🕓 {msg}</span>{stopbtn}</div>"
     elif run:
         subbar = ""
         sub_total = s.get("sub_total")
@@ -1540,7 +1539,7 @@ def job_status_frag(name: str):
             sub_label = html.escape(str(s.get("sub_label") or ""))
             subbar = (f"<div class='small muted' style='margin-top:4px'>{sub_label} · {sub_done}/{sub_total} article(s)</div>"
                       f"<div class='progress'><i style='width:{spct}%'></i></div>")
-        inner = (f"<span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>{stopbtn}"
+        inner = (f"<div class='job-status'><span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>{stopbtn}</div>"
                  f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}")
     else:
         inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"

@@ -33,13 +33,18 @@ RAW_DIR = os.path.join(paths.SHARED_DIR, "discogs_dump_raw")
 
 # Le bucket S3 direct (discogs-data-dumps.s3...) renvoie 403 sur le listing
 # ET sur les objets depuis fin 2025 (vérifié) — seul data.discogs.com (même
-# bucket, derrière Cloudflare) fonctionne encore, sous les mêmes chemins.
+# bucket, derrière Cloudflare) fonctionne encore. Le chemin direct
+# (/data/{year}/...) a lui aussi cessé de servir le fichier : le serveur y
+# répond 200 + une page HTML générique au lieu du binaire (vérifié en
+# conditions réelles). Le téléchargement passe désormais par un paramètre de
+# requête ?download=... — c'est ce que la page de listing elle-même génère
+# comme lien pour chaque fichier.
 # UA de navigateur : Cloudflare peut challenger un UA "requests"/"curl" nu.
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/124.0.0.0 Safari/537.36 Radar/1.0 (+personal-use, cf. CLAUDE.md)")
 DATA_HOST = "https://data.discogs.com"
-DUMP_URL_TMPL = DATA_HOST + "/data/{year}/discogs_{date}_releases.xml.gz"
-CHECKSUM_URL_TMPL = DATA_HOST + "/data/{year}/discogs_{date}_CHECKSUM.txt"
+DUMP_URL_TMPL = DATA_HOST + "/?download=data/{year}/discogs_{date}_releases.xml.gz"
+CHECKSUM_URL_TMPL = DATA_HOST + "/?download=data/{year}/discogs_{date}_CHECKSUM.txt"
 
 _NOT_VINYL_MARKERS = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD", "Blu-ray", "SACD", "VHS")
 
@@ -102,9 +107,10 @@ def save_meta(d):
 # --------------------------------------------------------------- listing / téléchargement
 
 def _list_via_s3_xml(year):
-    """Repli 1 : data.discogs.com sert le même bucket que l'ancien accès S3
-    direct (fermé, 403) — sa réponse de listing est probablement encore un
-    ListBucketResult XML standard."""
+    """Repli 1 : tente le ListBucketResult XML standard d'un accès S3 direct.
+    En pratique data.discogs.com répond désormais avec une page HTML de
+    listing (cf. `_list_via_html`) — ce repli échoue donc au parsing XML et
+    laisse la main au suivant, gardé au cas où la forme XML reviendrait."""
     r = requests.get(f"{DATA_HOST}/", params={"delimiter": "/", "prefix": f"data/{year}/"},
                       headers={"User-Agent": UA}, timeout=30)
     r.raise_for_status()
@@ -132,7 +138,11 @@ def _list_via_html(year):
 def _list_via_month_probe(months_back=6):
     """Repli 3, déterministe, sans listing : la cadence récente est le 1er du
     mois (pas garanti historiquement) — on sonde le CHECKSUM.txt de chaque
-    mois récent en HEAD et on garde le plus récent qui répond 200."""
+    mois récent en HEAD et on garde le plus récent qui répond avec un vrai
+    fichier. Le host répond 200 + une page HTML générique pour à peu près
+    n'importe quel chemin (vérifié en conditions réelles) : le status_code
+    seul ne prouve plus rien, on exige en plus un en-tête `content-disposition`
+    de type pièce jointe, propre aux vraies réponses de téléchargement."""
     from datetime import date
     today = date.today()
     out = []
@@ -142,7 +152,7 @@ def _list_via_month_probe(months_back=6):
         url = CHECKSUM_URL_TMPL.format(year=y, date=date_str)
         try:
             r = requests.head(url, headers={"User-Agent": UA}, timeout=15, allow_redirects=True)
-            if r.status_code == 200:
+            if r.status_code == 200 and "attachment" in r.headers.get("content-disposition", "").lower():
                 out.append(date_str)
         except requests.RequestException:
             pass
@@ -153,12 +163,11 @@ def _list_via_month_probe(months_back=6):
 
 
 def find_latest_dump_date():
-    """Date 'YYYYMMDD' du dernier dump 'releases' publié — chaîne de repli
-    car le mécanisme de listing exact de data.discogs.com n'a pas pu être
-    vérifié en direct (réseau bloqué depuis l'environnement de dev, cf.
-    CLAUDE.md) : ListBucketResult XML -> regex HTML -> sondage déterministe
-    mois par mois. Essaie l'année courante puis la précédente (cas d'un
-    import lancé en tout début d'année, avant le 1er dump de l'année)."""
+    """Date 'YYYYMMDD' du dernier dump 'releases' publié — chaîne de repli :
+    ListBucketResult XML -> regex HTML (celui qui marche en pratique,
+    vérifié en conditions réelles) -> sondage déterministe mois par mois.
+    Essaie l'année courante puis la précédente (cas d'un import lancé en
+    tout début d'année, avant le 1er dump de l'année)."""
     from datetime import date
     for lister in (_list_via_s3_xml, _list_via_html):
         for year in (date.today().year, date.today().year - 1):

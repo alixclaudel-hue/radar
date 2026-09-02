@@ -127,10 +127,14 @@ genre/style réel de chaque sortie déjà repérée en inventaire vendeur (le `r
 déjà connu gratuitement, aucun appel API en plus) ; repli sur le profilage label existant si
 la sortie n'est pas encore dans l'index (pas encore importé, ou trop récente).
 
-**Non testé en conditions réelles** : le listing/téléchargement de `data.discogs.com` n'a
-jamais pu être exercé en dev cloud (réseau bloqué, cf. section Session cloud) — la chaîne de
-repli (`find_latest_dump_date` : XML S3 → HTML → sondage mensuel) n'a été validée que sur
-fixtures synthétiques. Premier lancement réel à surveiller sur le VPS.
+**Premier lancement réel (VPS, sept. 2026)** : `data.discogs.com` sert désormais les fichiers
+via `?download=data/{year}/discogs_{date}_...` (paramètre de requête) et non plus via le
+chemin direct `/data/{year}/...` — celui-ci répond 200 + une page HTML générique au lieu du
+binaire. `find_latest_dump_date()` (repli HTML) trouvait déjà la bonne date malgré ça (la
+regex matche le nom de fichier où qu'il apparaisse dans la page) ; seuls `dump_url()` et
+`checksum_url()` étaient cassés. Corrigé. Le sondage mensuel (`_list_via_month_probe`, 3ᵉ
+repli, pas atteint en pratique) est désormais durci : le host répond 200 pour à peu près
+n'importe quel chemin, il faut en plus un `content-disposition: attachment`.
 
 ## Le « cerveau »
 

@@ -98,3 +98,34 @@ def stop(name, uid=None):
          if not (j["uid"] == uid and j["name"] == name and j["state"] == "queued")]
     save_queue(q)
     open(os.path.join(_user_jobs_dir(uid), f"{name}.stop"), "w").close()
+
+
+def reap_orphans():
+    """À appeler au démarrage du worker. Le worker est unique et sériel (cf.
+    worker.py) : un job encore marqué "running" dans la queue au démarrage
+    ne peut être qu'un orphelin d'un worker précédent tué en plein travail
+    (redéploiement, OOM...) — jamais un run concurrent légitime. Sans ce
+    nettoyage, launch() refuse silencieusement tout nouveau lancement pour
+    ce job (cf. status() qui force running=True tant que l'entrée traîne
+    dans la queue) : l'appli paraît bloquée pour de bon."""
+    q = load_queue()
+    orphans = [j for j in q if j["state"] == "running"]
+    if not orphans:
+        return orphans
+    for j in orphans:
+        p = _status_path(j["name"], j["uid"])
+        try:
+            with open(p, encoding="utf-8") as f:
+                s = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not s.get("running"):
+            continue
+        s["running"] = False
+        s["message"] = (s.get("message") or "").strip() + " — interrompu par un redéploiement, relance le job."
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(s, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, p)
+    save_queue([j for j in q if j["state"] != "running"])
+    return orphans

@@ -13,10 +13,9 @@
   <div id="job-scan_catalog" hx-get="/jobs/scan_catalog/status" hx-trigger="load" class="small" hx-swap="outerHTML"></div>
 
   <form hx-post="/sellers/catalog/add" hx-target="#sellers-catalog" hx-swap="outerHTML"
-        hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:520px;margin-top:10px">
-    <div class="field" style="flex:1;margin:0"><label>Ajouter un vendeur <span class="muted">· identifiant Discogs</span></label>
+        hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:420px;margin-top:10px">
+    <div class="field" style="flex:1;margin:0"><label>Ajouter un vendeur <span class="muted">· identifiant Discogs exact</span></label>
       <input name="u" placeholder="ex. hardwax-berlin"></div>
-    <div class="field" style="flex:1;margin:0"><label>Nom</label><input name="name" placeholder="Hard Wax"></div>
     <button type="submit" class="small">Ajouter</button>
   </form>
 

@@ -192,6 +192,16 @@ a.chip:hover{ border-color:var(--pin); }
 .inbox-row .txt{ flex:1; min-width:0; }
 .inbox-row .txt .sub{ font-size:12px; color:var(--soft); }
 
+/* tracks de DJ sets (Mon univers → Mes sets) */
+.tk-card{ display:flex; flex-direction:column; gap:5px; padding:9px 4px; border-top:1px solid var(--line); }
+.tk-card__title{ display:flex; align-items:baseline; gap:8px; }
+.tk-card__title a{ flex:1; min-width:0; overflow-wrap:break-word; }
+.tk-card__foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding-left:2px; }
+.tk-card__meta{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tk-card__actions{ display:flex; align-items:center; gap:12px; flex:0 0 auto; }
+.tk-card__actions button{ background:none; border:none; padding:1px; cursor:pointer; color:var(--ink); line-height:0; }
+.tk-card__actions a{ line-height:0; }
+
 .tracklist{ margin:8px 0 2px; font-size:13px; }
 .tracklist .tk-row{ display:flex; align-items:center; gap:7px; padding:3px 0; }
 .tracklist .tk-title{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -207,6 +217,11 @@ a.chip:hover{ border-color:var(--pin); }
 
 .progress{ height:8px; background:var(--line); border-radius:999px; overflow:hidden; }
 .progress > i{ display:block; height:100%; background:var(--pin); }
+
+.job-status{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
+.job-status .small{ min-width:0; }
+.btn-stop{ flex:none; border-color:var(--clay); color:var(--clay); }
+.btn-stop:hover{ background:var(--clay); color:var(--paper); }
 
 .spinner{ display:inline-block; width:14px; height:14px; border:2px solid var(--line);
   border-top-color:var(--pin); border-radius:50%; animation:spin .7s linear infinite; }

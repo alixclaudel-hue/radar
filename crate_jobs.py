@@ -2041,6 +2041,15 @@ def job_import_discogs_dump(job, params):
     "actualiser" retélécharge et reconstruit l'index en entier (peut prendre
     longtemps selon la bande passante et la taille des fichiers — plusieurs Go
     au total, l'essentiel pour Releases).
+
+    Reprenable : chaque déploiement redéploie le conteneur du worker (tout merge sur
+    main, pas seulement ceux qui touchent au dump), ce qui tue ce job en plein milieu
+    d'un import de ~1h45 s'il tombe pendant. `discogs_dump_import.state.json`
+    (dd.load_import_state/save_import_state) retient l'étape atteinte et, pour
+    Releases (le gros morceau), le nombre de sorties déjà committées : au prochain
+    lancement, l'import reprend à cet endroit plutôt que de repartir de zéro.
+    Labels/Artists (quelques minutes chacun) repartent de zéro sur eux-mêmes si
+    interrompus, sans reperdre Releases.
     """
     from radar_web.radar import discogs_dump as dd
 
@@ -2052,8 +2061,20 @@ def job_import_discogs_dump(job, params):
         return job.finish(error=f"Impossible de lister les dumps Discogs : {e}")
 
     meta = dd.get_meta()
-    if meta.get("dump_date") == latest and not force:
+    state = dd.load_import_state()
+    # une reprise porte forcément sur le MÊME dump (un dump mensuel est un instantané
+    # complet, jamais un delta) — un checkpoint d'un autre dump_date est caduc, ignoré.
+    resuming = state.get("dump_date") == latest and state.get("stage") in (
+        "releases", "labels", "artists", "finalize")
+    if meta.get("dump_date") == latest and not force and not resuming:
         return job.finish(f"Déjà à jour (dump du {latest}).")
+    if not resuming:
+        state = {"dump_date": latest, "stage": "releases",
+                  "releases_done": 0, "releases_vinyl": 0, "n_labels": 0, "n_artists": 0}
+        dd.save_import_state(state)
+    else:
+        job.msg(f"Reprise d'un import interrompu du dump {latest} (redémarré à l'étape « {state['stage']} », "
+                f"{state['releases_done']:,} sortie(s) déjà traitée(s))…".replace(",", " "))
 
     kinds = ("releases", "labels", "artists")
     gz_paths = {k: os.path.join(dd.RAW_DIR, f"discogs_{latest}_{k}.xml.gz") for k in kinds}
@@ -2088,31 +2109,68 @@ def job_import_discogs_dump(job, params):
         # ok is None : CHECKSUM.txt indisponible (ou ce fichier n'y figure pas), on ne bloque pas l'import dessus.
 
     est_total = meta.get("n_total") or 20_000_000
-    con = dd.open_new_db()
+    con = dd.open_new_db(resume=resuming)
     try:
-        job.msg(f"Import du dump {latest} — sorties…")
+        if state["stage"] == "releases":
+            job.msg(f"Import du dump {latest} — sorties…")
 
-        def releases_progress(done):
-            job.sub(done=done, total=max(est_total, done), label="import des sorties")
-        n_total, n_vinyl = dd.import_releases(con, gz_paths["releases"], progress_cb=releases_progress)
+            def releases_progress(done):
+                job.sub(done=done, total=max(est_total, done), label="import des sorties")
 
-        job.msg(f"Import du dump {latest} — labels…")
+            def releases_checkpoint(done, vinyl):
+                # `seen`/`n_vinyl` ne remontent ici qu'après un commit (cf. import_releases) :
+                # toujours sûr à écrire comme point de reprise.
+                state["releases_done"], state["releases_vinyl"] = done, vinyl
+                dd.save_import_state(state)
 
-        def labels_progress(done):
-            job.sub(done=done, total=max(done, 1), label="import des labels")
-        n_labels = dd.import_labels(con, gz_paths["labels"], progress_cb=labels_progress)
+            n_total, n_vinyl = dd.import_releases(
+                con, gz_paths["releases"], progress_cb=releases_progress,
+                resume_from=state["releases_done"], resume_vinyl=state["releases_vinyl"],
+                checkpoint_cb=releases_checkpoint)
+            state["stage"] = "labels"
+            dd.save_import_state(state)
+        else:
+            n_total, n_vinyl = state["releases_done"], state["releases_vinyl"]
 
-        job.msg(f"Import du dump {latest} — artistes…")
+        if state["stage"] == "labels":
+            job.msg(f"Import du dump {latest} — labels…")
 
-        def artists_progress(done):
-            job.sub(done=done, total=max(done, 1), label="import des artistes")
-        n_artists = dd.import_artists(con, gz_paths["artists"], progress_cb=artists_progress)
+            def labels_progress(done):
+                job.sub(done=done, total=max(done, 1), label="import des labels")
+            # pas de reprise fine ici (fichier bien plus petit que releases, quelques
+            # minutes tout au plus) : un labels interrompu repart de zéro sur ce seul
+            # fichier, sans reperdre releases. INSERT OR REPLACE (clé = id) : rejouer le
+            # parsing en entier ne duplique rien.
+            n_labels = dd.import_labels(con, gz_paths["labels"], progress_cb=labels_progress)
+            state["stage"], state["n_labels"] = "artists", n_labels
+            dd.save_import_state(state)
+        else:
+            n_labels = state["n_labels"]
+
+        if state["stage"] == "artists":
+            job.msg(f"Import du dump {latest} — artistes…")
+            # artist_aliases est un INSERT simple (pas REPLACE, pas de clé naturelle) :
+            # si une tentative précédente sur CETTE étape a été interrompue en cours de
+            # route, ses lignes partielles doivent être purgées avant de tout rejouer,
+            # sinon les alias déjà committés se dupliqueraient. Sans effet sur un premier
+            # passage (table encore vide).
+            con.execute("DELETE FROM artist_aliases")
+
+            def artists_progress(done):
+                job.sub(done=done, total=max(done, 1), label="import des artistes")
+            n_artists = dd.import_artists(con, gz_paths["artists"], progress_cb=artists_progress)
+            state["stage"], state["n_artists"] = "finalize", n_artists
+            dd.save_import_state(state)
+        else:
+            n_artists = state["n_artists"]
 
         job.msg("Construction des index…")
         dd.finalize_new_db(con)
     except Exception as e:                        # noqa: BLE001
         con.close()
         return job.finish(error=f"Import échoué : {e}")
+
+    dd.clear_import_state()
 
     for kind in kinds:
         try:

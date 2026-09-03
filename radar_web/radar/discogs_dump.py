@@ -30,6 +30,11 @@ from .store import normalize_label
 DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_meta.json")
 RAW_DIR = os.path.join(paths.SHARED_DIR, "discogs_dump_raw")
+# Checkpoint de reprise (releases_done/vinyl + étape atteinte) : un import complet dure
+# ~1h45, largement plus long qu'un cycle de déploiement — sans ça, un redéploiement en
+# plein milieu (rebuild Docker sur CHAQUE merge, pas seulement ceux qui touchent au dump)
+# faisait tout reperdre. Supprimé une fois l'import terminé (clear_import_state).
+IMPORT_STATE_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_import.state.json")
 
 # Le bucket S3 direct (discogs-data-dumps.s3...) renvoie 403 sur le listing
 # ET sur les objets depuis fin 2025 (vérifié) — seul data.discogs.com (même
@@ -106,16 +111,19 @@ def _create_indexes(con):
     """Appelé une fois la table remplie, jamais avant : indexer une table déjà
     pleine évite de mettre à jour les arbres B à chaque ligne insérée pendant
     tout l'import (facteur 2-3 sur la durée, cf. diagnostic D1)."""
-    con.execute("CREATE INDEX idx_releases_label_key ON releases(label_key)")
-    con.execute("CREATE INDEX idx_releases_artist_key ON releases(artist_key)")
-    con.execute("CREATE INDEX idx_releases_year ON releases(year)")
-    con.execute("CREATE INDEX idx_rs_style ON release_styles(style)")
-    con.execute("CREATE INDEX idx_rs_release ON release_styles(release_id)")
-    con.execute("CREATE INDEX idx_labels_name_key ON labels(name_key)")
-    con.execute("CREATE INDEX idx_artists_name_key ON artists(name_key)")
-    con.execute("CREATE INDEX idx_alias_key ON artist_aliases(name_key)")
-    con.execute("CREATE INDEX idx_ra_artist ON release_artists(artist_id)")
-    con.execute("CREATE INDEX idx_ra_release ON release_artists(release_id)")
+    # IF NOT EXISTS : finalize_new_db (donc _create_indexes) doit pouvoir être rejoué sans
+    # erreur si un redéploiement interrompt l'étape "finalize" après quelques index déjà
+    # construits (cf. reprise sur discogs_dump_import.state.json).
+    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_label_key ON releases(label_key)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_artist_key ON releases(artist_key)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_year ON releases(year)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_rs_style ON release_styles(style)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_rs_release ON release_styles(release_id)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_labels_name_key ON labels(name_key)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_artists_name_key ON artists(name_key)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_alias_key ON artist_aliases(name_key)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_ra_artist ON release_artists(artist_id)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_ra_release ON release_artists(release_id)")
 
 
 def get_meta():
@@ -132,6 +140,34 @@ def save_meta(d):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(d, f, ensure_ascii=False, indent=2)
     os.replace(tmp, META_PATH)
+
+
+def load_import_state():
+    """{} si aucun import interrompu en attente de reprise, ou si le fichier est
+    absent/corrompu (on repart alors de zéro plutôt que de planter dessus)."""
+    try:
+        with open(IMPORT_STATE_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_import_state(d):
+    """Appelé après chaque lot commité pendant import_releases (~toutes les 20k
+    sorties) : le point de reprise doit toujours correspondre à des données déjà
+    committées dans le .new, jamais à un état intermédiaire."""
+    os.makedirs(paths.SHARED_DIR, exist_ok=True)
+    tmp = IMPORT_STATE_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(tmp, IMPORT_STATE_PATH)
+
+
+def clear_import_state():
+    try:
+        os.remove(IMPORT_STATE_PATH)
+    except OSError:
+        pass
 
 
 # --------------------------------------------------------------- listing / téléchargement
@@ -400,7 +436,7 @@ def _detect_needs_wrap(gz_path, root_tag=b"<releases"):
     return needs_wrap, skip
 
 
-def open_new_db():
+def open_new_db(resume=False):
     """Ouvre le fichier de reconstruction `DB_PATH + ".new"` : PRAGMAs d'import
     puis schéma créé (sans index — cf. `_create_indexes`). Un cycle d'import
     enchaîne `import_releases`/`import_labels`/`import_artists` sur la MÊME
@@ -409,12 +445,24 @@ def open_new_db():
     unique. Reconstruire à part, jamais dans `DB_PATH` lui-même, ferme la
     fenêtre où `available()` mentirait pendant les ~1h45 que dure un import
     (cf. diagnostic D1) — l'appli lit l'ancienne base valide jusqu'à la
-    dernière seconde, et un import interrompu ne détruit jamais l'existant."""
+    dernière seconde, et un import interrompu ne détruit jamais l'existant.
+
+    `resume=True` : reprise d'un import interrompu (cf.
+    `discogs_dump_import.state.json`, même `dump_date`) — rouvre le `.new`
+    existant tel quel, sans le vider ni recréer le schéma (les tables
+    contiennent déjà les lignes committées avant l'interruption)."""
     os.makedirs(paths.SHARED_DIR, exist_ok=True)
     new_path = DB_PATH + ".new"
+    if resume and os.path.exists(new_path):
+        con = sqlite3.connect(new_path)
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA synchronous=OFF")
+        con.execute("PRAGMA temp_store=MEMORY")
+        con.execute("PRAGMA cache_size=-131072")
+        return con
     for p in (new_path, new_path + "-wal", new_path + "-shm"):
         try:
-            os.remove(p)                          # reliquat d'un import précédent interrompu
+            os.remove(p)                          # reliquat d'un import précédent abandonné
         except OSError:
             pass
     con = sqlite3.connect(new_path)
@@ -471,16 +519,27 @@ def finalize_new_db(con):
     os.replace(new_path, DB_PATH)
 
 
-def import_releases(con, gz_path, progress_cb=None, batch_size=5000):
+def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
+                     resume_from=0, resume_vinyl=0, checkpoint_cb=None):
     """Parse en flux le dump releases.xml.gz, ne garde que le vinyle, insère
     en base par lots dans `releases`/`release_styles`/`release_artists`, sur
     une connexion déjà ouverte par `open_new_db()` (ne gère pas le cycle de
     vie du fichier — cf. `open_new_db()`/`finalize_new_db()`). Retourne
-    (n_total_vu, n_vinyle)."""
+    (n_total_vu, n_vinyle).
+
+    `resume_from`/`resume_vinyl` : reprise après une interruption (cf.
+    `discogs_dump_import.state.json`) — les `resume_from` premiers éléments
+    `<release>` du flux sont juste traversés (`elem.clear()`, pas de parsing
+    ni d'insertion) pour retrouver la même position dans le fichier sans
+    reproduire un travail déjà committé ; `resume_vinyl` est repris tel quel
+    comme base du compteur retourné. `checkpoint_cb(seen, n_vinyl)` : appelé
+    juste après chaque commit (`flush`) — seen/n_vinyl à ce moment-là
+    correspondent toujours à des lignes déjà committées, jamais à un état
+    intermédiaire (sûr à persister comme point de reprise)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<releases")
-    n_total, n_vinyl, batch, style_rows, credit_rows = 0, 0, [], [], []
+    seen, n_vinyl, batch, style_rows, credit_rows = 0, resume_vinyl, [], [], []
 
     def flush():
         if batch:
@@ -498,6 +557,8 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000):
                 "INSERT INTO release_artists (release_id, artist_id, role) VALUES (?,?,?)", credit_rows)
             credit_rows.clear()
         con.commit()
+        if checkpoint_cb:
+            checkpoint_cb(seen, n_vinyl)
 
     with gzip.open(gz_path, "rb") as raw:
         stream = io.BufferedReader(_RootWrappedStream(raw, needs_wrap, skip_bytes))
@@ -506,7 +567,13 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000):
         for event, elem in context:
             if event != "end" or elem.tag != "release":
                 continue
-            n_total += 1
+            seen += 1
+            if seen <= resume_from:       # déjà committé lors d'un run précédent -> on ne
+                elem.clear()              # fait que traverser, pour retomber au même endroit
+                root.clear()              # dans le flux XML sans reparser ni réinsérer
+                if progress_cb and seen % 20000 == 0:
+                    progress_cb(seen)
+                continue
             parsed = _parse_release_elem(elem)
             elem.clear()
             root.clear()                 # `elem.clear()` seul ne suffit pas : la racine garde
@@ -520,12 +587,12 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000):
                 credit_rows.extend((row[0], aid, role) for aid, role in credits)
                 if len(batch) >= batch_size:
                     flush()
-            if progress_cb and n_total % 20000 == 0:
-                progress_cb(n_total)
+            if progress_cb and seen % 20000 == 0:
+                progress_cb(seen)
     flush()
     if progress_cb:
-        progress_cb(n_total)
-    return n_total, n_vinyl
+        progress_cb(seen)
+    return seen, n_vinyl
 
 
 def import_labels(con, gz_path, progress_cb=None, batch_size=5000):

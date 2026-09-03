@@ -125,17 +125,31 @@ toujours en API live via `sellers.py`). Filtré au vinyle 12"/LP uniquement (`_i
 ~18-20M sorties tous formats dans le dump réduites à un sous-ensemble gérable.
 
 Rempli par le job `import_discogs_dump` (`crate_jobs.py`) : télécharge (reprise via
-`Range` si interrompu), vérifie la somme de contrôle (`CHECKSUM.txt`, best-effort — absence
-n'empêche pas l'import), parse en flux (`ET.iterparse`, `root.clear()` **et** `elem.clear()`
-après chaque `<release>` — memory-leak sinon sur un fichier de cette taille), reconstruit
-l'index en entier (pas de delta, un dump mensuel est toujours un instantané complet) dans
-`discogs_dump.sqlite3.new`, jamais dans le fichier servi par l'appli : les index ne sont créés
-qu'une fois la table remplie (`ANALYZE` ensuite), puis bascule atomique (`os.replace`) à la
-toute fin. L'appli lit l'ancienne base valide jusqu'à la dernière seconde — pas de fenêtre où
-`available()` mentirait pendant les ~1h45 que dure un import. `journal_mode=WAL` posé à la
-création (persistant dans le fichier). Bouton manuel dans Réglages ; veille automatique
-mensuelle via `RADAR_DISCOGS_DUMP_SYNC=1` (à poser sur le `.env` du service `radar-worker` sur
-le VPS, comme `RADAR_SELLER_SCAN=1`).
+`Range` si interrompu), vérifie la somme de contrôle de chacun des 3 fichiers
+(`CHECKSUM.txt`, best-effort — absence n'empêche pas l'import), parse en flux
+(`ET.iterparse`, `root.clear()` **et** `elem.clear()` après chaque élément — memory-leak
+sinon sur un fichier de cette taille), reconstruit l'index en entier (pas de delta, un
+dump mensuel est toujours un instantané complet) dans `discogs_dump.sqlite3.new`, jamais
+dans le fichier servi par l'appli : les index ne sont créés qu'une fois la table remplie
+(`ANALYZE` ensuite), puis bascule atomique (`os.replace`) à la toute fin. L'appli lit
+l'ancienne base valide jusqu'à la dernière seconde — pas de fenêtre où `available()`
+mentirait pendant les ~1h45 que dure un import. `journal_mode=WAL` + `synchronous=OFF`
+pendant la construction (vrai gain de vitesse), repassé en `DELETE` juste avant la
+bascule — le fichier livré n'est jamais en WAL (tous les lecteurs ne font que des
+`SELECT`, un `-wal`/`-shm` orphelin au prochain remplacement mensuel serait un risque de
+lecture corrompue). Bouton manuel dans Réglages ; veille automatique mensuelle via
+`RADAR_DISCOGS_DUMP_SYNC=1` (à poser sur le `.env` du service `radar-worker` sur le VPS,
+comme `RADAR_SELLER_SCAN=1`).
+
+**Reprenable.** Chaque merge sur `main` redéploie le conteneur du worker — pas seulement
+les merges qui touchent au dump — ce qui tue ce job s'il tombe en plein import. Un
+checkpoint (`discogs_dump_import.state.json` : étape atteinte + position dans Releases)
+survit à l'interruption ; au prochain lancement (même bouton, y compris « forcer »),
+l'import reprend où il s'était arrêté au lieu de repartir de zéro. Releases (le gros
+morceau, ~1h45) reprend précisément où il en était (les sorties déjà committées sont
+retraversées sans être réimportées, pour retomber au même endroit dans le flux XML) ;
+Labels/Artists (quelques minutes chacun) repartent de zéro sur eux-mêmes si interrompus,
+sans jamais reperdre Releases. État purgé une fois l'import entièrement terminé.
 
 Table `release_styles` (`release_id`, `style`) à part, indexée : la colonne `releases.styles`
 (genres/styles joints par virgule) n'est interrogeable qu'en `LIKE '%…%'`, jamais par index.

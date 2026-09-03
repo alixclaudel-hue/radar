@@ -1,7 +1,8 @@
 """Radar — interface FastAPI + HTMX. Données PARTAGÉES avec l'appli Streamlit.
 Lancement :  uvicorn radar_web.app:app --reload --port 8600
 
-Nav : 🧠 Ma patte musicale · 🔍 Recherche ciblée · 📻 Veille Discogs · 🌐 Mon univers · 🎛️ Réglages
+Nav : 🧠 Mes sources · 🔍 Chercher un disque · 📻 Nouveautés · 🌐 Mes labels & artistes · 🎛️ Réglages
+(URLs historiques inchangées : /patte, /search, /veille, /univers, /settings)
 """
 import hashlib
 import hmac
@@ -12,7 +13,7 @@ import re
 import secrets
 import threading
 import time
-from typing import List
+from datetime import datetime
 from urllib.parse import quote_plus, urlencode
 
 import requests
@@ -302,7 +303,7 @@ def home():
     return RedirectResponse("/patte", status_code=303)
 
 
-# ============================================================ 🧠 Mieux connaître ton univers
+# ============================================================ 🧠 Mes sources
 def _last_import(job):
     s = jobs.status(job)
     fa = s.get("finished_at") if s else None
@@ -316,11 +317,14 @@ def patte_page(request: Request, saved: int = 0):
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
     last = {j: _last_import(j) for j in
            ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
+    st = c.stats()
+    # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
+    onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
     return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
-                  src=c.corpus_by_source(), st=c.stats(), saved=saved, last=last)
+                  src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding)
 
 
 def _apply_patte_form(f):
@@ -440,7 +444,7 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
     return HTMLResponse(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
 
 
-# ============================================================ 🔍 Recherche ciblée
+# ============================================================ 🔍 Chercher un disque
 SEARCH_MIN_YEAR = 1960
 
 
@@ -504,16 +508,16 @@ def _hist_summary(p):
 
 
 @app.get("/search", response_class=HTMLResponse)
-def search_page(request: Request, sid: str = ""):
-    c = Ctx()
-    styles_mine, styles_more = _search_styles(c)
+def search_page(request: Request, sid: str = "", style: str = ""):
     hist = load(_pu().search_hist, [])
     entry = next((e for e in hist if e.get("id") == sid), hist[0] if hist else None)
+    q = (entry or {}).get("params", {})
+    if not entry and style.strip():
+        q = {"style": [style.strip()]}
     return render(request, "pages/search.html", active="search",
-                  q=(entry or {}).get("params", {}), last_id=(entry or {}).get("id", ""),
+                  q=q, last_id=(entry or {}).get("id", ""),
                   history=[{"id": e["id"], "ts": e.get("ts", ""), "n": e.get("n", 0),
                             "summary": _hist_summary(e.get("params", {}))} for e in hist],
-                  genres=vocab.GENRES, styles_mine=styles_mine, styles_more=styles_more,
                   year_min=SEARCH_MIN_YEAR, year_max=int(time.strftime("%Y")))
 
 
@@ -537,7 +541,7 @@ def search_replay(request: Request, sid: str):
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
                 searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
-                dump_date=entry.get("dump_date"))
+                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")))
 
 
 def _base_labels_ranked(c):
@@ -714,7 +718,7 @@ def _local_rows_to_raw(rows, genres):
 
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
-               genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
+               genre: str = Form(""), style: str = Form(""),
                year_from: str = Form(""), year_to: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2"),
                base_metric: str = Form(""), base_min: str = Form(""),
@@ -725,8 +729,8 @@ def search_run(request: Request, label: str = Form(""),
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
     fmt = "Vinyl" if vinyl else ""
-    genres = [g.strip() for g in genre if g and g.strip()]
-    styles = [s.strip() for s in style if s and s.strip()]
+    genres = [g.strip() for g in genre.splitlines() if g.strip()]
+    styles = [s.strip() for s in style.splitlines() if s.strip()]
     try:
         npages = max(1, min(4, int(pages or 2)))
     except ValueError:
@@ -808,12 +812,24 @@ def search_run(request: Request, label: str = Form(""),
                        "score": sc,
                        "detail": {"label": det.get("label"), "artist": det.get("artist"),
                                   "style": det.get("style")}})
+    n_before_thresholds = len(scored)
     mins = {"label": _score_min(label_min), "artist": _score_min(artist_min), "style": _score_min(style_min)}
     if any(v is not None for v in mins.values()):
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     scored = scored[:48]
+    # X4 : état vide explicite — distinguer les causes déjà connues côté serveur
+    empty_reason = None
+    if not scored:
+        if n_before_thresholds and any(v is not None for v in mins.values()):
+            empty_reason = "thresholds"
+        elif not used_local and not token:
+            empty_reason = "no_source"
+        elif not label.strip() and not base_labels and not styles and not genres:
+            empty_reason = "no_criteria"
+        else:
+            empty_reason = "no_match"
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
               "vinyl": bool(vinyl), "pages": npages,
@@ -827,7 +843,8 @@ def search_run(request: Request, label: str = Form(""),
                     "dump_date": dump_date})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
     return frag(request, "partials/results.html", results=scored,
-                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date)
+                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date,
+                empty_reason=empty_reason, has_token=bool(token))
 
 
 _DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
@@ -1099,7 +1116,7 @@ def release_meta_batch(ids: str = ""):
     return HTMLResponse("".join(tpl.render({"m": cache.get(rid) or {}, "rid": rid}) for rid in rids))
 
 
-# ============================================================ 📻 Veille Discogs (+ vendeurs + reco)
+# ============================================================ 📻 Nouveautés (+ vendeurs + reco)
 def _inbox(request, path, source_key, key_ns, mins=30):
     items = load(path, [])
     if not items:
@@ -1236,7 +1253,7 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
 
-# --------------------------------------------------------------------- recos (dans Mon univers)
+# --------------------------------------------------------------------- recos (dans Mes labels & artistes)
 @app.get("/univers/reco/labels", response_class=HTMLResponse)
 def reco_labels_frag(request: Request):
     c = Ctx()
@@ -1309,7 +1326,7 @@ def univers_review_action(request: Request, kind: str, action: str, key: str = F
     return frag(request, "partials/review.html", review=_review_ctx(Ctx()))
 
 
-# ============================================================ 🌐 Mon univers
+# ============================================================ 🌐 Mes labels & artistes
 @app.get("/univers", response_class=HTMLResponse)
 def univers_page(request: Request, tab: str = "labels"):
     c = Ctx()
@@ -1492,8 +1509,11 @@ def univers_label_graph_show(request: Request, gid: str):
     return _label_graph_render(request, entry)
 
 
+ARTISTS_PAGE_SIZE = 25
+
+
 @app.get("/univers/artists/table", response_class=HTMLResponse)
-def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
+def univers_artists_table(request: Request, flt: str = "", hide: str = "", page: int = 1):
     c = Ctx()
     disp, tiers, asc = c.artist_disp(), c.artist_tier_map(), c.ascore
     catn = {"1": "Cœur", "2": "Aimé", None: "—"}
@@ -1512,7 +1532,12 @@ def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
             continue
         rows.append({"name": name, "note": note, "cat": catn.get(t, "—"), "key": ck})
     rows.sort(key=lambda r: -r["note"])
-    return frag(request, "partials/artists_table.html", rows=rows[:250], n=len(rows))
+    total = len(rows)
+    pages = max(1, -(-total // ARTISTS_PAGE_SIZE))
+    page = max(1, min(page, pages))
+    shown = rows[(page - 1) * ARTISTS_PAGE_SIZE: page * ARTISTS_PAGE_SIZE]
+    return frag(request, "partials/artists_table.html", rows=shown, n=total,
+                page=page, pages=pages, flt=flt, hide=hide)
 
 
 @app.post("/univers/artist/set", response_class=HTMLResponse)
@@ -1675,7 +1700,7 @@ def job_launch(name: str):
         srcs = [s.strip() for s in (_cfg().get("djset_sources") or "").splitlines() if s.strip()]
         if not srcs:
             return HTMLResponse("<div id='job-ingest_djsets' class='notice warn small'>"
-                                "Aucune source DJ — renseigne-les dans « Mieux connaître ton univers → DJ sets ».</div>")
+                                "Aucune source DJ — renseigne-les dans « Mes sources → DJ sets ».</div>")
         d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
         os.makedirs(d, exist_ok=True)
         save(os.path.join(d, "djsets.input.json"),
@@ -1693,6 +1718,38 @@ def job_stop(name: str):
     return job_status_frag(name)
 
 
+# X5 : durée typique annoncée dès le lancement (jobs longs seulement — les autres
+# se voient bien assez à leur barre de progression).
+JOB_DURATION_HINTS = {
+    "import_discogs_dump": "~1 h 45 (dump complet Discogs)",
+    "scan_catalog": "jusqu'à ~1 h au premier passage, plus rapide ensuite",
+    "build_graph": "de quelques minutes à ~1 h selon la taille du graphe",
+    "ingest_djsets": "quelques minutes par source",
+}
+JOB_LONG_PAGE_NOTE_S = 600  # au-delà, rappeler qu'on peut fermer la page
+
+
+def _job_elapsed_s(s):
+    started = s.get("started_at")
+    if not started:
+        return None
+    try:
+        return max(0.0, time.time() - datetime.fromisoformat(started).timestamp())
+    except ValueError:
+        return None
+
+
+def _fmt_duration_s(secs):
+    secs = max(0, int(secs))
+    if secs < 60:
+        return f"{secs} s"
+    m, sec = divmod(secs, 60)
+    if m < 60:
+        return f"{m} min"
+    h, m = divmod(m, 60)
+    return f"{h} h {m:02d}"
+
+
 @app.get("/jobs/{name}/status", response_class=HTMLResponse)
 def job_status_frag(name: str):
     s = jobs.status(name)
@@ -1702,12 +1759,15 @@ def job_status_frag(name: str):
     pct = min(100, round(100 * done / total))
     run, err, queued = s.get("running"), s.get("error"), s.get("queued")
     msg = html.escape(str(s.get("message") or ""))
+    elapsed = _job_elapsed_s(s)
+    hint = JOB_DURATION_HINTS.get(name)
     stopbtn = (f"<button type='button' class='small btn-stop' hx-post='/jobs/{name}/stop' "
                f"hx-target='#job-{name}' hx-swap='outerHTML' hx-confirm='Arrêter ce job ?'>■ arrêter</button>")
     if err:
         inner = f"<span class='notice warn small'>{html.escape(str(err))}</span>"
     elif queued:
-        inner = f"<div class='job-status'><span class='small muted'>🕓 {msg}</span>{stopbtn}</div>"
+        hint_txt = f" · dure généralement {hint}" if hint else ""
+        inner = f"<div class='job-status'><span class='small muted'>🕓 {msg}{hint_txt}</span>{stopbtn}</div>"
     elif run:
         subbar = ""
         sub_total = s.get("sub_total")
@@ -1717,11 +1777,23 @@ def job_status_frag(name: str):
             sub_label = html.escape(str(s.get("sub_label") or ""))
             subbar = (f"<div class='small muted' style='margin-top:4px'>{sub_label} · {sub_done}/{sub_total} article(s)</div>"
                       f"<div class='progress'><i style='width:{spct}%'></i></div>")
-        inner = (f"<div class='job-status'><span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>{stopbtn}</div>"
-                 f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}")
+        eta_txt = ""
+        if elapsed and elapsed > 5 and done and s.get("total") and done < s["total"]:
+            rate = done / elapsed
+            if rate > 0:
+                eta_txt = f" · reste ~{_fmt_duration_s((s['total'] - done) / rate)}"
+        elif hint:
+            eta_txt = f" · dure généralement {hint}"
+        close_note = ""
+        if elapsed and elapsed > JOB_LONG_PAGE_NOTE_S:
+            close_note = ("<div class='small muted' style='margin-top:4px'>"
+                          "Tu peux fermer cette page, le job continue en fond sur le serveur.</div>")
+        inner = (f"<div class='job-status'><span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}{eta_txt}</span>{stopbtn}</div>"
+                 f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}{close_note}")
     else:
         inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"
-    poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'"
+    poll_s = 10 if (elapsed and elapsed > 30) else 2
+    poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every {poll_s}s' hx-swap='outerHTML'"
             if (run or queued) else "")
     return HTMLResponse(f"<div id='job-{name}' {poll}>{inner}</div>")
 

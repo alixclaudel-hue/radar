@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% import "partials/_icons.html" as icons %}
-{% block title %}Recherche · Radar{% endblock %}
+{% block title %}Chercher un disque · Radar{% endblock %}
 {% block content %}
 
-<h1>Recherche</h1>
+<h1>Chercher un disque</h1>
 <p class="muted small">Un label pour une recherche ciblée, ou laisse vide et filtre par style / genre / année.</p>
 
 <form hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
@@ -47,24 +47,21 @@
   </div>
 
   <div class="row">
-    <div class="field">
-      <label>Genre <span class="muted">· choix multiple</span></label>
-      <select name="genre" multiple size="6">
-        {% for g in genres %}<option value="{{ g }}" {{ 'selected' if g in (q.genre or []) }}>{{ g }}</option>{% endfor %}
-      </select>
+    <div class="field combo">
+      <label>Genre <span class="muted">un par ligne — tape pour filtrer</span>
+        <textarea name="genre" rows="3" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/genres" hx-target="#sug-f-genre" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ (q.genre or [])|join('\n') }}</textarea></label>
+      <div id="sug-f-genre" class="lbl-suggest" hidden></div>
     </div>
-    <div class="field">
-      <label>Style <span class="muted">· choix multiple</span></label>
-      <select name="style" multiple size="8">
-        {% if styles_mine %}
-        <optgroup label="Mes catégories">
-          {% for s in styles_mine %}<option value="{{ s }}" {{ 'selected' if s in (q.style or []) }}>{{ s }}</option>{% endfor %}
-        </optgroup>
-        {% endif %}
-        <optgroup label="Autres styles Discogs">
-          {% for s in styles_more %}<option value="{{ s }}" {{ 'selected' if s in (q.style or []) }}>{{ s }}</option>{% endfor %}
-        </optgroup>
-      </select>
+    <div class="field combo">
+      <label>Style <span class="muted">un par ligne — tape pour filtrer, tes catégories en premier</span>
+        <textarea name="style" rows="3" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/styles" hx-target="#sug-f-style" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ (q.style or [])|join('\n') }}</textarea></label>
+      <div id="sug-f-style" class="lbl-suggest" hidden></div>
     </div>
   </div>
   <div class="field">

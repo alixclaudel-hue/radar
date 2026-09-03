@@ -4,7 +4,17 @@
 {% elif results is not defined %}
   <p class="muted small">Aucune recherche lancée.</p>
 {% elif not results %}
-  <p class="muted small">Aucun résultat pour ces filtres.</p>
+  {% if empty_reason == 'no_source' %}
+  <p class="muted small">Aucun disque : ni catalogue local, ni token Discogs configuré — impossible de chercher quoi que ce soit.</p>
+  <p class="small"><a href="/patte">Renseigner le token Discogs → Mes sources</a></p>
+  {% elif empty_reason == 'thresholds' %}
+  <p class="muted small">Des disques existent pour ces critères, mais aucun ne passe les seuils minimum (label/artiste/style) fixés dans Réglages.</p>
+  <p class="small"><a href="/settings">Baisser ou retirer un seuil → Réglages</a></p>
+  {% elif empty_reason == 'no_criteria' %}
+  <p class="muted small">Aucun disque trouvé — et aucun critère n'a été précisé (ni label, ni style, ni genre). Essaie de préciser une recherche.</p>
+  {% else %}
+  <p class="muted small">Aucun résultat pour ces filtres{% if not has_token %} — sans token Discogs, seul le catalogue local (figé au dernier import mensuel) est cherché{% endif %}.</p>
+  {% endif %}
   {% if searched %}<p class="muted small">Labels cherchés : {{ searched|join(', ') }}</p>{% endif %}
 {% else %}
   <div class="section-title">

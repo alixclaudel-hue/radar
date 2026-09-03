@@ -23,15 +23,15 @@
     </div>
     <nav class="nav">
       {% set cur = active|default('') %}
-      <a href="/patte"    class="{{ 'active' if cur=='patte' }}">🧠 Mieux connaître ton univers</a>
-      <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Recherche ciblée</a>
-      <a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Veille Discogs</a>
-      <a href="/univers"  class="{{ 'active' if cur=='univers' }}">🌐 Mon univers</a>
+      <a href="/patte"    class="{{ 'active' if cur=='patte' }}">🧠 Mes sources</a>
+      <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Chercher un disque</a>
+      <a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Nouveautés</a>
+      <a href="/univers"  class="{{ 'active' if cur=='univers' }}">🌐 Mes labels &amp; artistes</a>
       <a href="/settings" class="{{ 'active' if cur=='settings' }}">🎛️ Réglages</a>
     </nav>
     <hr>
     {% if not has_token and active != 'patte' %}
-      <p class="notice warn small">⚠️ Token Discogs manquant — <a href="/patte">Mieux connaître ton univers → Discogs</a>.</p>
+      <p class="notice warn small">⚠️ Token Discogs manquant — <a href="/patte">Mes sources → Discogs</a>.</p>
     {% endif %}
     {% block content %}{% endblock %}
   </div>

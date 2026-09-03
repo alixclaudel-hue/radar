@@ -15,6 +15,7 @@ import json
 import math
 import os
 import re
+import sqlite3
 import sys
 import time
 from collections import Counter
@@ -874,31 +875,36 @@ def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_e
     """Co-crédits d'une graine par jointure SQL sur release_artists (D4) —
     aucun appel API, aucune pause, et le garde-fou "compilation" comme
     HAVING plutôt qu'un split de chaîne. Retourne le nombre de sorties
-    retenues (hors compilations)."""
-    rows = con.execute("""
-        SELECT ra1.release_id, ra1.role, ra2.artist_id, a.name, r.label, r.label_key
-        FROM release_artists ra1
-        JOIN release_artists ra2 ON ra2.release_id = ra1.release_id AND ra2.artist_id != ra1.artist_id
-        JOIN releases r ON r.id = ra1.release_id
-        LEFT JOIN artists a ON a.id = ra2.artist_id
-        WHERE ra1.artist_id = ?
-    """, (rid,)).fetchall()
-    if not rows:
+    retenues (hors compilations). 0 (pas une erreur) si la base n'a pas
+    encore été reconstruite au nouveau schéma (release_artists créée au
+    Lot 4) — même garde que label_style_counts plutôt qu'un job qui plante."""
+    try:
+        rows = con.execute("""
+            SELECT ra1.release_id, ra1.role, ra2.artist_id, a.name, r.label, r.label_key
+            FROM release_artists ra1
+            JOIN release_artists ra2 ON ra2.release_id = ra1.release_id AND ra2.artist_id != ra1.artist_id
+            JOIN releases r ON r.id = ra1.release_id
+            LEFT JOIN artists a ON a.id = ra2.artist_id
+            WHERE ra1.artist_id = ?
+        """, (rid,)).fetchall()
+        if not rows:
+            return 0
+        by_release = {}
+        for rel_id, role, co_id, co_name, lab, lk in rows:
+            info = by_release.setdefault(rel_id, {"role": role, "label": lab, "label_key": lk, "co": []})
+            info["co"].append((co_id, co_name))
+        rel_ids = list(by_release)
+        main_counts = dict(_sql_in_chunks(con,
+            "SELECT release_id, COUNT(*) FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
+            "GROUP BY release_id", rel_ids))
+        # une compilation "Various" ne porte souvent QU'1 <artists> release-level (l'artiste
+        # générique "Various", id 194) : main_counts reste sous max_credits, le garde-fou par
+        # comptage seul la laisse passer (diagnostic R2) -> détection dédiée par id.
+        various_ids = {row[0] for row in _sql_in_chunks(con,
+            "SELECT release_id FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
+            "AND artist_id = ?", rel_ids, (VARIOUS_ARTIST_ID,))}
+    except sqlite3.OperationalError:
         return 0
-    by_release = {}
-    for rel_id, role, co_id, co_name, lab, lk in rows:
-        info = by_release.setdefault(rel_id, {"role": role, "label": lab, "label_key": lk, "co": []})
-        info["co"].append((co_id, co_name))
-    rel_ids = list(by_release)
-    main_counts = dict(_sql_in_chunks(con,
-        "SELECT release_id, COUNT(*) FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
-        "GROUP BY release_id", rel_ids))
-    # une compilation "Various" ne porte souvent QU'1 <artists> release-level (l'artiste
-    # générique "Various", id 194) : main_counts reste sous max_credits, le garde-fou par
-    # comptage seul la laisse passer (diagnostic R2) -> détection dédiée par id.
-    various_ids = {row[0] for row in _sql_in_chunks(con,
-        "SELECT release_id FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
-        "AND artist_id = ?", rel_ids, (VARIOUS_ARTIST_ID,))}
     n_rels = 0
     for rel_id, info in by_release.items():
         if rel_id in various_ids or main_counts.get(rel_id, 0) > max_credits:  # compilation -> tout sauté
@@ -2067,15 +2073,19 @@ def job_import_discogs_dump(job, params):
         except Exception as e:                    # noqa: BLE001
             return job.finish(error=f"Téléchargement du dump {kind} échoué : {e}")
 
-    job.msg("Vérification de l'intégrité du dump des sorties…")
-    ok = dd.verify_checksum(latest, gz_paths["releases"])
-    if ok is False:
-        try:
-            os.remove(gz_paths["releases"])
-        except OSError:
-            pass
-        return job.finish(error="Somme de contrôle invalide — fichier corrompu, relance le job.")
-    # ok is None : CHECKSUM.txt indisponible, on ne bloque pas l'import dessus.
+    # CHECKSUM.txt couvre les 4 fichiers du mois (releases/labels/artists/masters) — on ne
+    # télécharge pas masters, mais rien ne justifiait de ne vérifier QUE releases parmi les
+    # 3 qu'on importe (labels/artists corrompus silencieusement sinon, diagnostic mineur Lot 4).
+    for kind in kinds:
+        job.msg(f"Vérification de l'intégrité du dump {kind}…")
+        ok = dd.verify_checksum(latest, gz_paths[kind])
+        if ok is False:
+            try:
+                os.remove(gz_paths[kind])
+            except OSError:
+                pass
+            return job.finish(error=f"Somme de contrôle invalide pour {kind} — fichier corrompu, relance le job.")
+        # ok is None : CHECKSUM.txt indisponible (ou ce fichier n'y figure pas), on ne bloque pas l'import dessus.
 
     est_total = meta.get("n_total") or 20_000_000
     con = dd.open_new_db()

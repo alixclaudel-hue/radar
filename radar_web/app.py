@@ -1841,7 +1841,7 @@ def job_status_frag(name: str):
 def settings_page(request: Request, saved: int = 0):
     c = Ctx()
     return render(request, "pages/settings.html", active="settings", cfg=c.cfg,
-                  sc=c.scoring, saved=saved)
+                  sc=c.scoring, saved=saved, default_scoring=store.DEFAULT_SCORING)
 
 
 def _catalog_rows():

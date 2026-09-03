@@ -201,6 +201,14 @@
 
     draw();
     box.hidden = false;
+    // la toile affiche déjà chaque valeur à côté de son axe : les champs
+    // chiffrés doublonnent l'info une fois le JS chargé — masqués (pas
+    // supprimés : ils restent la source de vérité du formulaire), pour
+    // qu'un navigateur sans JS les retrouve intacts.
+    axes.forEach(function (ax) {
+      var wrap = ax.input.closest('.field');
+      if (wrap) wrap.hidden = true;
+    });
   }
 
   function init(root) {

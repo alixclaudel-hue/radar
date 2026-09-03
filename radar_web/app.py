@@ -1841,7 +1841,7 @@ def job_status_frag(name: str):
 def settings_page(request: Request, saved: int = 0):
     c = Ctx()
     return render(request, "pages/settings.html", active="settings", cfg=c.cfg,
-                  sc=c.scoring, saved=saved)
+                  sc=c.scoring, saved=saved, default_scoring=store.DEFAULT_SCORING)
 
 
 def _catalog_rows():
@@ -1926,9 +1926,9 @@ async def settings_save(request: Request):
     f = await request.form()
     c = _cfg()
     sc = c["scoring"]
-    for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor")),
+    for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link")),
                       ("album", ("label", "artist", "style", "artist_max_vs_mean")),
-                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset"))):
+                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link"))):
         for key in keys:
             v = f.get(f"{grp}__{key}")
             if v not in (None, ""):

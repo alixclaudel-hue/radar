@@ -173,10 +173,13 @@ Le job télécharge aussi les dumps `labels` et `artists` (86 Mo + 474 Mo, contr
   sur leur propre id via `artists`).
 - `release_artists` (`release_id`, `artist_id`, `role`) — crédits par sortie, limités aux
   rôles qui pèsent dans le scoring (`Main`, `Producer`, `Remix`, `Written-By`, `Featuring`),
-  remplie pendant le parsing des sorties (`<artists>` + `<extraartists>` filtrés). Rend
-  possible un vrai graphe de co-crédits par jointure SQL (`JOIN release_artists ON
-  release_id` en s'excluant soi-même) au lieu d'un appel API par graine — **pas encore
-  branché** : `job_build_graph`/`canonicalize` continuent d'interroger l'API pour l'instant.
+  remplie pendant le parsing des sorties (`<artists>` + `<extraartists>` filtrés). Branché
+  (Lot 5) : `job_build_graph` construit le graphe de co-crédits par jointure SQL
+  (`_graph_edges_from_sql`, `crate_jobs.py`) quand le référentiel local est disponible —
+  aucun appel API, repli sur l'ancien comportement (`_graph_edges_from_api`) sinon. Deux
+  fonctions dédiées dans `discogs_dump.py`, `label_ids_for_artists`/`artist_ids_for_labels`,
+  interrogent directement cette table (sans passer par un job) pour le ranking labels/artistes
+  — cf. `Ctx.label_db_signal`/`Ctx.artist_label_signal` plus bas.
 - `resolve_name(name, kind, con=None)` — résolution de nom vers id Discogs canonique sans
   appel API (`name_key` direct, puis repli `artist_aliases` pour un artiste). **Encore
   inutilisée** par les jobs de résolution — prochaine étape (cf. `docs/etat.md`).
@@ -219,6 +222,15 @@ n'importe quel chemin, il faut en plus un `content-disposition: attachment`.
 `ascore` (score artiste), re-scoring du graphe de producteurs, `reco_rows` (reco labels).
 Recalculé à chaque requête à partir des fichiers de `/data` (cache mtime via
 `store.load_cached`).
+
+`reco_rows` (labels) et `ascore` (artistes) intègrent chacun un signal tiré du référentiel
+local Discogs, sans appel API : `label_db_signal` (poids `reco.db_link`) — un artiste
+Cœur/Aimés a un disque chez ce label (`discogs_dump.label_ids_for_artists`, direct,
+disponible sans job) combiné au score du graphe de co-crédits (`job_build_graph`, pondéré
+par palier) ; `artist_label_signal` (poids `artist_score.label_link`) — l'inverse, l'artiste
+a-t-il un disque chez un label déjà suivi (base ou watchlist), via
+`discogs_dump.artist_ids_for_labels`. Élargit l'univers classé : un label jamais possédé ni
+écouté peut désormais apparaître dans `reco_rows` par ce seul signal.
 
 ## Jobs
 

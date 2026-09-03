@@ -965,6 +965,81 @@ def label_style_counts(label_keys, con=None):
     return out
 
 
+def _in_chunks(con, sql_tmpl, ids, extra_params=()):
+    """Comme `_sql_in_chunks` (crate_jobs.py) mais gardé ici : discogs_dump.py
+    ne doit pas dépendre du script de jobs (sens d'import inverse). Par lots
+    de 900 pour rester sous SQLITE_MAX_VARIABLE_NUMBER."""
+    out = []
+    ids = list(ids)
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        qmarks = ",".join("?" * len(chunk))
+        out += con.execute(sql_tmpl.format(qmarks), chunk + list(extra_params)).fetchall()
+    return out
+
+
+def label_ids_for_artists(artist_ids, con=None):
+    """{label_key: {"name": str, "artist_ids": {id,...}}} — labels où au moins
+    un des artist_ids donnés a un crédit (release_artists), tous rôles
+    confondus. Disponible immédiatement (aucun job requis), à la différence
+    de `label_edges` (job_build_graph : mêmes labels vus depuis toutes les
+    graines résolues, pondérées par palier, mais seulement à jour depuis le
+    dernier lancement du job) — les deux se combinent côté
+    Ctx.label_db_signal pour ne pas dépendre uniquement du job.
+    {} si le dump n'est pas disponible ou pas encore au nouveau schéma."""
+    artist_ids = [int(a) for a in dict.fromkeys(artist_ids) if a]
+    if not artist_ids or not available():
+        return {}
+    owns = con is None
+    if owns:
+        con = connect_readonly()
+        if con is None:
+            return {}
+    try:
+        rows = _in_chunks(con,
+            "SELECT DISTINCT r.label_key, r.label, ra.artist_id FROM release_artists ra "
+            "JOIN releases r ON r.id = ra.release_id "
+            "WHERE ra.artist_id IN ({}) AND r.label_key IS NOT NULL AND r.label_key != ''",
+            artist_ids)
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        if owns:
+            con.close()
+    out = {}
+    for lk, lab, aid in rows:
+        out.setdefault(lk, {"name": lab, "artist_ids": set()})["artist_ids"].add(aid)
+    return out
+
+
+def artist_ids_for_labels(label_keys, con=None):
+    """{artist_id: {"name": str, "n": int}} — artistes crédités sur au moins
+    un des label_keys donnés (release_artists JOIN releases), l'artiste
+    générique "Various" (id 194, cf. crate_jobs.VARIOUS_ARTIST_ID) exclu.
+    Mirroir de `label_ids_for_artists` pour le ranking artistes : "cet
+    artiste a-t-il un disque chez un label que je suis déjà"."""
+    keys = [k for k in dict.fromkeys(label_keys) if k]
+    if not keys or not available():
+        return {}
+    owns = con is None
+    if owns:
+        con = connect_readonly()
+        if con is None:
+            return {}
+    try:
+        rows = _in_chunks(con,
+            "SELECT ra.artist_id, a.name, COUNT(*) FROM release_artists ra "
+            "JOIN releases r ON r.id = ra.release_id LEFT JOIN artists a ON a.id = ra.artist_id "
+            "WHERE r.label_key IN ({}) AND ra.artist_id != 194 GROUP BY ra.artist_id",
+            keys)
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        if owns:
+            con.close()
+    return {aid: {"name": name, "n": n} for aid, name, n in rows}
+
+
 def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
     """[{id, title, artist, label, catno, year, genres, styles}] — recherche
     ciblée en local, triée par année décroissante (cf. diagnostic D6). Un

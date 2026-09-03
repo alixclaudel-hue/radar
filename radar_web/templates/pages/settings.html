@@ -7,23 +7,36 @@
 <p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes se règlent dans Mes sources.</p>
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
+{% macro reset_btn(pairs) -%}
+<button type="button" class="small" data-reset-fields='{{ pairs | tojson }}' style="margin-left:10px">↺ valeurs par défaut</button>
+{%- endmacro %}
 <form method="post" action="/settings">
-  <h3>{{ icons.label() }} Score label (reco)</h3>
+  <h3>{{ icons.label() }} Score label (reco)
+    {{ reset_btn([['reco__collection', default_scoring.reco.collection], ['reco__corpus', default_scoring.reco.corpus],
+                  ['reco__artist', default_scoring.reco.artist], ['reco__affinity', default_scoring.reco.affinity],
+                  ['reco__want_factor', default_scoring.reco.want_factor], ['reco__db_link', default_scoring.reco.db_link]]) }}
+  </h3>
   <div class="wgroup">
     {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
                  ['reco__artist','artiste'], ['reco__affinity','affinité'],
-                 ['reco__want_factor','want']]) }}
+                 ['reco__want_factor','want'], ['reco__db_link','base Discogs']]) }}
     <div class="row wgroup__fields">
-      {% for k in ['collection','corpus','artist','affinity','want_factor'] %}
+      {% for k in ['collection','corpus','artist','affinity','want_factor','db_link'] %}
       <div class="field"><label>{{ k }}
         <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></label></div>
       {% endfor %}
       <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)
         <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></label></div>
     </div>
+    <p class="muted small">« base Discogs » : un artiste Cœur/Aimés a un disque chez ce label,
+      ou le graphe de co-crédits en repère un proche — référentiel local, aucun appel API.</p>
   </div>
 
-  <h3>{{ icons.album() }} Score album</h3>
+  <h3>{{ icons.album() }} Score album
+    {{ reset_btn([['album__label', default_scoring.album.label], ['album__artist', default_scoring.album.artist],
+                  ['album__style', default_scoring.album.style],
+                  ['album__artist_max_vs_mean', default_scoring.album.artist_max_vs_mean]]) }}
+  </h3>
   <div class="wgroup">
     {{ wr.toile([['album__label','label'], ['album__artist','artiste'],
                  ['album__style','style'], ['album__artist_max_vs_mean','max/moy.']]) }}
@@ -35,20 +48,34 @@
     </div>
   </div>
 
-  <h3>{{ icons.artist() }} Score artiste</h3>
+  <h3>{{ icons.artist() }} Score artiste
+    {{ reset_btn([['artist_score__manual', default_scoring.artist_score.manual],
+                  ['artist_score__corpus', default_scoring.artist_score.corpus],
+                  ['artist_score__collection', default_scoring.artist_score.collection],
+                  ['artist_score__graph', default_scoring.artist_score.graph],
+                  ['artist_score__djset', default_scoring.artist_score.djset],
+                  ['artist_score__label_link', default_scoring.artist_score.label_link]]) }}
+  </h3>
   <div class="wgroup">
     {{ wr.toile([['artist_score__manual','manuel'], ['artist_score__corpus','corpus'],
                  ['artist_score__collection','collection'], ['artist_score__graph','graphe'],
-                 ['artist_score__djset','djset']]) }}
+                 ['artist_score__djset','djset'], ['artist_score__label_link','label aimé']]) }}
     <div class="row wgroup__fields">
-      {% for k in ['manual','corpus','collection','graph','djset'] %}
+      {% for k in ['manual','corpus','collection','graph','djset','label_link'] %}
       <div class="field"><label>{{ k }}
         <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></label></div>
       {% endfor %}
     </div>
+    <p class="muted small">« label aimé » : l'artiste a un disque chez un label que tu suis déjà
+      (base ou watchlist) — référentiel local, aucun appel API.</p>
   </div>
 
-  <h3>Rangs (Cœur / Aimés)</h3>
+  <h3>Rangs (Cœur / Aimés)
+    {{ reset_btn([['taste_tiers__1', default_scoring.taste_tiers['1']],
+                  ['taste_tiers__2', default_scoring.taste_tiers['2']],
+                  ['artist_tiers__1', default_scoring.artist_tiers['1']],
+                  ['artist_tiers__2', default_scoring.artist_tiers['2']]]) }}
+  </h3>
   <div class="wgroup">
     {{ wr.toile([['taste_tiers__1','style ♥'], ['artist_tiers__1','artiste ♥'],
                  ['taste_tiers__2','style +'], ['artist_tiers__2','artiste +']]) }}
@@ -64,6 +91,22 @@
   <button class="primary" type="submit">💾 Enregistrer</button>
 </form>
 <script src="/static/wradar.js" defer></script>
+<script>
+(function () {
+  document.querySelectorAll('[data-reset-fields]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var form = btn.closest('form');
+      JSON.parse(btn.dataset.resetFields).forEach(function (kv) {
+        var input = form.querySelector('[name="' + kv[0] + '"]');
+        if (!input) return;
+        input.value = kv[1];
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  });
+})();
+</script>
 
 <hr>
 <h3>Base de labels — export CSV <span class="muted small">· import : Mes sources</span></h3>

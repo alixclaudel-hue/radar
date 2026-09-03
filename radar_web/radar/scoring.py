@@ -277,20 +277,33 @@ class Ctx:
                 continue
             coll_c[self.canon_artist_key(a)] = coll_c.get(self.canon_artist_key(a), 0) + n
         graph = {ck: v["score"] for ck, v in self.graph_rescore()["artists"].items()}
+        # l'artiste a-t-il un disque chez un label que je suis déjà (base/watchlist) ?
+        # référentiel local — une relation différente du terme "graph" ci-dessus
+        # (co-crédits entre artistes), donc sans le recouper (cf. Ctx.artist_label_signal).
+        label_link = self.artist_label_signal()
         scale_c, scale_l, scale_d = _robust_scale(corpus_c), _robust_scale(coll_c), _robust_scale(djset_c)
         mg = max(graph.values(), default=1) or 1
+        w_manual, w_corpus = sw.get("manual", 0.5), sw.get("corpus", 0.18)
+        w_coll, w_graph = sw.get("collection", 0.1), sw.get("graph", 0.14)
+        w_djset, w_label = sw.get("djset", 0.08), sw.get("label_link", 0.15)
+        # normalisé par la somme des poids réellement en jeu (même principe que reco_rows,
+        # diagnostic N2) : sans ça, ajouter un terme fait dériver le plafond au-delà de 100
+        # au lieu de rééquilibrer les poids relatifs des signaux existants.
+        tot = w_manual + w_corpus + w_coll + w_graph + w_djset + w_label or 1.0
         out = {}
-        for k in set(tiers) | set(corpus_c) | set(coll_c) | set(graph) | set(djset_c):
+        for k in set(tiers) | set(corpus_c) | set(coll_c) | set(graph) | set(djset_c) | set(label_link):
             tier = tiers.get(k)
             manual = float(aw.get(tier, 0)) if tier else 0.0
             # échelle robuste au p95 + log1p plutôt qu'au max brut (cf. N5) : un seul
             # artiste hyperactif (un DJ set où il revient 40 fois) ne doit pas écraser
             # la note de tous les autres en déplaçant le maximum de la population.
-            out[k] = min(100, round(100 * (sw.get("manual", 0.5) * manual
-                                  + sw.get("corpus", 0.18) * _log_ratio(corpus_c.get(k, 0), scale_c)
-                                  + sw.get("collection", 0.1) * _log_ratio(coll_c.get(k, 0), scale_l)
-                                  + sw.get("graph", 0.14) * graph.get(k, 0) / mg
-                                  + sw.get("djset", 0.08) * _log_ratio(djset_c.get(k, 0), scale_d))))
+            raw = (w_manual * manual
+                   + w_corpus * _log_ratio(corpus_c.get(k, 0), scale_c)
+                   + w_coll * _log_ratio(coll_c.get(k, 0), scale_l)
+                   + w_graph * graph.get(k, 0) / mg
+                   + w_djset * _log_ratio(djset_c.get(k, 0), scale_d)
+                   + w_label * label_link.get(k, 0.0))
+            out[k] = min(100, round(100 * raw / tot))
         return out
 
     def corpus_by_source(self):
@@ -354,6 +367,64 @@ class Ctx:
             out[k] = (cur[0] + s, cur[1] + 1)
         return out
 
+    def label_db_signal(self):
+        """{label_key: 0-1} — deux calculs complémentaires du référentiel
+        local (aucun appel API), tous deux "un artiste que j'aime a un
+        disque chez ce label" mais avec des garanties différentes : DIRECT
+        (`discogs_dump.label_ids_for_artists`, artistes Cœur/Aimés
+        uniquement, disponible immédiatement, aucun job requis) et GRAPHE
+        (`label_edges` déjà calculé par job_build_graph, pondéré par palier
+        Cœur/Aimés/autre — plus large car il couvre aussi les artistes
+        seulement résolus, mais seulement à jour depuis le dernier lancement
+        du job). Combinés pour ne pas dépendre uniquement du job ; jamais
+        redondants avec `label_artist_signal` (qui ne voit que le corpus
+        écouté, un sous-ensemble minuscule du catalogue)."""
+        return self._memo("label_db_signal", self._compute_label_db_signal)["score"]
+
+    def label_db_names(self):
+        """{label_key: nom} — pour les labels qui n'apparaissent QUE via
+        label_db_signal (jamais possédés/écoutés, donc absents de
+        collection.label_ids) : reco_rows a besoin d'un nom à afficher."""
+        return self._memo("label_db_signal", self._compute_label_db_signal)["name"]
+
+    def _compute_label_db_signal(self):
+        from . import discogs_dump as dd
+        liked_ids = [int(k[3:]) for k in self.artist_tier_map() if k.startswith("id:")]
+        direct = dd.label_ids_for_artists(liked_ids) if liked_ids else {}
+        direct_n = {k: len(v["artist_ids"]) for k, v in direct.items()}
+        graph = self.graph_rescore()["labels"]
+        graph_sc = {k: v["score"] for k, v in graph.items()}
+        names = {k: v["name"] for k, v in graph.items()}
+        names.update({k: v["name"] for k, v in direct.items()})   # direct prioritaire si les 2 existent
+        scale_d, scale_g = _robust_scale(direct_n), _robust_scale(graph_sc)
+        score = {}
+        for k in set(direct_n) | set(graph_sc):
+            d = _log_ratio(direct_n.get(k, 0), scale_d)
+            g = _log_ratio(graph_sc.get(k, 0), scale_g)
+            score[k] = round(0.65 * d + 0.35 * g, 4)   # direct plus fiable (Cœur/Aimés stricts,
+            # pas d'attente de job) qu'un score de graphe agrégé sur toutes les graines résolues
+        return {"score": score, "name": names}
+
+    def artist_label_signal(self):
+        """{clé canonique: 0-1} — l'artiste a-t-il un disque chez un label
+        que je suis déjà (base ou watchlist) ? Mirroir, côté artistes, de la
+        moitié "directe" de `label_db_signal` (`discogs_dump.
+        artist_ids_for_labels`). Le co-crédit entre artistes (une relation
+        différente : "a-t-il bossé avec quelqu'un que j'aime") alimente déjà
+        `ascore` séparément via le terme `graph` — pas de recoupement."""
+        return self._memo("artist_label_signal", self._compute_artist_label_signal)
+
+    def _compute_artist_label_signal(self):
+        from . import discogs_dump as dd
+        liked_keys = ({normalize_label(x) for x in self.cfg.get("labels", [])}
+                      | {normalize_label(x) for x in self.cfg.get("watchlist", [])})
+        if not liked_keys:
+            return {}
+        hits = dd.artist_ids_for_labels(liked_keys)
+        counts = {f"id:{aid}": v["n"] for aid, v in hits.items()}
+        scale = _robust_scale(counts)
+        return {k: _log_ratio(n, scale) for k, n in counts.items()}
+
     @property
     def reco_index(self):
         # reco_rows() est déjà mémoïsé, mais reconstruire ce dict à chaque accès a un
@@ -370,10 +441,12 @@ class Ctx:
         wc = self.collection.get("want_label_counts", {})
         cs = self.corpus_label_scores()
         las = self.label_artist_signal()
+        db = self.label_db_signal()
         w = self.scoring["reco"]
         wf = float(w.get("want_factor", 0.6))
         w_coll, w_aff = float(w.get("collection", 0.6)), float(w.get("affinity", 0.4))
         w_corp, w_art = float(w.get("corpus", 0.5)), float(w.get("artist", 0.4))
+        w_db = float(w.get("db_link", 0.35))
         coll_raw = {k: lc.get(k, 0) + wf * wc.get(k, 0) for k in set(lc) | set(wc)}
         max_coll = max(coll_raw.values(), default=1.0) or 1.0
         max_corp = max(cs.values(), default=1.0) or 1.0
@@ -381,8 +454,13 @@ class Ctx:
         floor = float(self.scoring["label_affinity_floor"] or 0)
         watch = {normalize_label(x) for x in self.cfg.get("watchlist", [])}
         base = {normalize_label(x) for x in self.cfg.get("labels", [])}
-        keys = set(coll_raw) | set(cs) | set(las)
+        # `db` (artiste Cœur/Aimés au catalogue + graphe de co-crédits, référentiel local)
+        # élargit l'univers classé au-delà de ce que collection/corpus/las connaissent déjà —
+        # un label jamais possédé ni écouté mais où un artiste aimé a un disque doit pouvoir
+        # apparaître, pas seulement être visible dans la liste "candidats du graphe" à part.
+        keys = set(coll_raw) | set(cs) | set(las) | set(db)
         affinities = self.label_affinities(keys)
+        db_names = self.label_db_names()
         rows = []
         for k in keys:
             info = self.collection.get("label_ids", {}).get(k, {})
@@ -396,14 +474,16 @@ class Ctx:
             feat = {"collection": coll_raw.get(k, 0) / max_coll,
                     "corpus": cs.get(k, 0) / max_corp,
                     "artist": art_val / max_art,
-                    "affinity": (aff / 100) if aff is not None else 0}
+                    "affinity": (aff / 100) if aff is not None else 0,
+                    "db_link": db.get(k, 0.0)}
             # normalisé par la somme des poids réellement en jeu (jamais Σw fixe = 1.9,
             # cf. diagnostic N2) : la même formule que album_score, sur la même échelle /100.
             terms = [(w_coll, feat["collection"]), (w_corp, feat["corpus"]),
-                     (w_art, feat["artist"]), (w_aff, feat["affinity"])]
+                     (w_art, feat["artist"]), (w_aff, feat["affinity"]),
+                     (w_db, feat["db_link"])]
             tot = sum(t[0] for t in terms)
             score = min(100, round(100 * sum(t[0] * t[1] for t in terms) / tot)) if tot else 0
-            rows.append({"key": k, "name": info.get("name") or k, "score": score,
+            rows.append({"key": k, "name": info.get("name") or db_names.get(k) or k, "score": score,
                          "owned": lc.get(k, 0), "want": wc.get(k, 0),
                          "corpus": round(cs.get(k, 0), 1), "aff": aff, "coverage": coverage,
                          "artists": art_n, "watched": k in watch, "in_base": k in base, "feat": feat})

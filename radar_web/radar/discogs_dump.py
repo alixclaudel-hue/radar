@@ -833,6 +833,12 @@ def resolve_name(name, kind="label", con=None):
         if rows:
             return rows[0][0], rows[0][1], "exact", []
         return None, None, None, []
+    except sqlite3.OperationalError:
+        # base pas encore reconstruite au nouveau schéma (labels/artists/artist_aliases
+        # créées au Lot 4) — ex. juste après un déploiement, avant le prochain import
+        # mensuel : repli identique à "absent du référentiel", jamais un crash (même
+        # garde que label_style_counts).
+        return None, None, None, []
     finally:
         if owns:
             con.close()
@@ -924,6 +930,11 @@ def search_local(label_keys=None, styles=None, year_range=None, limit=500):
         query += " ORDER BY r.year DESC LIMIT ?"
         params.append(limit)
         rows = con.execute(query, params).fetchall()
+    except sqlite3.OperationalError:
+        # release_styles (jointure du filtre style) créée au Lot 4 — base pas encore
+        # reconstruite au nouveau schéma juste après un déploiement : même repli que
+        # label_style_counts plutôt qu'un 500 sur /search.
+        return []
     finally:
         con.close()
     keys = ("id", "title", "artist", "label", "catno", "year", "genres", "styles")

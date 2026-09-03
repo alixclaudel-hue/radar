@@ -18,7 +18,11 @@
   {% if searched %}<p class="muted small">Labels cherchés : {{ searched|join(', ') }}</p>{% endif %}
 {% else %}
   <div class="section-title">
+    {% if n_matches and n_matches > results|length %}
+    <h3>{{ results|length }} affichés sur {{ n_matches }} trouvés</h3>
+    {% else %}
     <h3>{{ results|length }} résultat{{ 's' if results|length > 1 }}</h3>
+    {% endif %}
     <span class="muted small">triés par score album</span>
   </div>
   {% if dump_date %}<p class="muted small">catalogue local au {{ dump_date[:4] }}-{{ dump_date[4:6] }}-{{ dump_date[6:] }}

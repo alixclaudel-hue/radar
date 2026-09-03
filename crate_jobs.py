@@ -1251,22 +1251,43 @@ def _yt_descriptions(ids, keys):
     return out
 
 
+#  Une recherche texte brute ("nom du DJ") classe les résultats par pertinence
+#  générale YouTube : un set iconique mais moins vu, ou repris par un tiers
+#  (Boiler Room, Cercle, une radio, un festival) plutôt que posté sur la
+#  chaîne de l'artiste, se retrouve souvent hors des toutes premières pages
+#  de CETTE requête précise et n'est donc jamais récupéré, quel que soit le
+#  filtre appliqué ensuite. Chaque variante ci-dessous interroge l'index de
+#  recherche sous un angle différent (le nom seul ne suffit pas) et couvre
+#  une tranche différente de résultats — cumulées, elles trouvent largement
+#  plus de sets qu'une seule requête, y compris ceux hébergés ailleurs que
+#  sur la chaîne propre de l'artiste.
+_SET_QUERY_HINTS = ("", "boiler room", "essential mix", "dj set", "live set",
+                    "full set", "b2b", "radio show")
+
+
 def _yt_video_ids(source, max_n, min_seconds=2100, keys=(), require_hint=True):
     """[(video_id, source_label)] pour une source. Filtres : durée ≥ min_seconds ;
     pour une recherche texte, le nom doit figurer dans le titre ; si `require_hint`,
     un mot-clé de set (set / mix / radio / boiler room / podcast / session…) doit
-    apparaître dans le titre OU la description."""
+    apparaître dans le titre OU la description.
+
+    Pour une recherche texte (pas un @handle/URL de chaîne, déjà ciblé par
+    nature), interroge plusieurs variantes de requête (cf. `_SET_QUERY_HINTS`)
+    et fusionne les résultats avant de filtrer — une seule requête au nom nu
+    passe à côté des sets tiers mal classés pour cette requête précise."""
+    import random
     import yt_dlp
     s = source.strip()
     is_text = not (s.startswith("@") or "youtube.com/" in s or s.startswith("http"))
     if s.startswith("@"):
-        target = f"https://www.youtube.com/{s}/videos"
+        targets = [f"https://www.youtube.com/{s}/videos"]
     elif "youtube.com/" in s:
-        target = s if "/videos" in s or "list=" in s else s.rstrip("/") + "/videos"
+        targets = [s if "/videos" in s or "list=" in s else s.rstrip("/") + "/videos"]
     elif s.startswith("http"):
-        target = s
+        targets = [s]
     else:
-        target = f"ytsearch{max(max_n * 6, 30)}:{s}"      # marge pour filtrer
+        per_query = max(max_n * 2, 25)      # marge pour filtrer, par variante
+        targets = [f"ytsearch{per_query}:{(s + ' ' + hint).strip()}" for hint in _SET_QUERY_HINTS]
 
     # on sépare le NOM (à exiger dans le titre) des mots-indices de recherche
     _hints = {"set", "sets", "dj", "mix", "mixe", "mixes", "radio", "boiler", "room",
@@ -1279,12 +1300,19 @@ def _yt_video_ids(source, max_n, min_seconds=2100, keys=(), require_hint=True):
     cookies = os.path.join(HERE, "www.youtube.com_cookies.txt")
     if os.path.exists(cookies):
         opts["cookiefile"] = cookies
+    roots = []
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(target, download=False)
+        for i, target in enumerate(targets):
+            try:
+                roots.append(ydl.extract_info(target, download=False))
+            except Exception:
+                continue
+            if i < len(targets) - 1:
+                time.sleep(random.uniform(1, 2))    # plusieurs requêtes d'affilée : ne pas cogner
 
     # 1) candidats : durée OK + (recherche texte) nom dans le titre
-    cand, seen, stack = [], set(), [info]
-    while stack and len(cand) < max_n * 3:
+    cand, seen, stack = [], set(), list(roots)
+    while stack and len(cand) < max_n * 3 * len(targets):
         node = stack.pop(0)
         if not node:
             continue

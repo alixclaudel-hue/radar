@@ -69,6 +69,26 @@ Réseau : niveau **Trusted** de l'environnement cloud = registres de paquets + G
 suffisant pour développer. Pour tester en vrai un appel Discogs/Bandcamp, passer
 l'environnement en **Custom** et ajouter `api.discogs.com`, `bandcamp.com`.
 
+## Deux sessions : dev cloud + diagnostic VPS
+
+Deux sessions Claude travaillent sur ce projet, avec des accès complémentaires :
+
+- **Dev cloud** (celle-ci) — code, PR, merge. Ne voit ni `/data`, ni les conteneurs,
+  ni les jobs. C'est la seule à qui l'utilisateur parle.
+- **Diagnostic VPS** (`session_01KbkY8jHGMbLLgkkQb8Kj6d`) — voit la base réelle, les
+  conteneurs, les jobs, les logs. **Lecture seule sur le code et les données** : elle
+  constate et prouve, elle ne corrige jamais. Son outillage de diagnostic vit dans
+  `~/radar-diag/` sur le VPS (dépôt à part, versionné), jamais dans ce dépôt-ci.
+
+La boucle : merge → déploiement auto → la session cloud réveille la diag (routine
+`diag-vps`, déclenchée à la demande) → la diag poste son rapport en commentaire d'une
+issue GitHub `Diag <sha>` → ça réveille la session cloud, qui corrige et fait la
+synthèse à l'utilisateur.
+
+Contrats : `.claude/skills/diag/SKILL.md` (côté VPS) et `.claude/skills/dev-loop/SKILL.md`
+(côté cloud : quand déclencher, comment consommer). Trois allers-retours maximum par
+déploiement, ensuite on escalade à l'utilisateur.
+
 ## Conventions
 
 - **Avant chaque push** : `python3 -m py_compile` sur les fichiers touchés, puis lancer

@@ -28,13 +28,27 @@
   {% if dump_date %}<p class="muted small">catalogue local au {{ dump_date[:4] }}-{{ dump_date[4:6] }}-{{ dump_date[6:] }}
     — coche « inclure les nouveautés » pour les sorties plus récentes</p>{% endif %}
   {% if searched %}<p class="muted small">Labels cherchés ({{ searched|length }}) : {{ searched|join(', ') }}</p>{% endif %}
+  {% set pager %}
+  {% if total_pages and total_pages > 1 %}
+  <div class="row" style="align-items:center;gap:10px;margin:8px 0">
+    <button type="button" class="small" {{ 'disabled' if page <= 1 }}
+            hx-post="/search" hx-include="#search-form" hx-vals='{"page": {{ page - 1 }}}'
+            hx-target="#results" hx-swap="innerHTML">← page précédente</button>
+    <span class="muted small">page {{ page }} / {{ total_pages }}</span>
+    <button type="button" class="small" {{ 'disabled' if page >= total_pages }}
+            hx-post="/search" hx-include="#search-form" hx-vals='{"page": {{ page + 1 }}}'
+            hx-target="#results" hx-swap="innerHTML">page suivante →</button>
+  </div>
+  {% endif %}
+  {% endset %}
+  {{ pager }}
   <div class="grid" hx-get="/release/meta" hx-trigger="load" hx-swap="none"
        hx-vals='{"ids": {{ results | map(attribute="raw") | map(attribute="id") | join(",") | tojson }}}'>
   {% for r in results %}
     {% set rr = r.raw %}
     {% set artist, sep, album = (rr.title or '').partition(' - ') %}
     <div class="card">
-      <div class="cover {{ 'empty' if not rr.thumb }}">
+      <div class="cover {{ 'empty' if not rr.thumb }}" id="cover-{{ rr.id }}">
         {% if rr.thumb %}<img src="{{ rr.thumb }}" alt="" loading="lazy">{% endif %}
         <div id="cover-meta-{{ rr.id }}" class="cover-meta"></div>
       </div>
@@ -95,4 +109,5 @@
     </div>
   {% endfor %}
   </div>
+  {{ pager }}
 {% endif %}

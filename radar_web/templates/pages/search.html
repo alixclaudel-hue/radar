@@ -6,7 +6,7 @@
 <h1>Chercher un disque</h1>
 <p class="muted small">Un label pour une recherche ciblée, ou laisse vide et filtre par style / genre / année.</p>
 
-<form hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
+<form id="search-form" hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
   <div class="field combo">
     <label for="f-label">Label <span class="muted">· propositions depuis ta base</span></label>
     <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"

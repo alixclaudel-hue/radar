@@ -2067,15 +2067,19 @@ def job_import_discogs_dump(job, params):
         except Exception as e:                    # noqa: BLE001
             return job.finish(error=f"Téléchargement du dump {kind} échoué : {e}")
 
-    job.msg("Vérification de l'intégrité du dump des sorties…")
-    ok = dd.verify_checksum(latest, gz_paths["releases"])
-    if ok is False:
-        try:
-            os.remove(gz_paths["releases"])
-        except OSError:
-            pass
-        return job.finish(error="Somme de contrôle invalide — fichier corrompu, relance le job.")
-    # ok is None : CHECKSUM.txt indisponible, on ne bloque pas l'import dessus.
+    # CHECKSUM.txt couvre les 4 fichiers du mois (releases/labels/artists/masters) — on ne
+    # télécharge pas masters, mais rien ne justifiait de ne vérifier QUE releases parmi les
+    # 3 qu'on importe (labels/artists corrompus silencieusement sinon, diagnostic mineur Lot 4).
+    for kind in kinds:
+        job.msg(f"Vérification de l'intégrité du dump {kind}…")
+        ok = dd.verify_checksum(latest, gz_paths[kind])
+        if ok is False:
+            try:
+                os.remove(gz_paths[kind])
+            except OSError:
+                pass
+            return job.finish(error=f"Somme de contrôle invalide pour {kind} — fichier corrompu, relance le job.")
+        # ok is None : CHECKSUM.txt indisponible (ou ce fichier n'y figure pas), on ne bloque pas l'import dessus.
 
     est_total = meta.get("n_total") or 20_000_000
     con = dd.open_new_db()

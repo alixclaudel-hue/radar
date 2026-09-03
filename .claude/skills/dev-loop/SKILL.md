@@ -54,6 +54,20 @@ dernier recours pousse son rapport dans `radar-diag/reports/<sha>.md`. Sans
 commentaire sur l'issue au bout d'une heure, va voir là-bas (`add_repo` sur
 `alixclaudel-hue/radar-diag`) avant de conclure que la boucle est cassée.
 
+**Latence non maîtrisée, testée et confirmée (03/09/2026)** : la session diag
+est de type `bridge` (`remote-control-auto`) — un process `claude` CLI lancé
+sur le VPS, pas une session cloud native. `fire_trigger` est bien accepté côté
+serveur (le retour d'appel le confirme), mais la livraison dépend de ce que
+fait ce process local, hors de mon contrôle : un test réel (message trivial,
+pas un vrai diagnostic) n'a montré aucune trace de traitement après 5 minutes,
+alors que la session restait `connected`. **Ne jamais présenter le
+déclenchement comme instantané à l'utilisateur.** Tire `get_session` sur
+`session_01KbkY8jHGMbLLgkkQb8Kj6d` pour observer `updated_at` : c'est le seul
+signal fiable de progression avant que le rapport arrive sur l'issue. Si
+l'utilisateur veut une latence courte pour un diagnostic donné, la seule
+option connue est qu'il garde lui-même une fenêtre ouverte sur cette session
+pendant l'opération — à proposer, jamais à supposer acquis.
+
 ## Comment consommer le rapport
 
 Le rapport arrive en commentaire de l'issue et te réveille.
@@ -81,7 +95,10 @@ ou sur le VPS, que ni toi ni la session diag n'avez le droit de déclencher).
 - **Trois allers-retours maximum** par déploiement. Au troisième, tu escalades à
   l'utilisateur avec ce qui reste ouvert — pas un quatrième tour.
 - **Délai de garde** : sans rapport au bout d'une heure, préviens l'utilisateur
-  plutôt que d'attendre en silence. La session diag dépend d'un process vivant
-  sur le VPS ; s'il est tombé, les réveils partent dans le vide.
+  plutôt que d'attendre en silence. Ce n'est pas une latence « normale » à
+  annoncer d'avance, c'est le seuil d'escalade — la latence réelle est
+  inconnue et peut être bien plus courte (dépend du process local sur le VPS,
+  cf. ci-dessus). Ne réduis pas ce seuil sans nouvelle mesure : le test du
+  03/09/2026 n'a couvert que 5 minutes, pas de quoi calibrer un seuil plus fin.
 - La session diag ne touche jamais au code ni aux données : si un correctif est
   nécessaire, il passe par toi, par une PR.

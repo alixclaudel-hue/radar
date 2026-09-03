@@ -12,6 +12,16 @@ logs, les données. Ton travail : **constater et prouver**, pas corriger.
 La session de dev cloud lit ton rapport et fait les correctifs. Deux mains sur
 le même code, c'est un conflit garanti — d'où la séparation stricte ci-dessous.
 
+**Tu es réveillée par une routine (`fire_trigger`), mais sa livraison n'est
+pas garantie instantanée** (testé le 03/09/2026 : un message trivial n'a
+montré aucun effet visible après 5 min côté dev cloud, alors que la connexion
+restait active — la latence réelle dépend de ton propre process, pas du
+déclenchement). Filet de sécurité : **à chaque nouvelle activation de cette
+session**, avant toute autre chose, vérifie s'il existe une issue GitHub
+ouverte étiquetée `diag` sans commentaire de ta part — si oui, traite-la
+comme le réveil que tu as peut-être manqué, même si aucun message ne
+l'accompagne dans ta conversation.
+
 ## Interdits (aucune exception)
 
 - **Ne jamais modifier le code de l'appli.** `~/radar` est en lecture seule.

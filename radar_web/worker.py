@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime
 
 from .radar import discogs_dump, jobs, paths, sellers
 
@@ -30,10 +31,12 @@ _last_dump_check = 0.0
 
 # Entretien de fond (nettoyage canonique, profilage des labels, graphe
 # producteur global) : opt-in via RADAR_AUTO_MAINTENANCE=1, pour ne plus
-# dépendre de boutons dans Réglages. Cadence par job mémorisée dans un
-# fichier marqueur (survit aux redémarrages du worker, un déploiement en
-# provoque un à chaque fois).
-AUTO_MAINT_PATH = os.path.join(paths.JOBS_DIR, "auto_maintenance.json")
+# dépendre de boutons dans Réglages. Cadence par job lue directement depuis
+# le statut persisté du job (finished_at, sans erreur) — jamais depuis
+# l'instant où on l'a lancé (cf. plus bas) : un déploiement interrompt un job
+# en cours en plein milieu (n'importe lequel, pas seulement ceux qui touchent
+# au dump), et il ne doit alors jamais compter comme "fait" pour sa cadence,
+# sous peine d'attendre jusqu'à 30 j (build_graph) avant d'être retenté.
 AUTO_MAINT_EVERY = {"canonicalize": 7 * 86400, "profile_labels": 7 * 86400, "build_graph": 30 * 86400}
 _last_auto_maint_check = 0.0
 
@@ -85,19 +88,19 @@ def _maybe_monthly_dump_sync():
         print(f"[worker] monthly dump check : {e}", file=sys.stderr, flush=True)
 
 
-def _load_auto_maint():
+def _last_successful_run(name):
+    """Timestamp de la DERNIÈRE exécution qui est allée à son terme sans erreur
+    (0.0 si jamais complétée) — lu depuis le statut persisté du job lui-même,
+    jamais depuis une marque posée au lancement (cf. commentaire plus haut :
+    c'était le bug qui a laissé build_graph "oublié" 30 j après une
+    interruption par déploiement)."""
+    s = jobs.status(name, uid=paths.DEFAULT_UID)
+    if not s or s.get("running") or s.get("error") or not s.get("finished_at"):
+        return 0.0
     try:
-        with open(AUTO_MAINT_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
-def _save_auto_maint(d):
-    tmp = AUTO_MAINT_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, AUTO_MAINT_PATH)
+        return datetime.fromisoformat(s["finished_at"]).timestamp()
+    except ValueError:
+        return 0.0
 
 
 def _maybe_auto_maintenance():
@@ -111,20 +114,15 @@ def _maybe_auto_maintenance():
         return
     _last_auto_maint_check = time.time()
     try:
-        marks = _load_auto_maint()
         queued_names = {j["name"] for j in jobs.load_queue()}
-        now, changed = time.time(), False
+        now = time.time()
         for name, params in (("canonicalize", {"scope": "corpus"}),
                               ("profile_labels", {"limit": 150}),
                               ("build_graph", {"mode": "global"})):
-            if name in queued_names or now - marks.get(name, 0) < AUTO_MAINT_EVERY[name]:
+            if name in queued_names or now - _last_successful_run(name) < AUTO_MAINT_EVERY[name]:
                 continue
             jobs.launch(name, params, uid=paths.DEFAULT_UID)
-            marks[name] = now
-            changed = True
             print(f"[worker] entretien de fond enfilé : {name}", file=sys.stderr, flush=True)
-        if changed:
-            _save_auto_maint(marks)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] auto maintenance check : {e}", file=sys.stderr, flush=True)
 

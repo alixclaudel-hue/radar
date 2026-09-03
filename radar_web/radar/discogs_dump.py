@@ -426,11 +426,31 @@ def open_new_db():
     return con
 
 
+def _materialize_label_styles(con):
+    """Profil de style par label, exhaustif sur tout le catalogue vinyle
+    importé (pas un échantillon des 100 sorties les plus "want" via l'API,
+    biaisé vers les pièces rares — cf. diagnostic D5). Une ligne par
+    (label_key, style) : la table remplace labels_profile.json (calculé par
+    job_profile_labels, encore utilisé en repli pour les labels absents du
+    dump — cf. scoring.Ctx.label_affinities)."""
+    con.execute("DROP TABLE IF EXISTS label_styles")
+    con.execute("""
+        CREATE TABLE label_styles AS
+        SELECT r.label_key AS label_key, rs.style AS style, COUNT(*) AS n
+        FROM releases r
+        JOIN release_styles rs ON rs.release_id = r.id
+        WHERE r.label_key IS NOT NULL
+        GROUP BY r.label_key, rs.style
+    """)
+    con.execute("CREATE INDEX idx_ls_label ON label_styles(label_key)")
+
+
 def finalize_new_db(con):
-    """Index + ANALYZE puis bascule atomique de `.new` vers `DB_PATH`. À
-    appeler une fois tous les dumps du cycle importés sur `con`
-    (`open_new_db()`) — ferme la connexion."""
+    """Index + profil de style par label + ANALYZE puis bascule atomique de
+    `.new` vers `DB_PATH`. À appeler une fois tous les dumps du cycle
+    importés sur `con` (`open_new_db()`) — ferme la connexion."""
     _create_indexes(con)
+    _materialize_label_styles(con)
     con.execute("ANALYZE")
     con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     con.close()
@@ -795,6 +815,37 @@ def lookup_release(release_id, con=None):
         return None
     keys = ("title", "artist", "label", "catno", "year", "country", "format", "genres", "styles", "master_id")
     return dict(zip(keys, row))
+
+
+def label_style_counts(label_keys, con=None):
+    """{label_key: {style: n, ...}} depuis la table `label_styles` matérialisée
+    à l'import (cf. `_materialize_label_styles`) — exhaustif sur tout le
+    catalogue vinyle importé, pour les clés demandées uniquement (pas de
+    chargement de la table entière). {} si le dump n'est pas disponible,
+    ou si `label_styles` n'existe pas encore (base construite avant D5,
+    en attente du prochain import mensuel) : repli à la charge de l'appelant."""
+    keys = [k for k in dict.fromkeys(label_keys) if k]
+    if not keys or not available():
+        return {}
+    owns = con is None
+    if owns:
+        con = connect_readonly()
+        if con is None:
+            return {}
+    try:
+        qmarks = ",".join("?" * len(keys))
+        rows = con.execute(
+            f"SELECT label_key, style, n FROM label_styles WHERE label_key IN ({qmarks})",
+            keys).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        if owns:
+            con.close()
+    out = {}
+    for lk, style, n in rows:
+        out.setdefault(lk, {})[style] = n
+    return out
 
 
 def search_by_label(label_name, limit=2000):

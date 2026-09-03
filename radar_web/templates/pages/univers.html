@@ -11,6 +11,16 @@
 </div>
 <hr>
 
+{% if n_review %}
+<details class="acc" open>
+  <summary>⚠️ À vérifier ({{ n_review }})</summary>
+  <div class="acc__body">
+    {% include "partials/review.html" %}
+  </div>
+</details>
+<hr>
+{% endif %}
+
 {% if tab == 'labels' %}
   <p class="muted small">{{ n_profiled }} profilés. Import/export CSV : Réglages.</p>
 

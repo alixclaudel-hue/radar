@@ -90,6 +90,25 @@ class Ctx:
         weighted = sum(n * self.wmap.get(style_key(s), 0.0) for s, n in sc.items())
         return min(100, round(100 * weighted / total))
 
+    def label_affinities(self, label_keys):
+        """{label_key: affinité 0-100 ou None} — priorité au profil matérialisé
+        depuis le dump Discogs (table label_styles, exhaustif sur tout le
+        catalogue vinyle importé), repli sur labels_profile.json (échantillon
+        API biaisé par le tri "want", cf. diagnostic D5) pour les labels
+        absents du dump. None si aucune des deux sources n'a de données."""
+        from . import discogs_dump as dd
+        keys = list(label_keys)
+        dump_styles = dd.label_style_counts(keys)
+        out = {}
+        for k in keys:
+            dstyles = dump_styles.get(k)
+            if dstyles:
+                out[k] = self.affinity_score({"style_counts": dstyles})
+                continue
+            e = self.profile.get(k)
+            out[k] = self.affinity_score(e) if e else None
+        return out
+
     def style_affinity_of(self, styles):
         styles = [s for s in (styles or []) if s]
         if not styles:
@@ -244,6 +263,8 @@ class Ctx:
         ac = self.cfg.get("artist_categories", {})
         res_ok = sum(1 for v in self.artists_res.values()
                      if v.get("discogs_id") and v.get("status") in ("exact", "approx", "confirmed"))
+        not_found = (sum(1 for v in self.resolved.values() if v.get("status") == "not_found")
+                     + sum(1 for v in self.artists_res.values() if v.get("status") == "not_found"))
         return {
             "labels": len(self.cfg.get("labels", [])),
             "labels_profiled": len(self.profile),
@@ -251,6 +272,7 @@ class Ctx:
             "aimes": len(ac.get("2", [])),
             "artists_resolved": res_ok,
             "artists_identified": len(self.ascore),
+            "not_found": not_found,
             "graph_edges": len((self.graph or {}).get("edges", {})),
             "tracks": len(self.corpus),
             "tracks_by_source": self.corpus_by_source(),
@@ -315,11 +337,12 @@ class Ctx:
         floor = float(self.scoring["label_affinity_floor"] or 0)
         watch = {normalize_label(x) for x in self.cfg.get("watchlist", [])}
         base = {normalize_label(x) for x in self.cfg.get("labels", [])}
+        keys = set(coll_raw) | set(cs) | set(las)
+        affinities = self.label_affinities(keys)
         rows = []
-        for k in set(coll_raw) | set(cs) | set(las):
+        for k in keys:
             info = self.collection.get("label_ids", {}).get(k, {})
-            e = self.profile.get(k)
-            aff = self.affinity_score(e) if e else None
+            aff = affinities.get(k)
             if floor and (aff is None or aff < floor):
                 continue
             art_val, art_n = las.get(k, (0.0, 0))

@@ -194,5 +194,8 @@
   <div class="stat"><b>{{ st.graph_edges }}</b><span>arêtes du graphe</span></div>
   <div class="stat"><b>{{ st.tracks }}</b><span>tracks (corpus)</span></div>
   <div class="stat"><b>{{ st.watchlist }} / {{ st.sellers }}</b><span>veille / vendeurs</span></div>
+  {% if st.not_found %}
+  <div class="stat"><b><a href="/univers">{{ st.not_found }}</a></b><span>jamais identifiés sur Discogs</span></div>
+  {% endif %}
 </div>
 {% endblock %}

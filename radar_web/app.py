@@ -539,12 +539,13 @@ def _base_labels_ranked(c):
     ridx = c.reco_index
     lc = c.collection.get("label_counts", {})
     lids = c.collection.get("label_ids", {})
+    keys = [store.normalize_label(name) for name in c.cfg.get("labels", [])]
+    affinities = c.label_affinities(keys)
     rows, seen = [], set()
-    for name in c.cfg.get("labels", []):
-        key = store.normalize_label(name)
+    for name, key in zip(c.cfg.get("labels", []), keys):
         res = c.resolved.get(key) or {}
         disp = res.get("discogs_name") or res.get("original") or name
-        aff = c.affinity_score(c.profile.get(key)) if c.profile.get(key) else None
+        aff = affinities.get(key)
         did = res.get("discogs_id") or lids.get(key, {}).get("id")
         rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key,
                      "aff": aff, "_reco": ridx.get(key, 0), "owned": lc.get(key, 0), "id": did})
@@ -1196,6 +1197,43 @@ def reco_artists_frag(request: Request):
     return frag(request, "partials/reco_artists.html", reco=rows, n_reco=len(g))
 
 
+def _review_rows(resolved, status):
+    """[{key, original, discogs_name, discogs_id, candidates}] pour les
+    entrées dans ce statut — alimente la section "À vérifier" (diagnostic C3) :
+    approx = deviné par l'API, à confirmer/rejeter ; not_found = jamais
+    identifié, purement informationnel (rien à confirmer)."""
+    out = []
+    for k, e in (resolved or {}).items():
+        if e.get("status") == status:
+            out.append({"key": k, "original": e.get("original") or k,
+                        "discogs_name": e.get("discogs_name"), "discogs_id": e.get("discogs_id"),
+                        "candidates": e.get("candidates") or []})
+    out.sort(key=lambda r: r["original"].lower())
+    return out
+
+
+def _review_ctx(c):
+    return {"labels_approx": _review_rows(c.resolved, "approx"),
+            "labels_not_found": _review_rows(c.resolved, "not_found"),
+            "artists_approx": _review_rows(c.artists_res, "approx"),
+            "artists_not_found": _review_rows(c.artists_res, "not_found")}
+
+
+@app.post("/univers/review/{kind}/{action}", response_class=HTMLResponse)
+def univers_review_action(request: Request, kind: str, action: str, key: str = Form("")):
+    if kind not in ("label", "artist") or action not in ("confirm", "reject"):
+        return HTMLResponse("", status_code=404)
+    path = _pu().resolved if kind == "label" else _pu().artists_res
+    data = load(path, {})
+    e = data.get(key)
+    if e and e.get("status") == "approx":
+        e["status"] = "confirmed" if action == "confirm" else "not_found"
+        e["candidates"] = []
+        e["reviewed_by"] = "user"
+        save(path, data)
+    return frag(request, "partials/review.html", review=_review_ctx(Ctx()))
+
+
 # ============================================================ 🌐 Mon univers
 @app.get("/univers", response_class=HTMLResponse)
 def univers_page(request: Request, tab: str = "labels"):
@@ -1208,6 +1246,7 @@ def univers_page(request: Request, tab: str = "labels"):
         ({"key": ck, "name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
          if not str(disp.get(ck, ck)).startswith("id:")),
         key=lambda r: r["name"].lower())
+    review = _review_ctx(c)
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
@@ -1216,6 +1255,8 @@ def univers_page(request: Request, tab: str = "labels"):
                   label_graphs=label_graphs,
                   artist_graphs=artist_graphs,
                   classified_artists=classified_artists,
+                  review=review,
+                  n_review=len(review["labels_approx"]) + len(review["artists_approx"]),
                   top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
                   top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 
@@ -1291,15 +1332,21 @@ def _graph_extras(entry, kind):
                 weight[k] = weight.get(k, 0) + int(e.get("w") or 0)
     notes, infos = {}, {}
     if kind == "label":
+        from .radar import discogs_dump as dd
         owned = c.collection.get("label_counts", {})
         reco, gl = c.reco_index, c.graph_rescore()["labels"]
+        dump_styles = dd.label_style_counts(nodes)
         for k in nodes:
+            dstyles = dump_styles.get(k)
             prof = c.profile.get(k)
-            notes[k] = c.affinity_score(prof) if prof else None
-            styles = sorted((prof or {}).get("style_counts", {}).items(), key=lambda kv: -kv[1])
+            style_counts = dstyles or (prof or {}).get("style_counts") or {}
+            notes[k] = c.affinity_score({"style_counts": style_counts}) if (dstyles or prof) else None
+            styles = sorted(style_counts.items(), key=lambda kv: -kv[1])
             facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "artiste(s) en commun")
-            if prof and prof.get("sampled"):
-                facts.append(f"{prof['sampled']} sorties profilées")
+            if dstyles:
+                facts.append("profil : catalogue Discogs complet")
+            elif prof and prof.get("sampled"):
+                facts.append(f"{prof['sampled']} sorties profilées (échantillon)")
             else:
                 facts.append("pas encore profilé")
             if owned.get(k):

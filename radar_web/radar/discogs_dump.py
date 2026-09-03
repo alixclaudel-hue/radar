@@ -43,7 +43,7 @@ RAW_DIR = os.path.join(paths.SHARED_DIR, "discogs_dump_raw")
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/124.0.0.0 Safari/537.36 Radar/1.0 (+personal-use, cf. CLAUDE.md)")
 DATA_HOST = "https://data.discogs.com"
-DUMP_URL_TMPL = DATA_HOST + "/?download=data/{year}/discogs_{date}_releases.xml.gz"
+DUMP_URL_TMPL = DATA_HOST + "/?download=data/{year}/discogs_{date}_{kind}.xml.gz"
 CHECKSUM_URL_TMPL = DATA_HOST + "/?download=data/{year}/discogs_{date}_CHECKSUM.txt"
 
 _NOT_VINYL_MARKERS = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD", "Blu-ray", "SACD", "VHS")
@@ -63,11 +63,9 @@ def _is_vinyl(fmt_names, fmt_descriptions):
 
 # --------------------------------------------------------------- SQLite
 
-def _connect():
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
+def _create_schema(con):
     con.execute("""
-        CREATE TABLE IF NOT EXISTS releases (
+        CREATE TABLE releases (
             id INTEGER PRIMARY KEY,
             title TEXT,
             artist TEXT,
@@ -83,9 +81,41 @@ def _connect():
             master_id INTEGER
         )
     """)
-    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_label_key ON releases(label_key)")
-    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_artist_key ON releases(artist_key)")
-    return con
+    # table à part (pas de LIKE '%…%' possible sur la colonne styles jointe par
+    # virgule -> jamais indexable) : une ligne par (release_id, style), pour
+    # pouvoir interroger un style précis par index plutôt que par SCAN complet.
+    con.execute("CREATE TABLE release_styles (release_id INTEGER, style TEXT)")
+    # dumps labels/artists (discogs_{date}_labels.xml.gz, _artists.xml.gz) :
+    # id Discogs canonique d'un nom, sans appel API. C'est ce qui alimente
+    # resolve_name() et, plus tard, un vrai graphe de co-crédits par jointure
+    # SQL plutôt que par appel /artists/{id}/releases un par un.
+    con.execute("CREATE TABLE labels (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, parent TEXT)")
+    con.execute("CREATE TABLE artists (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, real_name TEXT)")
+    # variantes de graphie d'un MÊME artiste (namevariations du dump) -> son id.
+    # Les <aliases> (autres identités, chacune avec sa propre entrée <artist>
+    # ailleurs dans le dump) n'ont pas besoin d'un lien de plus ici : chercher
+    # leur nom résout déjà directement sur leur propre id via `artists`.
+    con.execute("CREATE TABLE artist_aliases (name_key TEXT, artist_id INTEGER)")
+    # crédits par sortie, limités aux rôles qui pèsent dans le scoring — cf.
+    # DEFAULT_SCORING["graph"] (role_main/role_remix/role_other). Rempli
+    # pendant le parsing des sorties (<artists> + <extraartists> filtrés).
+    con.execute("CREATE TABLE release_artists (release_id INTEGER, artist_id INTEGER, role TEXT)")
+
+
+def _create_indexes(con):
+    """Appelé une fois la table remplie, jamais avant : indexer une table déjà
+    pleine évite de mettre à jour les arbres B à chaque ligne insérée pendant
+    tout l'import (facteur 2-3 sur la durée, cf. diagnostic D1)."""
+    con.execute("CREATE INDEX idx_releases_label_key ON releases(label_key)")
+    con.execute("CREATE INDEX idx_releases_artist_key ON releases(artist_key)")
+    con.execute("CREATE INDEX idx_releases_year ON releases(year)")
+    con.execute("CREATE INDEX idx_rs_style ON release_styles(style)")
+    con.execute("CREATE INDEX idx_rs_release ON release_styles(release_id)")
+    con.execute("CREATE INDEX idx_labels_name_key ON labels(name_key)")
+    con.execute("CREATE INDEX idx_artists_name_key ON artists(name_key)")
+    con.execute("CREATE INDEX idx_alias_key ON artist_aliases(name_key)")
+    con.execute("CREATE INDEX idx_ra_artist ON release_artists(artist_id)")
+    con.execute("CREATE INDEX idx_ra_release ON release_artists(release_id)")
 
 
 def get_meta():
@@ -186,8 +216,8 @@ def find_latest_dump_date():
         "et que son mécanisme de listing n'a pas encore changé de forme.")
 
 
-def dump_url(date_str):
-    return DUMP_URL_TMPL.format(year=date_str[:4], date=date_str)
+def dump_url(date_str, kind="releases"):
+    return DUMP_URL_TMPL.format(year=date_str[:4], date=date_str, kind=kind)
 
 
 def checksum_url(date_str):
@@ -227,7 +257,7 @@ def looks_like_gzip(path):
         return False
 
 
-def _diagnose_bad_download(date_str, file_path):
+def _diagnose_bad_download(date_str, file_path, kind="releases"):
     """Fichier téléchargé mais pas du gzip valide (mauvaise URL, page de
     blocage Cloudflare...) : taille + aperçu du contenu + un HEAD frais sur
     l'URL attendue pour voir ce que le serveur répond maintenant."""
@@ -240,25 +270,26 @@ def _diagnose_bad_download(date_str, file_path):
         size, preview = None, f"(illisible : {e})"
     info = f"taille={size} octet(s), aperçu={preview!r}"
     try:
-        r = requests.head(dump_url(date_str), headers={"User-Agent": UA}, timeout=15, allow_redirects=True)
+        r = requests.head(dump_url(date_str, kind), headers={"User-Agent": UA}, timeout=15, allow_redirects=True)
         info += f" — HEAD frais sur l'URL attendue : {r.status_code} ({r.headers.get('content-type', '?')})"
     except requests.RequestException as e:
         info += f" — HEAD frais échoué : {e}"
     return info
 
 
-def download_dump(date_str, dest_path, progress_cb=None):
-    """Téléchargement en flux (le fichier fait plusieurs Go) avec reprise
-    simple : si un fichier partiel existe déjà et correspond en taille à un
-    téléchargement précédent interrompu, on ne repart pas de zéro (Range).
-    Un partiel qui ne commence pas par la signature gzip (page d'erreur/de
-    blocage écrite là par une tentative précédente) est jeté avant de servir
-    de base à une reprise, sinon on ne ferait qu'empiler du contenu valide
-    après un en-tête déjà corrompu."""
+def download_dump(date_str, dest_path, progress_cb=None, kind="releases"):
+    """Téléchargement en flux (le fichier fait plusieurs Go pour "releases",
+    quelques centaines de Mo pour "labels"/"artists") avec reprise simple : si
+    un fichier partiel existe déjà et correspond en taille à un téléchargement
+    précédent interrompu, on ne repart pas de zéro (Range). Un partiel qui ne
+    commence pas par la signature gzip (page d'erreur/de blocage écrite là par
+    une tentative précédente) est jeté avant de servir de base à une reprise,
+    sinon on ne ferait qu'empiler du contenu valide après un en-tête déjà
+    corrompu."""
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     if os.path.exists(dest_path) and os.path.getsize(dest_path) >= 2 and not looks_like_gzip(dest_path):
         os.remove(dest_path)
-    url = dump_url(date_str)
+    url = dump_url(date_str, kind)
     resume_from = os.path.getsize(dest_path) if os.path.exists(dest_path) else 0
     headers = {"User-Agent": UA}
     mode = "wb"
@@ -291,7 +322,7 @@ def download_dump(date_str, dest_path, progress_cb=None):
         if total and done < total:               # connexion coupée en route (ex. reset côté serveur)
             raise RuntimeError(f"téléchargement incomplet : {done}/{total} octets reçus.")
     if resume_from == 0 and not looks_like_gzip(dest_path):
-        diag = _diagnose_bad_download(date_str, dest_path)
+        diag = _diagnose_bad_download(date_str, dest_path, kind)
         try:
             os.remove(dest_path)
         except OSError:
@@ -350,10 +381,11 @@ class _RootWrappedStream(io.RawIOBase):
         return len(chunk)
 
 
-def _detect_needs_wrap(gz_path):
+def _detect_needs_wrap(gz_path, root_tag=b"<releases"):
     """(needs_wrap, skip_bytes) — skip_bytes = longueur du prologue <?xml...?>
     (espaces de tête inclus) à avaler si on doit injecter notre propre root,
-    pour ne pas laisser une déclaration XML au milieu du flux (invalide)."""
+    pour ne pas laisser une déclaration XML au milieu du flux (invalide).
+    `root_tag` : balise racine attendue du dump (releases/labels/artists)."""
     with gzip.open(gz_path, "rb") as f:
         raw_head = f.read(4096)
     body = raw_head.lstrip()
@@ -364,32 +396,80 @@ def _detect_needs_wrap(gz_path):
         rest = body[decl_len:]
         skip += len(rest) - len(rest.lstrip())
         body = rest.lstrip()
-    needs_wrap = not body.startswith(b"<releases")
+    needs_wrap = not body.startswith(root_tag)
     return needs_wrap, skip
 
 
-def import_releases(gz_path, progress_cb=None, batch_size=5000):
+def open_new_db():
+    """Ouvre le fichier de reconstruction `DB_PATH + ".new"` : PRAGMAs d'import
+    puis schéma créé (sans index — cf. `_create_indexes`). Un cycle d'import
+    enchaîne `import_releases`/`import_labels`/`import_artists` sur la MÊME
+    connexion (les trois dumps du mois vont dans la même base), puis
+    `finalize_new_db()` une fois tout importé : index + bascule atomique
+    unique. Reconstruire à part, jamais dans `DB_PATH` lui-même, ferme la
+    fenêtre où `available()` mentirait pendant les ~1h45 que dure un import
+    (cf. diagnostic D1) — l'appli lit l'ancienne base valide jusqu'à la
+    dernière seconde, et un import interrompu ne détruit jamais l'existant."""
+    os.makedirs(paths.SHARED_DIR, exist_ok=True)
+    new_path = DB_PATH + ".new"
+    for p in (new_path, new_path + "-wal", new_path + "-shm"):
+        try:
+            os.remove(p)                          # reliquat d'un import précédent interrompu
+        except OSError:
+            pass
+    con = sqlite3.connect(new_path)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=OFF")     # base jetable jusqu'à la bascule : la durabilité
+    con.execute("PRAGMA temp_store=MEMORY")   # de ce fichier temporaire n'a pas d'importance
+    con.execute("PRAGMA cache_size=-131072")  # 128 Mo
+    _create_schema(con)
+    return con
+
+
+def finalize_new_db(con):
+    """Index + ANALYZE puis bascule atomique de `.new` vers `DB_PATH`. À
+    appeler une fois tous les dumps du cycle importés sur `con`
+    (`open_new_db()`) — ferme la connexion."""
+    _create_indexes(con)
+    con.execute("ANALYZE")
+    con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    con.close()
+    new_path = DB_PATH + ".new"
+    for suffix in ("-wal", "-shm"):               # compagnons WAL du fichier temporaire
+        try:
+            os.remove(new_path + suffix)
+        except OSError:
+            pass
+    os.replace(new_path, DB_PATH)
+
+
+def import_releases(con, gz_path, progress_cb=None, batch_size=5000):
     """Parse en flux le dump releases.xml.gz, ne garde que le vinyle, insère
-    en base par lots. Reconstruit la table entière (DELETE puis re-remplit
-    dans la même transaction que l'insertion, pas de table à part swap-in
-    pour rester simple — le temps d'indisponibilité pendant un import est
-    acceptable vu la cadence mensuelle). Retourne (n_total_vu, n_vinyle)."""
+    en base par lots dans `releases`/`release_styles`/`release_artists`, sur
+    une connexion déjà ouverte par `open_new_db()` (ne gère pas le cycle de
+    vie du fichier — cf. `open_new_db()`/`finalize_new_db()`). Retourne
+    (n_total_vu, n_vinyle)."""
     import xml.etree.ElementTree as ET
 
-    needs_wrap, skip_bytes = _detect_needs_wrap(gz_path)
-    con = _connect()
-    con.execute("DELETE FROM releases")
-    n_total, n_vinyl, batch = 0, 0, []
+    needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<releases")
+    n_total, n_vinyl, batch, style_rows, credit_rows = 0, 0, [], [], []
 
     def flush():
-        if not batch:
-            return
-        con.executemany(
-            "INSERT OR REPLACE INTO releases "
-            "(id, title, artist, artist_key, label, label_key, catno, year, country, format, genres, styles, master_id) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+        if batch:
+            con.executemany(
+                "INSERT OR REPLACE INTO releases "
+                "(id, title, artist, artist_key, label, label_key, catno, year, country, format, genres, styles, master_id) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+            batch.clear()
+        if style_rows:
+            con.executemany(
+                "INSERT INTO release_styles (release_id, style) VALUES (?,?)", style_rows)
+            style_rows.clear()
+        if credit_rows:
+            con.executemany(
+                "INSERT INTO release_artists (release_id, artist_id, role) VALUES (?,?,?)", credit_rows)
+            credit_rows.clear()
         con.commit()
-        batch.clear()
 
     with gzip.open(gz_path, "rb") as raw:
         stream = io.BufferedReader(_RootWrappedStream(raw, needs_wrap, skip_bytes))
@@ -399,31 +479,174 @@ def import_releases(gz_path, progress_cb=None, batch_size=5000):
             if event != "end" or elem.tag != "release":
                 continue
             n_total += 1
-            row = _parse_release_elem(elem)
+            parsed = _parse_release_elem(elem)
             elem.clear()
             root.clear()                 # `elem.clear()` seul ne suffit pas : la racine garde
                                           # une référence sur chaque enfant traité (fuite mémoire
                                           # sur 18-20M sorties sans ce clear-là aussi)
-            if row is not None:
+            if parsed is not None:
+                row, styles_list, credits = parsed
                 n_vinyl += 1
                 batch.append(row)
+                style_rows.extend((row[0], s) for s in styles_list)
+                credit_rows.extend((row[0], aid, role) for aid, role in credits)
                 if len(batch) >= batch_size:
                     flush()
             if progress_cb and n_total % 20000 == 0:
                 progress_cb(n_total)
     flush()
-    con.close()
     if progress_cb:
         progress_cb(n_total)
     return n_total, n_vinyl
 
 
+def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
+    """Parse en flux discogs_{date}_labels.xml.gz -> table `labels`, sur une
+    connexion déjà ouverte par `open_new_db()`. Retourne n_total.
+
+    Le lien parent/sous-label n'existe dans le dump que dans un sens
+    (`<sublabels><label id="X">` posé sur l'entrée du label PARENT) : on
+    accumule id->nom et enfant->id_parent en mémoire pendant le flux (quelques
+    centaines de milliers de labels, négligeable face aux ~7 M sorties) et on
+    résout `parent` en un seul passage UPDATE à la fin, indépendant de l'ordre
+    d'apparition des labels dans le dump.
+
+    `<sublabels>` porte lui-même des `<label id="X">Nom</label>` — même nom de
+    balise que l'enregistrement racine. Un compteur de profondeur distingue
+    les deux : ne traiter comme enregistrement que le `<label>` qui revient à
+    profondeur 0 (referme un enregistrement racine, pas une référence
+    imbriquée)."""
+    import xml.etree.ElementTree as ET
+
+    needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<labels")
+    n_total, batch, depth = 0, [], 0
+    id_to_name, parent_of = {}, {}
+
+    def flush():
+        if not batch:
+            return
+        con.executemany(
+            "INSERT OR REPLACE INTO labels (id, name, name_key, parent) VALUES (?,?,?,NULL)", batch)
+        batch.clear()
+        con.commit()
+
+    with gzip.open(gz_path, "rb") as raw:
+        stream = io.BufferedReader(_RootWrappedStream(raw, needs_wrap, skip_bytes))
+        context = ET.iterparse(stream, events=("start", "end"))
+        _, root = next(context)
+        for event, elem in context:
+            if elem.tag != "label":
+                continue
+            if event == "start":
+                depth += 1
+                continue
+            depth -= 1
+            if depth != 0:
+                continue                  # </label> d'une référence imbriquée (sublabels)
+            n_total += 1
+            lid = elem.get("id") or elem.findtext("id")
+            name = (elem.findtext("name") or "").strip()
+            if lid and str(lid).isdigit() and name:
+                lid = int(lid)
+                id_to_name[lid] = name
+                batch.append((lid, name, normalize_label(name)))
+                for sub in elem.findall("./sublabels/label"):
+                    sid = sub.get("id")
+                    if sid and sid.isdigit():
+                        parent_of[int(sid)] = lid
+            elem.clear()
+            root.clear()
+            if len(batch) >= batch_size:
+                flush()
+            if progress_cb and n_total % 20000 == 0:
+                progress_cb(n_total)
+    flush()
+    if parent_of:
+        con.executemany(
+            "UPDATE labels SET parent = ? WHERE id = ?",
+            [(id_to_name[pid], cid) for cid, pid in parent_of.items() if pid in id_to_name])
+        con.commit()
+    if progress_cb:
+        progress_cb(n_total)
+    return n_total
+
+
+def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
+    """Parse en flux discogs_{date}_artists.xml.gz -> tables `artists` +
+    `artist_aliases`, sur une connexion déjà ouverte par `open_new_db()`.
+    Retourne n_total. `artist_aliases` ne couvre que les `namevariations`
+    (variantes de graphie du MÊME id — non ambigu) ; cf. le commentaire sur
+    `_create_schema` pour pourquoi les `<aliases>` n'ont pas besoin d'un lien
+    de plus ici. Compteur de profondeur par précaution (cf. `import_labels`) :
+    si `<groups>`/`<members>` venait à imbriquer une balise `artist`, elle ne
+    serait pas comptée comme un enregistrement racine."""
+    import xml.etree.ElementTree as ET
+
+    needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<artists")
+    n_total, batch, alias_rows, depth = 0, [], [], 0
+
+    def flush():
+        if batch:
+            con.executemany(
+                "INSERT OR REPLACE INTO artists (id, name, name_key, real_name) VALUES (?,?,?,?)", batch)
+            batch.clear()
+        if alias_rows:
+            con.executemany(
+                "INSERT INTO artist_aliases (name_key, artist_id) VALUES (?,?)", alias_rows)
+            alias_rows.clear()
+        con.commit()
+
+    with gzip.open(gz_path, "rb") as raw:
+        stream = io.BufferedReader(_RootWrappedStream(raw, needs_wrap, skip_bytes))
+        context = ET.iterparse(stream, events=("start", "end"))
+        _, root = next(context)
+        for event, elem in context:
+            if elem.tag != "artist":
+                continue
+            if event == "start":
+                depth += 1
+                continue
+            depth -= 1
+            if depth != 0:
+                continue
+            n_total += 1
+            aid = elem.get("id") or elem.findtext("id")
+            name = (elem.findtext("name") or "").strip()
+            if aid and str(aid).isdigit() and name:
+                aid = int(aid)
+                real_name = (elem.findtext("realname") or "").strip() or None
+                batch.append((aid, name, normalize_label(name), real_name))
+                for nv in elem.findall("./namevariations/name"):
+                    if nv.text and nv.text.strip():
+                        alias_rows.append((normalize_label(nv.text), aid))
+            elem.clear()
+            root.clear()
+            if len(batch) >= batch_size:
+                flush()
+            if progress_cb and n_total % 20000 == 0:
+                progress_cb(n_total)
+    flush()
+    if progress_cb:
+        progress_cb(n_total)
+    return n_total
+
+
+_CREDIT_ROLES = {"Main", "Producer", "Remix", "Written-By", "Featuring"}
+
+
 def _parse_release_elem(elem):
-    """None si pas vinyle. À valider/ajuster contre un vrai fichier — écrit
-    d'après la structure documentée des dumps Discogs (artists/artist,
-    labels/label, formats/format/descriptions/description, genres/genre,
-    styles/style, master_id) ; utilise findtext/attrib défensivement pour ne
-    pas planter tout l'import sur une variation ponctuelle."""
+    """(row_releases, styles_list, credits) ou None si pas vinyle. À
+    valider/ajuster contre un vrai fichier — écrit d'après la structure
+    documentée des dumps Discogs (artists/artist, labels/label,
+    formats/format/descriptions/description, genres/genre, styles/style,
+    master_id) ; utilise findtext/attrib défensivement pour ne pas planter
+    tout l'import sur une variation ponctuelle. `styles_list` : liste brute
+    (avant jointure), pour peupler `release_styles` sans avoir à re-découper
+    la chaîne jointe. `credits` : [(artist_id, role), …] pour
+    `release_artists`, limité aux rôles qui pèsent dans le scoring (cf.
+    `_CREDIT_ROLES`) — les artistes principaux (`<artists>`) comptent "Main",
+    les rôles utiles de `<extraartists>` sont gardés tels quels, le reste
+    (Mixed By, Design, Photography, …) est ignoré pour limiter le volume."""
     rid = elem.get("id")
     if not rid:
         return None
@@ -441,12 +664,23 @@ def _parse_release_elem(elem):
     if not _is_vinyl(fmt_names, fmt_descriptions):
         return None
 
-    artists = []
+    artists, credits = [], []
     for a in elem.findall("./artists/artist"):
         name = (a.findtext("name") or "").strip()
         if name:
             artists.append(name)
+        aid = a.findtext("id")
+        if aid and aid.isdigit():
+            credits.append((int(aid), "Main"))
     artist = ", ".join(artists)
+
+    for a in elem.findall("./extraartists/artist"):
+        role = (a.findtext("role") or "").strip()
+        if role not in _CREDIT_ROLES:
+            continue
+        aid = a.findtext("id")
+        if aid and aid.isdigit():
+            credits.append((int(aid), role))
 
     labels, catnos = [], []
     for lab in elem.findall("./labels/label"):
@@ -460,7 +694,8 @@ def _parse_release_elem(elem):
     catno = catnos[0] if catnos else None
 
     genres = ", ".join(g.text for g in elem.findall("./genres/genre") if g.text)
-    styles = ", ".join(s.text for s in elem.findall("./styles/style") if s.text)
+    styles_list = [s.text for s in elem.findall("./styles/style") if s.text]
+    styles = ", ".join(styles_list)
 
     year = None
     released = elem.findtext("released") or ""
@@ -475,11 +710,12 @@ def _parse_release_elem(elem):
 
     title = (elem.findtext("title") or "").strip() or None
 
-    return (
+    row = (
         int(rid), title, artist, normalize_label(artist) if artist else None,
         label, normalize_label(label) if label else None, catno, year,
         elem.findtext("country"), fmt_descriptions, genres, styles, master_id,
     )
+    return row, styles_list, credits
 
 
 # --------------------------------------------------------------- lookup (lecture, utilisé par l'appli)
@@ -493,6 +729,49 @@ def connect_readonly():
     d'un vendeur) sans rouvrir le fichier à chaque fois. None si pas encore
     importé — l'appelant doit alors se rabattre sur son propre repli."""
     return sqlite3.connect(DB_PATH) if available() else None
+
+
+def resolve_name(name, kind="label", con=None):
+    """(discogs_name, discogs_id, status) sans aucun appel API, d'après le
+    référentiel local (`labels`/`artists`/`artist_aliases`) — repli
+    déterministe à essayer avant d'interroger l'API Discogs, qui devine sur
+    une recherche floue. status : 'exact' (correspondance directe sur le nom
+    principal) | 'alias' (artiste retrouvé via une variante de graphie,
+    `namevariations` du dump) | (None, None, None) si absent du référentiel —
+    l'appelant se rabat alors sur l'API, comme aujourd'hui. Encore inutilisé
+    par les jobs de résolution (canonicalize/build_graph) : ceux-ci
+    continuent d'interroger l'API pour l'instant, cf. Lot 5 du diagnostic."""
+    if not available():
+        return None, None, None
+    key = normalize_label(name)
+    if not key:
+        return None, None, None
+    owns = con is None
+    if owns:
+        con = connect_readonly()
+        if con is None:
+            return None, None, None
+    try:
+        if kind == "artist":
+            row = con.execute(
+                "SELECT name, id FROM artists WHERE name_key = ? LIMIT 1", (key,)).fetchone()
+            if row:
+                return row[0], row[1], "exact"
+            row = con.execute(
+                "SELECT a.name, a.id FROM artist_aliases al "
+                "JOIN artists a ON a.id = al.artist_id WHERE al.name_key = ? LIMIT 1",
+                (key,)).fetchone()
+            if row:
+                return row[0], row[1], "alias"
+            return None, None, None
+        row = con.execute(
+            "SELECT name, id FROM labels WHERE name_key = ? LIMIT 1", (key,)).fetchone()
+        if row:
+            return row[0], row[1], "exact"
+        return None, None, None
+    finally:
+        if owns:
+            con.close()
 
 
 def lookup_release(release_id, con=None):
@@ -536,17 +815,24 @@ def suggest_labels(prefix, limit=12):
     """Noms de labels du référentiel local dont la clé normalisée commence par
     `prefix` — typeahead d'ajout de label sans appel API Discogs. Sur-échantillonne
     puis déduplique en Python (une même clé normalisée peut avoir plusieurs graphies
-    selon les sorties : casse, variantes)."""
+    selon les sorties : casse, variantes).
+
+    Bornes de plage plutôt que `LIKE 'prefix%'` : un `LIKE` sur une colonne
+    insensible à la casse par défaut ne peut pas servir de borne d'index —
+    `EXPLAIN QUERY PLAN` le confirme (SCAN, pas SEARCH, malgré l'index
+    présent). `>= norm AND < norm + '\\uffff'` transforme la requête en une
+    vraie recherche par index, sur une table de plusieurs millions de lignes."""
     if not available():
         return []
-    norm = normalize_label(prefix).replace("%", "").replace("_", "")
+    norm = normalize_label(prefix)
     if not norm:
         return []
     con = sqlite3.connect(DB_PATH)
     try:
         rows = con.execute(
-            "SELECT label, label_key FROM releases WHERE label_key LIKE ? AND label IS NOT NULL "
-            "ORDER BY label_key LIMIT ?", (norm + "%", limit * 8)).fetchall()
+            "SELECT label, label_key FROM releases "
+            "WHERE label_key >= ? AND label_key < ? AND label IS NOT NULL "
+            "ORDER BY label_key LIMIT ?", (norm, norm + "￿", limit * 8)).fetchall()
     finally:
         con.close()
     seen, out = set(), []

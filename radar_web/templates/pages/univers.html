@@ -13,9 +13,6 @@
 
 {% if tab == 'labels' %}
   <p class="muted small">{{ n_profiled }} profilés. Import/export CSV : Réglages.</p>
-  <datalist id="dl-labels">
-    {% for l in label_names %}<option value="{{ l }}">{% endfor %}
-  </datalist>
 
   <details class="acc">
     <summary>➕ Ajouter un label</summary>
@@ -98,12 +95,10 @@
     <div class="acc__body">
       <div class="row" style="align-items:end;max-width:640px">
         <div class="field"><label>Filtrer</label>
-          <input name="flt" placeholder="nom…" list="dl-artists" autocomplete="off"
+          <input name="flt" placeholder="nom…" autocomplete="off"
                  hx-get="/univers/artists/table" hx-target="#atable"
                  hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]">
-          <datalist id="dl-artists">
-            {% for a in artist_names %}<option value="{{ a }}">{% endfor %}
-          </datalist></div>
+        </div>
         <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
           <label class="small"><input type="checkbox" name="hide" style="width:auto"
             hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>

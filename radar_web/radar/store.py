@@ -120,7 +120,8 @@ def deep_merge(base, over):
 
 
 _FLAT_WEIGHT_KEYS = ("taste_weights", "artist_weights", "reco_weights",
-                     "album_weights", "artist_score_weights", "label_affinity_floor")
+                     "album_weights", "artist_score_weights", "label_affinity_floor",
+                     "taste_styles")
 
 _ENV_SECRETS = (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY"),
                 ("spotify_client_id", "SPOTIFY_CLIENT_ID"),
@@ -175,3 +176,26 @@ def load_config(uid=None):
 
 def save_config(cfg, uid=None):
     save(paths.user_paths(uid or current_uid()).config, cfg)
+
+
+_CONFIG_CACHE = {}
+
+
+def read_config(uid=None):
+    """Version mémorisée de load_config(), invalidée sur (mtime, taille) comme
+    load_cached() — réservée aux LECTEURS (Ctx, render()). Le dict renvoyé est
+    partagé entre requêtes : ne JAMAIS le muter. Le chemin d'écriture (_cfg())
+    continue de passer par load_config(), qui mute son résultat avant
+    save_config()."""
+    path = paths.user_paths(uid or current_uid()).config
+    try:
+        st = os.stat(path)
+        sig = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        sig = None
+    hit = _CONFIG_CACHE.get(path)
+    if hit and hit[0] == sig:
+        return hit[1]
+    cfg = load_config(uid)
+    _CONFIG_CACHE[path] = (sig, cfg)
+    return cfg

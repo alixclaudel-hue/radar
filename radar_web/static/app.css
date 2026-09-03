@@ -1,5 +1,7 @@
 /* Radar — direction « Sleeve » */
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap');
+/* polices : <link> dans base.html <head>, avant cette feuille — un @import ici
+   forcerait une cascade sérielle (parser cette feuille avant même de découvrir
+   l'URL des polices) */
 
 :root{
   --paper:#F4F3EF; --surface:#FFFFFF; --ink:#121212; --soft:#6C6C66;

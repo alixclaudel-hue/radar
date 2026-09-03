@@ -1707,7 +1707,7 @@ JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True}
 
 
 @app.post("/jobs/{name}/launch", response_class=HTMLResponse)
-def job_launch(name: str):
+def job_launch(name: str, force: str = Form("")):
     if name == "ingest_djsets":
         srcs = [s.strip() for s in (_cfg().get("djset_sources") or "").splitlines() if s.strip()]
         if not srcs:
@@ -1719,7 +1719,14 @@ def job_launch(name: str):
              {"sources": srcs, "max_per_source": 25, "min_minutes": 35,
               "require_hint": True, "deep": True})
     if name in VALID_JOBS:
-        jobs.launch(name, JOB_PARAMS.get(name, {}))
+        # le paramètre "force" (bouton "forcer" de scan_catalog/import_discogs_dump,
+        # envoyé via hx-vals) n'était jamais lu ici : la route ignorait tout hors de
+        # JOB_PARAMS, donc "forcer" relançait le job SANS le flag -> job_import_discogs_dump
+        # retombait sur son test "déjà à jour" comme un lancement normal.
+        params = dict(JOB_PARAMS.get(name, {}))
+        if force:
+            params["force"] = True
+        jobs.launch(name, params)
     return job_status_frag(name)
 
 

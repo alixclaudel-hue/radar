@@ -1672,6 +1672,11 @@ def job_canonicalize(job, params):
     `params['scope']` = 'names' | 'corpus' (défaut 'corpus')."""
     from radar_web.radar import discogs_dump as dd
 
+    try:                     # reliquat de l'ancien mécanisme (cf. docstring) : plus lu
+        os.remove(os.path.join(USER_DIR, "canonicalize.state.json"))  # nulle part, best-effort
+    except OSError:
+        pass
+
     cfg = cfg_load()
     token = cfg.get("token", "")
     scope = params.get("scope", "corpus")

@@ -59,6 +59,9 @@
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
+            <span class="confidence" title="critères pris en compte : label {{ 'oui' if r.detail.label is not none else 'non' }}, artiste {{ 'oui' if r.detail.artist is not none else 'non' }}, style {{ 'oui' if r.detail.style is not none else 'non' }}">
+              <i class="{{ 'lit' if r.detail.label is not none }}"></i><i class="{{ 'lit' if r.detail.artist is not none }}"></i><i class="{{ 'lit' if r.detail.style is not none }}"></i>
+            </span>
           {% else %}
             <span class="badge ghost">—</span>
           {% endif %}

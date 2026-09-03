@@ -208,6 +208,11 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 }
 .badge.clay{ background:var(--clay); }
 .badge.ghost{ background:transparent; color:var(--soft); border:1px solid var(--line); font-family:inherit; }
+/* trois points label/artiste/style : allumés = critère pris en compte dans le score album
+   (cf. diagnostic N3 — un score fondé sur un seul critère doit se voir d'un coup d'œil) */
+.confidence{ display:inline-flex; gap:3px; }
+.confidence i{ width:6px; height:6px; border-radius:50%; background:var(--line); display:inline-block; }
+.confidence i.lit{ background:var(--pin); }
 .ic{ width:13px; height:13px; flex:none; vertical-align:-2px; }
 .badge .ic{ vertical-align:-2px; margin-right:1px; }
 .ic-lg{ width:18px; height:18px; }

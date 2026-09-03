@@ -28,8 +28,8 @@
         <td style="padding:6px 8px">
           {% if r.aff is not none %}
           <div class="progress" style="height:6px"><i style="width:{{ r.aff }}%"></i></div>
-          <span class="small muted">{{ icons.label() }} {{ r.aff }}</span>
-          {% else %}<span class="small muted">—</span>{% endif %}
+          <span class="small muted" title="couverture : part du catalogue du label classée dans une de tes catégories de style">{{ icons.label() }} {{ r.aff }} <span style="opacity:.7">· couv. {{ r.coverage }}%</span></span>
+          {% else %}<span class="small muted" title="pas encore profilé — n'est pas forcément une mauvaise affinité">— pas profilé</span>{% endif %}
         </td>
         <td style="padding:6px 8px" class="small muted">{{ r._reco }}</td>
         <td style="padding:6px 8px" class="small muted">{{ r.owned or '—' }}</td>

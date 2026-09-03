@@ -553,10 +553,11 @@ def _base_labels_ranked(c):
     for name, key in zip(c.cfg.get("labels", []), keys):
         res = c.resolved.get(key) or {}
         disp = res.get("discogs_name") or res.get("original") or name
-        aff = affinities.get(key)
+        aff, coverage = affinities[key]["aff"], affinities[key]["coverage"]
         did = res.get("discogs_id") or lids.get(key, {}).get("id")
         rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key,
-                     "aff": aff, "_reco": ridx.get(key, 0), "owned": lc.get(key, 0), "id": did})
+                     "aff": aff, "coverage": coverage, "_reco": ridx.get(key, 0),
+                     "owned": lc.get(key, 0), "id": did})
     rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
     uniq = []
     for r in rows:
@@ -1244,14 +1245,19 @@ def reco_labels_frag(request: Request):
     for r in c.reco_rows():
         if r["key"] not in base:
             rows.append(r)
-    # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base)
+    # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base) : rang
+    # de proximité, pas une note /100 — le score de graphe n'est pas sur une échelle absolue
+    # ni bornée, l'afficher à côté d'un vrai score /100 avec le même badge induisait en erreur
+    # (cf. diagnostic N2). c.graph_rescore()["labels"] est déjà trié par score décroissant.
     graph_rows = []
     for lk, v in c.graph_rescore()["labels"].items():
         if lk in base:
             continue
-        graph_rows.append({"name": v["name"], "key": lk, "score": round(v["score"]), "aff": None,
+        graph_rows.append({"name": v["name"], "key": lk, "aff": None,
                            "owned": 0, "want": 0, "corpus": 0, "artists": v["n_seeds"],
                            "seeds": ", ".join(v["seeds"])})
+    for i, r in enumerate(graph_rows):
+        r["rank"] = i + 1
     return frag(request, "partials/reco_labels.html", reco=rows[:30],
                 graph_reco=graph_rows[:30], n_reco=len(rows), n_graph=len(graph_rows))
 
@@ -1409,7 +1415,9 @@ def _graph_extras(entry, kind):
             dstyles = dump_styles.get(k)
             prof = c.profile.get(k)
             style_counts = dstyles or (prof or {}).get("style_counts") or {}
-            notes[k] = c.affinity_score({"style_counts": style_counts}) if (dstyles or prof) else None
+            notes[k] = None
+            if dstyles or prof:
+                notes[k], _cov = c.affinity_score({"style_counts": style_counts})
             styles = sorted(style_counts.items(), key=lambda kv: -kv[1])
             facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "artiste(s) en commun")
             if dstyles:

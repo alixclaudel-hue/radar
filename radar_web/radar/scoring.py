@@ -3,6 +3,7 @@ Un objet Ctx charge toutes les données une fois ; les fonctions le prennent en 
 
 v0 : label + style complets ; terme « artiste » simplifié (liste manuelle + corpus +
 collection ; le graphe de producteurs viendra ensuite)."""
+import math
 import os
 import re
 
@@ -17,6 +18,24 @@ _CREDIT_SPLIT = re.compile(r"\s*(?:,|&| feat\.? | ft\.? | vs\.? | and | x | with
 _SIDE_MARKER = re.compile(
     r"^\s*(this|logo|flip|reverse|other|blank|etched|runout)?\s*side\b"
     r"|^\s*side\s*[a-d]{1,2}\s*$|^\s*[a-d]{1,2}\s*$", re.I)
+
+
+def _robust_scale(counts):
+    """p95 des valeurs (jamais le max) : un seul artiste hyperactif ne doit
+    pas à lui seul déplacer l'échelle de tous les autres (cf. diagnostic N5).
+    Toujours >= 1 (jamais de division par zéro en aval)."""
+    vals = sorted(counts.values())
+    if not vals:
+        return 1
+    return vals[int(0.95 * (len(vals) - 1))] or 1
+
+
+def _log_ratio(n, scale):
+    """log1p(n)/log1p(scale), plafonné à 1 — écrase les valeurs extrêmes au
+    lieu d'un simple n/max linéaire (cf. diagnostic N5)."""
+    if n <= 0:
+        return 0.0
+    return min(1.0, math.log1p(n) / math.log1p(scale))
 
 # Ctx est reconstruit à chaque requête, mais les fichiers ne changent qu'au passage
 # d'un job. Les calculs dérivés coûteux (graphe, scores) sont donc mémorisés sous la
@@ -83,30 +102,41 @@ class Ctx:
         return m
 
     def affinity_score(self, entry):
+        """(affinité 0-100 ou None, couverture 0-100). Un style absent de
+        `wmap` (hors de mes catégories de goût) est exclu du calcul plutôt
+        que compté comme 0 — sinon « la moitié du catalogue est dans un
+        style que je n'ai pas classé » se confond avec « la moitié est dans
+        un style que je déteste explicitement » (cf. diagnostic N4). La part
+        exclue du calcul redevient visible séparément dans `coverage`."""
         sc = (entry or {}).get("style_counts") or {}
         total = sum(sc.values())
         if not total:
-            return 0
-        weighted = sum(n * self.wmap.get(style_key(s), 0.0) for s, n in sc.items())
-        return min(100, round(100 * weighted / total))
+            return None, 0
+        known_total = sum(n for s, n in sc.items() if style_key(s) in self.wmap)
+        coverage = round(100 * known_total / total)
+        if not known_total:
+            return None, coverage
+        weighted = sum(n * self.wmap.get(style_key(s), 0.0)
+                       for s, n in sc.items() if style_key(s) in self.wmap)
+        return min(100, round(100 * weighted / known_total)), coverage
 
     def label_affinities(self, label_keys):
-        """{label_key: affinité 0-100 ou None} — priorité au profil matérialisé
-        depuis le dump Discogs (table label_styles, exhaustif sur tout le
-        catalogue vinyle importé), repli sur labels_profile.json (échantillon
-        API biaisé par le tri "want", cf. diagnostic D5) pour les labels
-        absents du dump. None si aucune des deux sources n'a de données."""
+        """{label_key: {'aff': 0-100 ou None, 'coverage': 0-100}} — priorité
+        au profil matérialisé depuis le dump Discogs (table label_styles,
+        exhaustif sur tout le catalogue vinyle importé), repli sur
+        labels_profile.json (échantillon API biaisé par le tri "want", cf.
+        diagnostic D5) pour les labels absents du dump. aff=None et
+        coverage=0 si aucune des deux sources n'a de données (jamais
+        profilé) — à distinguer d'un aff bas mais réel."""
         from . import discogs_dump as dd
         keys = list(label_keys)
         dump_styles = dd.label_style_counts(keys)
         out = {}
         for k in keys:
             dstyles = dump_styles.get(k)
-            if dstyles:
-                out[k] = self.affinity_score({"style_counts": dstyles})
-                continue
-            e = self.profile.get(k)
-            out[k] = self.affinity_score(e) if e else None
+            entry = {"style_counts": dstyles} if dstyles else self.profile.get(k)
+            aff, cov = self.affinity_score(entry) if entry else (None, 0)
+            out[k] = {"aff": aff, "coverage": cov}
         return out
 
     def style_affinity_of(self, styles):
@@ -229,28 +259,37 @@ class Ctx:
         tiers = self.artist_tier_map()
         aw = self.scoring["artist_tiers"]
         sw = self.scoring["artist_score"]
-        corpus_c, coll_c = {}, {}
+        corpus_c, coll_c, djset_c = {}, {}, {}
         for r in self.corpus:
             a = (r.get("artist") or "").strip()
             if not a or normalize_label(a) in ARTIST_STOPWORDS:
                 continue
-            corpus_c[self.canon_artist_key(a)] = corpus_c.get(self.canon_artist_key(a), 0) + 1
+            k = self.canon_artist_key(a)
+            # djset compté à part (poids "djset" dédié, cf. N1) : sinon ces lignes
+            # pèseraient deux fois, une fois ici et une fois dans le terme djset.
+            if r.get("source") == "djset":
+                djset_c[k] = djset_c.get(k, 0) + 1
+            else:
+                corpus_c[k] = corpus_c.get(k, 0) + 1
         for a, n in self.collection.get("artist_counts", {}).items():
             if not a or normalize_label(a) in ARTIST_STOPWORDS:
                 continue
             coll_c[self.canon_artist_key(a)] = coll_c.get(self.canon_artist_key(a), 0) + n
         graph = {ck: v["score"] for ck, v in self.graph_rescore()["artists"].items()}
-        mc = max(corpus_c.values(), default=1)
-        ml = max(coll_c.values(), default=1)
+        scale_c, scale_l, scale_d = _robust_scale(corpus_c), _robust_scale(coll_c), _robust_scale(djset_c)
         mg = max(graph.values(), default=1) or 1
         out = {}
-        for k in set(tiers) | set(corpus_c) | set(coll_c) | set(graph):
+        for k in set(tiers) | set(corpus_c) | set(coll_c) | set(graph) | set(djset_c):
             tier = tiers.get(k)
             manual = float(aw.get(tier, 0)) if tier else 0.0
+            # échelle robuste au p95 + log1p plutôt qu'au max brut (cf. N5) : un seul
+            # artiste hyperactif (un DJ set où il revient 40 fois) ne doit pas écraser
+            # la note de tous les autres en déplaçant le maximum de la population.
             out[k] = min(100, round(100 * (sw.get("manual", 0.5) * manual
-                                  + sw.get("corpus", 0.18) * corpus_c.get(k, 0) / mc
-                                  + sw.get("collection", 0.1) * coll_c.get(k, 0) / ml
-                                  + sw.get("graph", 0.14) * graph.get(k, 0) / mg)))
+                                  + sw.get("corpus", 0.18) * _log_ratio(corpus_c.get(k, 0), scale_c)
+                                  + sw.get("collection", 0.1) * _log_ratio(coll_c.get(k, 0), scale_l)
+                                  + sw.get("graph", 0.14) * graph.get(k, 0) / mg
+                                  + sw.get("djset", 0.08) * _log_ratio(djset_c.get(k, 0), scale_d))))
         return out
 
     def corpus_by_source(self):
@@ -342,20 +381,27 @@ class Ctx:
         rows = []
         for k in keys:
             info = self.collection.get("label_ids", {}).get(k, {})
-            aff = affinities.get(k)
-            if floor and (aff is None or aff < floor):
+            aff, coverage = affinities[k]["aff"], affinities[k]["coverage"]
+            # le seuil filtre sur une affinité RÉELLEMENT basse, jamais sur "pas encore
+            # profilé" (aff is None) — sinon on masque silencieusement tout label non
+            # traité par un job, en faisant croire qu'on a filtré sur la qualité (N4).
+            if floor and aff is not None and aff < floor:
                 continue
             art_val, art_n = las.get(k, (0.0, 0))
             feat = {"collection": coll_raw.get(k, 0) / max_coll,
                     "corpus": cs.get(k, 0) / max_corp,
                     "artist": art_val / max_art,
                     "affinity": (aff / 100) if aff is not None else 0}
-            score = min(100, round(100 * (w_coll * feat["collection"] + w_corp * feat["corpus"]
-                                 + w_art * feat["artist"] + w_aff * feat["affinity"])))
+            # normalisé par la somme des poids réellement en jeu (jamais Σw fixe = 1.9,
+            # cf. diagnostic N2) : la même formule que album_score, sur la même échelle /100.
+            terms = [(w_coll, feat["collection"]), (w_corp, feat["corpus"]),
+                     (w_art, feat["artist"]), (w_aff, feat["affinity"])]
+            tot = sum(t[0] for t in terms)
+            score = min(100, round(100 * sum(t[0] * t[1] for t in terms) / tot)) if tot else 0
             rows.append({"key": k, "name": info.get("name") or k, "score": score,
                          "owned": lc.get(k, 0), "want": wc.get(k, 0),
-                         "corpus": round(cs.get(k, 0), 1), "aff": aff, "artists": art_n,
-                         "watched": k in watch, "in_base": k in base, "feat": feat})
+                         "corpus": round(cs.get(k, 0), 1), "aff": aff, "coverage": coverage,
+                         "artists": art_n, "watched": k in watch, "in_base": k in base, "feat": feat})
         rows.sort(key=lambda r: r["score"], reverse=True)
         return rows
 
@@ -384,8 +430,14 @@ class Ctx:
         tot = sum(t[0] for t in terms)
         if not tot:
             return None, {}
-        return (min(100, round(sum(t[0] * t[1] for t in terms) / tot)),
-                {"label": lscore, "artist": a_term, "style": s_term})
+        # rétrécissement vers un a priori neutre (cf. diagnostic N3) : un score
+        # fondé sur un seul critère disponible s'affichait à 100 % de confiance
+        # avec le même badge qu'un score fondé sur les trois — alors qu'on en sait
+        # objectivement moins. K/PRIOR tirent le résultat vers un centre neutre
+        # d'autant plus fort que peu de poids est réellement en jeu (tot petit).
+        K, PRIOR = 0.35, 45
+        score = min(100, round((sum(t[0] * t[1] for t in terms) + K * PRIOR) / (tot + K)))
+        return score, {"label": lscore, "artist": a_term, "style": s_term}
 
 
 def real_tracks(tracklist):

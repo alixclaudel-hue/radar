@@ -850,6 +850,26 @@ def _canon_key(name, ares):
     return normalize_label(name)
 
 
+VARIOUS_ARTIST_ID = 194  # id Discogs de l'artiste générique "Various" — marqueur de facto
+                          # des compilations, qui ne portent qu'1-3 <artists> release-level
+                          # (le vrai détail est au niveau piste, non parsé, cf. diagnostic R2)
+
+
+def _sql_in_chunks(con, sql_tmpl, ids, extra_params=()):
+    """Exécute sql_tmpl (un seul '{}' à la place du IN (...)) par lots de 900
+    ids — reste sous SQLITE_MAX_VARIABLE_NUMBER même sur un build restrictif
+    (défaut historique 999) au lieu de laisser un artiste à discographie
+    énorme (ou un id mal fusionné) lever OperationalError et tuer tout le
+    job de graphe (diagnostic Lot 5, garde-fou manquant)."""
+    out = []
+    ids = list(ids)
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        qmarks = ",".join("?" * len(chunk))
+        out += con.execute(sql_tmpl.format(qmarks), chunk + list(extra_params)).fetchall()
+    return out
+
+
 def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_edges, lab_edges):
     """Co-crédits d'une graine par jointure SQL sur release_artists (D4) —
     aucun appel API, aucune pause, et le garde-fou "compilation" comme
@@ -870,13 +890,18 @@ def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_e
         info = by_release.setdefault(rel_id, {"role": role, "label": lab, "label_key": lk, "co": []})
         info["co"].append((co_id, co_name))
     rel_ids = list(by_release)
-    qmarks = ",".join("?" * len(rel_ids))
-    main_counts = dict(con.execute(
-        f"SELECT release_id, COUNT(*) FROM release_artists "
-        f"WHERE release_id IN ({qmarks}) AND role = 'Main' GROUP BY release_id", rel_ids).fetchall())
+    main_counts = dict(_sql_in_chunks(con,
+        "SELECT release_id, COUNT(*) FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
+        "GROUP BY release_id", rel_ids))
+    # une compilation "Various" ne porte souvent QU'1 <artists> release-level (l'artiste
+    # générique "Various", id 194) : main_counts reste sous max_credits, le garde-fou par
+    # comptage seul la laisse passer (diagnostic R2) -> détection dédiée par id.
+    various_ids = {row[0] for row in _sql_in_chunks(con,
+        "SELECT release_id FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
+        "AND artist_id = ?", rel_ids, (VARIOUS_ARTIST_ID,))}
     n_rels = 0
     for rel_id, info in by_release.items():
-        if main_counts.get(rel_id, 0) > max_credits:   # compilation -> on saute tout (artistes + label)
+        if rel_id in various_ids or main_counts.get(rel_id, 0) > max_credits:  # compilation -> tout sauté
             continue
         n_rels += 1
         rw = rw_by_role(info["role"])
@@ -1011,7 +1036,7 @@ def job_build_graph(job, params):
             if job.stopped():
                 break
             if not rid:
-                dn, did, _status = dd.resolve_name(name, "artist", con) if con else (None, None, None)
+                dn, did, _status, _cands = dd.resolve_name(name, "artist", con) if con else (None, None, None, [])
                 if did:
                     rid = did
                     ares[normalize_label(name)] = {"original": name, "discogs_name": dn,
@@ -1516,9 +1541,14 @@ def _resolve_entity(token, name, kind):
     graphie du dump artistes) est marqué 'exact' : ni l'un ni l'autre ne
     devine, contrairement à la recherche API floue."""
     from radar_web.radar import discogs_dump as dd
-    dn, did, _status = dd.resolve_name(name, kind)
+    dn, did, status, cands = dd.resolve_name(name, kind)
     if did:
         return dn, did, "exact", []
+    if status == "ambiguous" and cands:
+        # plusieurs entités Discogs partagent cette name_key (suffixes de désambiguïsation
+        # "(2)"/"(3)" retirés par normalize_label) -> jamais un id choisi au hasard comme
+        # 'exact', remonté comme 'approx' avec les candidats pour la revue C3 (diagnostic R3).
+        return None, None, "approx", cands
     d = discogs_search(token, type=kind, q=name, per_page=8)
     time.sleep(1.1)
     cands = [{"name": c.get("title"), "id": c.get("id")}
@@ -1718,7 +1748,12 @@ def job_canonicalize(job, params):
                         r["artist"] = ref["artist"]
                     if ref.get("label"):
                         r["label"] = ref["label"]
-                elif token:
+                elif token and not con:
+                    # repli API seulement si le référentiel local n'est pas encore importé.
+                    # Si `con` existe mais que le lookup échoue, c'est presque toujours une
+                    # sortie non-vinyle (filtrée hors du dump par _is_vinyl) : sans ce garde-fou,
+                    # cette ligne repayait un appel API + sleep(1.1) À CHAQUE passage, pour
+                    # toujours — canonicalize tournant désormais en auto hebdo (diagnostic R1).
                     d = discogs_get(token, f"/releases/{r['release_id']}")
                     if d:
                         arts = d.get("artists") or []

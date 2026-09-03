@@ -71,9 +71,10 @@ class Ctx:
         self.resolved = store.load_cached(self.P.resolved, {})
         self.artists_res = store.load_cached(self.P.artists_res, {})
         self.graph = store.load_cached(self.P.graph, {})
+        from . import discogs_dump as dd
         self._key = (self.uid, _files_sig(
             self.P.config, self.P.graph, self.P.artists_res,
-            self.P.corpus, self.P.collection, self.P.profile))
+            self.P.corpus, self.P.collection, self.P.profile, dd.DB_PATH))
 
     def _memo(self, name, compute):
         slot = _DERIVED.get(self._key)
@@ -355,7 +356,11 @@ class Ctx:
 
     @property
     def reco_index(self):
-        return {r["key"]: r["score"] for r in self.reco_rows()}
+        # reco_rows() est déjà mémoïsé, mais reconstruire ce dict à chaque accès a un
+        # coût réel : album_score() y accède dans une boucle, sur ~50-100 lignes de
+        # résultats par recherche -> autant de rebuilds d'un dict de la taille de la
+        # base de labels (diagnostic Lot 1, mineur).
+        return self._memo("reco_index", lambda: {r["key"]: r["score"] for r in self.reco_rows()})
 
     def reco_rows(self):
         return self._memo("reco_rows", self._compute_reco_rows)

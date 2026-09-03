@@ -711,7 +711,7 @@ def _local_rows_to_raw(rows, genres):
             "label": [row["label"]] if row.get("label") else [],
             "style": row["styles"].split(", ") if row.get("styles") else [],
             "catno": row.get("catno") or "", "year": row.get("year") or "",
-            "cover_image": None, "thumb": None, "uri": None,
+            "cover_image": None, "thumb": None, "uri": f"/release/{row['id']}",
         })
     return out
 
@@ -756,7 +756,14 @@ def search_run(request: Request, label: str = Form(""),
             label_keys = [normalize_label(label)]
         else:
             label_keys = []
-        local_rows = dd.search_local(label_keys or None, styles or None, _year_bounds(year_from, year_to))
+        yb = _year_bounds(year_from, year_to)
+        # BETWEEN exclut les year IS NULL (nombreuses en local) : ne filtrer que si
+        # l'utilisateur a vraiment resserré l'intervalle, jamais sur les bornes par défaut
+        # qui couvrent tout — sinon toute sortie sans année connue disparaît en silence du
+        # local alors que le chemin API les incluait (_year_param renvoie '' = pas de filtre
+        # dans ce cas). Diagnostic R5.
+        year_range = None if (yb[0] <= SEARCH_MIN_YEAR and yb[1] >= int(time.strftime("%Y"))) else yb
+        local_rows = dd.search_local(label_keys or None, styles or None, year_range)
         for r in _local_rows_to_raw(local_rows, genres):
             seen_ids.add(r["id"])
             raw.append(r)
@@ -1072,7 +1079,7 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
 
 
 RELEASE_META_TTL = 86400
-RELEASE_META_MAX_FETCH = 12          # au-delà, on sert ce qu'on a plutôt que saturer le quota
+RELEASE_META_MAX_FETCH = 20          # au-delà, on sert ce qu'on a plutôt que saturer le quota
 _release_meta_lock = threading.Lock()
 
 
@@ -1348,7 +1355,12 @@ def univers_page(request: Request, tab: str = "labels"):
                   artist_graphs=artist_graphs,
                   classified_artists=classified_artists,
                   review=review,
-                  n_review=len(review["labels_approx"]) + len(review["artists_approx"]),
+                  # total (approx + not_found), pas seulement approx : sinon le panneau
+                  # "À vérifier" reste masqué (n_review=0) quand tout est not_found — cas
+                  # réel constaté (281 not_found, 0 approx) où le lien depuis /patte
+                  # ("jamais identifiés" -> /univers) menait à un panneau invisible (diag. Lot 5 C3).
+                  n_review=(len(review["labels_approx"]) + len(review["artists_approx"])
+                            + len(review["labels_not_found"]) + len(review["artists_not_found"])),
                   top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
                   top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 

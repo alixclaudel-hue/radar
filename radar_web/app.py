@@ -485,6 +485,7 @@ def _search_styles(c):
 
 
 SEARCH_HIST_MAX = 20
+SEARCH_PAGE_SIZE = 100
 
 
 def _hist_summary(p):
@@ -542,7 +543,7 @@ def search_replay(request: Request, sid: str):
     return frag(request, "partials/results.html", results=entry.get("results", []),
                 searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
                 dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")),
-                n_matches=entry.get("n_matches"))
+                n_matches=entry.get("n_matches"), page=1, total_pages=1)
 
 
 def _base_labels_ranked(c):
@@ -724,7 +725,7 @@ def search_run(request: Request, label: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2"),
                base_metric: str = Form(""), base_min: str = Form(""),
                label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form(""),
-               include_recent: str = Form("")):
+               include_recent: str = Form(""), page: str = Form("1")):
     from .radar import discogs_dump as dd
     c = Ctx()
     token = c.cfg.get("token", "")
@@ -827,10 +828,19 @@ def search_run(request: Request, label: str = Form(""),
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     n_matches = len(scored)
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
-    scored = scored[:48]
+    # pagination (100/page) : montrer TOUS les matches plutôt que tronquer au
+    # premier écran — cf. diagnostic utilisateur, un plafond fixe (48) masquait
+    # la quasi-totalité des correspondances sur une recherche large.
+    total_pages = max(1, -(-n_matches // SEARCH_PAGE_SIZE))       # division entière arrondie au sup.
+    try:
+        page_num = max(1, int(page))
+    except (ValueError, TypeError):
+        page_num = 1
+    page_num = min(page_num, total_pages)
+    page_results = scored[(page_num - 1) * SEARCH_PAGE_SIZE: page_num * SEARCH_PAGE_SIZE]
     # X4 : état vide explicite — distinguer les causes déjà connues côté serveur
     empty_reason = None
-    if not scored:
+    if not n_matches:
         if n_before_thresholds and any(v is not None for v in mins.values()):
             empty_reason = "thresholds"
         elif not used_local and not token:
@@ -845,15 +855,17 @@ def search_run(request: Request, label: str = Form(""),
               "base_metric": base_metric, "base_min": str(base_min or "").strip(),
               "label_min": str(label_min or "").strip(), "artist_min": str(artist_min or "").strip(),
               "style_min": str(style_min or "").strip(), "include_recent": bool(include_recent)}
-    hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
-    hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
-                    "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
-                    "n": len(scored), "n_matches": n_matches, "results": scored,
-                    "searched": base_labels, "dump_date": dump_date})
-    save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
-    return frag(request, "partials/results.html", results=scored,
+    if page_num == 1:      # ne pas ré-enregistrer un doublon de l'historique à chaque page tournée
+        hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
+        hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
+                        "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
+                        "n": len(page_results), "n_matches": n_matches, "results": page_results,
+                        "searched": base_labels, "dump_date": dump_date})
+        save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
+    return frag(request, "partials/results.html", results=page_results,
                 searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date,
-                empty_reason=empty_reason, has_token=bool(token), n_matches=n_matches)
+                empty_reason=empty_reason, has_token=bool(token), n_matches=n_matches,
+                page=page_num, total_pages=total_pages)
 
 
 _DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
@@ -1093,7 +1105,10 @@ def release_meta_batch(ids: str = ""):
     les ids manquants ou périmés du cache (plafonné), écrit le cache UNE
     SEULE fois, sous verrou, en relisant juste avant d'écrire pour fusionner
     ce qu'un autre process aurait ajouté entretemps. Répond en pastilles
-    hx-swap-oob, une par carte (#cover-meta-{id})."""
+    hx-swap-oob, une par carte (#cover-meta-{id}) — et complète la pochette
+    (#cover-{id}) pour les résultats du référentiel local, qui n'a aucune URL
+    d'image (cf. discogs_dump.search_local) : même appel API déjà fait pour
+    la note/le prix, zéro coût supplémentaire pour en extraire aussi `thumb`."""
     rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
     if not rids:
         return HTMLResponse("")
@@ -1104,15 +1119,17 @@ def release_meta_batch(ids: str = ""):
         token = _cfg().get("token", "")
         fetched = {}
         for rid in missing[:RELEASE_META_MAX_FETCH]:
-            rating = rcount = nfs = low = None
+            rating = rcount = nfs = low = thumb = None
             try:
                 d = discogs.release(int(rid), token=token)
                 rt = (d.get("community") or {}).get("rating") or {}
                 rating, rcount = rt.get("average"), rt.get("count")
                 nfs, low = d.get("num_for_sale"), d.get("lowest_price")
+                thumb = d.get("thumb") or ""
             except discogs.DiscogsError:
                 pass
-            fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "nfs": nfs, "low": low}
+            fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "nfs": nfs, "low": low,
+                            "thumb": thumb}
             time.sleep(1.1)
         with _release_meta_lock:
             cache = load(_pu().release_meta, {})   # relu sous le verrou : fusionne un accès concurrent

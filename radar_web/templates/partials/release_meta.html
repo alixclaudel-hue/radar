@@ -1,5 +1,8 @@
-<div id="cover-meta-{{ rid }}" class="cover-meta" hx-swap-oob="true">
-  {% if m.rating %}<span class="cm cm--star" title="{{ m.rcount or 0 }} votes Discogs">★ {{ '%.2f'|format(m.rating) }}</span>{% endif %}
-  {% if m.low %}<span class="cm" title="prix article le plus bas, hors frais de port">dès {{ m.low|round(0)|int }} € <span style="opacity:.7">hors&nbsp;port</span></span>{% endif %}
-  {% if m.nfs is not none %}<span class="cm">{{ m.nfs }} en vente</span>{% endif %}
+<div id="cover-{{ rid }}" class="cover {{ 'empty' if not m.thumb }}" hx-swap-oob="true">
+  {% if m.thumb %}<img src="{{ m.thumb }}" alt="" loading="lazy">{% endif %}
+  <div class="cover-meta">
+    {% if m.rating %}<span class="cm cm--star" title="{{ m.rcount or 0 }} votes Discogs">★ {{ '%.2f'|format(m.rating) }}</span>{% endif %}
+    {% if m.low %}<span class="cm" title="prix article le plus bas, hors frais de port">dès {{ m.low|round(0)|int }} € <span style="opacity:.7">hors&nbsp;port</span></span>{% endif %}
+    {% if m.nfs is not none %}<span class="cm">{{ m.nfs }} en vente</span>{% endif %}
+  </div>
 </div>

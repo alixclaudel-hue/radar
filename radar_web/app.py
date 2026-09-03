@@ -10,6 +10,7 @@ import io
 import os
 import re
 import secrets
+import threading
 import time
 from typing import List
 from urllib.parse import quote_plus, urlencode
@@ -443,16 +444,22 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
 SEARCH_MIN_YEAR = 1960
 
 
-def _year_param(year_from, year_to):
-    """Construit 'AAAA-AAAA' pour Discogs ; '' si l'intervalle couvre tout."""
+def _year_bounds(year_from, year_to):
+    """(a, b) entiers, bornés à [SEARCH_MIN_YEAR, année courante]."""
     mx = int(time.strftime("%Y"))
     try:
         a = int(year_from) if str(year_from).strip() else SEARCH_MIN_YEAR
         b = int(year_to) if str(year_to).strip() else mx
     except ValueError:
-        return ""
+        return SEARCH_MIN_YEAR, mx
     a, b = min(a, b), max(a, b)
-    a, b = max(SEARCH_MIN_YEAR, a), min(mx, b)
+    return max(SEARCH_MIN_YEAR, a), min(mx, b)
+
+
+def _year_param(year_from, year_to):
+    """Construit 'AAAA-AAAA' pour Discogs ; '' si l'intervalle couvre tout."""
+    mx = int(time.strftime("%Y"))
+    a, b = _year_bounds(year_from, year_to)
     if a <= SEARCH_MIN_YEAR and b >= mx:
         return ""
     return f"{a}-{b}"
@@ -529,7 +536,8 @@ def search_replay(request: Request, sid: str):
     if not entry:
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
-                searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids())
+                searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
+                dump_date=entry.get("dump_date"))
 
 
 def _base_labels_ranked(c):
@@ -682,13 +690,36 @@ def _score_min(raw):
     return v if v > 0 else None
 
 
+def _local_rows_to_raw(rows, genres):
+    """Résultats `discogs_dump.search_local` -> même forme que les résultats
+    de l'API (album_score/results.html attendent title="Artiste - Titre",
+    label/style en listes). Filtre le genre ici (colonne non normalisée dans
+    le référentiel local, cf. D6) sur ce sous-ensemble déjà borné."""
+    out = []
+    for row in rows:
+        row_genres = (row.get("genres") or "").split(", ") if row.get("genres") else []
+        if genres and not any(g in row_genres for g in genres):
+            continue
+        title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
+        out.append({
+            "id": row["id"], "title": title,
+            "label": [row["label"]] if row.get("label") else [],
+            "style": row["styles"].split(", ") if row.get("styles") else [],
+            "catno": row.get("catno") or "", "year": row.get("year") or "",
+            "cover_image": None, "thumb": None, "uri": None,
+        })
+    return out
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
                genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
                year_from: str = Form(""), year_to: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2"),
                base_metric: str = Form(""), base_min: str = Form(""),
-               label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form("")):
+               label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form(""),
+               include_recent: str = Form("")):
+    from .radar import discogs_dump as dd
     c = Ctx()
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
@@ -708,40 +739,59 @@ def search_run(request: Request, label: str = Form(""),
         b_min = None
     base_labels = _pick_base_labels(c, base_metric, b_min, 12) if base_metric else []
 
-    gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
-    if base_labels:
-        npages = min(npages, 1)                       # N labels -> 1 page chacun
-        combos = [(lab, g, s) for lab in base_labels for (g, s) in gs][:12]
-    else:
-        combos = [(label.strip() or None, g, s) for (g, s) in gs][:8]
-
+    # --- local d'abord (référentiel Discogs importé, cf. diagnostic D6) : instantané,
+    # mais un dump est mensuel — ignore les sorties des ~30 derniers jours. ---
     raw, seen_ids = [], set()
-    try:
-        for i, (lab, g, s) in enumerate(combos):
-            if i:
-                time.sleep(1.0)
-            if lab:
-                part = discogs.search_label_releases(token, lab, genre=g,
-                                                     style=s, fmt=fmt, year=year, max_pages=npages)
-            else:
-                part = []
-                for pg in range(1, npages + 1):
-                    p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
-                    for k, v in (("genre", g), ("style", s), ("year", year), ("format", fmt)):
-                        if v:
-                            p[k] = v
-                    d = discogs.search(token=token, **p)
-                    got = d.get("results", [])
-                    part += got
-                    if pg >= d.get("pagination", {}).get("pages", 1) or not got:
-                        break
-            for r in part:
-                rid = r.get("id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    raw.append(r)
-    except discogs.DiscogsError as e:
-        return frag(request, "partials/results.html", error=str(e))
+    used_local = dd.available()
+    dump_date = None
+    if used_local:
+        if base_labels:
+            label_keys = [normalize_label(lb) for lb in base_labels]
+        elif label.strip():
+            label_keys = [normalize_label(label)]
+        else:
+            label_keys = []
+        local_rows = dd.search_local(label_keys or None, styles or None, _year_bounds(year_from, year_to))
+        for r in _local_rows_to_raw(local_rows, genres):
+            seen_ids.add(r["id"])
+            raw.append(r)
+        dump_date = dd.get_meta().get("dump_date")
+
+    if bool(include_recent) or not used_local:
+        gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
+        if base_labels:
+            npages = min(npages, 1)                       # N labels -> 1 page chacun
+            combos = [(lab, g, s) for lab in base_labels for (g, s) in gs][:12]
+        else:
+            combos = [(label.strip() or None, g, s) for (g, s) in gs][:8]
+
+        try:
+            for i, (lab, g, s) in enumerate(combos):
+                if i:
+                    time.sleep(1.0)
+                if lab:
+                    part = discogs.search_label_releases(token, lab, genre=g,
+                                                         style=s, fmt=fmt, year=year, max_pages=npages)
+                else:
+                    part = []
+                    for pg in range(1, npages + 1):
+                        p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
+                        for k, v in (("genre", g), ("style", s), ("year", year), ("format", fmt)):
+                            if v:
+                                p[k] = v
+                        d = discogs.search(token=token, **p)
+                        got = d.get("results", [])
+                        part += got
+                        if pg >= d.get("pagination", {}).get("pages", 1) or not got:
+                            break
+                for r in part:
+                    rid = r.get("id")
+                    if rid and rid not in seen_ids:
+                        seen_ids.add(rid)
+                        raw.append(r)
+        except discogs.DiscogsError as e:
+            if not raw:              # le local a déjà des résultats : ne pas tout perdre sur un raté API
+                return frag(request, "partials/results.html", error=str(e))
     seen, scored = set(), []
     for r in raw:
         rid = r.get("id")
@@ -768,14 +818,15 @@ def search_run(request: Request, label: str = Form(""),
               "vinyl": bool(vinyl), "pages": npages,
               "base_metric": base_metric, "base_min": str(base_min or "").strip(),
               "label_min": str(label_min or "").strip(), "artist_min": str(artist_min or "").strip(),
-              "style_min": str(style_min or "").strip()}
+              "style_min": str(style_min or "").strip(), "include_recent": bool(include_recent)}
     hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
-                    "n": len(scored), "results": scored, "searched": base_labels})
+                    "n": len(scored), "results": scored, "searched": base_labels,
+                    "dump_date": dump_date})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
     return frag(request, "partials/results.html", results=scored,
-                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids())
+                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date)
 
 
 _DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
@@ -1003,30 +1054,48 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
 
 
 RELEASE_META_TTL = 86400
+RELEASE_META_MAX_FETCH = 12          # au-delà, on sert ce qu'on a plutôt que saturer le quota
+_release_meta_lock = threading.Lock()
 
 
-@app.get("/release/{rid}/meta", response_class=HTMLResponse)
-def release_meta(request: Request, rid: int):
+@app.get("/release/meta", response_class=HTMLResponse)
+def release_meta_batch(ids: str = ""):
+    """Une seule requête pour toute une grille de résultats (cf. diagnostic
+    P3) — remplace le hx-get par carte qui déclenchait jusqu'à 48 appels API
+    et 48 réécritures du cache partagé sans verrou. Ne demande à l'API que
+    les ids manquants ou périmés du cache (plafonné), écrit le cache UNE
+    SEULE fois, sous verrou, en relisant juste avant d'écrire pour fusionner
+    ce qu'un autre process aurait ajouté entretemps. Répond en pastilles
+    hx-swap-oob, une par carte (#cover-meta-{id})."""
+    rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
+    if not rids:
+        return HTMLResponse("")
     cache = load(_pu().release_meta, {})
-    ent = cache.get(str(rid))
-    if not ent or time.time() - ent.get("ts", 0) > RELEASE_META_TTL:
+    now = time.time()
+    missing = [rid for rid in rids if not cache.get(rid) or now - cache[rid].get("ts", 0) > RELEASE_META_TTL]
+    if missing:
         token = _cfg().get("token", "")
-        rating = rcount = nfs = low = None
-        try:
-            d = discogs.release(rid, token=token)
-            rt = (d.get("community") or {}).get("rating") or {}
-            rating, rcount = rt.get("average"), rt.get("count")
-            nfs, low = d.get("num_for_sale"), d.get("lowest_price")
-        except discogs.DiscogsError:
-            pass
-        ent = {"ts": time.time(), "rating": rating, "rcount": rcount,
-               "nfs": nfs, "low": low}
-        cache[str(rid)] = ent
-        if len(cache) > 4000:
-            for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
-                cache.pop(k, None)
-        save(_pu().release_meta, cache)
-    return frag(request, "partials/release_meta.html", m=ent, rid=rid)
+        fetched = {}
+        for rid in missing[:RELEASE_META_MAX_FETCH]:
+            rating = rcount = nfs = low = None
+            try:
+                d = discogs.release(int(rid), token=token)
+                rt = (d.get("community") or {}).get("rating") or {}
+                rating, rcount = rt.get("average"), rt.get("count")
+                nfs, low = d.get("num_for_sale"), d.get("lowest_price")
+            except discogs.DiscogsError:
+                pass
+            fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "nfs": nfs, "low": low}
+            time.sleep(1.1)
+        with _release_meta_lock:
+            cache = load(_pu().release_meta, {})   # relu sous le verrou : fusionne un accès concurrent
+            cache.update(fetched)
+            if len(cache) > 4000:
+                for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
+                    cache.pop(k, None)
+            save(_pu().release_meta, cache)
+    tpl = templates.get_template("partials/release_meta.html")
+    return HTMLResponse("".join(tpl.render({"m": cache.get(rid) or {}, "rid": rid}) for rid in rids))
 
 
 # ============================================================ 📻 Veille Discogs (+ vendeurs + reco)

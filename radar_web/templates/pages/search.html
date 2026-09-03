@@ -83,6 +83,12 @@
       <label class="small"><input type="checkbox" name="vinyl" style="width:auto" {{ 'checked' if q.vinyl }}> Vinyle uniquement</label>
     </div>
     <div class="field" style="flex:0 0 auto">
+      <label>&nbsp;</label>
+      <label class="small" title="Le catalogue local est un instantané mensuel : il ignore les sorties des ~30 derniers jours">
+        <input type="checkbox" name="include_recent" style="width:auto" {{ 'checked' if q.include_recent }}>
+        Inclure les nouveautés <span class="muted">(interroge Discogs, plus lent)</span></label>
+    </div>
+    <div class="field" style="flex:0 0 auto">
       <label>Pages / label</label>
       <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}" style="width:80px">
     </div>

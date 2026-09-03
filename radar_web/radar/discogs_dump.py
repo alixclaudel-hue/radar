@@ -848,6 +848,44 @@ def label_style_counts(label_keys, con=None):
     return out
 
 
+def search_local(label_keys=None, styles=None, year_range=None, limit=500):
+    """[{id, title, artist, label, catno, year, genres, styles}] — recherche
+    ciblée en local, triée par année décroissante (cf. diagnostic D6). Un
+    dump mensuel est un instantané complet du catalogue vinyle 12"/LP
+    (cf. `_is_vinyl`) : pas de filtre "vinyle uniquement" à part, toute la
+    table l'est déjà. Ne filtre pas le genre (colonne `releases.genres`
+    jointe par virgule, non normalisée) — à filtrer par l'appelant sur ce
+    sous-ensemble déjà borné par `limit`. Pas de vignette : le dump ne
+    contient aucune URL d'image, contrairement à l'API (repli nécessaire
+    pour les pochettes, cf. /release/meta)."""
+    if not available():
+        return []
+    con = sqlite3.connect(DB_PATH)
+    try:
+        where, params = [], []
+        query = ("SELECT DISTINCT r.id, r.title, r.artist, r.label, r.catno, r.year, r.genres, r.styles "
+                  "FROM releases r")
+        if styles:
+            query += " JOIN release_styles rs ON rs.release_id = r.id"
+            where.append("rs.style IN (%s)" % ",".join("?" * len(styles)))
+            params.extend(styles)
+        if label_keys:
+            where.append("r.label_key IN (%s)" % ",".join("?" * len(label_keys)))
+            params.extend(label_keys)
+        if year_range:
+            where.append("r.year BETWEEN ? AND ?")
+            params.extend(year_range)
+        if where:
+            query += " WHERE " + " AND ".join(where)
+        query += " ORDER BY r.year DESC LIMIT ?"
+        params.append(limit)
+        rows = con.execute(query, params).fetchall()
+    finally:
+        con.close()
+    keys = ("id", "title", "artist", "label", "catno", "year", "genres", "styles")
+    return [dict(zip(keys, r)) for r in rows]
+
+
 def search_by_label(label_name, limit=2000):
     if not available():
         return []

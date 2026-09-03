@@ -12,15 +12,17 @@
   <div class="wgroup">
     {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
                  ['reco__artist','artiste'], ['reco__affinity','affinité'],
-                 ['reco__want_factor','want']]) }}
+                 ['reco__want_factor','want'], ['reco__db_link','base Discogs']]) }}
     <div class="row wgroup__fields">
-      {% for k in ['collection','corpus','artist','affinity','want_factor'] %}
+      {% for k in ['collection','corpus','artist','affinity','want_factor','db_link'] %}
       <div class="field"><label>{{ k }}
         <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></label></div>
       {% endfor %}
       <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)
         <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></label></div>
     </div>
+    <p class="muted small">« base Discogs » : un artiste Cœur/Aimés a un disque chez ce label,
+      ou le graphe de co-crédits en repère un proche — référentiel local, aucun appel API.</p>
   </div>
 
   <h3>{{ icons.album() }} Score album</h3>
@@ -39,13 +41,15 @@
   <div class="wgroup">
     {{ wr.toile([['artist_score__manual','manuel'], ['artist_score__corpus','corpus'],
                  ['artist_score__collection','collection'], ['artist_score__graph','graphe'],
-                 ['artist_score__djset','djset']]) }}
+                 ['artist_score__djset','djset'], ['artist_score__label_link','label aimé']]) }}
     <div class="row wgroup__fields">
-      {% for k in ['manual','corpus','collection','graph','djset'] %}
+      {% for k in ['manual','corpus','collection','graph','djset','label_link'] %}
       <div class="field"><label>{{ k }}
         <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></label></div>
       {% endfor %}
     </div>
+    <p class="muted small">« label aimé » : l'artiste a un disque chez un label que tu suis déjà
+      (base ou watchlist) — référentiel local, aucun appel API.</p>
   </div>
 
   <h3>Rangs (Cœur / Aimés)</h3>

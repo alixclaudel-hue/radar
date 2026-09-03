@@ -14,30 +14,30 @@
 
   <form hx-post="/sellers/catalog/add" hx-target="#sellers-catalog" hx-swap="outerHTML"
         hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:420px;margin-top:10px">
-    <div class="field" style="flex:1;margin:0"><label>Ajouter un vendeur <span class="muted">· identifiant Discogs exact</span></label>
-      <input name="u" placeholder="ex. hardwax-berlin"></div>
+    <div class="field" style="flex:1;margin:0"><label>Ajouter un vendeur <span class="muted">· identifiant Discogs exact</span>
+      <input name="u" placeholder="ex. hardwax-berlin"></label></div>
     <button type="submit" class="small">Ajouter</button>
   </form>
 
   <details class="acc" style="margin-top:10px">
     <summary>Voir les {{ rows|length }} vendeurs</summary>
     <div class="acc__body">
-      <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px">
-        <thead><tr style="text-align:left;color:var(--soft);font-size:11px;text-transform:uppercase">
-          <th style="padding:5px 6px">Vendeur</th><th style="padding:5px 6px">Pays</th>
-          <th style="padding:5px 6px">Focus</th><th style="padding:5px 6px;width:70px">Articles</th>
-          <th style="padding:5px 6px;width:110px">Goût (12")</th>
-          <th style="padding:5px 6px;width:90px">Dernier scan</th><th></th></tr></thead>
+      <div class="tbl-wrap">
+      <table class="tbl" style="min-width:520px">
+        <thead><tr>
+          <th>Vendeur</th><th>Pays</th>
+          <th>Focus</th><th class="num" style="width:70px">Articles</th>
+          <th style="width:110px">Goût (12")</th>
+          <th style="width:90px">Dernier scan</th><th></th></tr></thead>
         <tbody>
         {% for r in rows %}
-        <tr style="border-top:1px solid var(--line);{{ 'opacity:.45' if not r.active }}">
-          <td style="padding:5px 6px"><a href="https://www.discogs.com/seller/{{ r.u }}/profile" target="_blank" rel="noopener">{{ r.name }}</a>
+        <tr style="{{ 'opacity:.45' if not r.active }}">
+          <td><a href="https://www.discogs.com/seller/{{ r.u }}/profile" target="_blank" rel="noopener">{{ r.name }}</a>
             {% if r.verified is false %}<span class="small clay" title="inventaire inaccessible">⚠</span>{% endif %}</td>
-          <td style="padding:5px 6px">{{ r.country }}</td>
-          <td style="padding:5px 6px" class="small muted">{{ r.focus }}</td>
-          <td style="padding:5px 6px">{{ r.n_items if r.n_items is not none else '—' }}</td>
-          <td style="padding:5px 6px">
+          <td>{{ r.country }}</td>
+          <td class="small muted">{{ r.focus }}</td>
+          <td class="num">{{ r.n_items if r.n_items is not none else '—' }}</td>
+          <td>
             {% if r.get('note') is not none %}
             <span class="badge small {{ 'clay' if r.note < 50 }}"
                   title="{{ r.n_matched }} article(s) 12\" d'artiste(s) connu(s) sur {{ r.n_12in }} au total">{{ icons.artist() }} {{ r.note }}</span>
@@ -45,8 +45,8 @@
             {% elif r.get('n_12in') %}<span class="small muted">{{ r.n_12in }} × 12" · goût inconnu</span>
             {% else %}<span class="small muted">—</span>{% endif %}
           </td>
-          <td style="padding:5px 6px" class="small muted">{{ (r.last_scan or '')[:10] or '—' }}</td>
-          <td style="padding:5px 6px">
+          <td class="small muted">{{ (r.last_scan or '')[:10] or '—' }}</td>
+          <td>
             <button class="small" hx-post="/sellers/catalog/toggle" hx-vals='{"u": {{ r.u|tojson }} }'
                     hx-target="#sellers-catalog" hx-swap="outerHTML">{{ 'désactiver' if r.active else 'activer' }}</button>
           </td>

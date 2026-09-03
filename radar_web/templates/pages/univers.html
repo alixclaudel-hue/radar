@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% import "partials/_icons.html" as icons %}
-{% block title %}Mon univers · Radar{% endblock %}
+{% block title %}Mes labels & artistes · Radar{% endblock %}
 {% block content %}
-<h1>Mon univers</h1>
+<h1>Mes labels &amp; artistes</h1>
 
 <div class="nav" style="margin-top:0">
   <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">{{ icons.label() }} Base de labels ({{ n_labels }})</a>
@@ -11,19 +11,35 @@
 </div>
 <hr>
 
-{% if tab == 'labels' %}
-  <p class="muted small">{{ n_profiled }} profilés. Import/export CSV : Réglages.</p>
+{% if n_review %}
+<details class="acc" open>
+  <summary>⚠️ À vérifier ({{ n_review }})</summary>
+  <div class="acc__body">
+    {% include "partials/review.html" %}
+  </div>
+</details>
+<hr>
+{% endif %}
 
-  <details class="acc">
+{% if tab == 'labels' %}
+  {% if n_labels == 0 %}
+  <p class="muted small">Base vide : c'est ici que vivent les labels dont tu suis le catalogue — le score des
+    disques cherchés en tient compte (affinité de style, reco). Ajoute-en un ci-dessous, ou importe une liste
+    depuis Réglages (CSV).</p>
+  {% else %}
+  <p class="muted small">{{ n_profiled }} profilés. Import/export CSV : Réglages.</p>
+  {% endif %}
+
+  <details class="acc"{{ ' open' if n_labels == 0 }}>
     <summary>➕ Ajouter un label</summary>
     <div class="acc__body">
       <form hx-post="/univers/labels/add" hx-target="#add-label-msg" hx-swap="innerHTML"
             hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:480px">
-        <div class="field combo" style="flex:1;margin:0"><label>Nom du label <span class="muted">· propositions Discogs</span></label>
+        <div class="field combo" style="flex:1;margin:0"><label>Nom du label <span class="muted">· propositions Discogs</span>
           <input name="name" placeholder="ex. Aim Records" data-combo="set" autocomplete="off"
                  hx-get="/suggest/discogs?type=label" hx-target="#sug-add-label" hx-swap="innerHTML"
                  hx-vals='js:{q: event.target.value}'
-                 hx-trigger="keyup changed delay:350ms">
+                 hx-trigger="keyup changed delay:350ms"></label>
           <div id="sug-add-label" class="lbl-suggest" hidden></div></div>
         <button class="primary" type="submit">Ajouter</button>
       </form>
@@ -46,11 +62,11 @@
         (reconstruit automatiquement en fond une fois par mois). Niveau 1 = liens directs avec tes graines,
         niveau 2 = liens de leurs voisins.</p>
       <form hx-post="/univers/labels/graph/build" hx-target="#label-graph-out" hx-swap="innerHTML">
-        <div class="field combo"><label>Labels de départ <span class="muted">un par ligne — propositions depuis ta base</span></label>
+        <div class="field combo"><label>Labels de départ <span class="muted">un par ligne — propositions depuis ta base</span>
           <textarea name="seeds" id="lg-seeds" rows="4" placeholder="ex. Aim Records" data-combo="line" autocomplete="off"
                     hx-get="/search/labels" hx-target="#sug-lg-seeds" hx-swap="innerHTML"
                     hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                    hx-trigger="focus, keyup changed delay:220ms"></textarea>
+                    hx-trigger="focus, keyup changed delay:220ms"></textarea></label>
           <div id="sug-lg-seeds" class="lbl-suggest" hidden></div></div>
         <script>window._lgSeeds = {aff: {{ top_aff|tojson }}, reco: {{ top_reco|tojson }}};</script>
         <div style="margin:4px 0">
@@ -58,10 +74,10 @@
           <button type="button" class="small" onclick="document.getElementById('lg-seeds').value=window._lgSeeds.reco">mes + reco</button>
         </div>
         <div class="row" style="align-items:end">
-          <div class="field" style="flex:0 0 auto"><label>Profondeur</label>
-            <select name="depth"><option value="1">niveau 1</option><option value="2" selected>niveau 1 + 2</option></select></div>
-          <div class="field" style="flex:0 0 160px"><label>Artistes communs min.</label>
-            <input name="min_shared" value="1" inputmode="numeric"></div>
+          <div class="field" style="flex:0 0 auto"><label>Profondeur
+            <select name="depth"><option value="1">niveau 1</option><option value="2" selected>niveau 1 + 2</option></select></label></div>
+          <div class="field" style="flex:0 0 160px"><label>Artistes communs min.
+            <input name="min_shared" value="1" inputmode="numeric"></label></div>
           <div class="field" style="flex:0 0 auto"><button class="primary" type="submit">Construire</button></div>
         </div>
       </form>
@@ -87,17 +103,24 @@
   <div hx-get="/univers/reco/labels" hx-trigger="load"></div>
 
 {% elif tab == 'artists' %}
+  {% if n_artists == 0 %}
+  <p class="muted small">Base vide : c'est ici que se voient les artistes que tu classes Cœur/Aimés — ils pilotent
+    le score artiste des recherches. Ajoute-les depuis Mes sources (listes Cœur/Aimés) : la résolution Discogs
+    se fait automatiquement en fond.</p>
+  <p class="small"><a href="/patte">Aller à Mes sources</a></p>
+  {% else %}
   <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. Règle la catégorie d'un clic.
     Résolution Discogs faite automatiquement en fond à chaque ajout.</p>
+  {% endif %}
 
   <details class="acc">
     <summary>🎤 Les artistes <span class="tag">{{ n_artists }}</span></summary>
     <div class="acc__body">
       <div class="row" style="align-items:end;max-width:640px">
-        <div class="field"><label>Filtrer</label>
+        <div class="field"><label>Filtrer
           <input name="flt" placeholder="nom…" autocomplete="off"
                  hx-get="/univers/artists/table" hx-target="#atable"
-                 hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]">
+                 hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]"></label>
         </div>
         <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
           <label class="small"><input type="checkbox" name="hide" style="width:auto"
@@ -116,12 +139,12 @@
         producteur (reconstruit automatiquement en fond une fois par mois). Un seul niveau
         de voisinage est possible ici (pas de lien graphe entre deux candidats).</p>
       <form hx-post="/univers/artists/graph/build" hx-target="#artist-graph-out" hx-swap="innerHTML">
-        <div class="field"><label>Artistes de départ <span class="muted">choix multiple</span></label>
+        <div class="field"><label>Artistes de départ <span class="muted">choix multiple</span>
           <select name="seeds" multiple size="8" style="height:auto">
             {% for a in classified_artists %}
             <option value="{{ a.key }}">{{ '💗 ' if a.tier == '1' else '' }}{{ a.name }}</option>
             {% endfor %}
-          </select></div>
+          </select></label></div>
         <button class="primary" type="submit">Construire</button>
       </form>
       <div id="artist-graph-out"></div>
@@ -146,7 +169,7 @@
   <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
 
 {% elif tab == 'sets' %}
-  <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mieux connaître ton univers</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
+  <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mes sources</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
   <hr>
   <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
 

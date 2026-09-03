@@ -1,30 +1,46 @@
 {% import "partials/_icons.html" as icons %}
-<p class="small muted">{{ rows|length }} affichés sur {{ n }} — triés par note. Change la catégorie d'un clic.</p>
-<div style="overflow-x:auto">
-<table style="width:100%;border-collapse:collapse;font-size:13px">
-  <thead><tr style="text-align:left;color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em">
-    <th style="padding:6px 8px">Artiste</th><th style="padding:6px 8px;width:90px">Note</th>
-    <th style="padding:6px 8px;width:170px">Catégorie</th><th></th></tr></thead>
-  <tbody>
-  {% for r in rows %}
-  <tr style="border-top:1px solid var(--line)">
-    <td style="padding:6px 8px"><a href="/disco?kind=artist&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.name }}</a></td>
-    <td style="padding:6px 8px">
-      <div class="progress" style="height:6px"><i style="width:{{ r.note }}%"></i></div>
-      <span class="small muted">{{ icons.artist() }} {{ r.note }}</span>
-    </td>
-    <td style="padding:6px 8px">
-      <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"
-              hx-post="/univers/artist/set" hx-vals='{"name": {{ r.name|tojson }} }'
-              hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
-        <option value="" {{ 'selected' if r.cat=='—' }}>—</option>
-        <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Cœur</option>
-        <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
-      </select>
-    </td>
-    <td class="m small"></td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
+<div id="artists-table">
+  <p class="small muted">{{ n }} artiste{{ 's' if n > 1 }} au total{% if flt %} (filtre « {{ flt }} »){% endif %} · page {{ page }}/{{ pages }} · triés par note. Change la catégorie d'un clic.</p>
+  {% if not rows %}
+    <p class="muted small">Aucun artiste.</p>
+  {% else %}
+  <div class="tbl-wrap">
+  <table class="tbl">
+    <thead><tr>
+      <th>Artiste</th><th style="width:90px">Note</th>
+      <th style="width:170px">Catégorie</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td><a href="/disco?kind=artist&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.name }}</a></td>
+      <td>
+        <div class="progress" style="height:6px"><i style="width:{{ r.note }}%"></i></div>
+        <span class="small muted">{{ icons.artist() }} {{ r.note }}</span>
+      </td>
+      <td>
+        <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"
+                hx-post="/univers/artist/set" hx-vals='{"name": {{ r.name|tojson }} }'
+                hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
+          <option value="" {{ 'selected' if r.cat=='—' }}>—</option>
+          <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Cœur</option>
+          <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
+        </select>
+      </td>
+      <td class="m small"></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <div class="row" style="justify-content:center;gap:8px;margin-top:8px">
+    {% if page > 1 %}
+    <button class="small" hx-get="/univers/artists/table" hx-target="#artists-table" hx-swap="outerHTML"
+            hx-vals='{"flt": {{ flt|tojson }}, "hide": {{ hide|tojson }}, "page": "{{ page - 1 }}"}'>‹ précédent</button>
+    {% endif %}
+    {% if page < pages %}
+    <button class="small" hx-get="/univers/artists/table" hx-target="#artists-table" hx-swap="outerHTML"
+            hx-vals='{"flt": {{ flt|tojson }}, "hide": {{ hide|tojson }}, "page": "{{ page + 1 }}"}'>suivant ›</button>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>

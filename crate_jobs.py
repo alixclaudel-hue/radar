@@ -850,10 +850,127 @@ def _canon_key(name, ares):
     return normalize_label(name)
 
 
+VARIOUS_ARTIST_ID = 194  # id Discogs de l'artiste générique "Various" — marqueur de facto
+                          # des compilations, qui ne portent qu'1-3 <artists> release-level
+                          # (le vrai détail est au niveau piste, non parsé, cf. diagnostic R2)
+
+
+def _sql_in_chunks(con, sql_tmpl, ids, extra_params=()):
+    """Exécute sql_tmpl (un seul '{}' à la place du IN (...)) par lots de 900
+    ids — reste sous SQLITE_MAX_VARIABLE_NUMBER même sur un build restrictif
+    (défaut historique 999) au lieu de laisser un artiste à discographie
+    énorme (ou un id mal fusionné) lever OperationalError et tuer tout le
+    job de graphe (diagnostic Lot 5, garde-fou manquant)."""
+    out = []
+    ids = list(ids)
+    for i in range(0, len(ids), 900):
+        chunk = ids[i:i + 900]
+        qmarks = ",".join("?" * len(chunk))
+        out += con.execute(sql_tmpl.format(qmarks), chunk + list(extra_params)).fetchall()
+    return out
+
+
+def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_edges, lab_edges):
+    """Co-crédits d'une graine par jointure SQL sur release_artists (D4) —
+    aucun appel API, aucune pause, et le garde-fou "compilation" comme
+    HAVING plutôt qu'un split de chaîne. Retourne le nombre de sorties
+    retenues (hors compilations)."""
+    rows = con.execute("""
+        SELECT ra1.release_id, ra1.role, ra2.artist_id, a.name, r.label, r.label_key
+        FROM release_artists ra1
+        JOIN release_artists ra2 ON ra2.release_id = ra1.release_id AND ra2.artist_id != ra1.artist_id
+        JOIN releases r ON r.id = ra1.release_id
+        LEFT JOIN artists a ON a.id = ra2.artist_id
+        WHERE ra1.artist_id = ?
+    """, (rid,)).fetchall()
+    if not rows:
+        return 0
+    by_release = {}
+    for rel_id, role, co_id, co_name, lab, lk in rows:
+        info = by_release.setdefault(rel_id, {"role": role, "label": lab, "label_key": lk, "co": []})
+        info["co"].append((co_id, co_name))
+    rel_ids = list(by_release)
+    main_counts = dict(_sql_in_chunks(con,
+        "SELECT release_id, COUNT(*) FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
+        "GROUP BY release_id", rel_ids))
+    # une compilation "Various" ne porte souvent QU'1 <artists> release-level (l'artiste
+    # générique "Various", id 194) : main_counts reste sous max_credits, le garde-fou par
+    # comptage seul la laisse passer (diagnostic R2) -> détection dédiée par id.
+    various_ids = {row[0] for row in _sql_in_chunks(con,
+        "SELECT release_id FROM release_artists WHERE release_id IN ({}) AND role = 'Main' "
+        "AND artist_id = ?", rel_ids, (VARIOUS_ARTIST_ID,))}
+    n_rels = 0
+    for rel_id, info in by_release.items():
+        if rel_id in various_ids or main_counts.get(rel_id, 0) > max_credits:  # compilation -> tout sauté
+            continue
+        n_rels += 1
+        rw = rw_by_role(info["role"])
+        for co_id, co_name in info["co"]:
+            ck = f"id:{co_id}"
+            if ck in seed_set or (co_name and normalize_label(co_name) in ARTIST_STOPWORDS):
+                continue
+            ce = art_edges.setdefault(ck, {"name": co_name or ck, "id": co_id, "co": {}})
+            slot = ce["co"].setdefault(sk, {"n": 0, "rw": rw})
+            slot["n"] += 1
+            slot["rw"] = max(slot["rw"], rw)
+        lab = _clean_graph_label(info["label"])
+        if lab:
+            lk = info["label_key"] or normalize_label(lab)
+            le = lab_edges.setdefault(lk, {"name": lab, "co": {}})
+            le["co"][sk] = le["co"].get(sk, 0) + 1
+    return n_rels
+
+
+def _graph_edges_from_api(token, rid, sk, seed_set, ares, pages, max_credits, rw_by_role,
+                           art_edges, lab_edges):
+    """Repli API (référentiel local pas encore importé) — comportement historique :
+    une à deux pages de /artists/{rid}/releases, pause entre chaque page."""
+    rels = []
+    for pg in range(1, pages + 1):
+        d = discogs_get(token, f"/artists/{rid}/releases",
+                        {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"})
+        rels += d.get("releases", [])
+        if pg >= d.get("pagination", {}).get("pages", 1):
+            break
+        time.sleep(1.1)
+    for rel in rels:
+        co_names = _split_artists(rel.get("artist", ""))
+        if len(co_names) > max_credits:        # compilation -> on saute tout (artistes + label)
+            continue
+        rw = rw_by_role(rel.get("role") or "Main")
+        for co in co_names:
+            ck = _canon_key(co, ares)
+            if not ck or ck in seed_set or ck in ARTIST_STOPWORDS:
+                continue
+            ce = art_edges.setdefault(ck, {"name": co, "id": None, "co": {}})
+            slot = ce["co"].setdefault(sk, {"n": 0, "rw": rw})
+            slot["n"] += 1
+            slot["rw"] = max(slot["rw"], rw)
+            re_ = ares.get(normalize_label(co))
+            if re_ and re_.get("discogs_id"):
+                ce["id"] = re_["discogs_id"]
+                ce["name"] = re_.get("discogs_name") or co
+        lab = _clean_graph_label(rel.get("label"))
+        if lab:
+            lk = normalize_label(lab)
+            le = lab_edges.setdefault(lk, {"name": lab, "co": {}})
+            le["co"][sk] = le["co"].get(sk, 0) + 1
+    return len(rels)
+
+
 def job_build_graph(job, params):
     """Construit le graphe de producteurs et stocke les ARÊTES BRUTES (comptes de
     co-crédits par graine, poids de rôle, labels). Le score final est recalculé
-    côté appli à partir des catégories courantes (pas besoin de re-fetch)."""
+    côté appli à partir des catégories courantes (pas besoin de re-fetch).
+
+    Co-crédits par jointure SQL sur `release_artists` (radar/discogs_dump.py,
+    D4) quand le référentiel local est disponible — aucun appel API, aucune
+    pause, et un vrai dépouillement de compilation (HAVING sur un décompte
+    de crédits `Main`, plutôt qu'un split de chaîne). Repli sur l'API
+    (comportement historique, avec pause) si le dump n'est pas encore
+    importé — cf. `_graph_edges_from_api`."""
+    from radar_web.radar import discogs_dump as dd
+
     cfg = cfg_load()
     token = cfg.get("token", "")
     pages = int(params.get("pages", 2))
@@ -864,6 +981,10 @@ def job_build_graph(job, params):
     role_main = float(gsc.get("role_main", 1.0))
     role_remix = float(gsc.get("role_remix", 0.7))
     role_other = float(gsc.get("role_other", 0.4))
+
+    def rw_by_role(role):
+        return role_main if role == "Main" else (role_remix if role in ("Remix", "Producer") else role_other)
+
     ares = load_json(ARTISTS_RESOLVED_PATH, {})
 
     prev = load_json(PRODUCER_GRAPH_PATH, {}) if incremental else {}
@@ -909,56 +1030,42 @@ def job_build_graph(job, params):
             + (" (mise à jour)" if incremental and prev_seeds else " — graphe global"))
     n_resolved = 0
 
-    for i, (sk, name, rid) in enumerate(seeds):
-        if job.stopped():
-            break
-        if not rid:
-            r = discogs_search(token, type="artist", q=name, per_page=3).get("results", [])
-            if r:
-                rid = r[0].get("id")
-                ares[normalize_label(name)] = {"original": name, "discogs_name": r[0].get("title"),
-                                               "discogs_id": rid, "status": "approx",
-                                               "candidates": []}
-                save_json(ARTISTS_RESOLVED_PATH, ares)
-            time.sleep(1.1)
-        if not rid:
-            job.tick(f"{name} — introuvable")
-            continue
-        n_resolved += 1
-        rels = []
-        for pg in range(1, pages + 1):
-            d = discogs_get(token, f"/artists/{rid}/releases",
-                            {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"})
-            rels += d.get("releases", [])
-            if pg >= d.get("pagination", {}).get("pages", 1):
+    con = dd.connect_readonly()
+    try:
+        for i, (sk, name, rid) in enumerate(seeds):
+            if job.stopped():
                 break
-            time.sleep(1.1)
-        for rel in rels:
-            co_names = _split_artists(rel.get("artist", ""))
-            if len(co_names) > max_credits:        # compilation -> on saute tout (artistes + label)
+            if not rid:
+                dn, did, _status, _cands = dd.resolve_name(name, "artist", con) if con else (None, None, None, [])
+                if did:
+                    rid = did
+                    ares[normalize_label(name)] = {"original": name, "discogs_name": dn,
+                                                   "discogs_id": rid, "status": "exact", "candidates": []}
+                    save_json(ARTISTS_RESOLVED_PATH, ares)
+                else:
+                    r = discogs_search(token, type="artist", q=name, per_page=3).get("results", [])
+                    if r:
+                        rid = r[0].get("id")
+                        ares[normalize_label(name)] = {"original": name, "discogs_name": r[0].get("title"),
+                                                       "discogs_id": rid, "status": "approx",
+                                                       "candidates": []}
+                        save_json(ARTISTS_RESOLVED_PATH, ares)
+                    time.sleep(1.1)
+            if not rid:
+                job.tick(f"{name} — introuvable")
                 continue
-            role = rel.get("role") or "Main"
-            rw = role_main if role == "Main" else (
-                role_remix if role in ("Remix", "Producer") else role_other)
-            for co in co_names:
-                ck = _canon_key(co, ares)
-                if not ck or ck in seed_set or ck in ARTIST_STOPWORDS:
-                    continue
-                ce = art_edges.setdefault(ck, {"name": co, "id": None, "co": {}})
-                slot = ce["co"].setdefault(sk, {"n": 0, "rw": rw})
-                slot["n"] += 1
-                slot["rw"] = max(slot["rw"], rw)
-                re_ = ares.get(normalize_label(co))
-                if re_ and re_.get("discogs_id"):
-                    ce["id"] = re_["discogs_id"]
-                    ce["name"] = re_.get("discogs_name") or co
-            lab = _clean_graph_label(rel.get("label"))
-            if lab:
-                lk = normalize_label(lab)
-                le = lab_edges.setdefault(lk, {"name": lab, "co": {}})
-                le["co"][sk] = le["co"].get(sk, 0) + 1
-        job.tick(f"{name} — {len(rels)} sorties")
-        time.sleep(1.1)
+            n_resolved += 1
+            if con:
+                n_rels = _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role,
+                                                art_edges, lab_edges)
+            else:
+                n_rels = _graph_edges_from_api(token, rid, sk, seed_set, ares, pages, max_credits,
+                                                rw_by_role, art_edges, lab_edges)
+                time.sleep(1.1)
+            job.tick(f"{name} — {n_rels} sortie(s)")
+    finally:
+        if con:
+            con.close()
 
     if not art_edges or (n_resolved == 0 and not (incremental and prev_seeds)):
         return job.finish(error=f"Graphe vide : {n_resolved}/{len(seeds)} graines résolues.")
@@ -1419,14 +1526,31 @@ def job_scan_sellers(job, params):
 # =================================================== enrichissement auto + canonique
 
 PENDING_ENRICH_PATH = os.path.join(USER_DIR, "pending_enrich.json")
-CANON_STATE_PATH = os.path.join(USER_DIR, "canonicalize.state.json")
 VEILLE_SEEN_PATH = os.path.join(USER_DIR, "veille_seen.json")
 VEILLE_NEW_PATH = os.path.join(USER_DIR, "veille_new.json")
 
 
 def _resolve_entity(token, name, kind):
-    """kind='label'|'artist' -> (discogs_name, id, status, candidates)."""
+    """kind='label'|'artist' -> (discogs_name, id, status, candidates).
+
+    Essaie d'abord le référentiel local (radar/discogs_dump.py, importé du
+    dump mensuel) — sans appel API ni pause. Ne retombe sur la recherche API
+    (avec la pause habituelle) que si le nom est absent du dump : pas encore
+    importé, ou vraiment introuvable dans le catalogue Discogs. Un nom
+    retrouvé localement (correspondance directe ou via une variante de
+    graphie du dump artistes) est marqué 'exact' : ni l'un ni l'autre ne
+    devine, contrairement à la recherche API floue."""
+    from radar_web.radar import discogs_dump as dd
+    dn, did, status, cands = dd.resolve_name(name, kind)
+    if did:
+        return dn, did, "exact", []
+    if status == "ambiguous" and cands:
+        # plusieurs entités Discogs partagent cette name_key (suffixes de désambiguïsation
+        # "(2)"/"(3)" retirés par normalize_label) -> jamais un id choisi au hasard comme
+        # 'exact', remonté comme 'approx' avec les candidats pour la revue C3 (diagnostic R3).
+        return None, None, "approx", cands
     d = discogs_search(token, type=kind, q=name, per_page=8)
+    time.sleep(1.1)
     cands = [{"name": c.get("title"), "id": c.get("id")}
              for c in d.get("results", []) if c.get("title")]
     if not cands:
@@ -1492,12 +1616,12 @@ def job_enrich(job, params):
         canon = dn if (dn and status == "exact") else name
         res[normalize_label(name)] = {"original": name, "discogs_name": dn or name,
                                       "discogs_id": did, "status": status,
-                                      "candidates": cands, "reviewed_by": "auto"}
+                                      "candidates": cands if status in ("approx", "not_found") else [],
+                                      "reviewed_by": "auto"}
         if canon != name:
             cfg_changed |= _rename_in_list(cfg.setdefault("labels", []), name, canon)
             cfg_changed |= _rename_in_list(cfg.setdefault("watchlist", []), name, canon)
             res[normalize_label(canon)] = res[normalize_label(name)]
-        time.sleep(1.1)
         pk = normalize_label(canon)
         if pk not in prof:
             prof[pk] = _profile_label(token, canon)
@@ -1512,14 +1636,13 @@ def job_enrich(job, params):
         dn, did, status, cands = _resolve_entity(token, name, "artist")
         ares[normalize_label(name)] = {"original": name, "discogs_name": dn or name,
                                        "discogs_id": did, "status": status,
-                                       "candidates": cands}
+                                       "candidates": cands if status in ("approx", "not_found") else []}
         if dn and status == "exact" and normalize_label(dn) != normalize_label(name):
             for cid in ("1", "2", "3"):
                 cfg_changed |= _rename_in_list(
                     cfg.setdefault("artist_categories", {}).setdefault(cid, []), name, dn)
         save_json(ARTISTS_RESOLVED_PATH, ares)
         job.tick(f"artiste {name} → {dn or '?'} ({status})")
-        time.sleep(1.1)
 
     if cfg_changed:
         save_json(CONFIG_PATH, cfg)
@@ -1529,107 +1652,126 @@ def job_enrich(job, params):
 
 def job_canonicalize(job, params):
     """Passe unique : réécrit toute la base (labels + catégories d'artistes) avec les
-    noms Discogs canoniques + ids, puis les champs artiste/label du corpus. Reprenable
-    via canonicalize.state.json. `params['scope']` = 'names' | 'corpus' (défaut 'corpus')."""
+    noms Discogs canoniques + ids, puis les champs artiste/label du corpus.
+
+    Résolution locale d'abord (radar/discogs_dump.py resolve_name/lookup_release) :
+    plus de token nécessaire pour l'essentiel, plus de pause. Un passage complet
+    prend maintenant quelques secondes au lieu de plusieurs heures dès que le
+    référentiel local couvre la base — canonicalize.state.json (dont la seule
+    raison d'être était de ne pas repayer des appels API coûteux en cas
+    d'interruption) a donc disparu : on repart de zéro à chaque lancement, un
+    nom déjà résolu 'exact'/'confirmed' étant de toute façon sauté (cf. le test
+    juste en dessous). Un token reste utile en repli pour les noms absents du
+    référentiel local (pas encore importés, ou introuvables sur Discogs).
+    `params['scope']` = 'names' | 'corpus' (défaut 'corpus')."""
+    from radar_web.radar import discogs_dump as dd
+
     cfg = cfg_load()
     token = cfg.get("token", "")
-    if not token:
-        return job.finish(error="Pas de token Discogs.")
     scope = params.get("scope", "corpus")
-    state = load_json(CANON_STATE_PATH, {"labels": [], "artists": [], "corpus_ids": []})
-    done_l = set(state["labels"])
-    done_a = set(state["artists"])
-    done_c = set(state["corpus_ids"])
 
     res = load_json(RESOLVED_PATH, {})
     ares = load_json(ARTISTS_RESOLVED_PATH, {})
     base = list(cfg.get("labels", []))
     cats = cfg.setdefault("artist_categories", {})
     art_names = [n for cid in ("1", "2", "3") for n in cats.get(cid, [])]
-    corpus = load_json(CORPUS_PATH, [])
-    corpus_todo = ([r for r in corpus if r.get("release_id") and str(r["release_id"]) not in done_c]
-                   if scope == "corpus" else [])
-    job.st["total"] = (len(base) - len(done_l)) + (len(art_names) - len(done_a)) + len(corpus_todo)
+    corpus = load_json(CORPUS_PATH, []) if scope == "corpus" else []
+    corpus_todo = [r for r in corpus if r.get("release_id")]
+    job.st["total"] = len(base) + len(art_names) + len(corpus_todo)
 
-    changed = 0
+    changed, n_since_save = 0, 0
     for name in base:
         if job.stopped():
             break
         k = normalize_label(name)
-        if k in done_l:
-            continue
         cur = res.get(k)
         if cur and cur.get("discogs_id") and cur.get("status") in ("exact", "confirmed"):
             canon = cur.get("discogs_name") or name
+            if cur.get("candidates"):            # migration C2 : plus persisté pour exact/confirmed
+                cur["candidates"] = []
         else:
             dn, did, status, cands = _resolve_entity(token, name, "label")
             res[k] = {"original": name, "discogs_name": dn or name, "discogs_id": did,
-                      "status": status, "candidates": cands, "reviewed_by": "auto"}
+                      "status": status, "candidates": cands if status in ("approx", "not_found") else [],
+                      "reviewed_by": "auto"}
             canon = dn if (dn and status == "exact") else name
-            time.sleep(1.1)
         if _rename_in_list(base, name, canon):
             changed += 1
             res[normalize_label(canon)] = res.get(k, {})
-        done_l.add(k)
-        if len(done_l) % 10 == 0:
-            cfg["labels"] = base
-            save_json(CONFIG_PATH, cfg)
+        n_since_save += 1
+        if n_since_save >= 200:                   # sauvegarde périodique : survit à une interruption
+            cfg["labels"] = base                   # sans repayer la résolution déjà faite (pas d'appel
+            save_json(CONFIG_PATH, cfg)             # API pour un nom déjà en 'exact'/'confirmed')
             save_json(RESOLVED_PATH, res)
-            state["labels"] = sorted(done_l)
-            save_json(CANON_STATE_PATH, state)
+            n_since_save = 0
         job.tick(f"label {name} → {canon}")
     cfg["labels"] = base
     save_json(CONFIG_PATH, cfg)
     save_json(RESOLVED_PATH, res)
 
+    n_since_save = 0
     for name in list(art_names):
         if job.stopped():
             break
         k = normalize_label(name)
-        if k in done_a:
-            continue
         cur = ares.get(k)
         if cur and cur.get("discogs_id") and cur.get("status") in ("exact", "confirmed"):
             canon = cur.get("discogs_name") or name
+            if cur.get("candidates"):            # migration C2 : plus persisté pour exact/confirmed
+                cur["candidates"] = []
         else:
             dn, did, status, cands = _resolve_entity(token, name, "artist")
             ares[k] = {"original": name, "discogs_name": dn or name, "discogs_id": did,
-                       "status": status, "candidates": cands}
+                       "status": status, "candidates": cands if status in ("approx", "not_found") else []}
             canon = dn if (dn and status == "exact") else name
-            time.sleep(1.1)
         for cid in ("1", "2", "3"):
             _rename_in_list(cats.setdefault(cid, []), name, canon)
-        done_a.add(k)
-        save_json(CONFIG_PATH, cfg)
-        save_json(ARTISTS_RESOLVED_PATH, ares)
-        state["artists"] = sorted(done_a)
-        save_json(CANON_STATE_PATH, state)
+        n_since_save += 1
+        if n_since_save >= 200:
+            save_json(CONFIG_PATH, cfg)
+            save_json(ARTISTS_RESOLVED_PATH, ares)
+            n_since_save = 0
         job.tick(f"artiste {name} → {canon}")
+    save_json(CONFIG_PATH, cfg)
+    save_json(ARTISTS_RESOLVED_PATH, ares)
 
-    for i, r in enumerate(corpus_todo):
-        if job.stopped():
-            break
-        rid = str(r["release_id"])
-        d = discogs_get(token, f"/releases/{r['release_id']}")
-        if d:
-            arts = d.get("artists") or []
-            if arts:
-                r["artist"] = ", ".join(a.get("name", "").strip() for a in arts if a.get("name"))
-            labs = d.get("labels") or []
-            if labs:
-                r["label"] = labs[0].get("name") or r.get("label")
-        done_c.add(rid)
-        if (i + 1) % 8 == 0:
-            save_json(CORPUS_PATH, corpus)
-            state["corpus_ids"] = sorted(done_c)
-            save_json(CANON_STATE_PATH, state)
-        job.tick(f"corpus {r.get('artist', '')[:30]}")
-        time.sleep(1.1)
-    save_json(CORPUS_PATH, corpus)
-    state.update(labels=sorted(done_l), artists=sorted(done_a), corpus_ids=sorted(done_c))
-    save_json(CANON_STATE_PATH, state)
-    job.finish(f"Nettoyage : {changed} label(s) renommé(s), {len(done_a)} artiste(s), "
-               f"{len(done_c)} ligne(s) de corpus canonisées.")
+    n_corpus = 0
+    if corpus_todo:
+        con = dd.connect_readonly()
+        try:
+            for r in corpus_todo:
+                if job.stopped():
+                    break
+                ref = dd.lookup_release(r["release_id"], con) if con else None
+                if ref:
+                    if ref.get("artist"):
+                        r["artist"] = ref["artist"]
+                    if ref.get("label"):
+                        r["label"] = ref["label"]
+                elif token and not con:
+                    # repli API seulement si le référentiel local n'est pas encore importé.
+                    # Si `con` existe mais que le lookup échoue, c'est presque toujours une
+                    # sortie non-vinyle (filtrée hors du dump par _is_vinyl) : sans ce garde-fou,
+                    # cette ligne repayait un appel API + sleep(1.1) À CHAQUE passage, pour
+                    # toujours — canonicalize tournant désormais en auto hebdo (diagnostic R1).
+                    d = discogs_get(token, f"/releases/{r['release_id']}")
+                    if d:
+                        arts = d.get("artists") or []
+                        if arts:
+                            r["artist"] = ", ".join(a.get("name", "").strip() for a in arts if a.get("name"))
+                        labs = d.get("labels") or []
+                        if labs:
+                            r["label"] = labs[0].get("name") or r.get("label")
+                    time.sleep(1.1)
+                n_corpus += 1
+                job.tick(f"corpus {r.get('artist', '')[:30]}")
+        finally:
+            if con:
+                con.close()
+        save_json(CORPUS_PATH, corpus)
+
+    job.finish(f"Nettoyage : {changed} label(s) renommé(s), {len(art_names)} artiste(s), "
+               f"{n_corpus} ligne(s) de corpus canonisées.")
 
 
 def _veille_search(token, rule):
@@ -1970,8 +2112,16 @@ def job_import_discogs_dump(job, params):
 
     dd.save_meta({"dump_date": latest, "imported_at": datetime.now().isoformat(timespec="seconds"),
                   "n_total": n_total, "n_vinyl": n_vinyl, "n_labels": n_labels, "n_artists": n_artists})
+
+    # Un nouveau dump doit rafraîchir toute la chaîne dérivée sans intervention :
+    # la résolution canonique (bien meilleure avec les namevariations du nouveau
+    # dump artistes) puis le profilage des labels.
+    from radar_web.radar import jobs as job_queue
+    job_queue.launch("canonicalize", {"scope": "corpus"}, uid="owner")
+    job_queue.launch("profile_labels", {"limit": 150}, uid="owner")
+
     job.finish(f"Dump {latest} importé : {n_vinyl} sortie(s) vinyle 12\"/LP retenue(s) sur {n_total} au total, "
-               f"{n_labels} label(s), {n_artists} artiste(s).")
+               f"{n_labels} label(s), {n_artists} artiste(s). Canonisation + profilage enfilés.")
 
 
 JOBS = {

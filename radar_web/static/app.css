@@ -4,6 +4,9 @@
    l'URL des polices) */
 
 :root{
+  color-scheme: light;   /* palette entièrement claire (direction "pochette papier") : sans ça,
+                            les contrôles natifs (select, curseurs) suivent le thème système —
+                            un <select> noir au milieu d'une page crème en mode sombre (cf. U4) */
   --paper:#F4F3EF; --surface:#FFFFFF; --ink:#121212; --soft:#6C6C66;
   --line:#E3E2DB; --pin:#1C4A3E; --pin-dark:#123329; --clay:#C36B4B; --bandcamp:#1DA0C3;
   --radius:14px;
@@ -208,6 +211,11 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 }
 .badge.clay{ background:var(--clay); }
 .badge.ghost{ background:transparent; color:var(--soft); border:1px solid var(--line); font-family:inherit; }
+/* trois points label/artiste/style : allumés = critère pris en compte dans le score album
+   (cf. diagnostic N3 — un score fondé sur un seul critère doit se voir d'un coup d'œil) */
+.confidence{ display:inline-flex; gap:3px; }
+.confidence i{ width:6px; height:6px; border-radius:50%; background:var(--line); display:inline-block; }
+.confidence i.lit{ background:var(--pin); }
 .ic{ width:13px; height:13px; flex:none; vertical-align:-2px; }
 .badge .ic{ vertical-align:-2px; margin-right:1px; }
 .ic-lg{ width:18px; height:18px; }
@@ -230,7 +238,7 @@ a.chip:hover{ border-color:var(--pin); }
 .inbox-row .txt{ flex:1; min-width:0; }
 .inbox-row .txt .sub{ font-size:12px; color:var(--soft); }
 
-/* tracks de DJ sets (Mon univers → Mes sets) */
+/* tracks de DJ sets (Mes labels & artistes → Mes sets) */
 .tk-card{ display:flex; flex-direction:column; gap:5px; padding:9px 4px; border-top:1px solid var(--line); }
 .tk-card__title{ display:flex; align-items:baseline; gap:8px; }
 .tk-card__title a{ flex:1; min-width:0; overflow-wrap:break-word; }
@@ -255,6 +263,15 @@ a.chip:hover{ border-color:var(--pin); }
 
 .progress{ height:8px; background:var(--line); border-radius:999px; overflow:hidden; }
 .progress > i{ display:block; height:100%; background:var(--pin); }
+
+/* table générique (labels/artistes/vendeurs) : styling partagé, plus de style inline dupliqué */
+.tbl-wrap{ overflow-x:auto; }
+.tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+.tbl thead tr{ text-align:left; color:var(--soft); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+.tbl th, .tbl td{ padding:6px 8px; }
+.tbl tbody tr{ border-top:1px solid var(--line); }
+.tbl tbody tr:nth-child(even){ background:var(--surface); }
+.tbl td.num, .tbl th.num{ font-variant-numeric:tabular-nums; }
 
 .job-status{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:4px; }
 .job-status .small{ min-width:0; }

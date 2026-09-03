@@ -4,10 +4,10 @@
     <p class="muted small">Rien de nouveau. Lance un scan.</p>
   {% else %}
     <div class="row" style="align-items:end">
-      <div class="field" style="flex:0 0 auto"><label>Score min</label>
+      <div class="field" style="flex:0 0 auto"><label>Score min
         <input type="number" step="5" value="{{ mins }}" style="width:90px"
                hx-get="/inbox/{{ key_ns }}" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML"
-               name="mins" hx-trigger="change"></div>
+               name="mins" hx-trigger="change"></label></div>
       <div class="field" style="flex:0 0 auto">
         <button hx-post="/inbox/{{ key_ns }}/clear" hx-confirm="Marquer toutes les nouveautés comme vues ?"
                 hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML">✓ Tout vu</button>

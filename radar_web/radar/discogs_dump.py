@@ -426,13 +426,41 @@ def open_new_db():
     return con
 
 
+def _materialize_label_styles(con):
+    """Profil de style par label, exhaustif sur tout le catalogue vinyle
+    importé (pas un échantillon des 100 sorties les plus "want" via l'API,
+    biaisé vers les pièces rares — cf. diagnostic D5). Une ligne par
+    (label_key, style) : la table remplace labels_profile.json (calculé par
+    job_profile_labels, encore utilisé en repli pour les labels absents du
+    dump — cf. scoring.Ctx.label_affinities)."""
+    con.execute("DROP TABLE IF EXISTS label_styles")
+    con.execute("""
+        CREATE TABLE label_styles AS
+        SELECT r.label_key AS label_key, rs.style AS style, COUNT(*) AS n
+        FROM releases r
+        JOIN release_styles rs ON rs.release_id = r.id
+        WHERE r.label_key IS NOT NULL
+        GROUP BY r.label_key, rs.style
+    """)
+    con.execute("CREATE INDEX idx_ls_label ON label_styles(label_key)")
+
+
 def finalize_new_db(con):
-    """Index + ANALYZE puis bascule atomique de `.new` vers `DB_PATH`. À
-    appeler une fois tous les dumps du cycle importés sur `con`
-    (`open_new_db()`) — ferme la connexion."""
+    """Index + profil de style par label + ANALYZE puis bascule atomique de
+    `.new` vers `DB_PATH`. À appeler une fois tous les dumps du cycle
+    importés sur `con` (`open_new_db()`) — ferme la connexion."""
     _create_indexes(con)
+    _materialize_label_styles(con)
     con.execute("ANALYZE")
     con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    # WAL n'apporte rien au fichier livré : tous les lecteurs (connect_readonly, ailleurs
+    # dans le code) ne font que des SELECT. Le journal_mode est persisté DANS le fichier
+    # lui-même (pas juste une pragma de session) — sans ce retour à DELETE avant bascule,
+    # le fichier servi resterait marqué WAL, chaque lecteur y créerait des -wal/-shm, et le
+    # prochain os.replace() mensuel les laisserait orphelins à côté du nouveau fichier :
+    # risque documenté SQLite de lectures périmées/corrompues (diagnostic R6). Garder WAL
+    # + synchronous=OFF pendant la CONSTRUCTION (cf. open_new_db) reste un vrai gain.
+    con.execute("PRAGMA journal_mode=DELETE")
     con.close()
     new_path = DB_PATH + ".new"
     for suffix in ("-wal", "-shm"):               # compagnons WAL du fichier temporaire
@@ -633,6 +661,32 @@ def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
 
 _CREDIT_ROLES = {"Main", "Producer", "Remix", "Written-By", "Featuring"}
 
+# Le champ <role> des <extraartists> Discogs est du texte libre et sale : listes
+# jointes par virgule ("Producer, Mixed By"), qualificatifs entre crochets
+# ("Producer [Additional]"), verbes ("Remixed By", "Produced By") plutôt que les
+# noms canoniques ci-dessus. Une égalité stricte contre _CREDIT_ROLES ratait donc
+# la majorité des crédits extra réels (diagnostic R4) — normaliser avant de tester.
+_ROLE_ALIASES = {
+    "remix": "Remix", "remixed by": "Remix", "additional remix": "Remix",
+    "producer": "Producer", "produced by": "Producer", "co-producer": "Producer",
+    "additional producer": "Producer", "executive producer": "Producer",
+    "written-by": "Written-By", "words by": "Written-By",
+    "music by": "Written-By", "lyrics by": "Written-By",
+    "featuring": "Featuring", "feat.": "Featuring",
+}
+
+
+def _normalize_extra_roles(raw):
+    """<role> brut (souvent une liste ',' -séparée, avec qualificatifs entre
+    crochets) -> rôles canoniques qu'il contient (cf. _CREDIT_ROLES), dédupliqués."""
+    out = []
+    for part in (raw or "").split(","):
+        part = re.sub(r"\[.*?\]", "", part).strip().lower()
+        canon = _ROLE_ALIASES.get(part)
+        if canon and canon not in out:
+            out.append(canon)
+    return out
+
 
 def _parse_release_elem(elem):
     """(row_releases, styles_list, credits) ou None si pas vinyle. À
@@ -645,8 +699,10 @@ def _parse_release_elem(elem):
     la chaîne jointe. `credits` : [(artist_id, role), …] pour
     `release_artists`, limité aux rôles qui pèsent dans le scoring (cf.
     `_CREDIT_ROLES`) — les artistes principaux (`<artists>`) comptent "Main",
-    les rôles utiles de `<extraartists>` sont gardés tels quels, le reste
-    (Mixed By, Design, Photography, …) est ignoré pour limiter le volume."""
+    les rôles utiles de `<extraartists>` sont normalisés vers leur forme
+    canonique (`_normalize_extra_roles` : texte libre Discogs, listes et
+    qualificatifs entre crochets, cf. diagnostic R4), le reste (Mixed By,
+    Design, Photography, …) est ignoré pour limiter le volume."""
     rid = elem.get("id")
     if not rid:
         return None
@@ -675,11 +731,10 @@ def _parse_release_elem(elem):
     artist = ", ".join(artists)
 
     for a in elem.findall("./extraartists/artist"):
-        role = (a.findtext("role") or "").strip()
-        if role not in _CREDIT_ROLES:
-            continue
         aid = a.findtext("id")
-        if aid and aid.isdigit():
+        if not (aid and aid.isdigit()):
+            continue
+        for role in _normalize_extra_roles(a.findtext("role")):
             credits.append((int(aid), role))
 
     labels, catnos = [], []
@@ -732,43 +787,52 @@ def connect_readonly():
 
 
 def resolve_name(name, kind="label", con=None):
-    """(discogs_name, discogs_id, status) sans aucun appel API, d'après le
-    référentiel local (`labels`/`artists`/`artist_aliases`) — repli
-    déterministe à essayer avant d'interroger l'API Discogs, qui devine sur
-    une recherche floue. status : 'exact' (correspondance directe sur le nom
-    principal) | 'alias' (artiste retrouvé via une variante de graphie,
-    `namevariations` du dump) | (None, None, None) si absent du référentiel —
-    l'appelant se rabat alors sur l'API, comme aujourd'hui. Encore inutilisé
-    par les jobs de résolution (canonicalize/build_graph) : ceux-ci
-    continuent d'interroger l'API pour l'instant, cf. Lot 5 du diagnostic."""
+    """(discogs_name, discogs_id, status, candidates) sans aucun appel API,
+    d'après le référentiel local (`labels`/`artists`/`artist_aliases`) —
+    repli déterministe à essayer avant d'interroger l'API Discogs, qui
+    devine sur une recherche floue. status : 'exact' (correspondance directe
+    et non-ambiguë) | 'alias' (artiste retrouvé via une variante de
+    graphie, `namevariations` du dump) | 'ambiguous' (name_key partagée par
+    plusieurs entités Discogs distinctes — `normalize_label` retire les
+    suffixes de désambiguïsation Discogs "(2)"/"(3)", donc "Rhythm",
+    "Rhythm (2)", "Rhythm (3)" collisionnent tous sur la même clé ;
+    `candidates` porte alors les entités possibles, jamais un id choisi au
+    hasard comme 'exact' — diagnostic R3) | (None, None, None, []) si absent
+    du référentiel — l'appelant se rabat alors sur l'API, comme aujourd'hui."""
     if not available():
-        return None, None, None
+        return None, None, None, []
     key = normalize_label(name)
     if not key:
-        return None, None, None
+        return None, None, None, []
     owns = con is None
     if owns:
         con = connect_readonly()
         if con is None:
-            return None, None, None
+            return None, None, None, []
     try:
         if kind == "artist":
-            row = con.execute(
-                "SELECT name, id FROM artists WHERE name_key = ? LIMIT 1", (key,)).fetchone()
-            if row:
-                return row[0], row[1], "exact"
-            row = con.execute(
+            rows = con.execute(
+                "SELECT name, id FROM artists WHERE name_key = ? LIMIT 5", (key,)).fetchall()
+            if len(rows) > 1:
+                return None, None, "ambiguous", [{"name": r[0], "id": r[1]} for r in rows]
+            if rows:
+                return rows[0][0], rows[0][1], "exact", []
+            rows = con.execute(
                 "SELECT a.name, a.id FROM artist_aliases al "
-                "JOIN artists a ON a.id = al.artist_id WHERE al.name_key = ? LIMIT 1",
-                (key,)).fetchone()
-            if row:
-                return row[0], row[1], "alias"
-            return None, None, None
-        row = con.execute(
-            "SELECT name, id FROM labels WHERE name_key = ? LIMIT 1", (key,)).fetchone()
-        if row:
-            return row[0], row[1], "exact"
-        return None, None, None
+                "JOIN artists a ON a.id = al.artist_id WHERE al.name_key = ? LIMIT 5",
+                (key,)).fetchall()
+            if len(rows) > 1:
+                return None, None, "ambiguous", [{"name": r[0], "id": r[1]} for r in rows]
+            if rows:
+                return rows[0][0], rows[0][1], "alias", []
+            return None, None, None, []
+        rows = con.execute(
+            "SELECT name, id FROM labels WHERE name_key = ? LIMIT 5", (key,)).fetchall()
+        if len(rows) > 1:
+            return None, None, "ambiguous", [{"name": r[0], "id": r[1]} for r in rows]
+        if rows:
+            return rows[0][0], rows[0][1], "exact", []
+        return None, None, None, []
     finally:
         if owns:
             con.close()
@@ -795,6 +859,75 @@ def lookup_release(release_id, con=None):
         return None
     keys = ("title", "artist", "label", "catno", "year", "country", "format", "genres", "styles", "master_id")
     return dict(zip(keys, row))
+
+
+def label_style_counts(label_keys, con=None):
+    """{label_key: {style: n, ...}} depuis la table `label_styles` matérialisée
+    à l'import (cf. `_materialize_label_styles`) — exhaustif sur tout le
+    catalogue vinyle importé, pour les clés demandées uniquement (pas de
+    chargement de la table entière). {} si le dump n'est pas disponible,
+    ou si `label_styles` n'existe pas encore (base construite avant D5,
+    en attente du prochain import mensuel) : repli à la charge de l'appelant."""
+    keys = [k for k in dict.fromkeys(label_keys) if k]
+    if not keys or not available():
+        return {}
+    owns = con is None
+    if owns:
+        con = connect_readonly()
+        if con is None:
+            return {}
+    try:
+        qmarks = ",".join("?" * len(keys))
+        rows = con.execute(
+            f"SELECT label_key, style, n FROM label_styles WHERE label_key IN ({qmarks})",
+            keys).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        if owns:
+            con.close()
+    out = {}
+    for lk, style, n in rows:
+        out.setdefault(lk, {})[style] = n
+    return out
+
+
+def search_local(label_keys=None, styles=None, year_range=None, limit=500):
+    """[{id, title, artist, label, catno, year, genres, styles}] — recherche
+    ciblée en local, triée par année décroissante (cf. diagnostic D6). Un
+    dump mensuel est un instantané complet du catalogue vinyle 12"/LP
+    (cf. `_is_vinyl`) : pas de filtre "vinyle uniquement" à part, toute la
+    table l'est déjà. Ne filtre pas le genre (colonne `releases.genres`
+    jointe par virgule, non normalisée) — à filtrer par l'appelant sur ce
+    sous-ensemble déjà borné par `limit`. Pas de vignette : le dump ne
+    contient aucune URL d'image, contrairement à l'API (repli nécessaire
+    pour les pochettes, cf. /release/meta)."""
+    if not available():
+        return []
+    con = sqlite3.connect(DB_PATH)
+    try:
+        where, params = [], []
+        query = ("SELECT DISTINCT r.id, r.title, r.artist, r.label, r.catno, r.year, r.genres, r.styles "
+                  "FROM releases r")
+        if styles:
+            query += " JOIN release_styles rs ON rs.release_id = r.id"
+            where.append("rs.style IN (%s)" % ",".join("?" * len(styles)))
+            params.extend(styles)
+        if label_keys:
+            where.append("r.label_key IN (%s)" % ",".join("?" * len(label_keys)))
+            params.extend(label_keys)
+        if year_range:
+            where.append("r.year BETWEEN ? AND ?")
+            params.extend(year_range)
+        if where:
+            query += " WHERE " + " AND ".join(where)
+        query += " ORDER BY r.year DESC LIMIT ?"
+        params.append(limit)
+        rows = con.execute(query, params).fetchall()
+    finally:
+        con.close()
+    keys = ("id", "title", "artist", "label", "catno", "year", "genres", "styles")
+    return [dict(zip(keys, r)) for r in rows]
 
 
 def search_by_label(label_name, limit=2000):

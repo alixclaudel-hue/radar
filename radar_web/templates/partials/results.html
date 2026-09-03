@@ -4,23 +4,35 @@
 {% elif results is not defined %}
   <p class="muted small">Aucune recherche lancée.</p>
 {% elif not results %}
-  <p class="muted small">Aucun résultat pour ces filtres.</p>
+  {% if empty_reason == 'no_source' %}
+  <p class="muted small">Aucun disque : ni catalogue local, ni token Discogs configuré — impossible de chercher quoi que ce soit.</p>
+  <p class="small"><a href="/patte">Renseigner le token Discogs → Mes sources</a></p>
+  {% elif empty_reason == 'thresholds' %}
+  <p class="muted small">Des disques existent pour ces critères, mais aucun ne passe les seuils minimum (label/artiste/style) fixés dans Réglages.</p>
+  <p class="small"><a href="/settings">Baisser ou retirer un seuil → Réglages</a></p>
+  {% elif empty_reason == 'no_criteria' %}
+  <p class="muted small">Aucun disque trouvé — et aucun critère n'a été précisé (ni label, ni style, ni genre). Essaie de préciser une recherche.</p>
+  {% else %}
+  <p class="muted small">Aucun résultat pour ces filtres{% if not has_token %} — sans token Discogs, seul le catalogue local (figé au dernier import mensuel) est cherché{% endif %}.</p>
+  {% endif %}
   {% if searched %}<p class="muted small">Labels cherchés : {{ searched|join(', ') }}</p>{% endif %}
 {% else %}
   <div class="section-title">
     <h3>{{ results|length }} résultat{{ 's' if results|length > 1 }}</h3>
     <span class="muted small">triés par score album</span>
   </div>
+  {% if dump_date %}<p class="muted small">catalogue local au {{ dump_date[:4] }}-{{ dump_date[4:6] }}-{{ dump_date[6:] }}
+    — coche « inclure les nouveautés » pour les sorties plus récentes</p>{% endif %}
   {% if searched %}<p class="muted small">Labels cherchés ({{ searched|length }}) : {{ searched|join(', ') }}</p>{% endif %}
-  <div class="grid">
+  <div class="grid" hx-get="/release/meta" hx-trigger="load" hx-swap="none"
+       hx-vals='{"ids": {{ results | map(attribute="raw") | map(attribute="id") | join(",") | tojson }}}'>
   {% for r in results %}
     {% set rr = r.raw %}
     {% set artist, sep, album = (rr.title or '').partition(' - ') %}
     <div class="card">
       <div class="cover {{ 'empty' if not rr.thumb }}">
         {% if rr.thumb %}<img src="{{ rr.thumb }}" alt="" loading="lazy">{% endif %}
-        <div class="cover-meta" hx-get="/release/{{ rr.id }}/meta"
-             hx-trigger="revealed" hx-swap="outerHTML"></div>
+        <div id="cover-meta-{{ rr.id }}" class="cover-meta"></div>
       </div>
       <div class="body">
         {% if sep %}<span class="artist">{{ artist }}</span>{% endif %}
@@ -57,6 +69,9 @@
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
+            <span class="confidence" title="critères pris en compte : label {{ 'oui' if r.detail.label is not none else 'non' }}, artiste {{ 'oui' if r.detail.artist is not none else 'non' }}, style {{ 'oui' if r.detail.style is not none else 'non' }}">
+              <i class="{{ 'lit' if r.detail.label is not none }}"></i><i class="{{ 'lit' if r.detail.artist is not none }}"></i><i class="{{ 'lit' if r.detail.style is not none }}"></i>
+            </span>
           {% else %}
             <span class="badge ghost">—</span>
           {% endif %}

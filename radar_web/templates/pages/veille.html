@@ -1,48 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Veille Discogs · Radar{% endblock %}
+{% block title %}Nouveautés · Radar{% endblock %}
 {% block content %}
-<h1>Veille Discogs</h1>
-<p class="muted small">Règles de critères → scan de fond → boîte Nouveautés notée. 1ᵉʳ passage = référence.</p>
+<h1>Nouveautés</h1>
+<p class="muted small">Règles de critères → scan de fond → sorties notées automatiquement. 1ᵉʳ passage = référence.</p>
 {% if saved %}<p class="notice small">Règles enregistrées.</p>{% endif %}
 
 <h3>Règles</h3>
 {% if watchlist %}<p class="small muted">🏷️ Labels suivis ({{ watchlist|length }}) — règle implicite, scannée auto.</p>{% endif %}
+{% if not rules and not watchlist %}
+<p class="muted small">Aucune règle : rien n'est scanné pour l'instant. Une règle décrit ce qui t'intéresse
+  (styles, genres, labels ou artistes précis, tranche d'années) — le scan de fond note automatiquement
+  chaque nouvelle sortie qui correspond. Les labels de ta base (Mes sources) sont aussi suivis d'office.</p>
+{% endif %}
 <form method="post" action="/veille/rules">
   {% for r in rules %}
   <div class="notice" style="margin-bottom:12px">
     <div class="row">
-      <div class="field" style="flex:2"><label>Nom</label><input name="name_{{ loop.index0 }}" value="{{ r.name }}"></div>
+      <div class="field" style="flex:2"><label>Nom<input name="name_{{ loop.index0 }}" value="{{ r.name }}"></label></div>
       <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
         <label class="small"><input type="checkbox" name="active_{{ loop.index0 }}" style="width:auto" {{ 'checked' if r.active }}> active</label>
         <label class="small"><input type="checkbox" name="vinyl_{{ loop.index0 }}" style="width:auto" {{ 'checked' if r.vinyl_only }}> vinyle</label>
       </div>
-      <div class="field" style="flex:0 0 90px"><label>Année de</label><input name="yf_{{ loop.index0 }}" value="{{ r.year_from or 2000 }}"></div>
-      <div class="field" style="flex:0 0 90px"><label>à</label><input name="yt_{{ loop.index0 }}" value="{{ r.year_to or year }}"></div>
+      <div class="field" style="flex:0 0 90px"><label>Année de<input name="yf_{{ loop.index0 }}" value="{{ r.year_from or 2000 }}"></label></div>
+      <div class="field" style="flex:0 0 90px"><label>à<input name="yt_{{ loop.index0 }}" value="{{ r.year_to or year }}"></label></div>
     </div>
     <div class="row">
-      <div class="field combo"><label>Styles</label>
+      <div class="field combo"><label>Styles
         <textarea name="styles_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
                   hx-get="/suggest/styles" hx-target="#sug-vst-{{ loop.index0 }}" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                  hx-trigger="focus, keyup changed delay:220ms">{{ r.styles|join('\n') }}</textarea>
+                  hx-trigger="focus, keyup changed delay:220ms">{{ r.styles|join('\n') }}</textarea></label>
         <div id="sug-vst-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
-      <div class="field combo"><label>Genres</label>
+      <div class="field combo"><label>Genres
         <textarea name="genres_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
                   hx-get="/suggest/genres" hx-target="#sug-vge-{{ loop.index0 }}" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                  hx-trigger="focus, keyup changed delay:220ms">{{ r.genres|join('\n') }}</textarea>
+                  hx-trigger="focus, keyup changed delay:220ms">{{ r.genres|join('\n') }}</textarea></label>
         <div id="sug-vge-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
-      <div class="field combo"><label>Labels précis <span class="muted">· propositions Discogs</span></label>
+      <div class="field combo"><label>Labels précis <span class="muted">· propositions Discogs</span>
         <textarea name="labels_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
                   hx-get="/suggest/discogs?type=label" hx-target="#sug-vlb-{{ loop.index0 }}" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                  hx-trigger="keyup changed delay:350ms">{{ r.labels|join('\n') }}</textarea>
+                  hx-trigger="keyup changed delay:350ms">{{ r.labels|join('\n') }}</textarea></label>
         <div id="sug-vlb-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
-      <div class="field combo"><label>Artistes précis <span class="muted">· propositions Discogs</span></label>
+      <div class="field combo"><label>Artistes précis <span class="muted">· propositions Discogs</span>
         <textarea name="artists_{{ loop.index0 }}" rows="2" data-combo="line" autocomplete="off"
                   hx-get="/suggest/discogs?type=artist" hx-target="#sug-var-{{ loop.index0 }}" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                  hx-trigger="keyup changed delay:350ms">{{ r.artists|join('\n') }}</textarea>
+                  hx-trigger="keyup changed delay:350ms">{{ r.artists|join('\n') }}</textarea></label>
         <div id="sug-var-{{ loop.index0 }}" class="lbl-suggest" hidden></div></div>
     </div>
     <button type="submit" name="_action" value="del:{{ loop.index0 }}"
@@ -62,8 +67,8 @@
 <hr>
 <h3>Vendeurs Discogs</h3>
 <form method="post" action="/sellers/add" style="display:flex;gap:8px;align-items:end;max-width:520px">
-  <div class="field" style="flex:1;margin:0"><label>Ajouter (identifiants, séparés par virgule)</label>
-    <input name="name" placeholder="hardwax, redeye_records"></div>
+  <div class="field" style="flex:1;margin:0"><label>Ajouter (identifiants, séparés par virgule)
+    <input name="name" placeholder="hardwax, redeye_records"></label></div>
   <button class="primary" type="submit">Ajouter</button>
 </form>
 {% if sellers %}

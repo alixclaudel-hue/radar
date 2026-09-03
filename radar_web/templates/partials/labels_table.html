@@ -1,39 +1,39 @@
 {% import "partials/_icons.html" as icons %}
 <div id="labels-table">
   <div class="field" style="max-width:320px">
-    <label>Filtrer</label>
+    <label>Filtrer
     <input name="flt" value="{{ flt }}" placeholder="nom…" autocomplete="off"
            hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
-           hx-trigger="input changed delay:250ms" hx-include="this">
+           hx-trigger="input changed delay:250ms" hx-include="this"></label>
   </div>
   <p class="small muted">{{ total }} label{{ 's' if total > 1 }} au total{% if flt %} (filtre « {{ flt }} »){% endif %} · page {{ page }}/{{ pages }} · triés par affinité</p>
   {% if not rows %}
     <p class="muted small">Aucun label.</p>
   {% else %}
-  <div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:13px">
-    <thead><tr style="text-align:left;color:var(--soft);font-size:11px;text-transform:uppercase;letter-spacing:.06em">
-      <th style="padding:6px 8px">Label</th>
-      <th style="padding:6px 8px;width:90px">Affinité</th>
-      <th style="padding:6px 8px;width:60px">Reco</th>
-      <th style="padding:6px 8px;width:70px">Possédés</th>
+  <div class="tbl-wrap">
+  <table class="tbl">
+    <thead><tr>
+      <th>Label</th>
+      <th style="width:90px">Affinité</th>
+      <th class="num" style="width:60px">Reco</th>
+      <th class="num" style="width:70px">Possédés</th>
       <th></th></tr></thead>
     <tbody>
       {% for r in rows %}
-      <tr style="border-top:1px solid var(--line)">
-        <td style="padding:6px 8px">
+      <tr>
+        <td>
           <a href="/disco?kind=label&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.disp }}</a>
           <a href="{{ r.url }}" target="_blank" rel="noopener" class="small muted" title="fiche Discogs">↗</a>
         </td>
-        <td style="padding:6px 8px">
+        <td>
           {% if r.aff is not none %}
           <div class="progress" style="height:6px"><i style="width:{{ r.aff }}%"></i></div>
-          <span class="small muted">{{ icons.label() }} {{ r.aff }}</span>
-          {% else %}<span class="small muted">—</span>{% endif %}
+          <span class="small muted" title="couverture : part du catalogue du label classée dans une de tes catégories de style">{{ icons.label() }} {{ r.aff }} <span style="opacity:.7">· couv. {{ r.coverage }}%</span></span>
+          {% else %}<span class="small muted" title="pas encore profilé — n'est pas forcément une mauvaise affinité">— pas profilé</span>{% endif %}
         </td>
-        <td style="padding:6px 8px" class="small muted">{{ r._reco }}</td>
-        <td style="padding:6px 8px" class="small muted">{{ r.owned or '—' }}</td>
-        <td style="padding:6px 8px">
+        <td class="num small muted">{{ r._reco }}</td>
+        <td class="num small muted">{{ r.owned or '—' }}</td>
+        <td>
           <button class="small" title="retirer de la base"
                   hx-post="/univers/labels/remove" hx-confirm="Retirer « {{ r.disp }} » de ta base ?"
                   hx-target="#labels-table" hx-swap="outerHTML"

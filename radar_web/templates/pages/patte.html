@@ -1,12 +1,18 @@
 {% extends "base.html" %}
-{% block title %}Mieux connaître ton univers · Radar{% endblock %}
+{% block title %}Mes sources · Radar{% endblock %}
 {% block content %}
-<h1>Mieux connaître ton univers</h1>
+<h1>Mes sources</h1>
+{% if onboarding %}
+<p class="muted small">Pour démarrer : 3 étapes. Le reste (YouTube, Spotify, Bandcamp, DJ sets, import CSV) est
+  facultatif et reste disponible plus bas, une fois ça fait.</p>
+{% else %}
 <p class="muted small">Une section par source : identifiants + import + résultat au même endroit. Chaque plateforme s'importe séparément.</p>
+{% endif %}
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
 <form method="post" action="/patte">
 
+  {% if onboarding %}<p class="small muted" style="margin:0 0 2px">Étape 1 sur 3</p>{% endif %}
   <!-- ============ Discogs ============ -->
   <details class="acc" {{ 'open' if not cfg.token }}>
     <summary>
@@ -15,9 +21,10 @@
       <span class="tag">{% if cfg.token %}<span class="ok">✓ connecté</span>{% else %}token manquant{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants{% if coll.fetched_at %} · importé {{ coll.fetched_at.replace('T',' ')[:16] }}{% endif %}</span>
     </summary>
     <div class="acc__body">
-      <div class="field"><label>Token d'accès personnel</label>
-        <input type="password" name="token" value="{{ cfg.token or '' }}"></div>
-      <p class="small muted">Sert aux recommandations de labels.</p>
+      <div class="field"><label>Token d'accès personnel
+        <input type="password" name="token" value="{{ cfg.token or '' }}"></label></div>
+      <p class="small muted">Sert aux recommandations de labels.
+        {% if not cfg.token %}<a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">Générer un token sur Discogs ↗</a>{% endif %}</p>
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-discogs" hx-swap="innerHTML">💾 Enregistrer</button>
         <button type="button" class="small" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">⬇ Importer collection + wantlist</button>
@@ -27,6 +34,40 @@
     </div>
   </details>
 
+  {% if onboarding %}<p class="small muted" style="margin:14px 0 2px">Étape 2 sur 3 · dis ce que tu écoutes</p>{% endif %}
+  <!-- ============ Styles ============ -->
+  <details class="acc" {{ 'open' if onboarding }}>
+    <summary>🎚️ Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
+    <div class="acc__body">
+      <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
+      <div class="row">
+        <div class="field combo"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})
+          <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
+                    hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
+                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('1') or [])|join('\n') }}</textarea></label>
+          <div id="sug-styles-1" class="lbl-suggest" hidden></div></div>
+        <div class="field combo"><label>Aimés (poids {{ sc.taste_tiers['2'] }})
+          <textarea name="styles_2" rows="7" data-combo="line" autocomplete="off"
+                    hx-get="/suggest/styles" hx-target="#sug-styles-2" hx-swap="innerHTML"
+                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('2') or [])|join('\n') }}</textarea></label>
+          <div id="sug-styles-2" class="lbl-suggest" hidden></div></div>
+      </div>
+      <div class="btnrow">
+        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-styles" hx-swap="innerHTML">💾 Enregistrer</button>
+        <span id="save-styles" class="small ok"></span>
+      </div>
+    </div>
+  </details>
+
+  {% if onboarding %}
+  <p class="small muted" style="margin:14px 0 2px">Facultatif — à ajouter quand tu veux</p>
+  <details class="acc">
+    <summary>➕ Ajouter d'autres sources <span class="tag">YouTube, Spotify, Bandcamp</span></summary>
+    <div class="acc__body">
+  {% endif %}
+
   <!-- ============ YouTube ============ -->
   <details class="acc">
     <summary>
@@ -35,9 +76,9 @@
       <span class="tag">{% if cfg.youtube_api_key %}<span class="ok">✓ clé</span>{% else %}clé manquante{% endif %} · {{ pl_urls|length }} playlist{{ 's' if pl_urls|length>1 }}{% if last.ingest_youtube %} · importé {{ last.ingest_youtube }}{% endif %}</span>
     </summary>
     <div class="acc__body">
-      <div class="field"><label>Clé API YouTube Data v3</label>
-        <input type="password" name="youtube_api_key" value="{{ cfg.youtube_api_key or '' }}"></div>
-      <label>Playlists (une URL par champ)</label>
+      <div class="field"><label>Clé API YouTube Data v3
+        <input type="password" name="youtube_api_key" value="{{ cfg.youtube_api_key or '' }}"></label></div>
+      <p class="small">Playlists (une URL par champ)</p>
       {% for u in (pl_urls + ['']) %}
       {% set pid = (u | pl_id) %}
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
@@ -66,12 +107,12 @@
     <div class="acc__body">
       <p class="small muted">API Spotify → <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> → crée une app → <em>Client ID</em> + <em>Client Secret</em>. Playlists publiques uniquement.</p>
       <div class="row">
-        <div class="field"><label>Client ID</label>
-          <input name="spotify_client_id" value="{{ cfg.spotify_client_id or '' }}"></div>
-        <div class="field"><label>Client Secret</label>
-          <input type="password" name="spotify_client_secret" value="{{ cfg.spotify_client_secret or '' }}"></div>
+        <div class="field"><label>Client ID
+          <input name="spotify_client_id" value="{{ cfg.spotify_client_id or '' }}"></label></div>
+        <div class="field"><label>Client Secret
+          <input type="password" name="spotify_client_secret" value="{{ cfg.spotify_client_secret or '' }}"></label></div>
       </div>
-      <label>Playlists (une URL par champ)</label>
+      <p class="small">Playlists (une URL par champ)</p>
       {% for u in (sp_urls + ['']) %}
       {% set pid = (u | sp_id) %}
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
@@ -100,10 +141,10 @@
     <div class="acc__body">
       <p class="small muted">Bandcamp → réglages → <em>Subsonic</em> : génère un identifiant + mot de passe.</p>
       <div class="row">
-        <div class="field"><label>Identifiant Subsonic</label>
-          <input name="bandcamp_sub_user" value="{{ cfg.bandcamp_sub_user or '' }}"></div>
-        <div class="field"><label>Mot de passe</label>
-          <input type="password" name="bandcamp_sub_pass" value="{{ cfg.bandcamp_sub_pass or '' }}"></div>
+        <div class="field"><label>Identifiant Subsonic
+          <input name="bandcamp_sub_user" value="{{ cfg.bandcamp_sub_user or '' }}"></label></div>
+        <div class="field"><label>Mot de passe
+          <input type="password" name="bandcamp_sub_pass" value="{{ cfg.bandcamp_sub_pass or '' }}"></label></div>
       </div>
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-bandcamp" hx-swap="innerHTML">💾 Enregistrer</button>
@@ -114,46 +155,34 @@
     </div>
   </details>
 
-  <!-- ============ Styles ============ -->
-  <details class="acc">
-    <summary>🎚️ Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
-    <div class="acc__body">
-      <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
-      <div class="row">
-        <div class="field combo"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})</label>
-          <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
-                    hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
-                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('1') or [])|join('\n') }}</textarea>
-          <div id="sug-styles-1" class="lbl-suggest" hidden></div></div>
-        <div class="field combo"><label>Aimés (poids {{ sc.taste_tiers['2'] }})</label>
-          <textarea name="styles_2" rows="7" data-combo="line" autocomplete="off"
-                    hx-get="/suggest/styles" hx-target="#sug-styles-2" hx-swap="innerHTML"
-                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('2') or [])|join('\n') }}</textarea>
-          <div id="sug-styles-2" class="lbl-suggest" hidden></div></div>
-      </div>
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-styles" hx-swap="innerHTML">💾 Enregistrer</button>
-        <span id="save-styles" class="small ok"></span>
-      </div>
+  {% if onboarding %}
     </div>
   </details>
+  {% endif %}
 
 </form>
+
+{% if onboarding %}
+<p class="small muted" style="margin:14px 0 2px">Étape 3 sur 3</p>
+<div class="notice">
+  <p class="small">Dernière étape : lance une première recherche pour voir le moteur de score à l'œuvre.</p>
+  <a class="primary" style="display:inline-block;text-decoration:none;padding:8px 16px;border-radius:8px"
+     href="/search{% if (cats.get('1') or cats.get('2')) %}?style={{ ((cats.get('1') or cats.get('2'))[0]) | urlencode }}{% endif %}">🔍 Chercher un disque</a>
+</div>
+{% endif %}
 
 <!-- ============ DJ sets (hors du formulaire principal) ============ -->
 <details class="acc" style="margin-top:10px">
   <summary>🎧 DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
   <div class="acc__body">
     <p class="small muted">Scanne les sets/podcasts YouTube d'un DJ et verse les tracks jouées dans
-      ton corpus. Résultats dans <a href="/univers?tab=sets">Mon univers → Mes sets</a>.</p>
+      ton corpus. Résultats dans <a href="/univers?tab=sets">Mes labels &amp; artistes → Mes sets</a>.</p>
     <form hx-post="/patte/djset/scan" hx-target="#djset-panel" hx-swap="outerHTML"
           hx-on::after-request="this.reset()" class="row combo" style="align-items:end;max-width:520px">
-      <div class="field" style="flex:1;margin:0"><label>Prochain DJ à scanner <span class="muted">· propositions Discogs</span></label>
+      <div class="field" style="flex:1;margin:0"><label>Prochain DJ à scanner <span class="muted">· propositions Discogs</span>
         <input name="name" placeholder="ex. Gilles Peterson" data-combo="set" autocomplete="off"
                hx-get="/suggest/discogs?type=artist" hx-target="#sug-djset" hx-swap="innerHTML"
-               hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:350ms">
+               hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:350ms"></label>
         <div id="sug-djset" class="lbl-suggest" hidden></div></div>
       <button class="primary" type="submit">Scanner</button>
     </form>
@@ -167,15 +196,16 @@
   <div class="acc__body">
     <div class="row">
       <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
-        <label>Labels</label>
-        <input type="file" name="file" accept=".csv" required>
+        <label>Labels
+        <input type="file" name="file" accept=".csv" required></label>
         <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer</label>
         <button type="submit" class="small">Importer</button>
       </form>
       <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
-        <label>Artistes aimés</label>
-        <input type="file" name="file" accept=".csv" required>
-        <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimés</option></select>
+        <label>Artistes aimés
+        <input type="file" name="file" accept=".csv" required></label>
+        <label class="small">Catégorie
+        <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimés</option></select></label>
         <button type="submit" class="small">Importer</button>
       </form>
     </div>
@@ -186,13 +216,16 @@
 <hr>
 <h3>En bref</h3>
 <div class="statgrid">
-  <div class="stat"><b>{{ st.labels }}</b><span>labels</span></div>
-  <div class="stat"><b>{{ st.labels_profiled }}</b><span>labels profilés</span></div>
-  <div class="stat"><b>{{ st.coeur }} / {{ st.aimes }}</b><span>artistes Cœur / Aimés</span></div>
-  <div class="stat"><b>{{ st.artists_resolved }}</b><span>artistes résolus</span></div>
-  <div class="stat"><b>{{ st.artists_identified }}</b><span>artistes identifiés</span></div>
-  <div class="stat"><b>{{ st.graph_edges }}</b><span>arêtes du graphe</span></div>
-  <div class="stat"><b>{{ st.tracks }}</b><span>tracks (corpus)</span></div>
-  <div class="stat"><b>{{ st.watchlist }} / {{ st.sellers }}</b><span>veille / vendeurs</span></div>
+  <div class="stat" title="labels que tu as ajoutés à ta base"><b>{{ st.labels }}</b><span>labels</span></div>
+  <div class="stat" title="parmi eux, ceux dont on connaît le style musical"><b>{{ st.labels_profiled }}</b><span>labels dont on connaît le style</span></div>
+  <div class="stat" title="artistes que tu as classés dans tes deux catégories de goût"><b>{{ st.coeur }} / {{ st.aimes }}</b><span>artistes Cœur / Aimés</span></div>
+  <div class="stat" title="parmi tes artistes classés, ceux dont l'identité Discogs a été retrouvée avec certitude"><b>{{ st.artists_resolved }}</b><span>artistes reconnus sur Discogs</span></div>
+  <div class="stat" title="artistes croisés dans ta collection, ton écoute ou tes DJ sets, classés ou non"><b>{{ st.artists_identified }}</b><span>artistes croisés dans ton écoute</span></div>
+  <div class="stat" title="connexions entre artistes détectées via leurs sorties communes"><b>{{ st.graph_edges }}</b><span>liens entre artistes</span></div>
+  <div class="stat" title="titres (YouTube, Spotify, Bandcamp, DJ sets...) déjà analysés pour affiner tes recommandations"><b>{{ st.tracks }}</b><span>titres analysés</span></div>
+  <div class="stat" title="règles de nouveautés actives / vendeurs suivis"><b>{{ st.watchlist }} / {{ st.sellers }}</b><span>nouveautés / vendeurs</span></div>
+  {% if st.not_found %}
+  <div class="stat" title="labels ou artistes jamais retrouvés sur Discogs — vérifie l'orthographe ou retire-les"><b><a href="/univers">{{ st.not_found }}</a></b><span>jamais identifiés sur Discogs</span></div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,46 @@
+<div id="review-panel">
+  {% set n_approx = review.labels_approx|length + review.artists_approx|length %}
+  {% set n_nf = review.labels_not_found|length + review.artists_not_found|length %}
+  {% if n_approx %}
+  <p class="small">{{ n_approx }} résolution{{ 's' if n_approx > 1 }} deviné{{ 's' if n_approx > 1 }} (pas certain) à vérifier :</p>
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <tbody>
+      {% for r in review.labels_approx %}
+      <tr style="border-top:1px solid var(--line)">
+        <td style="padding:6px 8px">{{ r.original }}</td>
+        <td style="padding:6px 8px" class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
+        <td style="padding:6px 8px;white-space:nowrap">
+          <button class="small" hx-post="/univers/review/label/confirm" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
+          <button class="small" hx-post="/univers/review/label/reject" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>✗ non</button>
+        </td>
+      </tr>
+      {% endfor %}
+      {% for r in review.artists_approx %}
+      <tr style="border-top:1px solid var(--line)">
+        <td style="padding:6px 8px">{{ r.original }} <span class="muted small">(artiste)</span></td>
+        <td style="padding:6px 8px" class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
+        <td style="padding:6px 8px;white-space:nowrap">
+          <button class="small" hx-post="/univers/review/artist/confirm" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
+          <button class="small" hx-post="/univers/review/artist/reject" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>✗ non</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% if n_nf %}
+  <p class="small muted" style="margin-top:{{ '10px' if n_approx else '0' }}">
+    {{ n_nf }} jamais identifié{{ 's' if n_nf > 1 }} sur Discogs, ni dans le référentiel local ni via l'API —
+    corrige l'orthographe ou retire l'entrée si besoin :
+    {{ (review.labels_not_found + review.artists_not_found) | map(attribute='original') | join(', ') }}</p>
+  {% endif %}
+  {% if not n_approx and not n_nf %}
+  <p class="small muted">Rien à vérifier — toutes les résolutions sont fiables.</p>
+  {% endif %}
+</div>

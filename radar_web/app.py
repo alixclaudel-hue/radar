@@ -1,7 +1,8 @@
 """Radar — interface FastAPI + HTMX. Données PARTAGÉES avec l'appli Streamlit.
 Lancement :  uvicorn radar_web.app:app --reload --port 8600
 
-Nav : 🧠 Ma patte musicale · 🔍 Recherche ciblée · 📻 Veille Discogs · 🌐 Mon univers · 🎛️ Réglages
+Nav : 🧠 Mes sources · 🔍 Chercher un disque · 📻 Nouveautés · 🌐 Mes labels & artistes · 🎛️ Réglages
+(URLs historiques inchangées : /patte, /search, /veille, /univers, /settings)
 """
 import hashlib
 import hmac
@@ -10,8 +11,9 @@ import io
 import os
 import re
 import secrets
+import threading
 import time
-from typing import List
+from datetime import datetime
 from urllib.parse import quote_plus, urlencode
 
 import requests
@@ -301,7 +303,7 @@ def home():
     return RedirectResponse("/patte", status_code=303)
 
 
-# ============================================================ 🧠 Mieux connaître ton univers
+# ============================================================ 🧠 Mes sources
 def _last_import(job):
     s = jobs.status(job)
     fa = s.get("finished_at") if s else None
@@ -315,11 +317,14 @@ def patte_page(request: Request, saved: int = 0):
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
     last = {j: _last_import(j) for j in
            ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
+    st = c.stats()
+    # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
+    onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
     return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
-                  src=c.corpus_by_source(), st=c.stats(), saved=saved, last=last)
+                  src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding)
 
 
 def _apply_patte_form(f):
@@ -439,20 +444,26 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
     return HTMLResponse(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
 
 
-# ============================================================ 🔍 Recherche ciblée
+# ============================================================ 🔍 Chercher un disque
 SEARCH_MIN_YEAR = 1960
 
 
-def _year_param(year_from, year_to):
-    """Construit 'AAAA-AAAA' pour Discogs ; '' si l'intervalle couvre tout."""
+def _year_bounds(year_from, year_to):
+    """(a, b) entiers, bornés à [SEARCH_MIN_YEAR, année courante]."""
     mx = int(time.strftime("%Y"))
     try:
         a = int(year_from) if str(year_from).strip() else SEARCH_MIN_YEAR
         b = int(year_to) if str(year_to).strip() else mx
     except ValueError:
-        return ""
+        return SEARCH_MIN_YEAR, mx
     a, b = min(a, b), max(a, b)
-    a, b = max(SEARCH_MIN_YEAR, a), min(mx, b)
+    return max(SEARCH_MIN_YEAR, a), min(mx, b)
+
+
+def _year_param(year_from, year_to):
+    """Construit 'AAAA-AAAA' pour Discogs ; '' si l'intervalle couvre tout."""
+    mx = int(time.strftime("%Y"))
+    a, b = _year_bounds(year_from, year_to)
     if a <= SEARCH_MIN_YEAR and b >= mx:
         return ""
     return f"{a}-{b}"
@@ -497,16 +508,16 @@ def _hist_summary(p):
 
 
 @app.get("/search", response_class=HTMLResponse)
-def search_page(request: Request, sid: str = ""):
-    c = Ctx()
-    styles_mine, styles_more = _search_styles(c)
+def search_page(request: Request, sid: str = "", style: str = ""):
     hist = load(_pu().search_hist, [])
     entry = next((e for e in hist if e.get("id") == sid), hist[0] if hist else None)
+    q = (entry or {}).get("params", {})
+    if not entry and style.strip():
+        q = {"style": [style.strip()]}
     return render(request, "pages/search.html", active="search",
-                  q=(entry or {}).get("params", {}), last_id=(entry or {}).get("id", ""),
+                  q=q, last_id=(entry or {}).get("id", ""),
                   history=[{"id": e["id"], "ts": e.get("ts", ""), "n": e.get("n", 0),
                             "summary": _hist_summary(e.get("params", {}))} for e in hist],
-                  genres=vocab.GENRES, styles_mine=styles_mine, styles_more=styles_more,
                   year_min=SEARCH_MIN_YEAR, year_max=int(time.strftime("%Y")))
 
 
@@ -529,7 +540,8 @@ def search_replay(request: Request, sid: str):
     if not entry:
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
-                searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids())
+                searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
+                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")))
 
 
 def _base_labels_ranked(c):
@@ -539,15 +551,17 @@ def _base_labels_ranked(c):
     ridx = c.reco_index
     lc = c.collection.get("label_counts", {})
     lids = c.collection.get("label_ids", {})
+    keys = [store.normalize_label(name) for name in c.cfg.get("labels", [])]
+    affinities = c.label_affinities(keys)
     rows, seen = [], set()
-    for name in c.cfg.get("labels", []):
-        key = store.normalize_label(name)
+    for name, key in zip(c.cfg.get("labels", []), keys):
         res = c.resolved.get(key) or {}
         disp = res.get("discogs_name") or res.get("original") or name
-        aff = c.affinity_score(c.profile.get(key)) if c.profile.get(key) else None
+        aff, coverage = affinities[key]["aff"], affinities[key]["coverage"]
         did = res.get("discogs_id") or lids.get(key, {}).get("id")
         rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key,
-                     "aff": aff, "_reco": ridx.get(key, 0), "owned": lc.get(key, 0), "id": did})
+                     "aff": aff, "coverage": coverage, "_reco": ridx.get(key, 0),
+                     "owned": lc.get(key, 0), "id": did})
     rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
     uniq = []
     for r in rows:
@@ -681,19 +695,42 @@ def _score_min(raw):
     return v if v > 0 else None
 
 
+def _local_rows_to_raw(rows, genres):
+    """Résultats `discogs_dump.search_local` -> même forme que les résultats
+    de l'API (album_score/results.html attendent title="Artiste - Titre",
+    label/style en listes). Filtre le genre ici (colonne non normalisée dans
+    le référentiel local, cf. D6) sur ce sous-ensemble déjà borné."""
+    out = []
+    for row in rows:
+        row_genres = (row.get("genres") or "").split(", ") if row.get("genres") else []
+        if genres and not any(g in row_genres for g in genres):
+            continue
+        title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
+        out.append({
+            "id": row["id"], "title": title,
+            "label": [row["label"]] if row.get("label") else [],
+            "style": row["styles"].split(", ") if row.get("styles") else [],
+            "catno": row.get("catno") or "", "year": row.get("year") or "",
+            "cover_image": None, "thumb": None, "uri": f"/release/{row['id']}",
+        })
+    return out
+
+
 @app.post("/search", response_class=HTMLResponse)
 def search_run(request: Request, label: str = Form(""),
-               genre: List[str] = Form(default=[]), style: List[str] = Form(default=[]),
+               genre: str = Form(""), style: str = Form(""),
                year_from: str = Form(""), year_to: str = Form(""),
                vinyl: str = Form(""), pages: str = Form("2"),
                base_metric: str = Form(""), base_min: str = Form(""),
-               label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form("")):
+               label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form(""),
+               include_recent: str = Form("")):
+    from .radar import discogs_dump as dd
     c = Ctx()
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
     fmt = "Vinyl" if vinyl else ""
-    genres = [g.strip() for g in genre if g and g.strip()]
-    styles = [s.strip() for s in style if s and s.strip()]
+    genres = [g.strip() for g in genre.splitlines() if g.strip()]
+    styles = [s.strip() for s in style.splitlines() if s.strip()]
     try:
         npages = max(1, min(4, int(pages or 2)))
     except ValueError:
@@ -707,40 +744,66 @@ def search_run(request: Request, label: str = Form(""),
         b_min = None
     base_labels = _pick_base_labels(c, base_metric, b_min, 12) if base_metric else []
 
-    gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
-    if base_labels:
-        npages = min(npages, 1)                       # N labels -> 1 page chacun
-        combos = [(lab, g, s) for lab in base_labels for (g, s) in gs][:12]
-    else:
-        combos = [(label.strip() or None, g, s) for (g, s) in gs][:8]
-
+    # --- local d'abord (référentiel Discogs importé, cf. diagnostic D6) : instantané,
+    # mais un dump est mensuel — ignore les sorties des ~30 derniers jours. ---
     raw, seen_ids = [], set()
-    try:
-        for i, (lab, g, s) in enumerate(combos):
-            if i:
-                time.sleep(1.0)
-            if lab:
-                part = discogs.search_label_releases(token, lab, genre=g,
-                                                     style=s, fmt=fmt, year=year, max_pages=npages)
-            else:
-                part = []
-                for pg in range(1, npages + 1):
-                    p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
-                    for k, v in (("genre", g), ("style", s), ("year", year), ("format", fmt)):
-                        if v:
-                            p[k] = v
-                    d = discogs.search(token=token, **p)
-                    got = d.get("results", [])
-                    part += got
-                    if pg >= d.get("pagination", {}).get("pages", 1) or not got:
-                        break
-            for r in part:
-                rid = r.get("id")
-                if rid and rid not in seen_ids:
-                    seen_ids.add(rid)
-                    raw.append(r)
-    except discogs.DiscogsError as e:
-        return frag(request, "partials/results.html", error=str(e))
+    used_local = dd.available()
+    dump_date = None
+    if used_local:
+        if base_labels:
+            label_keys = [normalize_label(lb) for lb in base_labels]
+        elif label.strip():
+            label_keys = [normalize_label(label)]
+        else:
+            label_keys = []
+        yb = _year_bounds(year_from, year_to)
+        # BETWEEN exclut les year IS NULL (nombreuses en local) : ne filtrer que si
+        # l'utilisateur a vraiment resserré l'intervalle, jamais sur les bornes par défaut
+        # qui couvrent tout — sinon toute sortie sans année connue disparaît en silence du
+        # local alors que le chemin API les incluait (_year_param renvoie '' = pas de filtre
+        # dans ce cas). Diagnostic R5.
+        year_range = None if (yb[0] <= SEARCH_MIN_YEAR and yb[1] >= int(time.strftime("%Y"))) else yb
+        local_rows = dd.search_local(label_keys or None, styles or None, year_range)
+        for r in _local_rows_to_raw(local_rows, genres):
+            seen_ids.add(r["id"])
+            raw.append(r)
+        dump_date = dd.get_meta().get("dump_date")
+
+    if bool(include_recent) or not used_local:
+        gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
+        if base_labels:
+            npages = min(npages, 1)                       # N labels -> 1 page chacun
+            combos = [(lab, g, s) for lab in base_labels for (g, s) in gs][:12]
+        else:
+            combos = [(label.strip() or None, g, s) for (g, s) in gs][:8]
+
+        try:
+            for i, (lab, g, s) in enumerate(combos):
+                if i:
+                    time.sleep(1.0)
+                if lab:
+                    part = discogs.search_label_releases(token, lab, genre=g,
+                                                         style=s, fmt=fmt, year=year, max_pages=npages)
+                else:
+                    part = []
+                    for pg in range(1, npages + 1):
+                        p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
+                        for k, v in (("genre", g), ("style", s), ("year", year), ("format", fmt)):
+                            if v:
+                                p[k] = v
+                        d = discogs.search(token=token, **p)
+                        got = d.get("results", [])
+                        part += got
+                        if pg >= d.get("pagination", {}).get("pages", 1) or not got:
+                            break
+                for r in part:
+                    rid = r.get("id")
+                    if rid and rid not in seen_ids:
+                        seen_ids.add(rid)
+                        raw.append(r)
+        except discogs.DiscogsError as e:
+            if not raw:              # le local a déjà des résultats : ne pas tout perdre sur un raté API
+                return frag(request, "partials/results.html", error=str(e))
     seen, scored = set(), []
     for r in raw:
         rid = r.get("id")
@@ -756,25 +819,39 @@ def search_run(request: Request, label: str = Form(""),
                        "score": sc,
                        "detail": {"label": det.get("label"), "artist": det.get("artist"),
                                   "style": det.get("style")}})
+    n_before_thresholds = len(scored)
     mins = {"label": _score_min(label_min), "artist": _score_min(artist_min), "style": _score_min(style_min)}
     if any(v is not None for v in mins.values()):
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     scored = scored[:48]
+    # X4 : état vide explicite — distinguer les causes déjà connues côté serveur
+    empty_reason = None
+    if not scored:
+        if n_before_thresholds and any(v is not None for v in mins.values()):
+            empty_reason = "thresholds"
+        elif not used_local and not token:
+            empty_reason = "no_source"
+        elif not label.strip() and not base_labels and not styles and not genres:
+            empty_reason = "no_criteria"
+        else:
+            empty_reason = "no_match"
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
               "vinyl": bool(vinyl), "pages": npages,
               "base_metric": base_metric, "base_min": str(base_min or "").strip(),
               "label_min": str(label_min or "").strip(), "artist_min": str(artist_min or "").strip(),
-              "style_min": str(style_min or "").strip()}
+              "style_min": str(style_min or "").strip(), "include_recent": bool(include_recent)}
     hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
-                    "n": len(scored), "results": scored, "searched": base_labels})
+                    "n": len(scored), "results": scored, "searched": base_labels,
+                    "dump_date": dump_date})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
     return frag(request, "partials/results.html", results=scored,
-                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids())
+                searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date,
+                empty_reason=empty_reason, has_token=bool(token))
 
 
 _DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
@@ -1002,33 +1079,51 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
 
 
 RELEASE_META_TTL = 86400
+RELEASE_META_MAX_FETCH = 20          # au-delà, on sert ce qu'on a plutôt que saturer le quota
+_release_meta_lock = threading.Lock()
 
 
-@app.get("/release/{rid}/meta", response_class=HTMLResponse)
-def release_meta(request: Request, rid: int):
+@app.get("/release/meta", response_class=HTMLResponse)
+def release_meta_batch(ids: str = ""):
+    """Une seule requête pour toute une grille de résultats (cf. diagnostic
+    P3) — remplace le hx-get par carte qui déclenchait jusqu'à 48 appels API
+    et 48 réécritures du cache partagé sans verrou. Ne demande à l'API que
+    les ids manquants ou périmés du cache (plafonné), écrit le cache UNE
+    SEULE fois, sous verrou, en relisant juste avant d'écrire pour fusionner
+    ce qu'un autre process aurait ajouté entretemps. Répond en pastilles
+    hx-swap-oob, une par carte (#cover-meta-{id})."""
+    rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
+    if not rids:
+        return HTMLResponse("")
     cache = load(_pu().release_meta, {})
-    ent = cache.get(str(rid))
-    if not ent or time.time() - ent.get("ts", 0) > RELEASE_META_TTL:
+    now = time.time()
+    missing = [rid for rid in rids if not cache.get(rid) or now - cache[rid].get("ts", 0) > RELEASE_META_TTL]
+    if missing:
         token = _cfg().get("token", "")
-        rating = rcount = nfs = low = None
-        try:
-            d = discogs.release(rid, token=token)
-            rt = (d.get("community") or {}).get("rating") or {}
-            rating, rcount = rt.get("average"), rt.get("count")
-            nfs, low = d.get("num_for_sale"), d.get("lowest_price")
-        except discogs.DiscogsError:
-            pass
-        ent = {"ts": time.time(), "rating": rating, "rcount": rcount,
-               "nfs": nfs, "low": low}
-        cache[str(rid)] = ent
-        if len(cache) > 4000:
-            for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
-                cache.pop(k, None)
-        save(_pu().release_meta, cache)
-    return frag(request, "partials/release_meta.html", m=ent, rid=rid)
+        fetched = {}
+        for rid in missing[:RELEASE_META_MAX_FETCH]:
+            rating = rcount = nfs = low = None
+            try:
+                d = discogs.release(int(rid), token=token)
+                rt = (d.get("community") or {}).get("rating") or {}
+                rating, rcount = rt.get("average"), rt.get("count")
+                nfs, low = d.get("num_for_sale"), d.get("lowest_price")
+            except discogs.DiscogsError:
+                pass
+            fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "nfs": nfs, "low": low}
+            time.sleep(1.1)
+        with _release_meta_lock:
+            cache = load(_pu().release_meta, {})   # relu sous le verrou : fusionne un accès concurrent
+            cache.update(fetched)
+            if len(cache) > 4000:
+                for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
+                    cache.pop(k, None)
+            save(_pu().release_meta, cache)
+    tpl = templates.get_template("partials/release_meta.html")
+    return HTMLResponse("".join(tpl.render({"m": cache.get(rid) or {}, "rid": rid}) for rid in rids))
 
 
-# ============================================================ 📻 Veille Discogs (+ vendeurs + reco)
+# ============================================================ 📻 Nouveautés (+ vendeurs + reco)
 def _inbox(request, path, source_key, key_ns, mins=30):
     items = load(path, [])
     if not items:
@@ -1165,7 +1260,7 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
 
-# --------------------------------------------------------------------- recos (dans Mon univers)
+# --------------------------------------------------------------------- recos (dans Mes labels & artistes)
 @app.get("/univers/reco/labels", response_class=HTMLResponse)
 def reco_labels_frag(request: Request):
     c = Ctx()
@@ -1174,14 +1269,19 @@ def reco_labels_frag(request: Request):
     for r in c.reco_rows():
         if r["key"] not in base:
             rows.append(r)
-    # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base)
+    # candidats issus du graphe (labels où tes artistes ont sorti, absents de la base) : rang
+    # de proximité, pas une note /100 — le score de graphe n'est pas sur une échelle absolue
+    # ni bornée, l'afficher à côté d'un vrai score /100 avec le même badge induisait en erreur
+    # (cf. diagnostic N2). c.graph_rescore()["labels"] est déjà trié par score décroissant.
     graph_rows = []
     for lk, v in c.graph_rescore()["labels"].items():
         if lk in base:
             continue
-        graph_rows.append({"name": v["name"], "key": lk, "score": round(v["score"]), "aff": None,
+        graph_rows.append({"name": v["name"], "key": lk, "aff": None,
                            "owned": 0, "want": 0, "corpus": 0, "artists": v["n_seeds"],
                            "seeds": ", ".join(v["seeds"])})
+    for i, r in enumerate(graph_rows):
+        r["rank"] = i + 1
     return frag(request, "partials/reco_labels.html", reco=rows[:30],
                 graph_reco=graph_rows[:30], n_reco=len(rows), n_graph=len(graph_rows))
 
@@ -1196,7 +1296,44 @@ def reco_artists_frag(request: Request):
     return frag(request, "partials/reco_artists.html", reco=rows, n_reco=len(g))
 
 
-# ============================================================ 🌐 Mon univers
+def _review_rows(resolved, status):
+    """[{key, original, discogs_name, discogs_id, candidates}] pour les
+    entrées dans ce statut — alimente la section "À vérifier" (diagnostic C3) :
+    approx = deviné par l'API, à confirmer/rejeter ; not_found = jamais
+    identifié, purement informationnel (rien à confirmer)."""
+    out = []
+    for k, e in (resolved or {}).items():
+        if e.get("status") == status:
+            out.append({"key": k, "original": e.get("original") or k,
+                        "discogs_name": e.get("discogs_name"), "discogs_id": e.get("discogs_id"),
+                        "candidates": e.get("candidates") or []})
+    out.sort(key=lambda r: r["original"].lower())
+    return out
+
+
+def _review_ctx(c):
+    return {"labels_approx": _review_rows(c.resolved, "approx"),
+            "labels_not_found": _review_rows(c.resolved, "not_found"),
+            "artists_approx": _review_rows(c.artists_res, "approx"),
+            "artists_not_found": _review_rows(c.artists_res, "not_found")}
+
+
+@app.post("/univers/review/{kind}/{action}", response_class=HTMLResponse)
+def univers_review_action(request: Request, kind: str, action: str, key: str = Form("")):
+    if kind not in ("label", "artist") or action not in ("confirm", "reject"):
+        return HTMLResponse("", status_code=404)
+    path = _pu().resolved if kind == "label" else _pu().artists_res
+    data = load(path, {})
+    e = data.get(key)
+    if e and e.get("status") == "approx":
+        e["status"] = "confirmed" if action == "confirm" else "not_found"
+        e["candidates"] = []
+        e["reviewed_by"] = "user"
+        save(path, data)
+    return frag(request, "partials/review.html", review=_review_ctx(Ctx()))
+
+
+# ============================================================ 🌐 Mes labels & artistes
 @app.get("/univers", response_class=HTMLResponse)
 def univers_page(request: Request, tab: str = "labels"):
     c = Ctx()
@@ -1208,6 +1345,7 @@ def univers_page(request: Request, tab: str = "labels"):
         ({"key": ck, "name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
          if not str(disp.get(ck, ck)).startswith("id:")),
         key=lambda r: r["name"].lower())
+    review = _review_ctx(c)
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
@@ -1216,6 +1354,13 @@ def univers_page(request: Request, tab: str = "labels"):
                   label_graphs=label_graphs,
                   artist_graphs=artist_graphs,
                   classified_artists=classified_artists,
+                  review=review,
+                  # total (approx + not_found), pas seulement approx : sinon le panneau
+                  # "À vérifier" reste masqué (n_review=0) quand tout est not_found — cas
+                  # réel constaté (281 not_found, 0 approx) où le lien depuis /patte
+                  # ("jamais identifiés" -> /univers) menait à un panneau invisible (diag. Lot 5 C3).
+                  n_review=(len(review["labels_approx"]) + len(review["artists_approx"])
+                            + len(review["labels_not_found"]) + len(review["artists_not_found"])),
                   top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
                   top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
 
@@ -1291,15 +1436,23 @@ def _graph_extras(entry, kind):
                 weight[k] = weight.get(k, 0) + int(e.get("w") or 0)
     notes, infos = {}, {}
     if kind == "label":
+        from .radar import discogs_dump as dd
         owned = c.collection.get("label_counts", {})
         reco, gl = c.reco_index, c.graph_rescore()["labels"]
+        dump_styles = dd.label_style_counts(nodes)
         for k in nodes:
+            dstyles = dump_styles.get(k)
             prof = c.profile.get(k)
-            notes[k] = c.affinity_score(prof) if prof else None
-            styles = sorted((prof or {}).get("style_counts", {}).items(), key=lambda kv: -kv[1])
+            style_counts = dstyles or (prof or {}).get("style_counts") or {}
+            notes[k] = None
+            if dstyles or prof:
+                notes[k], _cov = c.affinity_score({"style_counts": style_counts})
+            styles = sorted(style_counts.items(), key=lambda kv: -kv[1])
             facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "artiste(s) en commun")
-            if prof and prof.get("sampled"):
-                facts.append(f"{prof['sampled']} sorties profilées")
+            if dstyles:
+                facts.append("profil : catalogue Discogs complet")
+            elif prof and prof.get("sampled"):
+                facts.append(f"{prof['sampled']} sorties profilées (échantillon)")
             else:
                 facts.append("pas encore profilé")
             if owned.get(k):
@@ -1368,8 +1521,11 @@ def univers_label_graph_show(request: Request, gid: str):
     return _label_graph_render(request, entry)
 
 
+ARTISTS_PAGE_SIZE = 25
+
+
 @app.get("/univers/artists/table", response_class=HTMLResponse)
-def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
+def univers_artists_table(request: Request, flt: str = "", hide: str = "", page: int = 1):
     c = Ctx()
     disp, tiers, asc = c.artist_disp(), c.artist_tier_map(), c.ascore
     catn = {"1": "Cœur", "2": "Aimé", None: "—"}
@@ -1388,7 +1544,12 @@ def univers_artists_table(request: Request, flt: str = "", hide: str = ""):
             continue
         rows.append({"name": name, "note": note, "cat": catn.get(t, "—"), "key": ck})
     rows.sort(key=lambda r: -r["note"])
-    return frag(request, "partials/artists_table.html", rows=rows[:250], n=len(rows))
+    total = len(rows)
+    pages = max(1, -(-total // ARTISTS_PAGE_SIZE))
+    page = max(1, min(page, pages))
+    shown = rows[(page - 1) * ARTISTS_PAGE_SIZE: page * ARTISTS_PAGE_SIZE]
+    return frag(request, "partials/artists_table.html", rows=shown, n=total,
+                page=page, pages=pages, flt=flt, hide=hide)
 
 
 @app.post("/univers/artist/set", response_class=HTMLResponse)
@@ -1551,7 +1712,7 @@ def job_launch(name: str):
         srcs = [s.strip() for s in (_cfg().get("djset_sources") or "").splitlines() if s.strip()]
         if not srcs:
             return HTMLResponse("<div id='job-ingest_djsets' class='notice warn small'>"
-                                "Aucune source DJ — renseigne-les dans « Mieux connaître ton univers → DJ sets ».</div>")
+                                "Aucune source DJ — renseigne-les dans « Mes sources → DJ sets ».</div>")
         d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
         os.makedirs(d, exist_ok=True)
         save(os.path.join(d, "djsets.input.json"),
@@ -1569,6 +1730,38 @@ def job_stop(name: str):
     return job_status_frag(name)
 
 
+# X5 : durée typique annoncée dès le lancement (jobs longs seulement — les autres
+# se voient bien assez à leur barre de progression).
+JOB_DURATION_HINTS = {
+    "import_discogs_dump": "~1 h 45 (dump complet Discogs)",
+    "scan_catalog": "jusqu'à ~1 h au premier passage, plus rapide ensuite",
+    "build_graph": "de quelques minutes à ~1 h selon la taille du graphe",
+    "ingest_djsets": "quelques minutes par source",
+}
+JOB_LONG_PAGE_NOTE_S = 600  # au-delà, rappeler qu'on peut fermer la page
+
+
+def _job_elapsed_s(s):
+    started = s.get("started_at")
+    if not started:
+        return None
+    try:
+        return max(0.0, time.time() - datetime.fromisoformat(started).timestamp())
+    except ValueError:
+        return None
+
+
+def _fmt_duration_s(secs):
+    secs = max(0, int(secs))
+    if secs < 60:
+        return f"{secs} s"
+    m, sec = divmod(secs, 60)
+    if m < 60:
+        return f"{m} min"
+    h, m = divmod(m, 60)
+    return f"{h} h {m:02d}"
+
+
 @app.get("/jobs/{name}/status", response_class=HTMLResponse)
 def job_status_frag(name: str):
     s = jobs.status(name)
@@ -1578,12 +1771,15 @@ def job_status_frag(name: str):
     pct = min(100, round(100 * done / total))
     run, err, queued = s.get("running"), s.get("error"), s.get("queued")
     msg = html.escape(str(s.get("message") or ""))
+    elapsed = _job_elapsed_s(s)
+    hint = JOB_DURATION_HINTS.get(name)
     stopbtn = (f"<button type='button' class='small btn-stop' hx-post='/jobs/{name}/stop' "
                f"hx-target='#job-{name}' hx-swap='outerHTML' hx-confirm='Arrêter ce job ?'>■ arrêter</button>")
     if err:
         inner = f"<span class='notice warn small'>{html.escape(str(err))}</span>"
     elif queued:
-        inner = f"<div class='job-status'><span class='small muted'>🕓 {msg}</span>{stopbtn}</div>"
+        hint_txt = f" · dure généralement {hint}" if hint else ""
+        inner = f"<div class='job-status'><span class='small muted'>🕓 {msg}{hint_txt}</span>{stopbtn}</div>"
     elif run:
         subbar = ""
         sub_total = s.get("sub_total")
@@ -1593,11 +1789,23 @@ def job_status_frag(name: str):
             sub_label = html.escape(str(s.get("sub_label") or ""))
             subbar = (f"<div class='small muted' style='margin-top:4px'>{sub_label} · {sub_done}/{sub_total} article(s)</div>"
                       f"<div class='progress'><i style='width:{spct}%'></i></div>")
-        inner = (f"<div class='job-status'><span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}</span>{stopbtn}</div>"
-                 f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}")
+        eta_txt = ""
+        if elapsed and elapsed > 5 and done and s.get("total") and done < s["total"]:
+            rate = done / elapsed
+            if rate > 0:
+                eta_txt = f" · reste ~{_fmt_duration_s((s['total'] - done) / rate)}"
+        elif hint:
+            eta_txt = f" · dure généralement {hint}"
+        close_note = ""
+        if elapsed and elapsed > JOB_LONG_PAGE_NOTE_S:
+            close_note = ("<div class='small muted' style='margin-top:4px'>"
+                          "Tu peux fermer cette page, le job continue en fond sur le serveur.</div>")
+        inner = (f"<div class='job-status'><span class='small muted'>⏳ {msg} · {done}/{s.get('total', 0)}{eta_txt}</span>{stopbtn}</div>"
+                 f"<div class='progress'><i style='width:{pct}%'></i></div>{subbar}{close_note}")
     else:
         inner = f"<span class='small muted'>✓ {msg or 'terminé'}</span>"
-    poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every 2s' hx-swap='outerHTML'"
+    poll_s = 10 if (elapsed and elapsed > 30) else 2
+    poll = (f"hx-get='/jobs/{name}/status' hx-trigger='every {poll_s}s' hx-swap='outerHTML'"
             if (run or queued) else "")
     return HTMLResponse(f"<div id='job-{name}' {poll}>{inner}</div>")
 

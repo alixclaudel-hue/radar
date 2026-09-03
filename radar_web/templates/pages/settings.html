@@ -4,7 +4,7 @@
 {% block title %}Réglages · Radar{% endblock %}
 {% block content %}
 <h1>Réglages</h1>
-<p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes sont dans Ma patte musicale.</p>
+<p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes se règlent dans Mes sources.</p>
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
 <form method="post" action="/settings">
@@ -15,11 +15,11 @@
                  ['reco__want_factor','want']]) }}
     <div class="row wgroup__fields">
       {% for k in ['collection','corpus','artist','affinity','want_factor'] %}
-      <div class="field"><label>{{ k }}</label>
-        <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></div>
+      <div class="field"><label>{{ k }}
+        <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></label></div>
       {% endfor %}
-      <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)</label>
-        <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></div>
+      <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)
+        <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></label></div>
     </div>
   </div>
 
@@ -29,8 +29,8 @@
                  ['album__style','style'], ['album__artist_max_vs_mean','max/moy.']]) }}
     <div class="row wgroup__fields">
       {% for k in ['label','artist','style','artist_max_vs_mean'] %}
-      <div class="field"><label>{{ k }}</label>
-        <input name="album__{{ k }}" type="number" step="0.05" value="{{ sc.album[k] }}"></div>
+      <div class="field"><label>{{ k }}
+        <input name="album__{{ k }}" type="number" step="0.05" value="{{ sc.album[k] }}"></label></div>
       {% endfor %}
     </div>
   </div>
@@ -42,8 +42,8 @@
                  ['artist_score__djset','djset']]) }}
     <div class="row wgroup__fields">
       {% for k in ['manual','corpus','collection','graph','djset'] %}
-      <div class="field"><label>{{ k }}</label>
-        <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></div>
+      <div class="field"><label>{{ k }}
+        <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></label></div>
       {% endfor %}
     </div>
   </div>
@@ -53,10 +53,10 @@
     {{ wr.toile([['taste_tiers__1','style ♥'], ['artist_tiers__1','artiste ♥'],
                  ['taste_tiers__2','style +'], ['artist_tiers__2','artiste +']]) }}
     <div class="row wgroup__fields">
-      <div class="field"><label>Style — Cœur</label><input name="taste_tiers__1" type="number" step="0.05" value="{{ sc.taste_tiers['1'] }}"></div>
-      <div class="field"><label>Style — Aimés</label><input name="taste_tiers__2" type="number" step="0.05" value="{{ sc.taste_tiers['2'] }}"></div>
-      <div class="field"><label>Artiste — Cœur</label><input name="artist_tiers__1" type="number" step="0.05" value="{{ sc.artist_tiers['1'] }}"></div>
-      <div class="field"><label>Artiste — Aimés</label><input name="artist_tiers__2" type="number" step="0.05" value="{{ sc.artist_tiers['2'] }}"></div>
+      <div class="field"><label>Style — Cœur<input name="taste_tiers__1" type="number" step="0.05" value="{{ sc.taste_tiers['1'] }}"></label></div>
+      <div class="field"><label>Style — Aimés<input name="taste_tiers__2" type="number" step="0.05" value="{{ sc.taste_tiers['2'] }}"></label></div>
+      <div class="field"><label>Artiste — Cœur<input name="artist_tiers__1" type="number" step="0.05" value="{{ sc.artist_tiers['1'] }}"></label></div>
+      <div class="field"><label>Artiste — Aimés<input name="artist_tiers__2" type="number" step="0.05" value="{{ sc.artist_tiers['2'] }}"></label></div>
     </div>
   </div>
 
@@ -66,7 +66,7 @@
 <script src="/static/wradar.js" defer></script>
 
 <hr>
-<h3>Base de labels — export CSV <span class="muted small">· import : Mieux connaître ton univers</span></h3>
+<h3>Base de labels — export CSV <span class="muted small">· import : Mes sources</span></h3>
 <div class="field" style="max-width:320px"><label>Exporter</label>
   <a class="small" href="/univers/labels/export">⬇ Exporter la base (CSV)</a></div>
 

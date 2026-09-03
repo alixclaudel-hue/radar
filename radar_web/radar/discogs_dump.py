@@ -965,7 +965,7 @@ def label_style_counts(label_keys, con=None):
     return out
 
 
-def search_local(label_keys=None, styles=None, year_range=None, limit=500):
+def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
     """[{id, title, artist, label, catno, year, genres, styles}] — recherche
     ciblée en local, triée par année décroissante (cf. diagnostic D6). Un
     dump mensuel est un instantané complet du catalogue vinyle 12"/LP
@@ -974,7 +974,16 @@ def search_local(label_keys=None, styles=None, year_range=None, limit=500):
     jointe par virgule, non normalisée) — à filtrer par l'appelant sur ce
     sous-ensemble déjà borné par `limit`. Pas de vignette : le dump ne
     contient aucune URL d'image, contrairement à l'API (repli nécessaire
-    pour les pochettes, cf. /release/meta)."""
+    pour les pochettes, cf. /release/meta).
+
+    `limit` haut à dessein : le tri est `ORDER BY year DESC` — avec un plafond
+    trop bas (500 à l'origine), un style courant (ex. House) sur une plage de
+    plusieurs années matche largement plus que ça, et les années les plus
+    anciennes de la plage se retrouvent silencieusement exclues avant même
+    d'atteindre le filtre genre ou le calcul du score (elles ne sont jamais
+    dans les 500 lignes les plus récentes). 5000 laisse la marge nécessaire
+    pour qu'une requête style+année sans label couvre réellement toute la
+    plage demandée plutôt que sa seule extrémité récente."""
     if not available():
         return []
     con = sqlite3.connect(DB_PATH)

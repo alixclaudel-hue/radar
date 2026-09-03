@@ -541,7 +541,8 @@ def search_replay(request: Request, sid: str):
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
                 searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
-                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")))
+                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")),
+                n_matches=entry.get("n_matches"))
 
 
 def _base_labels_ranked(c):
@@ -824,6 +825,7 @@ def search_run(request: Request, label: str = Form(""),
     if any(v is not None for v in mins.values()):
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
+    n_matches = len(scored)
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     scored = scored[:48]
     # X4 : état vide explicite — distinguer les causes déjà connues côté serveur
@@ -846,12 +848,12 @@ def search_run(request: Request, label: str = Form(""),
     hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
     hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],
                     "ts": time.strftime("%Y-%m-%d %H:%M"), "params": params,
-                    "n": len(scored), "results": scored, "searched": base_labels,
-                    "dump_date": dump_date})
+                    "n": len(scored), "n_matches": n_matches, "results": scored,
+                    "searched": base_labels, "dump_date": dump_date})
     save(_pu().search_hist, hist[:SEARCH_HIST_MAX])
     return frag(request, "partials/results.html", results=scored,
                 searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date,
-                empty_reason=empty_reason, has_token=bool(token))
+                empty_reason=empty_reason, has_token=bool(token), n_matches=n_matches)
 
 
 _DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)

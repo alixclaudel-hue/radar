@@ -11,7 +11,7 @@
         {{ (r.label or [])|join(', ') }}{% if r.year %} · {{ r.year }}{% endif %}{% if r.format %} · {{ r.format|join(', ') }}{% endif %}
       </span>
       {% if r.id|string in in_cart %}
-        <span class="small ok">✓ au panier</span>
+        <span class="small ok">✓ en wantlist</span>
       {% else %}
       <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="rid" value="{{ r.id }}">
@@ -19,7 +19,7 @@
         <input type="hidden" name="artist" value="{{ a }}">
         <input type="hidden" name="label" value="{{ (r.label or [''])[0] }}">
         <input type="hidden" name="thumb" value="{{ r.thumb or '' }}">
-        <button type="submit" class="small">➕ panier</button>
+        <button type="submit" class="small">➕ wantlist</button>
       </form>
       {% endif %}
     </div>

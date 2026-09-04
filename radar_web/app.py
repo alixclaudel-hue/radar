@@ -955,15 +955,28 @@ def disco_page(request: Request, kind: str = "artist", key: str = "",
                   voted=_voted_map(), in_cart=_cart_ids(), total_raw=len(raw))
 
 
-# ---------------------------------------------------------------- panier interne
+# ---------------------------------------------------------------- panier = wantlist Discogs
 def _cart_ids():
     return {str(x.get("id")) for x in load(_pu().cart, [])}
+
+
+def _discogs_username(cfg, token):
+    """Résout le pseudo Discogs une fois puis le met en cache dans la config
+    (évite un aller-retour `/oauth/identity` à chaque ajout/retrait)."""
+    user = cfg.get("discogs_username", "")
+    if user:
+        return user
+    user = discogs.identity(token).get("username", "")
+    if user:
+        cfg["discogs_username"] = user
+        store.save_config(cfg)
+    return user
 
 
 @app.get("/release_matches", response_class=HTMLResponse)
 def release_matches(request: Request, a: str = "", t: str = ""):
     """Vinyles Discogs contenant cette track (une track peut être sortie sur
-    plusieurs sorties — VA, rééditions...) — pour l'ajout au panier depuis un
+    plusieurs sorties — VA, rééditions...) — pour l'ajout à la wantlist depuis un
     DJ set, où on n'a résolu qu'un seul release_id à l'ingestion."""
     a, t = a.strip(), t.strip()
     token = _cfg().get("token", "")
@@ -991,19 +1004,72 @@ def cart_add(rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
     rid = (rid or "").strip()
     if not rid:
         return HTMLResponse("<span class='small msg-err'>id manquant</span>")
+    cfg = _cfg()
+    token = cfg.get("token", "")
+    if not token:
+        return HTMLResponse("<span class='small msg-err'>Token Discogs manquant.</span>")
+    try:
+        user = _discogs_username(cfg, token)
+        if not user:
+            return HTMLResponse("<span class='small msg-err'>Identité Discogs illisible.</span>")
+        discogs.add_to_wantlist(token, user, rid)
+    except discogs.DiscogsError as e:
+        return HTMLResponse(f"<span class='small msg-err'>{html.escape(str(e))}</span>")
     cart = load(_pu().cart, [])
     if rid not in {str(x.get("id")) for x in cart}:
         cart.insert(0, {"id": rid, "title": title.strip(), "artist": artist.strip(),
                         "thumb": thumb.strip(), "label": label.strip(),
                         "added_at": time.strftime("%Y-%m-%d")})
         save(_pu().cart, cart)
-    return HTMLResponse("<span class='small ok'>✓ au panier</span>")
+    return HTMLResponse("<span class='small ok'>✓ en wantlist</span>")
 
 
 @app.post("/cart/remove", response_class=HTMLResponse)
 def cart_remove(request: Request, rid: str = Form("")):
     rid = (rid or "").strip()
+    cfg = _cfg()
+    token = cfg.get("token", "")
+    if token:
+        try:
+            user = _discogs_username(cfg, token)
+            if user:
+                discogs.remove_from_wantlist(token, user, rid)
+        except discogs.DiscogsError as e:
+            return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
     cart = [x for x in load(_pu().cart, []) if str(x.get("id")) != rid]
+    save(_pu().cart, cart)
+    return frag(request, "partials/cart.html", cart=cart)
+
+
+@app.post("/cart/sync", response_class=HTMLResponse)
+def cart_sync(request: Request):
+    """Recharge la wantlist Discogs réelle et remplace le cache local — la
+    wantlist Discogs est la source de vérité, le cache local (`cart.json`)
+    n'existe que pour l'affichage sans appel API à chaque page."""
+    cfg = _cfg()
+    token = cfg.get("token", "")
+    if not token:
+        return HTMLResponse("<p class='small msg-err'>Token Discogs manquant.</p>")
+    try:
+        user = _discogs_username(cfg, token)
+        if not user:
+            return HTMLResponse("<p class='small msg-err'>Identité Discogs illisible.</p>")
+        items, page, pages = [], 1, 1
+        while page <= pages and page <= 20:
+            d = discogs.wants(token, user, page=page, per_page=100)
+            items += d.get("wants", [])
+            pages = d.get("pagination", {}).get("pages", 1)
+            page += 1
+    except discogs.DiscogsError as e:
+        return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
+    cart = []
+    for w in items:
+        bi = w.get("basic_information", {}) or {}
+        cart.append({"id": str(w.get("id")), "title": bi.get("title", ""),
+                     "artist": ", ".join(a.get("name", "") for a in bi.get("artists") or []),
+                     "label": ((bi.get("labels") or [{}])[0]).get("name", ""),
+                     "thumb": bi.get("thumb") or bi.get("cover_image") or "",
+                     "added_at": (w.get("date_added") or "")[:10]})
     save(_pu().cart, cart)
     return frag(request, "partials/cart.html", cart=cart)
 

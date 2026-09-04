@@ -1,10 +1,17 @@
 <div id="cart-list">
+  <div class="btnrow" style="margin-bottom:6px">
+    <button class="small" hx-post="/cart/sync" hx-target="#cart-list" hx-swap="outerHTML"
+            title="Recharger depuis la wantlist Discogs (récupère les ajouts faits ailleurs que dans Radar)">
+      🔄 synchroniser avec la wantlist Discogs
+    </button>
+  </div>
   {% if not cart %}
-    <p class="muted small">Panier vide. Ajoute des vinyles depuis la Recherche ou une discographie
-      (bouton « ➕ panier » sur les pochettes).</p>
+    <p class="muted small">Wantlist vide. Ajoute des vinyles depuis la Recherche ou une discographie
+      (bouton « ➕ wantlist » sur les pochettes), ou synchronise pour récupérer ta wantlist Discogs
+      existante.</p>
   {% else %}
-    <p class="small muted">{{ cart|length }} vinyle{{ 's' if cart|length > 1 }} — objectif : regrouper
-      l'achat chez un même vendeur (le croisement avec les vendeurs suivis arrive).</p>
+    <p class="small muted">{{ cart|length }} vinyle{{ 's' if cart|length > 1 }} dans ta wantlist Discogs
+      — objectif : regrouper l'achat chez un même vendeur (croisement ci-dessous).</p>
     <div class="lrows">
       {% for x in cart %}
       <div class="lrow">
@@ -17,7 +24,7 @@
            target="_blank" rel="noopener" title="annonces, prix croissant">🛒</a>
         <button class="small" hx-post="/cart/remove" hx-vals='{"rid": "{{ x.id }}"}'
                 hx-target="#cart-list" hx-swap="outerHTML"
-                hx-confirm="Retirer « {{ x.title }} » du panier ?">✕</button>
+                hx-confirm="Retirer « {{ x.title }} » de la wantlist Discogs ?">✕</button>
       </div>
       {% endfor %}
     </div>

@@ -17,8 +17,8 @@
     <div class="wl-list">
       {% for x in cart %}
       <div class="wl-item">
-        <div class="wl-row" hx-get="/release/{{ x.id }}/tracks" hx-target="next .tracklist" hx-swap="innerHTML"
-             title="Toucher pour voir les tracks (écoute + achat Bandcamp par track)">
+        <div class="wl-row" data-tracks-url="/release/{{ x.id }}/tracks"
+             title="Toucher pour voir/masquer les tracks (écoute + achat Bandcamp par track)">
           {% if x.thumb %}<img class="wl-thumb" src="{{ x.thumb }}" alt="">{% endif %}
           <div class="wl-info">
             <span class="wl-title">{{ (x.artist ~ ' — ') if x.artist }}{{ x.title }}</span>
@@ -30,7 +30,7 @@
                   hx-target="#cart-list" hx-swap="outerHTML"
                   hx-confirm="Retirer « {{ x.title }} » de la wantlist Discogs ?">✕</button>
         </div>
-        <div class="tracklist"></div>
+        <div class="tracklist" hidden></div>
       </div>
       {% endfor %}
     </div>

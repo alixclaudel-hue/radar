@@ -110,7 +110,8 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
 .wl-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
 .wl-title{ font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .wl-meta{ font-size:11px; color:var(--soft); line-height:1.35; }
-.wl-chevron{ color:var(--soft); font-size:14px; flex:0 0 auto; }
+.wl-chevron{ color:var(--soft); font-size:14px; flex:0 0 auto; transition:transform .15s ease; }
+.wl-row.open .wl-chevron{ transform:rotate(180deg); }
 
 /* graphes (labels et artistes : même rendu) */
 .lgraph svg text{ pointer-events:none; }

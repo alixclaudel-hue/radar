@@ -176,10 +176,41 @@ Le job télécharge aussi les dumps `labels` et `artists` (86 Mo + 474 Mo, contr
   remplie pendant le parsing des sorties (`<artists>` + `<extraartists>` filtrés). Branché
   (Lot 5) : `job_build_graph` construit le graphe de co-crédits par jointure SQL
   (`_graph_edges_from_sql`, `crate_jobs.py`) quand le référentiel local est disponible —
-  aucun appel API, repli sur l'ancien comportement (`_graph_edges_from_api`) sinon. Deux
-  fonctions dédiées dans `discogs_dump.py`, `label_ids_for_artists`/`artist_ids_for_labels`,
-  interrogent directement cette table (sans passer par un job) pour le ranking labels/artistes
-  — cf. `Ctx.label_db_signal`/`Ctx.artist_label_signal` plus bas.
+  aucun appel API, repli sur l'ancien comportement (`_graph_edges_from_api`, 1 seul saut)
+  sinon. Deux fonctions dédiées dans `discogs_dump.py`, `label_ids_for_artists`/
+  `artist_ids_for_labels`, interrogent directement cette table (sans passer par un job)
+  pour le ranking labels/artistes — cf. `Ctx.label_db_signal`/`Ctx.artist_label_signal`
+  plus bas.
+
+  **Graphe multi-niveaux** (2026-09-04) : `_graph_edges_from_sql` fait une BFS bornée à
+  `scoring.graph.max_levels` sauts (4 par défaut) depuis chaque graine — niveau 1 = co-crédit
+  direct (poids plein), chaque niveau suivant multiplié par `scoring.graph.level_decay`
+  (0.5) — plutôt qu'un seul saut. `scoring.graph.node_cap` (150) plafonne le nombre de
+  nœuds explorés PAR GRAINE : un graphe de co-crédits est un "petit monde", sans plafond
+  4 sauts depuis des centaines de graines toucherait l'essentiel du catalogue et ferait
+  perdre tout son sens de "proche de mes goûts" à la reco (en plus d'exploser le temps du
+  job). Le plafond ne tronque jamais les co-crédits DIRECTS d'une graine (toujours un seul
+  aller-retour SQL, coût nul) — seule l'exploration plus profonde est coupée. Une sortie
+  qui ne relie qu'à des nœuds déjà visités à un niveau égal ou antérieur n'est jamais
+  recréditée (ni artistes ni labels) : chaque sortie ne compte qu'une fois, là où elle a
+  été découverte pour la première fois.
+
+  Nouveau mode `taste` (seul mode utilisé par l'entretien de fond, cf. plus bas) : graines
+  = Cœur + Aimés + tous les artistes du corpus (toutes sources, DJ sets compris, dédoublonnés).
+  `Ctx.seed_category_weight()` (`scoring.py`) pondère chaque graine selon sa provenance au
+  moment du SCORE (pas de la construction, comme le reste du graphe — pas besoin de
+  reconstruire si tu change un poids) : Cœur/Aimés (`scoring.graph.tier_w`, prioritaire),
+  sinon la meilleure source où l'artiste apparaît dans le corpus (`scoring.sources` — mêmes
+  poids que pour le score label : Bandcamp/collection Discogs > YouTube/Spotify > DJ sets),
+  sinon le poids plancher (`tier_w.none`) pour tout autre artiste devenu graine (modes
+  `top`/`global`, toujours disponibles).
+
+  Le terme `graph` de `Ctx.ascore` (artistes) est normalisé par p95 + `log1p`
+  (`_robust_scale`/`_log_ratio`, même principe que N5) plutôt que par le maximum brut de la
+  population : sans ça, un seul artiste très prolifique avec une graine Cœur (ex. un alias
+  à 30 sorties partagées) comprime le terme graphe de tous les autres candidats en tirant
+  le maximum vers le haut, même ceux avec une vraie collaboration solide (ex. 10 sorties
+  partagées) — cf. échange du 2026-09-04, exemple chiffré à l'appui.
 - `resolve_name(name, kind, con=None)` — résolution de nom vers id Discogs canonique sans
   appel API (`name_key` direct, puis repli `artist_aliases` pour un artiste). **Encore
   inutilisée** par les jobs de résolution — prochaine étape (cf. `docs/etat.md`).
@@ -197,9 +228,10 @@ Le job télécharge aussi les dumps `labels` et `artists` (86 Mo + 474 Mo, contr
 `RADAR_AUTO_MAINTENANCE=1` (même `.env` du service `radar-worker`) enfile automatiquement,
 chacun à sa propre cadence : `canonicalize` (résolution canonique labels/artistes/corpus,
 hebdo), `profile_labels` (profilage genre/style par label via l'API, hebdo), `build_graph`
-en mode `global` (graphe producteur complet, alimente le ranking labels/artistes de Mon
-univers, mensuel). Ces trois tâches n'ont plus de bouton dans l'interface — un utilisateur
-n'a plus rien à cliquer. Cadence mémorisée dans `jobs/auto_maintenance.json` (survit aux redémarrages
+en mode `taste` (graines = Cœur + Aimés + tous les artistes du corpus, alimente le ranking
+labels/artistes de Mon univers, mensuel — cf. « Graphe multi-niveaux » plus bas). Ces trois
+tâches n'ont plus de bouton dans l'interface — un utilisateur n'a plus rien à cliquer.
+Cadence mémorisée dans `jobs/auto_maintenance.json` (survit aux redémarrages
 du worker, donc aux déploiements).
 
 `sellers.seller_affinity()` interroge ce référentiel (`lookup_release(release_id)`) pour le

@@ -871,13 +871,19 @@ def _sql_in_chunks(con, sql_tmpl, ids, extra_params=()):
     return out
 
 
-def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_edges, lab_edges):
-    """Co-crédits d'une graine par jointure SQL sur release_artists (D4) —
-    aucun appel API, aucune pause, et le garde-fou "compilation" comme
-    HAVING plutôt qu'un split de chaîne. Retourne le nombre de sorties
-    retenues (hors compilations). 0 (pas une erreur) si la base n'a pas
-    encore été reconstruite au nouveau schéma (release_artists créée au
-    Lot 4) — même garde que label_style_counts plutôt qu'un job qui plante."""
+def _expand_node(con, rid, sk, weight, seed_set, max_credits, rw_by_role,
+                  art_edges, lab_edges, visited, next_frontier, node_cap):
+    """Co-crédits directs de `rid` (une sortie de la BFS bornée, cf.
+    `_graph_edges_from_sql`), pondérés par `weight` (poids de rôle × décroissance
+    du niveau courant). `visited`/`next_frontier` sont mutés en place : un nœud
+    déjà visité à un niveau <= celui-ci (donc déjà crédité, à un poids au moins
+    aussi fort) n'est jamais recompté ni ré-exploré — la comparaison se fait sur
+    un instantané pris AVANT ce nœud, pour que plusieurs sorties partagées avec
+    CE `rid` continuent de s'additionner normalement dans le même appel. Retourne
+    le nombre de sorties retenues (hors compilations). 0 (pas une erreur) si la
+    base n'a pas encore été reconstruite au nouveau schéma (release_artists créée
+    au Lot 4) — même garde que label_style_counts plutôt qu'un job qui plante."""
+    already = frozenset(visited)
     try:
         rows = con.execute("""
             SELECT ra1.release_id, ra1.role, ra2.artist_id, a.name, r.label, r.label_key
@@ -909,22 +915,58 @@ def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_e
     for rel_id, info in by_release.items():
         if rel_id in various_ids or main_counts.get(rel_id, 0) > max_credits:  # compilation -> tout sauté
             continue
+        # une sortie qui ne relie qu'à des nœuds déjà visités (typiquement : le nœud en
+        # cours d'expansion partage aussi une sortie AVEC LA GRAINE, ou avec un nœud
+        # d'un niveau antérieur) ne représente aucune preuve nouvelle à ce niveau — déjà
+        # comptée là où elle a été découverte pour la première fois. Sans ce filtre, une
+        # même sortie serait recréditée (artistes ET labels) à chaque niveau qui la
+        # retraverse, avec un poids différent à chaque fois.
+        new_co = [(co_id, co_name) for co_id, co_name in info["co"] if co_id not in already]
+        if not new_co:
+            continue
         n_rels += 1
-        rw = rw_by_role(info["role"])
-        for co_id, co_name in info["co"]:
+        rw = rw_by_role(info["role"]) * weight
+        for co_id, co_name in new_co:
             ck = f"id:{co_id}"
-            if ck in seed_set or (co_name and normalize_label(co_name) in ARTIST_STOPWORDS):
-                continue
-            ce = art_edges.setdefault(ck, {"name": co_name or ck, "id": co_id, "co": {}})
-            slot = ce["co"].setdefault(sk, {"n": 0, "rw": rw})
-            slot["n"] += 1
-            slot["rw"] = max(slot["rw"], rw)
+            if ck not in seed_set and not (co_name and normalize_label(co_name) in ARTIST_STOPWORDS):
+                ce = art_edges.setdefault(ck, {"name": co_name or ck, "id": co_id, "co": {}})
+                slot = ce["co"].setdefault(sk, {"n": 0, "rw": 0.0})
+                slot["n"] += 1
+                slot["rw"] = max(slot["rw"], rw)
+            if co_id not in visited and len(visited) < node_cap:
+                visited.add(co_id)
+                next_frontier.add(co_id)
         lab = _clean_graph_label(info["label"])
         if lab:
             lk = info["label_key"] or normalize_label(lab)
             le = lab_edges.setdefault(lk, {"name": lab, "co": {}})
-            le["co"][sk] = le["co"].get(sk, 0) + 1
+            le["co"][sk] = le["co"].get(sk, 0.0) + weight
     return n_rels
+
+
+def _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role, art_edges, lab_edges,
+                           max_levels=4, level_decay=0.5, node_cap=150):
+    """BFS bornée depuis la graine `rid`, jusqu'à `max_levels` sauts de
+    co-crédits (niveau 1 = co-crédit direct, poids plein ; chaque niveau
+    suivant est multiplié par `level_decay`). `node_cap` plafonne le nombre
+    de nœuds explorés PAR GRAINE : un graphe de co-crédits est un "petit
+    monde" — sans plafond, 4 sauts depuis des centaines de graines (mode
+    global) toucherait vite l'essentiel du catalogue et ferait perdre tout
+    son sens de "proche de mes goûts" à la reco (en plus d'exploser le temps
+    du job). Retourne le nombre total de sorties retenues, tous niveaux
+    confondus."""
+    visited, frontier = {rid}, {rid}
+    n_rels_total = 0
+    level = 1
+    while frontier and level <= max_levels and len(visited) < node_cap:
+        weight = level_decay ** (level - 1)
+        next_frontier = set()
+        for node in frontier:
+            n_rels_total += _expand_node(con, node, sk, weight, seed_set, max_credits, rw_by_role,
+                                          art_edges, lab_edges, visited, next_frontier, node_cap)
+        frontier = next_frontier
+        level += 1
+    return n_rels_total
 
 
 def _graph_edges_from_api(token, rid, sk, seed_set, ares, pages, max_credits, rw_by_role,
@@ -973,8 +1015,14 @@ def job_build_graph(job, params):
     D4) quand le référentiel local est disponible — aucun appel API, aucune
     pause, et un vrai dépouillement de compilation (HAVING sur un décompte
     de crédits `Main`, plutôt qu'un split de chaîne). Repli sur l'API
-    (comportement historique, avec pause) si le dump n'est pas encore
-    importé — cf. `_graph_edges_from_api`."""
+    (comportement historique, avec pause, 1 seul saut) si le dump n'est pas
+    encore importé — cf. `_graph_edges_from_api`.
+
+    mode="taste" (2026-09-04) : graines = Cœur + Aimés + tous les artistes du
+    corpus (toutes sources, DJ sets compris — le poids par source, appliqué
+    au moment du score plutôt qu'à la construction, vit dans
+    Ctx.seed_category_weight). Traversée multi-niveaux (cf.
+    `_graph_edges_from_sql` : max_levels/level_decay/node_cap)."""
     from radar_web.radar import discogs_dump as dd
 
     cfg = cfg_load()
@@ -987,6 +1035,9 @@ def job_build_graph(job, params):
     role_main = float(gsc.get("role_main", 1.0))
     role_remix = float(gsc.get("role_remix", 0.7))
     role_other = float(gsc.get("role_other", 0.4))
+    max_levels = int(gsc.get("max_levels", 4))
+    level_decay = float(gsc.get("level_decay", 0.5))
+    node_cap = int(gsc.get("node_cap", 150))
 
     def rw_by_role(role):
         return role_main if role == "Main" else (role_remix if role in ("Remix", "Producer") else role_other)
@@ -1007,6 +1058,23 @@ def job_build_graph(job, params):
                     continue
                 seen.add(sk)
                 seeds.append((sk, e.get("discogs_name") or e.get("original") or nk, rid))
+    elif mode == "taste":
+        cats = cfg.get("artist_categories", {})
+        names = [n for cid in ("1", "2") for n in cats.get(cid, [])]
+        seen_names = {normalize_label(n) for n in names}
+        for r in load_json(CORPUS_PATH, []):
+            a = (r.get("artist") or "").strip()
+            k = normalize_label(a)
+            if a and k and k not in seen_names and k not in ARTIST_STOPWORDS:
+                seen_names.add(k)
+                names.append(a)
+        for nm in names:
+            sk = _canon_key(nm, ares)
+            if sk in seen or (incremental and sk in prev_seeds):
+                continue
+            seen.add(sk)
+            e = ares.get(normalize_label(nm)) or {}
+            seeds.append((sk, e.get("discogs_name") or nm, e.get("discogs_id") or e.get("id")))
     else:
         scored, _tier, _disp = _seed_artists(cfg)
         explicit = params.get("seed_names")
@@ -1063,7 +1131,7 @@ def job_build_graph(job, params):
             n_resolved += 1
             if con:
                 n_rels = _graph_edges_from_sql(con, rid, sk, seed_set, max_credits, rw_by_role,
-                                                art_edges, lab_edges)
+                                                art_edges, lab_edges, max_levels, level_decay, node_cap)
             else:
                 n_rels = _graph_edges_from_api(token, rid, sk, seed_set, ares, pages, max_credits,
                                                 rw_by_role, art_edges, lab_edges)
@@ -1082,7 +1150,7 @@ def job_build_graph(job, params):
     total_seeds = len(seed_names)
     save_json(PRODUCER_GRAPH_PATH, {
         "built_at": datetime.now().isoformat(timespec="seconds"),
-        "mode": "global" if mode == "global" or incremental else mode,
+        "mode": mode,
         "n_resolved_seeds": total_seeds,
         "seeds": seed_names, "edges": art_edges, "label_edges": lab_edges,
     })

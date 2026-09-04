@@ -118,7 +118,7 @@ def _maybe_auto_maintenance():
         now = time.time()
         for name, params in (("canonicalize", {"scope": "corpus"}),
                               ("profile_labels", {"limit": 150}),
-                              ("build_graph", {"mode": "global"})):
+                              ("build_graph", {"mode": "taste"})):
             if name in queued_names or now - _last_successful_run(name) < AUTO_MAINT_EVERY[name]:
                 continue
             jobs.launch(name, params, uid=paths.DEFAULT_UID)

@@ -3,6 +3,7 @@ Un objet Ctx charge toutes les données une fois ; les fonctions le prennent en 
 
 v0 : label + style complets ; terme « artiste » simplifié (liste manuelle + corpus +
 collection ; le graphe de producteurs viendra ensuite)."""
+import hashlib
 import math
 import os
 import re
@@ -18,6 +19,15 @@ _CREDIT_SPLIT = re.compile(r"\s*(?:,|&| feat\.? | ft\.? | vs\.? | and | x | with
 _SIDE_MARKER = re.compile(
     r"^\s*(this|logo|flip|reverse|other|blank|etched|runout)?\s*side\b"
     r"|^\s*side\s*[a-d]{1,2}\s*$|^\s*[a-d]{1,2}\s*$", re.I)
+
+
+def track_row_id(r):
+    """Identifiant stable d'une ligne de corpus DJ set (absent des données
+    d'origine, cf. job_ingest_djsets) — permet de cibler précisément UNE track
+    pour la supprimer (page Mes sets) même si le même artiste+titre revient
+    dans plusieurs sets scannés."""
+    key = f"{r.get('dj','')}|{r.get('video','')}|{r.get('artist','')}|{r.get('title','')}|{r.get('added_at','')}"
+    return hashlib.md5(key.encode()).hexdigest()[:12]
 
 
 def _robust_scale(counts):
@@ -221,7 +231,7 @@ class Ctx:
                 "label": [r["label"]] if r.get("label") else [],
                 "title": f"{r.get('artist', '')} - {r.get('title', '')}",
                 "style": r.get("style") or []})
-            row = dict(r, _score=sc)
+            row = dict(r, _score=sc, _rid=track_row_id(r))
             by_dj.setdefault(r.get("dj", "?"), {}).setdefault(r.get("video", "?"), []).append(row)
         return by_dj
 

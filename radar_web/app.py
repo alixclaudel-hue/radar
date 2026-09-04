@@ -24,7 +24,7 @@ from fastapi.templating import Jinja2Templates
 
 from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, learn,
                     paths, sellers, store, vocab, ytcache)
-from .radar.scoring import Ctx, real_tracks, yt_search_url
+from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 
 
@@ -1689,6 +1689,20 @@ def univers_sets(request: Request, dj: str = "", mins: int = 0):
             out.append({"dj": d, "vids": sorted(vids, key=lambda v: -v["best"]),
                         "n": sum(len(v["tracks"]) for v in vids)})
     return frag(request, "partials/sets.html", djs=djs, groups=out, dj=dj, mins=mins)
+
+
+@app.post("/univers/sets/delete", response_class=HTMLResponse)
+def univers_sets_delete_track(rid: str = Form("")):
+    """Retire UNE track de corpus (source djset) — page Mes sets. Elle ne
+    compte alors plus dans ascore/reco_rows ni comme graine du graphe
+    (mode taste)."""
+    if not rid:
+        return HTMLResponse("")
+    corpus = load(_pu().corpus, [])
+    new_corpus = [r for r in corpus if not (r.get("source") == "djset" and track_row_id(r) == rid)]
+    if len(new_corpus) != len(corpus):
+        save(_pu().corpus, new_corpus)
+    return HTMLResponse("")
 
 
 @app.post("/univers/labels/import", response_class=HTMLResponse)

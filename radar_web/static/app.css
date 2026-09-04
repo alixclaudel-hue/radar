@@ -101,18 +101,6 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
 .lrow__meta{ flex:1; min-width:0; font-size:11px; color:var(--soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .badge.small{ font-size:11px; padding:1px 8px; }
 
-/* wantlist (Mon univers → onglet panier) : ligne entière tactile (tap = tracks),
-   label + date sur leur propre ligne pour tenir en portrait sur mobile */
-.wl-list{ display:flex; flex-direction:column; }
-.wl-item{ border-top:1px solid var(--line); }
-.wl-row{ display:flex; align-items:center; gap:8px; padding:6px 2px; cursor:pointer; font-size:13px; }
-.wl-thumb{ width:34px; height:34px; border-radius:4px; object-fit:cover; flex:0 0 34px; }
-.wl-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-.wl-title{ font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.wl-meta{ font-size:11px; color:var(--soft); line-height:1.35; }
-.wl-chevron{ color:var(--soft); font-size:14px; flex:0 0 auto; transition:transform .15s ease; }
-.wl-row.open .wl-chevron{ transform:rotate(180deg); }
-
 /* graphes (labels et artistes : même rendu) */
 .lgraph svg text{ pointer-events:none; }
 .lgraph__head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }

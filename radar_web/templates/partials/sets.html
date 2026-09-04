@@ -33,7 +33,7 @@
             <a href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener" title="Sur Discogs">💿</a>
           {% endif %}
           <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
-          <button type="button" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter au panier"
+          <button type="button" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter à la wantlist"
                   hx-get="/release_matches?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}"
                   hx-target="#rm-{{ v.vid }}-{{ loop.index }}" hx-swap="innerHTML">{{ icons.cart() }}</button>
           <button type="button" title="Supprimer cette track (ne comptera plus dans les notes ni le graphe)"

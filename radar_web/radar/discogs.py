@@ -11,19 +11,58 @@ class DiscogsError(RuntimeError):
     pass
 
 
-def get(path, params=None, token=""):
-    params = dict(params or {})
-    if token:
-        params["token"] = token
-    r = requests.get(f"{BASE}{path}", params=params,
-                     headers={"User-Agent": UA}, timeout=20)
+def _check(r):
     if r.status_code == 401:
         raise DiscogsError("Token Discogs invalide ou manquant (401).")
     if r.status_code == 429:
         raise DiscogsError("Limite Discogs atteinte (429) — patiente une minute.")
     if not r.ok:
         raise DiscogsError(f"Erreur Discogs {r.status_code} : {r.text[:200]}")
+
+
+def get(path, params=None, token=""):
+    params = dict(params or {})
+    if token:
+        params["token"] = token
+    r = requests.get(f"{BASE}{path}", params=params,
+                     headers={"User-Agent": UA}, timeout=20)
+    _check(r)
     return r.json()
+
+
+def put(path, params=None, token=""):
+    params = dict(params or {})
+    if token:
+        params["token"] = token
+    r = requests.put(f"{BASE}{path}", params=params,
+                     headers={"User-Agent": UA}, timeout=20)
+    _check(r)
+    return r.json() if r.text else {}
+
+
+def delete(path, params=None, token=""):
+    params = dict(params or {})
+    if token:
+        params["token"] = token
+    r = requests.delete(f"{BASE}{path}", params=params,
+                        headers={"User-Agent": UA}, timeout=20)
+    _check(r)
+
+
+def identity(token):
+    return get("/oauth/identity", token=token)
+
+
+def wants(token, username, page=1, per_page=100):
+    return get(f"/users/{username}/wants", {"page": page, "per_page": per_page}, token=token)
+
+
+def add_to_wantlist(token, username, release_id):
+    put(f"/users/{username}/wants/{release_id}", token=token)
+
+
+def remove_from_wantlist(token, username, release_id):
+    delete(f"/users/{username}/wants/{release_id}", token=token)
 
 
 def search(token="", **params):

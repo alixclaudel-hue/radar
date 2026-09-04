@@ -7,14 +7,17 @@
 <p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes se règlent dans Mes sources.</p>
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
+{# Réinitialise aux valeurs du DERNIER enregistrement (sc.*, ce qui est chargé dans les
+   champs), pas aux valeurs par défaut de l'appli — sert à annuler une fausse manip sur
+   le diagramme, pas à repartir de zéro sur des réglages déjà personnalisés. #}
 {% macro reset_btn(pairs) -%}
-<button type="button" class="small" data-reset-fields='{{ pairs | tojson }}' style="margin-left:10px">↺ valeurs par défaut</button>
+<button type="button" class="small" data-reset-fields='{{ pairs | tojson }}' style="margin-left:10px">↺ annuler (dernier enregistrement)</button>
 {%- endmacro %}
 <form method="post" action="/settings">
   <h3>{{ icons.label() }} Score label (reco)
-    {{ reset_btn([['reco__collection', default_scoring.reco.collection], ['reco__corpus', default_scoring.reco.corpus],
-                  ['reco__artist', default_scoring.reco.artist], ['reco__affinity', default_scoring.reco.affinity],
-                  ['reco__want_factor', default_scoring.reco.want_factor], ['reco__db_link', default_scoring.reco.db_link]]) }}
+    {{ reset_btn([['reco__collection', sc.reco.collection], ['reco__corpus', sc.reco.corpus],
+                  ['reco__artist', sc.reco.artist], ['reco__affinity', sc.reco.affinity],
+                  ['reco__want_factor', sc.reco.want_factor], ['reco__db_link', sc.reco.db_link]]) }}
   </h3>
   <div class="wgroup">
     {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
@@ -33,9 +36,9 @@
   </div>
 
   <h3>{{ icons.album() }} Score album
-    {{ reset_btn([['album__label', default_scoring.album.label], ['album__artist', default_scoring.album.artist],
-                  ['album__style', default_scoring.album.style],
-                  ['album__artist_max_vs_mean', default_scoring.album.artist_max_vs_mean]]) }}
+    {{ reset_btn([['album__label', sc.album.label], ['album__artist', sc.album.artist],
+                  ['album__style', sc.album.style],
+                  ['album__artist_max_vs_mean', sc.album.artist_max_vs_mean]]) }}
   </h3>
   <div class="wgroup">
     {{ wr.toile([['album__label','label'], ['album__artist','artiste'],
@@ -49,12 +52,12 @@
   </div>
 
   <h3>{{ icons.artist() }} Score artiste
-    {{ reset_btn([['artist_score__manual', default_scoring.artist_score.manual],
-                  ['artist_score__corpus', default_scoring.artist_score.corpus],
-                  ['artist_score__collection', default_scoring.artist_score.collection],
-                  ['artist_score__graph', default_scoring.artist_score.graph],
-                  ['artist_score__djset', default_scoring.artist_score.djset],
-                  ['artist_score__label_link', default_scoring.artist_score.label_link]]) }}
+    {{ reset_btn([['artist_score__manual', sc.artist_score.manual],
+                  ['artist_score__corpus', sc.artist_score.corpus],
+                  ['artist_score__collection', sc.artist_score.collection],
+                  ['artist_score__graph', sc.artist_score.graph],
+                  ['artist_score__djset', sc.artist_score.djset],
+                  ['artist_score__label_link', sc.artist_score.label_link]]) }}
   </h3>
   <div class="wgroup">
     {{ wr.toile([['artist_score__manual','manuel'], ['artist_score__corpus','corpus'],
@@ -71,10 +74,10 @@
   </div>
 
   <h3>Rangs (Cœur / Aimés)
-    {{ reset_btn([['taste_tiers__1', default_scoring.taste_tiers['1']],
-                  ['taste_tiers__2', default_scoring.taste_tiers['2']],
-                  ['artist_tiers__1', default_scoring.artist_tiers['1']],
-                  ['artist_tiers__2', default_scoring.artist_tiers['2']]]) }}
+    {{ reset_btn([['taste_tiers__1', sc.taste_tiers['1']],
+                  ['taste_tiers__2', sc.taste_tiers['2']],
+                  ['artist_tiers__1', sc.artist_tiers['1']],
+                  ['artist_tiers__2', sc.artist_tiers['2']]]) }}
   </h3>
   <div class="wgroup">
     {{ wr.toile([['taste_tiers__1','style ♥'], ['artist_tiers__1','artiste ♥'],

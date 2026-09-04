@@ -1093,6 +1093,12 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
 
 
 RELEASE_META_TTL = 86400
+# La pochette d'une sortie ne change (quasi) jamais, contrairement à la note/au prix —
+# une fois trouvée, elle sort du cycle de rafraîchissement pour de bon (ou presque) au
+# lieu de reconsommer le quota API (RELEASE_META_MAX_FETCH) juste pour la reconfirmer :
+# le budget par chargement se concentre sur les sorties qui n'ont encore AUCUNE pochette,
+# et leur nombre ne peut donc que croître au fil des visites (jamais retomber à zéro).
+RELEASE_META_THUMB_TTL = 180 * 86400
 RELEASE_META_MAX_FETCH = 20          # au-delà, on sert ce qu'on a plutôt que saturer le quota
 _release_meta_lock = threading.Lock()
 
@@ -1114,7 +1120,15 @@ def release_meta_batch(ids: str = ""):
         return HTMLResponse("")
     cache = load(_pu().release_meta, {})
     now = time.time()
-    missing = [rid for rid in rids if not cache.get(rid) or now - cache[rid].get("ts", 0) > RELEASE_META_TTL]
+    missing = []
+    for rid in rids:
+        e = cache.get(rid)
+        if not e:
+            missing.append(rid)
+            continue
+        ttl = RELEASE_META_THUMB_TTL if e.get("thumb") else RELEASE_META_TTL
+        if now - e.get("ts", 0) > ttl:
+            missing.append(rid)
     if missing:
         token = _cfg().get("token", "")
         fetched = {}
@@ -1128,6 +1142,10 @@ def release_meta_batch(ids: str = ""):
                 thumb = d.get("thumb") or ""
             except discogs.DiscogsError:
                 pass
+            if not thumb:
+                # pas de nouvelle pochette cette fois (erreur, ou Discogs n'en a
+                # toujours pas) : ne jamais effacer une pochette déjà connue.
+                thumb = (cache.get(rid) or {}).get("thumb") or ""
             fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "nfs": nfs, "low": low,
                             "thumb": thumb}
             time.sleep(1.1)
@@ -1841,7 +1859,7 @@ def job_status_frag(name: str):
 def settings_page(request: Request, saved: int = 0):
     c = Ctx()
     return render(request, "pages/settings.html", active="settings", cfg=c.cfg,
-                  sc=c.scoring, saved=saved, default_scoring=store.DEFAULT_SCORING)
+                  sc=c.scoring, saved=saved)
 
 
 def _catalog_rows():

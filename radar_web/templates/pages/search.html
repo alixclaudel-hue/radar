@@ -35,14 +35,19 @@
   </details>
 
   <div class="field" style="margin-top:10px">
-    <label>Score minimum par critère <span class="muted">· ne garde que les albums qui passent tous les seuils renseignés</span></label>
+    <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
+      <button type="button" class="small" id="mins-reset" style="float:right">↺ réinitialiser</button></label>
     <div class="row">
-      <div class="field"><label>{{ icons.label() }} Label</label>
-        <input name="label_min" inputmode="numeric" placeholder="ex. 60" value="{{ q.label_min or '' }}"></div>
-      <div class="field"><label>{{ icons.artist() }} Artiste</label>
-        <input name="artist_min" inputmode="numeric" placeholder="ex. 60" value="{{ q.artist_min or '' }}"></div>
-      <div class="field"><label>🎚️ Style</label>
-        <input name="style_min" inputmode="numeric" placeholder="ex. 60" value="{{ q.style_min or '' }}"></div>
+      <div class="field">
+        <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
+        <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
+               value="{{ q.label_min or 0 }}">
+      </div>
+      <div class="field">
+        <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
+        <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
+               value="{{ q.artist_min or 0 }}">
+      </div>
     </div>
   </div>
 
@@ -75,16 +80,6 @@
     </div>
   </div>
   <div class="row">
-    <div class="field" style="flex:0 0 auto">
-      <label>&nbsp;</label>
-      <label class="small"><input type="checkbox" name="vinyl" style="width:auto" {{ 'checked' if q.vinyl }}> Vinyle uniquement</label>
-    </div>
-    <div class="field" style="flex:0 0 auto">
-      <label>&nbsp;</label>
-      <label class="small" title="Le catalogue local est un instantané mensuel : il ignore les sorties des ~30 derniers jours">
-        <input type="checkbox" name="include_recent" style="width:auto" {{ 'checked' if q.include_recent }}>
-        Inclure les nouveautés <span class="muted">(interroge Discogs, plus lent)</span></label>
-    </div>
     <div class="field" style="flex:0 0 auto">
       <label>Pages / label</label>
       <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}" style="width:80px">
@@ -146,6 +141,21 @@
   lo.addEventListener('input', function () { clamp(lo); });
   hi.addEventListener('input', function () { clamp(hi); });
   draw();
+})();
+(function () {
+  var ids = ['label-min', 'artist-min'];
+  ids.forEach(function (id) {
+    var inp = document.getElementById(id), out = document.getElementById(id + '-out');
+    if (inp && out) inp.addEventListener('input', function () { out.textContent = inp.value; });
+  });
+  var reset = document.getElementById('mins-reset');
+  if (reset) reset.addEventListener('click', function () {
+    ids.forEach(function (id) {
+      var inp = document.getElementById(id), out = document.getElementById(id + '-out');
+      if (inp) inp.value = 0;
+      if (out) out.textContent = '0';
+    });
+  });
 })();
 </script>
 {% endblock %}

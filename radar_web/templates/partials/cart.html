@@ -14,27 +14,23 @@
   {% else %}
     <p class="small muted">{{ cart|length }} vinyle{{ 's' if cart|length > 1 }} dans ta wantlist Discogs
       — objectif : regrouper l'achat chez un même vendeur (croisement ci-dessous).</p>
-    <div class="lrows">
+    <div class="wl-list">
       {% for x in cart %}
-      <div>
-        <div class="lrow">
-          {% if x.thumb %}<img src="{{ x.thumb }}" alt="" width="34" height="34"
-               style="border-radius:4px;object-fit:cover;flex:0 0 34px">{% endif %}
-          <a class="lrow__name" href="https://www.discogs.com/release/{{ x.id }}"
-             target="_blank" rel="noopener">{{ (x.artist ~ ' — ') if x.artist }}{{ x.title }}</a>
-          <span class="lrow__meta">{{ x.label }}{% if x.added_at %} · ajouté {{ x.added_at }}{% endif %}</span>
-          <a class="small" href="https://www.discogs.com/sell/release/{{ x.id }}?sort=price&sort_order=asc"
-             target="_blank" rel="noopener" title="annonces, prix croissant">🛒</a>
-          <button class="small" hx-post="/cart/remove" hx-vals='{"rid": "{{ x.id }}"}'
+      <div class="wl-item">
+        <div class="wl-row" hx-get="/release/{{ x.id }}/tracks" hx-target="next .tracklist" hx-swap="innerHTML"
+             title="Toucher pour voir les tracks (écoute + achat Bandcamp par track)">
+          {% if x.thumb %}<img class="wl-thumb" src="{{ x.thumb }}" alt="">{% endif %}
+          <div class="wl-info">
+            <span class="wl-title">{{ (x.artist ~ ' — ') if x.artist }}{{ x.title }}</span>
+            <span class="wl-meta">{{ x.label }}{% if x.added_at %}<br>ajouté {{ x.added_at }}{% endif %}</span>
+          </div>
+          <span class="wl-chevron" aria-hidden="true">⌄</span>
+          <button type="button" class="small" onclick="event.stopPropagation()"
+                  hx-post="/cart/remove" hx-vals='{"rid": "{{ x.id }}"}'
                   hx-target="#cart-list" hx-swap="outerHTML"
                   hx-confirm="Retirer « {{ x.title }} » de la wantlist Discogs ?">✕</button>
         </div>
-        <div class="tracklist">
-          <button type="button" class="small"
-                  hx-get="/release/{{ x.id }}/tracks"
-                  hx-target="closest .tracklist" hx-swap="innerHTML"
-                  title="Écouter chaque track sur YouTube ou l'acheter individuellement sur Bandcamp">🎵 Pistes</button>
-        </div>
+        <div class="tracklist"></div>
       </div>
       {% endfor %}
     </div>

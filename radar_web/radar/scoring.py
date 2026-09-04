@@ -3,6 +3,7 @@ Un objet Ctx charge toutes les données une fois ; les fonctions le prennent en 
 
 v0 : label + style complets ; terme « artiste » simplifié (liste manuelle + corpus +
 collection ; le graphe de producteurs viendra ensuite)."""
+import hashlib
 import math
 import os
 import re
@@ -18,6 +19,15 @@ _CREDIT_SPLIT = re.compile(r"\s*(?:,|&| feat\.? | ft\.? | vs\.? | and | x | with
 _SIDE_MARKER = re.compile(
     r"^\s*(this|logo|flip|reverse|other|blank|etched|runout)?\s*side\b"
     r"|^\s*side\s*[a-d]{1,2}\s*$|^\s*[a-d]{1,2}\s*$", re.I)
+
+
+def track_row_id(r):
+    """Identifiant stable d'une ligne de corpus DJ set (absent des données
+    d'origine, cf. job_ingest_djsets) — permet de cibler précisément UNE track
+    pour la supprimer (page Mes sets) même si le même artiste+titre revient
+    dans plusieurs sets scannés."""
+    key = f"{r.get('dj','')}|{r.get('video','')}|{r.get('artist','')}|{r.get('title','')}|{r.get('added_at','')}"
+    return hashlib.md5(key.encode()).hexdigest()[:12]
 
 
 def _robust_scale(counts):
@@ -166,6 +176,33 @@ class Ctx:
                 m[self.canon_artist_key(n)] = cid
         return m
 
+    def seed_category_weight(self):
+        """{clé canonique: poids} pour pondérer une graine du graphe selon sa
+        provenance (2026-09-04) : Cœur/Aimés (poids scoring.graph.tier_w,
+        prioritaire), sinon la meilleure source où l'artiste apparaît dans le
+        corpus (poids scoring.sources — mêmes poids que pour le score label :
+        Bandcamp/collection Discogs plus engagés qu'une écoute YouTube
+        passive, DJ sets encore en-dessous), sinon le poids plancher
+        (tier_w.none) pour n'importe quel autre artiste devenu graine (mode
+        global). Mémoïsé comme le reste : ne dépend que de la config et du
+        corpus, jamais du graphe lui-même (pas de dépendance circulaire)."""
+        return self._memo("seed_category_weight", self._compute_seed_category_weight)
+
+    def _compute_seed_category_weight(self):
+        tw = self.scoring["graph"]["tier_w"]
+        srcw = self.scoring["sources"]
+        out = {k: float(tw.get(cid, tw["none"])) for k, cid in self.artist_tier_map().items()}
+        for r in self.corpus:
+            a = (r.get("artist") or "").strip()
+            if not a or normalize_label(a) in ARTIST_STOPWORDS:
+                continue
+            k = self.canon_artist_key(a)
+            if k in out:                # Cœur/Aimés déjà prioritaires, jamais rétrogradés
+                continue
+            w = float(srcw.get(r.get("source"), tw["none"]))
+            out[k] = max(out.get(k, 0.0), w)
+        return out
+
     def artist_disp(self):
         """{clé canonique: nom d'affichage} depuis toutes les sources."""
         d = {}
@@ -194,7 +231,7 @@ class Ctx:
                 "label": [r["label"]] if r.get("label") else [],
                 "title": f"{r.get('artist', '')} - {r.get('title', '')}",
                 "style": r.get("style") or []})
-            row = dict(r, _score=sc)
+            row = dict(r, _score=sc, _rid=track_row_id(r))
             by_dj.setdefault(r.get("dj", "?"), {}).setdefault(r.get("video", "?"), []).append(row)
         return by_dj
 
@@ -206,10 +243,9 @@ class Ctx:
     def _compute_graph_rescore(self):
         g = self.graph or {}
         gp = self.scoring["graph"]
-        tw = gp["tier_w"]
-        TW = {"1": tw["1"], "2": tw["2"], "3": tw["3"], None: tw["none"]}
         abr, lbr, c1b = gp["artist_breadth"], gp["label_breadth"], gp["cat1_bonus"]
         tiers = self.artist_tier_map()
+        seedw = self.seed_category_weight()
         edges = g.get("edges")
         if not edges:
             return {"artists": {}, "labels": g.get("labels", {})}
@@ -221,7 +257,7 @@ class Ctx:
             base, cat1, byseed = 0.0, 0, {}
             for sk, d in e.get("co", {}).items():
                 t = tiers.get(sk)
-                base += d["n"] * d.get("rw", 1.0) * TW.get(t, 0.3)
+                base += d["n"] * d.get("rw", 1.0) * seedw.get(sk, gp["tier_w"]["none"])
                 if t == "1":
                     cat1 += d["n"]
                 byseed[seeds.get(sk, sk)] = d["n"]
@@ -238,7 +274,7 @@ class Ctx:
             co = le.get("co", {})
             if not co:
                 continue
-            b = sum(n * TW.get(tiers.get(sk), 0.3) for sk, n in co.items())
+            b = sum(n * seedw.get(sk, gp["tier_w"]["none"]) for sk, n in co.items())
             c1s = sum(1 for sk in co if tiers.get(sk) == "1")
             n_seeds = len(co)
             labs[lk] = {"name": le["name"],
@@ -282,7 +318,11 @@ class Ctx:
         # (co-crédits entre artistes), donc sans le recouper (cf. Ctx.artist_label_signal).
         label_link = self.artist_label_signal()
         scale_c, scale_l, scale_d = _robust_scale(corpus_c), _robust_scale(coll_c), _robust_scale(djset_c)
-        mg = max(graph.values(), default=1) or 1
+        # p95 + log1p plutôt qu'un simple ratio au max brut (cf. N5) : un seul artiste très
+        # prolifique avec une graine Cœur (ex. un alias avec 30 sorties partagées) ne doit
+        # pas comprimer le terme graphe de tous les autres en tirant le maximum vers le haut
+        # (diagnostic soulevé le 2026-09-04 — même défaut que N5 avait déjà corrigé ailleurs).
+        scale_g = _robust_scale(graph)
         w_manual, w_corpus = sw.get("manual", 0.5), sw.get("corpus", 0.18)
         w_coll, w_graph = sw.get("collection", 0.1), sw.get("graph", 0.14)
         w_djset, w_label = sw.get("djset", 0.08), sw.get("label_link", 0.15)
@@ -300,7 +340,7 @@ class Ctx:
             raw = (w_manual * manual
                    + w_corpus * _log_ratio(corpus_c.get(k, 0), scale_c)
                    + w_coll * _log_ratio(coll_c.get(k, 0), scale_l)
-                   + w_graph * graph.get(k, 0) / mg
+                   + w_graph * _log_ratio(graph.get(k, 0), scale_g)
                    + w_djset * _log_ratio(djset_c.get(k, 0), scale_d)
                    + w_label * label_link.get(k, 0.0))
             out[k] = min(100, round(100 * raw / tot))

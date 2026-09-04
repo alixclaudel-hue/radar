@@ -20,6 +20,7 @@
     <p style="margin:8px 0 2px"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
       <span class="small muted">· {{ v.tracks|length }} track(s)</span></p>
     {% for t in v.tracks %}
+    <div id="tk-{{ v.vid }}-{{ loop.index }}">
     <div class="tk-card">
       <div class="tk-card__title">
         {% if t._score is not none %}<span class="badge small" title="Score album /100">{{ icons.album() }} {{ t._score }}</span>{% else %}<span class="badge ghost small">—</span>{% endif %}
@@ -35,10 +36,15 @@
           <button type="button" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter au panier"
                   hx-get="/release_matches?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}"
                   hx-target="#rm-{{ v.vid }}-{{ loop.index }}" hx-swap="innerHTML">{{ icons.cart() }}</button>
+          <button type="button" title="Supprimer cette track (ne comptera plus dans les notes ni le graphe)"
+                  hx-post="/univers/sets/delete" hx-vals='{"rid": "{{ t._rid }}"}'
+                  hx-target="#tk-{{ v.vid }}-{{ loop.index }}" hx-swap="outerHTML"
+                  hx-confirm="Supprimer cette track de tes DJ sets ?">🗑️</button>
         </span>
       </div>
     </div>
     <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel" style="padding:0 2px 6px 4px"></div>
+    </div>
     {% endfor %}
     {% endfor %}
   </div>

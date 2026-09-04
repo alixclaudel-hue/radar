@@ -722,15 +722,14 @@ def _local_rows_to_raw(rows, genres):
 def search_run(request: Request, label: str = Form(""),
                genre: str = Form(""), style: str = Form(""),
                year_from: str = Form(""), year_to: str = Form(""),
-               vinyl: str = Form(""), pages: str = Form("2"),
+               pages: str = Form("2"),
                base_metric: str = Form(""), base_min: str = Form(""),
-               label_min: str = Form(""), artist_min: str = Form(""), style_min: str = Form(""),
-               include_recent: str = Form(""), page: str = Form("1")):
+               label_min: str = Form(""), artist_min: str = Form(""),
+               page: str = Form("1")):
     from .radar import discogs_dump as dd
     c = Ctx()
     token = c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
-    fmt = "Vinyl" if vinyl else ""
     genres = [g.strip() for g in genre.splitlines() if g.strip()]
     styles = [s.strip() for s in style.splitlines() if s.strip()]
     try:
@@ -771,7 +770,7 @@ def search_run(request: Request, label: str = Form(""),
             raw.append(r)
         dump_date = dd.get_meta().get("dump_date")
 
-    if bool(include_recent) or not used_local:
+    if not used_local:
         gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
         if base_labels:
             npages = min(npages, 1)                       # N labels -> 1 page chacun
@@ -785,12 +784,12 @@ def search_run(request: Request, label: str = Form(""),
                     time.sleep(1.0)
                 if lab:
                     part = discogs.search_label_releases(token, lab, genre=g,
-                                                         style=s, fmt=fmt, year=year, max_pages=npages)
+                                                         style=s, year=year, max_pages=npages)
                 else:
                     part = []
                     for pg in range(1, npages + 1):
                         p = {"per_page": 100, "page": pg, "sort": "year", "sort_order": "desc"}
-                        for k, v in (("genre", g), ("style", s), ("year", year), ("format", fmt)):
+                        for k, v in (("genre", g), ("style", s), ("year", year)):
                             if v:
                                 p[k] = v
                         d = discogs.search(token=token, **p)
@@ -822,7 +821,7 @@ def search_run(request: Request, label: str = Form(""),
                        "detail": {"label": det.get("label"), "artist": det.get("artist"),
                                   "style": det.get("style")}})
     n_before_thresholds = len(scored)
-    mins = {"label": _score_min(label_min), "artist": _score_min(artist_min), "style": _score_min(style_min)}
+    mins = {"label": _score_min(label_min), "artist": _score_min(artist_min)}
     if any(v is not None for v in mins.values()):
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
@@ -851,10 +850,9 @@ def search_run(request: Request, label: str = Form(""),
             empty_reason = "no_match"
     params = {"label": label.strip(), "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
-              "vinyl": bool(vinyl), "pages": npages,
+              "pages": npages,
               "base_metric": base_metric, "base_min": str(base_min or "").strip(),
-              "label_min": str(label_min or "").strip(), "artist_min": str(artist_min or "").strip(),
-              "style_min": str(style_min or "").strip(), "include_recent": bool(include_recent)}
+              "label_min": str(label_min or "").strip(), "artist_min": str(artist_min or "").strip()}
     if page_num == 1:      # ne pas ré-enregistrer un doublon de l'historique à chaque page tournée
         hist = [e for e in load(_pu().search_hist, []) if e.get("params") != params]
         hist.insert(0, {"id": hashlib.md5(f"{time.time()}{params}".encode()).hexdigest()[:10],

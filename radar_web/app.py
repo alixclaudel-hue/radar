@@ -1238,21 +1238,14 @@ RELEASE_META_MAX_FETCH = 20          # au-delà, on sert ce qu'on a plutôt que 
 _release_meta_lock = threading.Lock()
 
 
-@app.get("/release/meta", response_class=HTMLResponse)
-def release_meta_batch(ids: str = ""):
-    """Une seule requête pour toute une grille de résultats (cf. diagnostic
-    P3) — remplace le hx-get par carte qui déclenchait jusqu'à 48 appels API
-    et 48 réécritures du cache partagé sans verrou. Ne demande à l'API que
-    les ids manquants ou périmés du cache (plafonné), écrit le cache UNE
-    SEULE fois, sous verrou, en relisant juste avant d'écrire pour fusionner
-    ce qu'un autre process aurait ajouté entretemps. Répond en pastilles
-    hx-swap-oob, une par carte (#cover-meta-{id}) — et complète la pochette
-    (#cover-{id}) pour les résultats du référentiel local, qui n'a aucune URL
-    d'image (cf. discogs_dump.search_local) : même appel API déjà fait pour
-    la note/le prix, zéro coût supplémentaire pour en extraire aussi `thumb`."""
-    rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
-    if not rids:
-        return HTMLResponse("")
+def _release_meta_ensure(rids):
+    """Complète et renvoie le cache partagé release_meta pour `rids` (note, prix,
+    nombre en vente, pochette) — ne demande à l'API que les ids manquants ou
+    périmés (plafonné), écrit le cache UNE SEULE fois, sous verrou, en relisant
+    juste avant d'écrire pour fusionner ce qu'un autre process aurait ajouté
+    entretemps. Partagé par `/release/meta` (grilles de résultats) et
+    `/inbox/meta` (file Nouveautés) — même appel Discogs, juste deux gabarits
+    de réponse différents selon qui l'utilise."""
     cache = load(_pu().release_meta, {})
     now = time.time()
     missing = []
@@ -1291,7 +1284,41 @@ def release_meta_batch(ids: str = ""):
                 for k in sorted(cache, key=lambda k: cache[k].get("ts", 0))[:1200]:
                     cache.pop(k, None)
             save(_pu().release_meta, cache)
+    return cache
+
+
+@app.get("/release/meta", response_class=HTMLResponse)
+def release_meta_batch(ids: str = ""):
+    """Une seule requête pour toute une grille de résultats (cf. diagnostic
+    P3) — remplace le hx-get par carte qui déclenchait jusqu'à 48 appels API
+    et 48 réécritures du cache partagé sans verrou. Répond en pastilles
+    hx-swap-oob, une par carte (#cover-meta-{id}) — et complète la pochette
+    (#cover-{id}) pour les résultats du référentiel local, qui n'a aucune URL
+    d'image (cf. discogs_dump.search_local) : même appel API déjà fait pour
+    la note/le prix, zéro coût supplémentaire pour en extraire aussi `thumb`."""
+    rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
+    if not rids:
+        return HTMLResponse("")
+    cache = _release_meta_ensure(rids)
     tpl = templates.get_template("partials/release_meta.html")
+    return HTMLResponse("".join(tpl.render({"m": cache.get(rid) or {}, "rid": rid}) for rid in rids))
+
+
+@app.get("/inbox/meta", response_class=HTMLResponse)
+def inbox_meta_batch(ids: str = ""):
+    """Même mécanique que /release/meta (cache partagé, ids manquants/périmés
+    seulement), pour la file Nouveautés (/veille) : un match de règle n'est pas
+    une annonce précise (pas de vendeur/état connus — cf. Pièges connus,
+    marketplace Discogs inobtenable en direct), mais le prix le plus bas et le
+    nombre d'annonces sont un signal du catalogue Discogs, déjà utilisé sur les
+    pastilles de la Recherche. Répond en pastilles hx-swap-oob (#inbox-meta-{id}),
+    distinctes de #cover-{id} (la file Nouveautés n'a pas de grande pochette carrée
+    à remplacer, juste une ligne compacte)."""
+    rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
+    if not rids:
+        return HTMLResponse("")
+    cache = _release_meta_ensure(rids)
+    tpl = templates.get_template("partials/inbox_meta.html")
     return HTMLResponse("".join(tpl.render({"m": cache.get(rid) or {}, "rid": rid}) for rid in rids))
 
 

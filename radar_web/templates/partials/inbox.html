@@ -3,7 +3,10 @@
   {% if not rows and n_total == 0 %}
     <p class="muted small">Rien de nouveau. Lance un scan.</p>
   {% else %}
-    <div class="row" style="align-items:end">
+    {% set noprice_ids = rows | rejectattr('it.price') | map(attribute='it.release_id') | select | map('string') | list %}
+    <div class="row" style="align-items:end"
+         {% if noprice_ids %}hx-get="/inbox/meta" hx-trigger="load" hx-swap="none"
+         hx-vals='{"ids": {{ noprice_ids | join(',') | tojson }}}'{% endif %}>
       <div class="field" style="flex:0 0 auto"><label>Score min
         <input type="number" step="5" value="{{ mins }}" style="width:90px"
                hx-get="/inbox/{{ key_ns }}" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML"
@@ -32,6 +35,7 @@
               {% if it.condition %} · {{ it.condition }}{% endif %}
               {% if it.year %} · {{ it.year }}{% endif %}
               {% if it.style %} · {{ it.style|join(', ') }}{% endif %}
+              {% if not it.price and it.release_id %}<span id="inbox-meta-{{ it.release_id }}"></span>{% endif %}
             </span>
           </div>
           <span class="wl-chevron" aria-hidden="true">{{ icons.tracks() }}</span>

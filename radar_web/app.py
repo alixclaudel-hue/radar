@@ -1302,12 +1302,15 @@ def _inbox(request, path, source_key, key_ns, mins=30):
         return frag(request, "partials/inbox.html", rows=[], key_ns=key_ns, sources=[],
                     mins=mins, n_total=0)
     c = Ctx()
+    meta_cache = load(_pu().release_meta, {})
     scored = []
     for it in items:
         sc, det = c.album_score({"title": f"{it.get('artist','')} - {it.get('title','')}",
                                  "label": [it["label"]] if it.get("label") else [],
                                  "style": it.get("style") or []})
-        scored.append({"it": it, "score": sc, "det": det, "src": it.get(source_key)})
+        rid = str(it.get("release_id") or it.get("listing_id") or "")
+        thumb = (meta_cache.get(rid) or {}).get("thumb") or ""
+        scored.append({"it": it, "score": sc, "det": det, "src": it.get(source_key), "thumb": thumb})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     rows = [r for r in scored if (r["score"] or 0) >= mins]
     return frag(request, "partials/inbox.html", rows=rows[:150], key_ns=key_ns, mins=mins,
@@ -1462,9 +1465,13 @@ def reco_labels_frag(request: Request):
 def reco_artists_frag(request: Request):
     c = Ctx()
     g = c.graph_rescore()["artists"]
+    # candidats retenus par proximité de graphe (pertinence), mais AFFICHÉS triés par note
+    # (le badge visible) : sinon la liste semble mal triée puisque le tri interne de `g`
+    # porte sur un score de proximité brut, différent du score affiché (cf. retour utilisateur).
     rows = [{"name": v["name"], "key": k, "prox": round(v["score"]), "note": c.ascore.get(k, 0),
              "why": ", ".join(v["why"])}
             for k, v in list(g.items())[:40] if not str(v["name"]).startswith("id:")]
+    rows.sort(key=lambda r: -r["note"])
     return frag(request, "partials/reco_artists.html", reco=rows, n_reco=len(g))
 
 
@@ -1512,11 +1519,6 @@ def univers_page(request: Request, tab: str = "labels"):
     ac = c.cfg.get("artist_categories", {})
     label_graphs = load(_pu().label_graphs, [])
     artist_graphs = load(_pu().artist_graphs, [])
-    disp, tiers = c.artist_disp(), c.artist_tier_map()
-    classified_artists = sorted(
-        ({"key": ck, "name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
-         if not str(disp.get(ck, ck)).startswith("id:")),
-        key=lambda r: r["name"].lower())
     review = _review_ctx(c)
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
                   n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
@@ -1525,7 +1527,6 @@ def univers_page(request: Request, tab: str = "labels"):
                   n_cart=len(load(_pu().cart, [])),
                   label_graphs=label_graphs,
                   artist_graphs=artist_graphs,
-                  classified_artists=classified_artists,
                   review=review,
                   # total (approx + not_found), pas seulement approx : sinon le panneau
                   # "À vérifier" reste masqué (n_review=0) quand tout est not_found — cas
@@ -1749,15 +1750,28 @@ def _artist_graph_render(request, entry):
                 kind="artist", notes=notes, infos=infos)
 
 
+@app.get("/univers/artists/suggest", response_class=HTMLResponse)
+def univers_artists_suggest(request: Request, q: str = ""):
+    c = Ctx()
+    disp, tiers = c.artist_disp(), c.artist_tier_map()
+    term = store.normalize_label(q)
+    rows = sorted(
+        ({"name": disp.get(ck, ck), "tier": t} for ck, t in tiers.items()
+         if not str(disp.get(ck, ck)).startswith("id:")
+         and (not term or term in store.normalize_label(disp.get(ck, ck)))),
+        key=lambda r: r["name"].lower())[:60]
+    return frag(request, "partials/artist_suggest.html", rows=rows)
+
+
 @app.post("/univers/artists/graph/build", response_class=HTMLResponse)
 async def univers_artist_graph_build(request: Request):
     f = await request.form()
-    seed_keys = f.getlist("seeds")
-    if not seed_keys:
+    names = [s.strip() for s in f.get("seeds", "").splitlines() if s.strip()]
+    if not names:
         return HTMLResponse("<p class='notice warn small'>Choisis au moins un artiste de départ.</p>")
     c = Ctx()
     disp = c.artist_disp()
-    seed_items = [(k, disp.get(k, k)) for k in seed_keys]
+    seed_items = list({c.canon_artist_key(n): disp.get(c.canon_artist_key(n), n) for n in names}.items())
     built = artistgraph.build(c.graph or {}, seed_items)
     if len(built["nodes"]) <= len(seed_items):
         return HTMLResponse(

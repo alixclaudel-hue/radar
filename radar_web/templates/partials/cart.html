@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <div id="cart-list">
   <div class="btnrow" style="margin-bottom:6px">
     <button class="small" hx-post="/cart/sync" hx-target="#cart-list" hx-swap="outerHTML"
@@ -24,7 +25,7 @@
             <span class="wl-title">{{ (x.artist ~ ' — ') if x.artist }}{{ x.title }}</span>
             <span class="wl-meta">{{ x.label }}{% if x.added_at %}<br>ajouté {{ x.added_at }}{% endif %}</span>
           </div>
-          <span class="wl-chevron" aria-hidden="true">⌄</span>
+          <span class="wl-chevron" aria-hidden="true">{{ icons.tracks() }}</span>
           <button type="button" class="small" onclick="event.stopPropagation()"
                   hx-post="/cart/remove" hx-vals='{"rid": "{{ x.id }}"}'
                   hx-target="#cart-list" hx-swap="outerHTML"

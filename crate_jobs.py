@@ -1035,12 +1035,26 @@ def job_build_graph(job, params):
     role_main = float(gsc.get("role_main", 1.0))
     role_remix = float(gsc.get("role_remix", 0.7))
     role_other = float(gsc.get("role_other", 0.4))
+    role_written = float(gsc.get("role_written", 0.05))
     max_levels = int(gsc.get("max_levels", 4))
     level_decay = float(gsc.get("level_decay", 0.5))
     node_cap = int(gsc.get("node_cap", 150))
 
     def rw_by_role(role):
-        return role_main if role == "Main" else (role_remix if role in ("Remix", "Producer") else role_other)
+        # Written-By (auteur/compositeur) traverse tous les genres via les reprises —
+        # un standard repris en cover/sample dans un style totalement différent crédite
+        # toujours son auteur d'origine, contrairement à Producer/Remix/Main qui impliquent
+        # une vraie collaboration artistique sur CETTE sortie. Sans un poids quasi nul,
+        # un auteur prolifique (ex. Lennon-McCartney) devient un hub artificiel du graphe,
+        # co-crédité des milliers de fois via des reprises sans aucun rapport de style
+        # (cf. retour utilisateur 2026-09-05 : Lennon-McCartney devant Frankie Knuckles).
+        if role == "Main":
+            return role_main
+        if role in ("Remix", "Producer"):
+            return role_remix
+        if role == "Written-By":
+            return role_written
+        return role_other
 
     ares = load_json(ARTISTS_RESOLVED_PATH, {})
 

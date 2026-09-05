@@ -1,0 +1,9 @@
+{% if not rows %}
+  <div class="lbl-suggest__head small muted">Aucun artiste classé (Cœur/Aimés) ne correspond.</div>
+{% else %}
+  {% for r in rows %}
+  <button type="button" class="lbl-opt" data-v="{{ r.name }}">
+    <span class="lbl-opt__name">{{ '💗 ' if r.tier == '1' else '' }}{{ r.name }}</span>
+  </button>
+  {% endfor %}
+{% endif %}

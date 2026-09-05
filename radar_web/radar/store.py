@@ -94,7 +94,7 @@ DEFAULT_SCORING = {
                      "graph": 0.14, "djset": 0.08, "label_link": 0.15},
     "graph": {"tier_w": {"1": 3.5, "2": 1.5, "3": 0.6, "none": 0.3},
               "artist_breadth": 0.4, "label_breadth": 0.5, "cat1_bonus": 2.0,
-              "role_main": 1.0, "role_remix": 0.7, "role_other": 0.4,
+              "role_main": 1.0, "role_remix": 0.7, "role_other": 0.4, "role_written": 0.05,
               "max_credits": 6, "max_levels": 4, "level_decay": 0.5, "node_cap": 150},
     "sources": {"discogs_collection": 1.0, "discogs_want": 0.6, "youtube": 0.5,
                 "spotify": 0.5, "bandcamp": 0.9, "djset": 0.4},

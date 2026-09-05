@@ -63,8 +63,7 @@
         <span class="catno">{{ rr.catno }}{% if rr.catno and rr.year %} · {% endif %}{{ rr.year }}</span>
         <div class="buys">
           <button type="button" class="ic-btn" title="Pistes"
-                  hx-get="/release/{{ rr.id }}/tracks"
-                  hx-target="#tracks-{{ rr.id }}" hx-swap="innerHTML">{{ icons.tracks() }}</button>
+                  onclick="var t=document.getElementById('tracks-{{ rr.id }}'); if(t.dataset.loaded==='1'){t.innerHTML='';t.dataset.loaded='';}else{t.dataset.loaded='1';htmx.ajax('GET','/release/{{ rr.id }}/tracks',{target:t,swap:'innerHTML'});}">{{ icons.tracks() }}</button>
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener"
              title="Fiche Discogs" class="ic-btn">{{ icons.discogs() }}</a>{% endif %}
           {% if in_cart and (rr.id | string) in in_cart %}
@@ -84,9 +83,6 @@
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
-            <span class="confidence" title="critères pris en compte dans ce score : L abel, A rtiste, S tyle — en couleur = pris en compte, gris = absent">
-              <i class="{{ 'lit' if r.detail.label is not none }}">L</i><i class="{{ 'lit' if r.detail.artist is not none }}">A</i><i class="{{ 'lit' if r.detail.style is not none }}">S</i>
-            </span>
           {% else %}
             <span class="badge ghost">—</span>
           {% endif %}

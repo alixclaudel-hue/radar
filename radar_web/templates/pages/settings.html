@@ -19,6 +19,9 @@
                   ['reco__artist', sc.reco.artist], ['reco__affinity', sc.reco.affinity],
                   ['reco__want_factor', sc.reco.want_factor], ['reco__db_link', sc.reco.db_link]]) }}
   </h3>
+  <p class="muted small">Classe tes labels dans Mon univers (recommandations) : combien suivre ce label a de
+    sens vu ta collection, ton écoute (corpus), tes artistes Cœur/Aimés qui y ont sorti, ton affinité de style
+    et ta wantlist.</p>
   <div class="wgroup">
     {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
                  ['reco__artist','artiste'], ['reco__affinity','affinité'],
@@ -40,6 +43,8 @@
                   ['album__style', sc.album.style],
                   ['album__artist_max_vs_mean', sc.album.artist_max_vs_mean]]) }}
   </h3>
+  <p class="muted small">Le score /100 affiché sur chaque disque en Recherche : combine l'affinité du label,
+    celle de l'artiste et celle du style pour CETTE sortie précise.</p>
   <div class="wgroup">
     {{ wr.toile([['album__label','label'], ['album__artist','artiste'],
                  ['album__style','style'], ['album__artist_max_vs_mean','max/moy.']]) }}
@@ -59,6 +64,8 @@
                   ['artist_score__djset', sc.artist_score.djset],
                   ['artist_score__label_link', sc.artist_score.label_link]]) }}
   </h3>
+  <p class="muted small">Classe tes artistes dans Mon univers : combine le rang que tu leur donnes à la main
+    (Cœur/Aimés), ton écoute (corpus, collection, DJ sets) et leur proximité dans le graphe de co-crédits.</p>
   <div class="wgroup">
     {{ wr.toile([['artist_score__manual','manuel'], ['artist_score__corpus','corpus'],
                  ['artist_score__collection','collection'], ['artist_score__graph','graphe'],
@@ -79,6 +86,8 @@
                   ['artist_tiers__1', sc.artist_tiers['1']],
                   ['artist_tiers__2', sc.artist_tiers['2']]]) }}
   </h3>
+  <p class="muted small">Poids appliqué selon le rang que tu donnes à un style ou un artiste : Cœur (référence)
+    compte plus que Aimés (+) dans les scores ci-dessus — c'est ici qu'on règle l'écart entre les deux.</p>
   <div class="wgroup">
     {{ wr.toile([['taste_tiers__1','style ♥'], ['artist_tiers__1','artiste ♥'],
                  ['taste_tiers__2','style +'], ['artist_tiers__2','artiste +']]) }}

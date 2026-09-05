@@ -109,7 +109,7 @@ select[multiple] option:checked{ background:var(--pin); color:var(--paper); }
 .wl-row{ display:flex; align-items:center; gap:8px; padding:6px 2px; cursor:pointer; font-size:13px; }
 .wl-thumb{ width:34px; height:34px; border-radius:4px; object-fit:cover; flex:0 0 34px; }
 .wl-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-.wl-title{ font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.wl-title{ font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-decoration:none; }
 .wl-meta{ font-size:11px; color:var(--soft); line-height:1.35; }
 .wl-chevron{ color:var(--soft); font-size:14px; flex:0 0 auto; transition:transform .15s ease; }
 .wl-row.open .wl-chevron{ transform:rotate(180deg); }
@@ -216,12 +216,14 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 .card .buys{ display:flex; align-items:center; justify-content:space-between; padding-top:6px; }
 .card .buys a{ color:var(--pin); text-decoration:none; }
 .card .buys a:hover{ text-decoration:underline; }
-/* icônes seules (pistes/Discogs/panier) : même gabarit .ic, pas de cadre de bouton */
+/* icônes seules (pistes/Discogs/panier) : même gabarit .ic, pas de cadre de bouton —
+   plus grandes que le .ic par défaut (13px) pour bien remplir la largeur de la ligne */
 .ic-btn{
-  border:none; background:none; padding:3px; border-radius:6px; line-height:0;
+  border:none; background:none; padding:5px; border-radius:8px; line-height:0;
   display:inline-flex; align-items:center; color:var(--ink);
 }
 .ic-btn:hover{ background:var(--line); color:var(--pin); }
+.ic-btn .ic{ width:20px; height:20px; }
 .card .foot{ margin-top:auto; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 
 .badge{
@@ -231,11 +233,6 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 }
 .badge.clay{ background:var(--clay); }
 .badge.ghost{ background:transparent; color:var(--soft); border:1px solid var(--line); font-family:inherit; }
-/* trois points label/artiste/style : allumés = critère pris en compte dans le score album
-   (cf. diagnostic N3 — un score fondé sur un seul critère doit se voir d'un coup d'œil) */
-.confidence{ display:inline-flex; gap:3px; flex:0 0 auto; }
-.confidence i{ font-style:normal; font-size:9px; font-weight:700; line-height:1; color:var(--line); }
-.confidence i.lit{ color:var(--pin); }
 .ic{ width:13px; height:13px; flex:none; vertical-align:-2px; }
 .badge .ic{ vertical-align:-2px; margin-right:1px; }
 .ic-lg{ width:18px; height:18px; }
@@ -399,11 +396,11 @@ button:focus-visible, .lbl-opt:focus-visible, a.chip:focus-visible{
    ailleurs : graphes, historique de recherche...) */
 .chip-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .vchip{
-  display:inline-flex; align-items:center; gap:4px; background:var(--surface);
-  border:1px solid var(--line); border-radius:999px; padding:3px 4px 3px 10px; font-size:12px;
+  display:inline-flex; align-items:center; gap:4px; background:var(--pin); color:var(--paper);
+  border:1px solid var(--pin); border-radius:999px; padding:3px 4px 3px 10px; font-size:12px;
 }
 .vchip-x{
-  border:none; background:none; padding:2px 4px; font-size:11px; color:var(--soft);
-  line-height:1; border-radius:50%;
+  border:none; background:none; padding:2px 4px; font-size:11px; color:var(--paper);
+  opacity:.75; line-height:1; border-radius:50%;
 }
-.vchip-x:hover{ color:var(--clay); background:none; }
+.vchip-x:hover{ opacity:1; background:rgba(255,255,255,.2); }

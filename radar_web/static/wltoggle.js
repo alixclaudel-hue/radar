@@ -1,7 +1,7 @@
-/* Wantlist (Mon univers -> onglet panier) : toucher une ligne charge ses tracks
-   la première fois, les replie/déplie ensuite sans nouvel appel réseau.
-   Délégation sur document.body : fonctionne même après un swap htmx (#cart-list
-   remplacé en entier par /cart/add, /cart/remove, /cart/sync). */
+/* Rangées façon wantlist (Mon univers -> panier, Nouveautés -> veille/vendeurs) :
+   toucher une ligne .wl-row charge ses tracks la première fois, les replie/déplie
+   ensuite sans nouvel appel réseau. Délégation sur document.body : fonctionne même
+   après un swap htmx qui remplace la liste en entier (#cart-list, #inbox-*). */
 (function () {
   document.body.addEventListener('click', function (ev) {
     var row = ev.target.closest('.wl-row');

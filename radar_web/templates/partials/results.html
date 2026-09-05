@@ -66,7 +66,7 @@
                   hx-get="/release/{{ rr.id }}/tracks"
                   hx-target="#tracks-{{ rr.id }}" hx-swap="innerHTML">{{ icons.tracks() }}</button>
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener"
-             title="Fiche Discogs" class="ic-btn">{{ icons.album() }}</a>{% endif %}
+             title="Fiche Discogs" class="ic-btn">{{ icons.discogs() }}</a>{% endif %}
           {% if in_cart and (rr.id | string) in in_cart %}
             <span class="small ok">✓ en wantlist</span>
           {% else %}

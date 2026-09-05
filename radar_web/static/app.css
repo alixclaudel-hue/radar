@@ -213,7 +213,7 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 .card .artist{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--soft); }
 .card .title{ font-family:'Syne',sans-serif; font-weight:700; font-size:15px; line-height:1.15; }
 .card .meta{ font-size:12px; color:var(--soft); }
-.card .buys{ display:flex; align-items:center; gap:10px; padding-top:6px; }
+.card .buys{ display:flex; align-items:center; justify-content:space-between; padding-top:6px; }
 .card .buys a{ color:var(--pin); text-decoration:none; }
 .card .buys a:hover{ text-decoration:underline; }
 /* icônes seules (pistes/Discogs/panier) : même gabarit .ic, pas de cadre de bouton */
@@ -365,7 +365,7 @@ button:focus-visible, .lbl-opt:focus-visible, a.chip:focus-visible{
   input, select, textarea, button{ font-size:16px; }   /* pas de zoom auto iOS */
 }
 @media (max-width:520px){
-  .grid{ grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:8px; }
+  .grid{ grid-template-columns:1fr; gap:10px; }
 }
 
 /* retours utilisateur (bouton flottant + mode "pointer un élément") */

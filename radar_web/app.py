@@ -286,6 +286,7 @@ def render(request, tpl, **ctx):
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
     ctx.setdefault("n_cart", len(load(_pu().cart, [])))
+    ctx.setdefault("n_notes", sum(1 for n in load(_pu().ui_notes, []) if n.get("status") == "nouveau"))
     return templates.TemplateResponse(request, tpl, {"request": request, **ctx})
 
 
@@ -486,6 +487,9 @@ def _search_styles(c):
 
 SEARCH_HIST_MAX = 20
 SEARCH_PAGE_SIZE = 100
+
+FEEDBACK_GH_REPO = "alixclaudel-hue/radar"
+FEEDBACK_GH_ISSUE = 62
 
 
 def _hist_summary(p):
@@ -1084,6 +1088,73 @@ def cart_sellers_frag(request: Request):
     scanned = sum(1 for e in cat.values() if e.get("last_scan"))
     return frag(request, "partials/cart_sellers.html", rows=rows, n_cart=len(cart),
                 n_catalog=len(cat), n_scanned=scanned)
+
+
+# ------------------------------------------------------------- 💬 retours UI
+def _notes_sorted():
+    return sorted(load(_pu().ui_notes, []), key=lambda n: n.get("ts", ""), reverse=True)
+
+
+def _post_feedback_to_github(note):
+    """Relaie une note sur l'issue GitHub permanente (#62) — best-effort : sans
+    token configuré (RADAR_FEEDBACK_GH_TOKEN) ou en cas d'erreur réseau, la note
+    reste de toute façon dans ui_notes.json, rien n'est perdu."""
+    token = os.environ.get("RADAR_FEEDBACK_GH_TOKEN", "")
+    if not token:
+        return False
+    body = f"**Nouveau retour** — `{note['page']}`\n\n"
+    if note.get("target"):
+        body += f"> à propos de : {note['target']}\n\n"
+    body += f"{note['note']}\n\n_id: {note['id']}_"
+    try:
+        r = requests.post(
+            f"https://api.github.com/repos/{FEEDBACK_GH_REPO}/issues/{FEEDBACK_GH_ISSUE}/comments",
+            json={"body": body}, timeout=10,
+            headers={"Authorization": f"Bearer {token}",
+                     "Accept": "application/vnd.github+json", "User-Agent": "Radar/1.0"})
+        return r.ok
+    except requests.RequestException:
+        return False
+
+
+@app.get("/feedback", response_class=HTMLResponse)
+def feedback_page(request: Request):
+    return render(request, "pages/feedback.html", active="", notes=_notes_sorted())
+
+
+@app.post("/feedback/add", response_class=HTMLResponse)
+def feedback_add(page: str = Form(""), target: str = Form(""), note: str = Form("")):
+    note = note.strip()
+    if not note:
+        return HTMLResponse("<span class='small msg-err'>note vide</span>")
+    n = {"id": "nt_" + hashlib.md5(f"{time.time()}{note}".encode()).hexdigest()[:10],
+         "ts": time.strftime("%Y-%m-%d %H:%M"), "page": page.strip(), "target": target.strip(),
+         "note": note, "status": "nouveau"}
+    n["gh_posted"] = _post_feedback_to_github(n)
+    notes = load(_pu().ui_notes, [])
+    notes.insert(0, n)
+    save(_pu().ui_notes, notes)
+    return HTMLResponse("<span class='small ok'>✓ envoyé</span>")
+
+
+@app.post("/feedback/status", response_class=HTMLResponse)
+def feedback_status(request: Request, id: str = Form(""), status: str = Form("")):
+    notes = load(_pu().ui_notes, [])
+    for n in notes:
+        if n.get("id") == id:
+            n["status"] = status
+    save(_pu().ui_notes, notes)
+    return frag(request, "partials/feedback_list.html", notes=_notes_sorted())
+
+
+@app.post("/feedback/retry", response_class=HTMLResponse)
+def feedback_retry(request: Request, id: str = Form("")):
+    notes = load(_pu().ui_notes, [])
+    for n in notes:
+        if n.get("id") == id:
+            n["gh_posted"] = _post_feedback_to_github(n)
+    save(_pu().ui_notes, notes)
+    return frag(request, "partials/feedback_list.html", notes=_notes_sorted())
 
 
 def _toks(s):

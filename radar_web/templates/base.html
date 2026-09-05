@@ -36,6 +36,9 @@
     {% block content %}{% endblock %}
   </div>
 
+  {% include "partials/_feedback_widget.html" %}
+  <script src="/static/feedback.js" defer></script>
+
   <script>
   /* Combobox générique : tout contrôle [data-combo] dans un .combo, avec un
      panneau frère .lbl-suggest rempli par htmx, reçoit des propositions

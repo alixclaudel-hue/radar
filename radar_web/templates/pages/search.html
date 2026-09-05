@@ -31,65 +31,63 @@
         <label>Note minimale <span class="muted">optionnel</span></label>
         <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
       </div>
+      <div class="field" style="margin-top:10px">
+        <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
+          <button type="button" class="small" id="mins-reset" style="float:right">↺ réinitialiser</button></label>
+        <div class="row">
+          <div class="field">
+            <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
+            <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
+                   value="{{ q.label_min or 0 }}">
+          </div>
+          <div class="field">
+            <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
+            <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
+                   value="{{ q.artist_min or 0 }}">
+          </div>
+        </div>
+      </div>
     </div>
   </details>
 
-  <div class="field" style="margin-top:10px">
-    <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
-      <button type="button" class="small" id="mins-reset" style="float:right">↺ réinitialiser</button></label>
-    <div class="row">
-      <div class="field">
-        <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
-        <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
-               value="{{ q.label_min or 0 }}">
-      </div>
-      <div class="field">
-        <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
-        <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
-               value="{{ q.artist_min or 0 }}">
-      </div>
-    </div>
-  </div>
-
   <div class="row">
     <div class="field combo">
-      <label>Genre <span class="muted">un par ligne — tape pour filtrer</span>
-        <textarea name="genre" rows="3" data-combo="line" autocomplete="off"
-                  hx-get="/suggest/genres" hx-target="#sug-f-genre" hx-swap="innerHTML"
-                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                  hx-trigger="focus, keyup changed delay:220ms">{{ (q.genre or [])|join('\n') }}</textarea></label>
+      <label>Genre <span class="muted">tape pour chercher, choisis dans la liste</span></label>
+      <input class="chip-input" data-combo="chips" autocomplete="off" placeholder="ex. Electronic"
+             hx-get="/suggest/genres" hx-target="#sug-f-genre" hx-swap="innerHTML"
+             hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:220ms, focus">
       <div id="sug-f-genre" class="lbl-suggest" hidden></div>
+      <input type="hidden" name="genre" value="{{ (q.genre or [])|join('\n') }}">
+      <div class="chip-list"></div>
     </div>
     <div class="field combo">
-      <label>Style <span class="muted">un par ligne — tape pour filtrer, tes catégories en premier</span>
-        <textarea name="style" rows="3" data-combo="line" autocomplete="off"
-                  hx-get="/suggest/styles" hx-target="#sug-f-style" hx-swap="innerHTML"
-                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                  hx-trigger="focus, keyup changed delay:220ms">{{ (q.style or [])|join('\n') }}</textarea></label>
+      <label>Style <span class="muted">tape pour chercher, tes catégories en premier</span></label>
+      <input class="chip-input" data-combo="chips" autocomplete="off" placeholder="ex. Deep House"
+             hx-get="/suggest/styles" hx-target="#sug-f-style" hx-swap="innerHTML"
+             hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:220ms, focus">
       <div id="sug-f-style" class="lbl-suggest" hidden></div>
+      <input type="hidden" name="style" value="{{ (q.style or [])|join('\n') }}">
+      <div class="chip-list"></div>
     </div>
   </div>
-  <div class="field">
-    <label>Période <span class="muted" id="yr-label">toutes années</span></label>
-    <div class="yrange" id="yrange" data-min="{{ year_min }}" data-max="{{ year_max }}">
-      <div class="yrange__rail"><div class="yrange__fill" id="yr-fill"></div></div>
-      <input type="range" name="year_from" id="yr-from"
-             min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_from or year_min }}" step="1">
-      <input type="range" name="year_to" id="yr-to"
-             min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
+  <div class="row" style="align-items:end">
+    <div class="field" style="flex:1">
+      <label>Période <span class="muted" id="yr-label">toutes années</span></label>
+      <div class="yrange" id="yrange" data-min="{{ year_min }}" data-max="{{ year_max }}">
+        <div class="yrange__rail"><div class="yrange__fill" id="yr-fill"></div></div>
+        <input type="range" name="year_from" id="yr-from"
+               min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_from or year_min }}" step="1">
+        <input type="range" name="year_to" id="yr-to"
+               min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
+      </div>
+    </div>
+    <div class="field" style="flex:0 0 90px">
+      <label>Pages/label</label>
+      <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}">
     </div>
   </div>
-  <div class="row">
-    <div class="field" style="flex:0 0 auto">
-      <label>Pages / label</label>
-      <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}" style="width:80px">
-    </div>
-    <div class="field" style="flex:0 0 auto; align-self:end">
-      <label>&nbsp;</label>
-      <button class="primary" type="submit">Rechercher</button>
-      <span id="busy" class="htmx-indicator"><span class="spinner"></span></span>
-    </div>
-  </div>
+  <button class="primary" type="submit" style="width:100%;margin-top:10px">Rechercher</button>
+  <span id="busy" class="htmx-indicator"><span class="spinner"></span></span>
 </form>
 
 <hr>

@@ -34,33 +34,6 @@
     </div>
   </details>
 
-  {% if onboarding %}<p class="small muted" style="margin:14px 0 2px">Étape 2 sur 3 · dis ce que tu écoutes</p>{% endif %}
-  <!-- ============ Styles ============ -->
-  <details class="acc" {{ 'open' if onboarding }}>
-    <summary>🎚️ Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
-    <div class="acc__body">
-      <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
-      <div class="row">
-        <div class="field combo"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})
-          <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
-                    hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
-                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('1') or [])|join('\n') }}</textarea></label>
-          <div id="sug-styles-1" class="lbl-suggest" hidden></div></div>
-        <div class="field combo"><label>Aimés (poids {{ sc.taste_tiers['2'] }})
-          <textarea name="styles_2" rows="7" data-combo="line" autocomplete="off"
-                    hx-get="/suggest/styles" hx-target="#sug-styles-2" hx-swap="innerHTML"
-                    hx-vals='js:{q: event.target.value.split("\n").pop()}'
-                    hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('2') or [])|join('\n') }}</textarea></label>
-          <div id="sug-styles-2" class="lbl-suggest" hidden></div></div>
-      </div>
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-styles" hx-swap="innerHTML">💾 Enregistrer</button>
-        <span id="save-styles" class="small ok"></span>
-      </div>
-    </div>
-  </details>
-
   {% if onboarding %}
   <p class="small muted" style="margin:14px 0 2px">Facultatif — à ajouter quand tu veux</p>
   <details class="acc">
@@ -189,6 +162,35 @@
     <div id="djset-panel" hx-get="/patte/djset/panel" hx-trigger="load"></div>
   </div>
 </details>
+
+<!-- ============ Styles (hors du formulaire principal) ============ -->
+{% if onboarding %}<p class="small muted" style="margin:14px 0 2px">Étape 2 sur 3 · dis ce que tu écoutes</p>{% endif %}
+<form method="post" action="/patte">
+<details class="acc" style="margin-top:10px" {{ 'open' if onboarding }}>
+  <summary>🎚️ Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
+  <div class="acc__body">
+    <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
+    <div class="row">
+      <div class="field combo"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})
+        <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('1') or [])|join('\n') }}</textarea></label>
+        <div id="sug-styles-1" class="lbl-suggest" hidden></div></div>
+      <div class="field combo"><label>Aimés (poids {{ sc.taste_tiers['2'] }})
+        <textarea name="styles_2" rows="7" data-combo="line" autocomplete="off"
+                  hx-get="/suggest/styles" hx-target="#sug-styles-2" hx-swap="innerHTML"
+                  hx-vals='js:{q: event.target.value.split("\n").pop()}'
+                  hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('2') or [])|join('\n') }}</textarea></label>
+        <div id="sug-styles-2" class="lbl-suggest" hidden></div></div>
+    </div>
+    <div class="btnrow">
+      <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-styles" hx-swap="innerHTML">💾 Enregistrer</button>
+      <span id="save-styles" class="small ok"></span>
+    </div>
+  </div>
+</details>
+</form>
 
 <!-- ============ Import CSV (hors du formulaire principal) ============ -->
 <details class="acc" style="margin-top:10px">

@@ -67,10 +67,7 @@
                   hx-target="closest .tracklist" hx-swap="innerHTML">🎵 Pistes</button>
         </div>
         <div class="buys">
-          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs&nbsp;↗</a>{% endif %}
-          <a href="https://www.discogs.com/sell/release/{{ rr.id }}?sort=price&sort_order=asc" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
-        </div>
-        <div class="btnrow" style="margin-top:2px">
+          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener" title="Fiche Discogs">ℹ️</a>{% endif %}
           {% if in_cart and (rr.id | string) in in_cart %}
             <span class="small ok">✓ en wantlist</span>
           {% else %}
@@ -80,15 +77,15 @@
             <input type="hidden" name="artist" value="{{ artist if sep else '' }}">
             <input type="hidden" name="label" value="{{ rr.label1 or '' }}">
             <input type="hidden" name="thumb" value="{{ rr.thumb or '' }}">
-            <button type="submit" class="small">➕ wantlist</button>
+            <button type="submit" class="small" title="Ajouter à la wantlist">{{ icons.cart() }}</button>
           </form>
           {% endif %}
         </div>
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
-            <span class="confidence" title="critères pris en compte : label {{ 'oui' if r.detail.label is not none else 'non' }}, artiste {{ 'oui' if r.detail.artist is not none else 'non' }}, style {{ 'oui' if r.detail.style is not none else 'non' }}">
-              <i class="{{ 'lit' if r.detail.label is not none }}"></i><i class="{{ 'lit' if r.detail.artist is not none }}"></i><i class="{{ 'lit' if r.detail.style is not none }}"></i>
+            <span class="confidence" title="critères pris en compte dans ce score : L abel, A rtiste, S tyle — en couleur = pris en compte, gris = absent">
+              <i class="{{ 'lit' if r.detail.label is not none }}">L</i><i class="{{ 'lit' if r.detail.artist is not none }}">A</i><i class="{{ 'lit' if r.detail.style is not none }}">S</i>
             </span>
           {% else %}
             <span class="badge ghost">—</span>

@@ -53,6 +53,7 @@ button, .btn{
 button:hover, .btn:hover{ background:var(--ink); color:var(--paper); }
 button.primary, .btn.primary{ background:var(--pin); border-color:var(--pin); color:var(--paper); }
 button.primary:hover{ background:var(--pin-dark); border-color:var(--pin-dark); }
+button.small, .btn.small{ padding:.2rem .65rem; font-size:12px; }
 button:disabled{ opacity:.45; cursor:not-allowed; }
 
 input, select, textarea{
@@ -215,19 +216,20 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 .card .buys{ display:flex; flex-wrap:wrap; gap:6px 10px; font-size:11px; padding-top:6px; }
 .card .buys a{ color:var(--pin); text-decoration:none; }
 .card .buys a:hover{ text-decoration:underline; }
-.card .foot{ margin-top:auto; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.card .foot{ margin-top:auto; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 
 .badge{
   background:var(--pin); color:var(--paper); font-family:'Syne',sans-serif; font-weight:700;
   padding:1px 10px; border-radius:999px; font-size:13px; display:inline-block;
+  flex:0 0 auto; white-space:nowrap;
 }
 .badge.clay{ background:var(--clay); }
 .badge.ghost{ background:transparent; color:var(--soft); border:1px solid var(--line); font-family:inherit; }
 /* trois points label/artiste/style : allumés = critère pris en compte dans le score album
    (cf. diagnostic N3 — un score fondé sur un seul critère doit se voir d'un coup d'œil) */
-.confidence{ display:inline-flex; gap:3px; }
-.confidence i{ width:6px; height:6px; border-radius:50%; background:var(--line); display:inline-block; }
-.confidence i.lit{ background:var(--pin); }
+.confidence{ display:inline-flex; gap:3px; flex:0 0 auto; }
+.confidence i{ font-style:normal; font-size:9px; font-weight:700; line-height:1; color:var(--line); }
+.confidence i.lit{ color:var(--pin); }
 .ic{ width:13px; height:13px; flex:none; vertical-align:-2px; }
 .badge .ic{ vertical-align:-2px; margin-right:1px; }
 .ic-lg{ width:18px; height:18px; }
@@ -240,8 +242,8 @@ a.chip:hover{ border-color:var(--pin); }
 .cart-tab{ margin-left:auto; font-size:13px; padding:6px 15px; font-weight:600; }
 .catno{ font-size:11px; color:var(--soft); }
 
-.vote{ display:inline-flex; gap:5px; }
-.vote button{ padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--surface); font-weight:400; }
+.vote{ display:inline-flex; gap:4px; }
+.vote button{ padding:1px 7px; font-size:12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); font-weight:400; }
 
 /* liste inbox */
 .inbox-row{
@@ -381,3 +383,17 @@ button:focus-visible, .lbl-opt:focus-visible, a.chip:focus-visible{
 }
 .fb-composer textarea{ margin-top:6px; }
 .fb-target-preview{ margin:0; }
+
+/* puces multi-sélection (genre/style/graine — combo data-combo="chips")
+   nommées .vchip pour ne pas percuter .chip (tags non interactifs, déjà utilisés
+   ailleurs : graphes, historique de recherche...) */
+.chip-list{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.vchip{
+  display:inline-flex; align-items:center; gap:4px; background:var(--surface);
+  border:1px solid var(--line); border-radius:999px; padding:3px 4px 3px 10px; font-size:12px;
+}
+.vchip-x{
+  border:none; background:none; padding:2px 4px; font-size:11px; color:var(--soft);
+  line-height:1; border-radius:50%;
+}
+.vchip-x:hover{ color:var(--clay); background:none; }

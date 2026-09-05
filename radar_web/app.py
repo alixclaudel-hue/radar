@@ -1336,7 +1336,10 @@ def _inbox(request, path, source_key, key_ns, mins=30):
                                  "label": [it["label"]] if it.get("label") else [],
                                  "style": it.get("style") or []})
         rid = str(it.get("release_id") or it.get("listing_id") or "")
-        thumb = (meta_cache.get(rid) or {}).get("thumb") or ""
+        # le scan (règles ou vendeurs) pose déjà sa propre pochette sur l'item — cf.
+        # job_scan_veille/job_scan_sellers (crate_jobs.py) — le cache release_meta n'est
+        # qu'un repli pour les items plus anciens scannés avant l'ajout de ce champ.
+        thumb = it.get("thumb") or (meta_cache.get(rid) or {}).get("thumb") or ""
         scored.append({"it": it, "score": sc, "det": det, "src": it.get(source_key), "thumb": thumb})
     scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     rows = [r for r in scored if (r["score"] or 0) >= mins]

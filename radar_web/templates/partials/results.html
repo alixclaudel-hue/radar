@@ -61,13 +61,12 @@
         </span>
         <span class="meta">{{ (rr.style or [])|join(', ') }}</span>
         <span class="catno">{{ rr.catno }}{% if rr.catno and rr.year %} · {% endif %}{{ rr.year }}</span>
-        <div class="tracklist">
-          <button type="button" class="small"
-                  hx-get="/release/{{ rr.id }}/tracks"
-                  hx-target="closest .tracklist" hx-swap="innerHTML">🎵 Pistes</button>
-        </div>
         <div class="buys">
-          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener" title="Fiche Discogs">ℹ️</a>{% endif %}
+          <button type="button" class="ic-btn" title="Pistes"
+                  hx-get="/release/{{ rr.id }}/tracks"
+                  hx-target="#tracks-{{ rr.id }}" hx-swap="innerHTML">{{ icons.tracks() }}</button>
+          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener"
+             title="Fiche Discogs" class="ic-btn">{{ icons.album() }}</a>{% endif %}
           {% if in_cart and (rr.id | string) in in_cart %}
             <span class="small ok">✓ en wantlist</span>
           {% else %}
@@ -77,10 +76,11 @@
             <input type="hidden" name="artist" value="{{ artist if sep else '' }}">
             <input type="hidden" name="label" value="{{ rr.label1 or '' }}">
             <input type="hidden" name="thumb" value="{{ rr.thumb or '' }}">
-            <button type="submit" class="small" title="Ajouter à la wantlist">{{ icons.cart() }}</button>
+            <button type="submit" class="ic-btn" title="Ajouter à la wantlist">{{ icons.cart() }}</button>
           </form>
           {% endif %}
         </div>
+        <div class="tracklist" id="tracks-{{ rr.id }}"></div>
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
@@ -94,10 +94,10 @@
           {% set v = (voted or {}).get(rr.id) %}
           <span class="vote" hx-swap="outerHTML" style="margin-left:auto">
             {% if v %}
-              <span class="small muted">{{ '👍' if v == 'up' else '👎' }} noté</span>
+              <span class="small muted {{ 'up' if v == 'up' else 'down' }}">{{ icons.thumbup() if v == 'up' else icons.thumbdown() }} noté</span>
             {% else %}
-            <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👍</button>
-            <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>👎</button>
+            <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
+            <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ rr.id }}","name":{{ (rr.title or '')|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.detail.label or 0)/100 }}","f_artist":"{{ (r.detail.artist or 0)/100 }}","f_style":"{{ (r.detail.style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
             {% endif %}
           </span>
           {% endif %}

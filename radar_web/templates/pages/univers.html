@@ -73,8 +73,10 @@
         <script>window._lgSeeds = {aff: {{ top_aff|tojson }}, reco: {{ top_reco|tojson }}};</script>
         <div style="margin:4px 0">
           <button type="button" class="small"
+                  title="Tes labels dont le catalogue colle le plus à tes styles Cœur / Aimés"
                   onclick="var h=document.getElementById('lg-seeds'); h.value=window._lgSeeds.aff; radarRenderChips(h.closest('.combo'));">mes + affinité style</button>
           <button type="button" class="small"
+                  title="Tes labels les mieux notés : collection + corpus + artistes aimés qui y ont sorti + affinité de style"
                   onclick="var h=document.getElementById('lg-seeds'); h.value=window._lgSeeds.reco; radarRenderChips(h.closest('.combo'));">mes + recommandations</button>
         </div>
         <div class="row" style="align-items:end">

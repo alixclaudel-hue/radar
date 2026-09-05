@@ -43,8 +43,47 @@
   /* Combobox générique : tout contrôle [data-combo] dans un .combo, avec un
      panneau frère .lbl-suggest rempli par htmx, reçoit des propositions
      cliquables (.lbl-opt[data-v]). data-combo = "set" (remplace), "line"
-     (remplace la dernière ligne), "csv" (remplace le dernier terme). */
+     (remplace la dernière ligne), "csv" (remplace le dernier terme), "chips"
+     (ctl reste vide, la valeur choisie s'ajoute comme puce dans .chip-list,
+     la vraie valeur soumise vit dans le <input type=hidden> du même .combo). */
   (function () {
+    function renderChips(wrap) {
+      var hidden = wrap.querySelector('input[type=hidden]'), list = wrap.querySelector('.chip-list');
+      if (!hidden || !list) return;
+      var vals = hidden.value ? hidden.value.split('\n').filter(Boolean) : [];
+      list.innerHTML = '';
+      vals.forEach(function (v) {
+        var chip = document.createElement('span');
+        chip.className = 'vchip';
+        chip.appendChild(document.createTextNode(v));
+        var x = document.createElement('button');
+        x.type = 'button'; x.className = 'vchip-x'; x.textContent = '✕';
+        x.addEventListener('click', function () {
+          hidden.value = vals.filter(function (s) { return s !== v; }).join('\n');
+          renderChips(wrap);
+        });
+        chip.appendChild(x);
+        list.appendChild(chip);
+      });
+    }
+    function addChip(ctl, v) {
+      v = (v || '').trim();
+      if (!v) return;
+      var wrap = ctl.closest('.combo'), hidden = wrap && wrap.querySelector('input[type=hidden]');
+      if (!hidden) return;
+      var vals = hidden.value ? hidden.value.split('\n').filter(Boolean) : [];
+      if (vals.indexOf(v) === -1) vals.push(v);
+      hidden.value = vals.join('\n');
+      ctl.value = '';
+      renderChips(wrap);
+    }
+    function initChips(root) {
+      (root || document).querySelectorAll('.combo .chip-list').forEach(function (list) {
+        renderChips(list.closest('.combo'));
+      });
+    }
+    window.radarRenderChips = renderChips;
+
     document.body.addEventListener('htmx:afterSwap', function (e) {
       if (e.target.classList && e.target.classList.contains('lbl-suggest'))
         e.target.hidden = !e.target.innerHTML.trim();
@@ -66,6 +105,8 @@
         } else if (mode === 'csv') {
           var ps = ctl.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
           ps.pop(); ps.push(v); ctl.value = ps.join(', ') + ', ';
+        } else if (mode === 'chips') {
+          addChip(ctl, v);
         } else {
           ctl.value = v;
         }
@@ -80,7 +121,14 @@
         var p = e.target.closest('.combo').querySelector('.lbl-suggest');
         if (p) p.hidden = true;
       }
+      if (e.key === 'Enter' && e.target.dataset && e.target.dataset.combo === 'chips') {
+        e.preventDefault();
+        addChip(e.target, e.target.value);
+      }
     });
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', function () { initChips(); });
+    else initChips();
   })();
   </script>
 </body>

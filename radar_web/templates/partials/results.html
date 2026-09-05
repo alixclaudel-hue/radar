@@ -67,10 +67,7 @@
                   hx-target="closest .tracklist" hx-swap="innerHTML">🎵 Pistes</button>
         </div>
         <div class="buys">
-          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener">Discogs&nbsp;↗</a>{% endif %}
-          <a href="https://www.discogs.com/sell/release/{{ rr.id }}?sort=price&sort_order=asc" target="_blank" rel="noopener">🛒&nbsp;Marché</a>
-        </div>
-        <div class="btnrow" style="margin-top:2px">
+          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener" title="Fiche Discogs">ℹ️</a>{% endif %}
           {% if in_cart and (rr.id | string) in in_cart %}
             <span class="small ok">✓ en wantlist</span>
           {% else %}
@@ -80,7 +77,7 @@
             <input type="hidden" name="artist" value="{{ artist if sep else '' }}">
             <input type="hidden" name="label" value="{{ rr.label1 or '' }}">
             <input type="hidden" name="thumb" value="{{ rr.thumb or '' }}">
-            <button type="submit" class="small">➕ wantlist</button>
+            <button type="submit" class="small" title="Ajouter à la wantlist">{{ icons.cart() }}</button>
           </form>
           {% endif %}
         </div>

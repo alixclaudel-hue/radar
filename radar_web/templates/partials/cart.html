@@ -19,7 +19,7 @@
       <div class="wl-item">
         <div class="wl-row" data-tracks-url="/release/{{ x.id }}/tracks"
              title="Toucher pour voir/masquer les tracks (écoute + achat Bandcamp par track)">
-          {% if x.thumb %}<img class="wl-thumb" src="{{ x.thumb }}" alt="">{% endif %}
+          {% if x.thumb %}<img class="wl-thumb" src="{{ x.thumb }}" alt="" width="34" height="34" loading="lazy">{% endif %}
           <div class="wl-info">
             <span class="wl-title">{{ (x.artist ~ ' — ') if x.artist }}{{ x.title }}</span>
             <span class="wl-meta">{{ x.label }}{% if x.added_at %}<br>ajouté {{ x.added_at }}{% endif %}</span>

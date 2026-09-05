@@ -1,0 +1,23 @@
+<button type="button" id="fb-toggle" class="fb-toggle" title="Laisser un retour sur cette page">💬{% if n_notes %}<span class="fb-badge">{{ n_notes }}</span>{% endif %}</button>
+
+<div id="fb-bar" class="fb-bar" hidden>
+  <span>Touche l'élément concerné…</span>
+  <button type="button" id="fb-general" class="small">note générale</button>
+  <a class="small" href="/feedback">🗒️ historique</a>
+  <button type="button" id="fb-cancel" class="small">annuler</button>
+</div>
+
+<div id="fb-composer" class="fb-composer" hidden>
+  <form hx-post="/feedback/add" hx-target="#fb-msg" hx-swap="innerHTML"
+        hx-on::after-request="if(event.detail.successful){ this.reset(); document.getElementById('fb-composer').hidden = true; }">
+    <p class="small muted fb-target-preview"></p>
+    <input type="hidden" name="page">
+    <input type="hidden" name="target">
+    <textarea name="note" rows="3" placeholder="Ton retour…" required></textarea>
+    <div class="btnrow">
+      <button class="primary small" type="submit">Envoyer</button>
+      <button type="button" id="fb-close" class="small">annuler</button>
+      <span id="fb-msg"></span>
+    </div>
+  </form>
+</div>

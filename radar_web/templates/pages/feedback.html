@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Retours · Radar{% endblock %}
+{% block content %}
+<h1>Mes retours</h1>
+<p class="muted small">Notes laissées avec le bouton 💬, où que tu sois dans l'appli — relayées sur
+  <a href="https://github.com/alixclaudel-hue/radar/issues/62" target="_blank" rel="noopener">l'issue GitHub</a>
+  si le token est configuré côté serveur, sinon gardées ici seulement.</p>
+{% include "partials/feedback_list.html" %}
+{% endblock %}

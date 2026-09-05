@@ -1,0 +1,26 @@
+<div id="fb-list">
+{% if not notes %}
+  <p class="muted small">Aucun retour pour l'instant — bouton 💬 en bas de n'importe quelle page.</p>
+{% else %}
+  <div class="lrows">
+    {% for n in notes %}
+    <div class="lrow" style="align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div class="small"><b>{{ n.page }}</b>{% if n.target %} · {{ n.target }}{% endif %}</div>
+        <div>{{ n.note }}</div>
+        <div class="small muted">{{ n.ts }}
+          {%- if not n.gh_posted %} · non transmis à GitHub
+          <button type="button" class="small" hx-post="/feedback/retry" hx-vals='{"id": "{{ n.id }}"}'
+                  hx-target="#fb-list" hx-swap="outerHTML">🔁 renvoyer</button>{% endif %}</div>
+      </div>
+      <select hx-post="/feedback/status" hx-vals='js:{id: "{{ n.id }}", status: event.target.value}'
+              hx-target="#fb-list" hx-swap="outerHTML" style="width:auto;flex:0 0 auto">
+        {% for s in ("nouveau", "en cours", "fait") %}
+        <option value="{{ s }}" {{ 'selected' if n.status == s }}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+</div>

@@ -213,9 +213,15 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 .card .artist{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--soft); }
 .card .title{ font-family:'Syne',sans-serif; font-weight:700; font-size:15px; line-height:1.15; }
 .card .meta{ font-size:12px; color:var(--soft); }
-.card .buys{ display:flex; flex-wrap:wrap; gap:6px 10px; font-size:11px; padding-top:6px; }
+.card .buys{ display:flex; align-items:center; gap:10px; padding-top:6px; }
 .card .buys a{ color:var(--pin); text-decoration:none; }
 .card .buys a:hover{ text-decoration:underline; }
+/* icônes seules (pistes/Discogs/panier) : même gabarit .ic, pas de cadre de bouton */
+.ic-btn{
+  border:none; background:none; padding:3px; border-radius:6px; line-height:0;
+  display:inline-flex; align-items:center; color:var(--ink);
+}
+.ic-btn:hover{ background:var(--line); color:var(--pin); }
 .card .foot{ margin-top:auto; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 
 .badge{
@@ -242,8 +248,12 @@ a.chip:hover{ border-color:var(--pin); }
 .cart-tab{ margin-left:auto; font-size:13px; padding:6px 15px; font-weight:600; }
 .catno{ font-size:11px; color:var(--soft); }
 
-.vote{ display:inline-flex; gap:4px; }
-.vote button{ padding:1px 7px; font-size:12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); font-weight:400; }
+.vote{ display:inline-flex; align-items:center; gap:4px; }
+.vote button{ padding:1px 7px; font-size:12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); font-weight:400; line-height:0; }
+.vote button.up{ color:var(--pin); }
+.vote button.down{ color:var(--clay); }
+.vote .up{ color:var(--pin); }
+.vote .down{ color:var(--clay); }
 
 /* liste inbox */
 .inbox-row{

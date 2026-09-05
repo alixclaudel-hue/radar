@@ -15,8 +15,8 @@
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="dest" value="base">
       <button class="small" title="Ajouter à ma base de labels">➕ {{ icons.label() }}</button></form>
     <span class="vote" hx-swap="outerHTML">
-      <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"up","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👍</button>
-      <button hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"down","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>👎</button>
+      <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"up","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>{{ icons.thumbup() }}</button>
+      <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"down","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>{{ icons.thumbdown() }}</button>
     </span>
   </div>
   {% endfor %}

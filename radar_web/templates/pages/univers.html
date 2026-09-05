@@ -4,13 +4,6 @@
 {% block content %}
 <h1>Mes labels &amp; artistes</h1>
 
-<div class="nav" style="margin-top:0">
-  <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">{{ icons.label() }} Base de labels ({{ n_labels }})</a>
-  <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}">{{ icons.artist() }} Base d'artistes ({{ n_artists }})</a>
-  <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}">🎚️ Mes sets ({{ n_sets }})</a>
-</div>
-<hr>
-
 {% if n_review %}
 <details class="acc" open>
   <summary>⚠️ À vérifier ({{ n_review }})</summary>
@@ -20,6 +13,13 @@
 </details>
 <hr>
 {% endif %}
+
+<div class="nav" style="margin-top:0">
+  <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">{{ icons.label() }} Base de labels ({{ n_labels }})</a>
+  <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}">{{ icons.artist() }} Base d'artistes ({{ n_artists }})</a>
+  <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}">🎚️ Mes sets ({{ n_sets }})</a>
+</div>
+<hr>
 
 {% if tab == 'labels' %}
   {% if n_labels == 0 %}
@@ -115,12 +115,12 @@
 
 {% elif tab == 'artists' %}
   {% if n_artists == 0 %}
-  <p class="muted small">Base vide : c'est ici que se voient les artistes que tu classes Cœur/Aimés — ils pilotent
-    le score artiste des recherches. Ajoute-les depuis Mes sources (listes Cœur/Aimés) : la résolution Discogs
-    se fait automatiquement en fond.</p>
+  <p class="muted small">Base vide : c'est ici que se voient les artistes que tu classes Principaux/Secondaires —
+    ils pilotent le score artiste des recherches. Ajoute-les depuis Mes sources (listes Cœur/Aimés) : la résolution
+    Discogs se fait automatiquement en fond.</p>
   <p class="small"><a href="/patte">Aller à Mes sources</a></p>
   {% else %}
-  <p class="muted small">Cœur (références) / Aimés — pilotent le score d'artiste. Règle la catégorie d'un clic.
+  <p class="muted small">Principaux (références) / Secondaires — pilotent le score d'artiste. Règle la catégorie d'un clic.
     Résolution Discogs faite automatiquement en fond à chaque ajout.</p>
   {% endif %}
 
@@ -150,12 +150,14 @@
         producteur (reconstruit automatiquement en fond une fois par mois). Un seul niveau
         de voisinage est possible ici (pas de lien graphe entre deux candidats).</p>
       <form hx-post="/univers/artists/graph/build" hx-target="#artist-graph-out" hx-swap="innerHTML">
-        <div class="field"><label>Artistes de départ <span class="muted">choix multiple</span>
-          <select name="seeds" multiple size="8" style="height:auto">
-            {% for a in classified_artists %}
-            <option value="{{ a.key }}">{{ '💗 ' if a.tier == '1' else '' }}{{ a.name }}</option>
-            {% endfor %}
-          </select></label></div>
+        <div class="field combo"><label>Artistes de départ <span class="muted">tape pour chercher parmi tes Cœur/Aimés</span></label>
+          <input class="chip-input" data-combo="chips" autocomplete="off" placeholder="ex. ADNY"
+                 hx-get="/univers/artists/suggest" hx-target="#sug-ag-seeds" hx-swap="innerHTML"
+                 hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:220ms, focus">
+          <div id="sug-ag-seeds" class="lbl-suggest" hidden></div>
+          <input type="hidden" name="seeds" id="ag-seeds">
+          <div class="chip-list"></div>
+        </div>
         <button class="primary" type="submit">Construire</button>
       </form>
       <div id="artist-graph-out"></div>

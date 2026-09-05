@@ -16,29 +16,38 @@
     </div>
     {% for r in rows %}
       {% set it = r.it %}
-      <div class="inbox-row">
-        {% if r.score is not none %}<span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
-        <div class="txt">
-          <a href="{{ it.uri or ('https://www.discogs.com/release/' ~ it.release_id) }}" target="_blank" rel="noopener">
-            {{ it.artist }} — {{ it.title }}</a>
-          <div class="sub">
-            <b>{{ it.rule or it.seller }}</b>
-            {% if it.label %} · {{ it.label }}{% endif %}
-            {% if it.price %} · {{ it.price }} {{ it.currency }}{% endif %}
-            {% if it.condition %} · {{ it.condition }}{% endif %}
-            {% if it.year %} · {{ it.year }}{% endif %}
-            {% if it.style %} · <span class="muted">{{ it.style|join(', ') }}</span>{% endif %}
+      {% set rid = it.release_id or it.listing_id %}
+      <div class="wl-item">
+        <div class="wl-row" data-tracks-url="/release/{{ rid }}/tracks"
+             title="Toucher pour voir/masquer les tracks (écoute + achat Bandcamp par track)">
+          {% if r.thumb %}<img class="wl-thumb" src="{{ r.thumb }}" alt="" width="34" height="34" loading="lazy">{% endif %}
+          {% if r.score is not none %}<span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>{% else %}<span class="badge ghost">—</span>{% endif %}
+          <div class="wl-info">
+            <a class="wl-title" href="{{ it.uri or ('https://www.discogs.com/release/' ~ it.release_id) }}"
+               target="_blank" rel="noopener" onclick="event.stopPropagation()">{{ it.artist }} — {{ it.title }}</a>
+            <span class="wl-meta">
+              <b>{{ it.rule or it.seller }}</b>
+              {% if it.label %} · {{ it.label }}{% endif %}
+              {% if it.price %} · {{ it.price }} {{ it.currency }}{% endif %}
+              {% if it.condition %} · {{ it.condition }}{% endif %}
+              {% if it.year %} · {{ it.year }}{% endif %}
+              {% if it.style %} · {{ it.style|join(', ') }}{% endif %}
+            </span>
           </div>
+          <span class="wl-chevron" aria-hidden="true">{{ icons.tracks() }}</span>
         </div>
-        {% if r.score is not none %}
-        <span class="vote" hx-swap="outerHTML">
-          <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
-          <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
-        </span>
-        {% endif %}
-        <button hx-post="/inbox/{{ key_ns }}/dismiss"
-                hx-vals='{"rid": "{{ it.release_id or it.listing_id }}"}'
-                hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer">✕</button>
+        <div class="tracklist" hidden></div>
+        <div class="row" style="justify-content:space-between;align-items:center;padding:2px 2px 8px">
+          {% if r.score is not none %}
+          <span class="vote" hx-swap="outerHTML">
+            <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
+            <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
+          </span>
+          {% else %}<span></span>{% endif %}
+          <button class="small" hx-post="/inbox/{{ key_ns }}/dismiss"
+                  hx-vals='{"rid": "{{ it.release_id or it.listing_id }}"}'
+                  hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer">✕</button>
+        </div>
       </div>
     {% endfor %}
   {% endif %}

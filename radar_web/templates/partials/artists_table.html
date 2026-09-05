@@ -22,8 +22,8 @@
                 hx-post="/univers/artist/set" hx-vals='{"name": {{ r.name|tojson }} }'
                 hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
           <option value="" {{ 'selected' if r.cat=='—' }}>—</option>
-          <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Cœur</option>
-          <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
+          <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Principaux</option>
+          <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Secondaires</option>
         </select>
       </td>
       <td class="m small"></td>

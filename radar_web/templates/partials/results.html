@@ -63,8 +63,7 @@
         <span class="catno">{{ rr.catno }}{% if rr.catno and rr.year %} · {% endif %}{{ rr.year }}</span>
         <div class="buys">
           <button type="button" class="ic-btn" title="Pistes"
-                  hx-get="/release/{{ rr.id }}/tracks"
-                  hx-target="#tracks-{{ rr.id }}" hx-swap="innerHTML">{{ icons.tracks() }}</button>
+                  onclick="var t=document.getElementById('tracks-{{ rr.id }}'); if(t.dataset.loaded==='1'){t.innerHTML='';t.dataset.loaded='';}else{t.dataset.loaded='1';htmx.ajax('GET','/release/{{ rr.id }}/tracks',{target:t,swap:'innerHTML'});}">{{ icons.tracks() }}</button>
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener"
              title="Fiche Discogs" class="ic-btn">{{ icons.discogs() }}</a>{% endif %}
           {% if in_cart and (rr.id | string) in in_cart %}

@@ -207,7 +207,7 @@
         <label>Artistes aimés
         <input type="file" name="file" accept=".csv" required></label>
         <label class="small">Catégorie
-        <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimés</option></select></label>
+        <select name="tier" style="width:auto"><option value="1">Principaux</option><option value="2" selected>Secondaires</option></select></label>
         <button type="submit" class="small">Importer</button>
       </form>
     </div>
@@ -220,7 +220,7 @@
 <div class="statgrid">
   <div class="stat" title="labels que tu as ajoutés à ta base"><b>{{ st.labels }}</b><span>labels</span></div>
   <div class="stat" title="parmi eux, ceux dont on connaît le style musical"><b>{{ st.labels_profiled }}</b><span>labels dont on connaît le style</span></div>
-  <div class="stat" title="artistes que tu as classés dans tes deux catégories de goût"><b>{{ st.coeur }} / {{ st.aimes }}</b><span>artistes Cœur / Aimés</span></div>
+  <div class="stat" title="artistes que tu as classés dans tes deux catégories de goût"><b>{{ st.coeur }} / {{ st.aimes }}</b><span>artistes Principaux / Secondaires</span></div>
   <div class="stat" title="parmi tes artistes classés, ceux dont l'identité Discogs a été retrouvée avec certitude"><b>{{ st.artists_resolved }}</b><span>artistes reconnus sur Discogs</span></div>
   <div class="stat" title="artistes croisés dans ta collection, ton écoute ou tes DJ sets, classés ou non"><b>{{ st.artists_identified }}</b><span>artistes croisés dans ton écoute</span></div>
   <div class="stat" title="connexions entre artistes détectées via leurs sorties communes"><b>{{ st.graph_edges }}</b><span>liens entre artistes</span></div>

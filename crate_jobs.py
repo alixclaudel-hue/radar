@@ -2166,6 +2166,59 @@ def job_publish_recos(job, params):
     job.finish(f"+{added} piste(s) ajoutée(s) à « {playlist_name} » — {len(remaining)} en attente.")
 
 
+def job_clean_recos(job, params):
+    """Nettoyage RECOS RADAR (Fonctionnalité 1, lot 3) : retire de la playlist les
+    pistes déjà écoutées, détectées via l'historique de visionnage YouTube (scraping
+    Playwright, cf. radar/ytwatch.py — aucune API officielle pour ça). Nécessite deux
+    jetons distincts : YouTube connecté en écriture (ytwrite, pour retirer de la
+    playlist) ET une session de visionnage importée à la main (ytwatch, pour lire
+    l'historique — un jeton OAuth applicatif ne donne accès à aucune page grand public).
+
+    Volontairement PAS chaîné depuis job_scan_recos/job_publish_recos : c'est la seule
+    vraie inconnue technique du lot (sélecteurs non documentés, page susceptible de
+    changer sans préavis) — opt-in séparé (RADAR_RECOS_CLEANUP) pour qu'un scraping
+    cassé ne bloque jamais le scan/la publication, qui reposent sur des API stables."""
+    from radar_web.radar import ytwatch, ytwrite as yw
+
+    try:
+        client = yw.get_client(RADAR_UID)
+    except yw.YouTubeAuthError as e:
+        return job.finish(error=f"YouTube non connecté en écriture : {e}")
+
+    playlist_name = params.get("playlist_name") or RECOS_PLAYLIST_NAME
+    try:
+        playlist_id = yw.get_or_create_playlist(client, playlist_name)
+        current = yw.existing_video_ids(client, playlist_id)     # {videoId: playlistItemId}
+    except Exception as e:                       # noqa: BLE001 — API Google, forme d'erreur variable
+        return job.finish(error=f"Playlist YouTube « {playlist_name} » : {type(e).__name__}: {e}")
+    if not current:
+        return job.finish("Playlist vide — rien à nettoyer.")
+
+    try:
+        watched = set(ytwatch.fetch_watched_video_ids(RADAR_UID))
+    except ytwatch.WatchSessionError as e:
+        return job.finish(error=f"Historique YouTube : {e}")
+    except Exception as e:                       # noqa: BLE001 — scraping, forme d'erreur imprévisible
+        return job.finish(error=f"Historique YouTube (scraping) : {type(e).__name__}: {e}")
+
+    to_remove = [vid for vid in current if vid in watched]
+    job.st["total"] = len(to_remove)
+    if not to_remove:
+        return job.finish(f"{len(current)} piste(s) dans la playlist, aucune déjà écoutée.")
+
+    removed = 0
+    for vid in to_remove:
+        if job.stopped():
+            break
+        try:
+            yw.remove_item(client, current[vid])
+            removed += 1
+            job.tick(f"{vid} : retirée (déjà écoutée)")
+        except Exception as e:                   # noqa: BLE001
+            job.tick(f"{vid} : erreur au retrait ({type(e).__name__})")
+    job.finish(f"{removed} piste(s) retirée(s) de « {playlist_name} » (déjà écoutée(s)).")
+
+
 def job_scan_catalog(job, params):
     """Parcourt le catalogue partagé de vendeurs Discogs (radar/sellers.py) :
     vérifie chaque compte, prend un snapshot de son inventaire « For Sale »
@@ -2488,6 +2541,7 @@ JOBS = {
     "scan_veille": job_scan_veille,
     "scan_recos": job_scan_recos,
     "publish_recos": job_publish_recos,
+    "clean_recos": job_clean_recos,
 }
 
 

@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, learn,
-                    paths, sellers, store, vocab, ytcache, ytwrite)
+                    paths, sellers, store, vocab, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -313,6 +313,7 @@ def _last_import(job):
 
 @app.get("/patte", response_class=HTMLResponse)
 def patte_page(request: Request, saved: int = 0, yt_connected: int = 0, yt_error: str = ""):
+    from .radar import ytwrite     # import local : dépendance lourde optionnelle (cf. CI, oauth_youtube_start)
     c = Ctx()
     pl_urls = [u for u in (c.cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
@@ -351,6 +352,7 @@ def oauth_youtube_start(request: Request):
     consentement Google. `state` posé en cookie court, revérifié au retour
     (cf. callback) : seule protection CSRF nécessaire pour ce flux, comme
     recommandé par Google."""
+    from .radar import ytwrite
     try:
         url, state = ytwrite.authorization_url(_yt_oauth_redirect_uri(request))
     except ytwrite.YouTubeAuthError as e:
@@ -363,6 +365,7 @@ def oauth_youtube_start(request: Request):
 
 @app.get("/oauth/youtube/callback")
 def oauth_youtube_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    from .radar import ytwrite
     if error:
         return _yt_oauth_error_redirect(f"Autorisation refusée ({error}).")
     expected = request.cookies.get("yt_oauth_state", "")
@@ -380,6 +383,7 @@ def oauth_youtube_callback(request: Request, code: str = "", state: str = "", er
 
 @app.post("/oauth/youtube/disconnect")
 def oauth_youtube_disconnect():
+    from .radar import ytwrite
     ytwrite.disconnect(store.current_uid())
     return RedirectResponse("/patte", status_code=303)
 

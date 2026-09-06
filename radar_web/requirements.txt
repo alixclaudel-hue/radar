@@ -6,3 +6,6 @@ requests>=2.28
 # pour les jobs lancés en sous-processus (crate_jobs.py)
 yt-dlp>=2024.10.22
 playwright==1.48.0
+# écriture sur playlist YouTube (RECOS RADAR) — même SDK que le script perso existant
+google-auth-oauthlib>=1.2
+google-api-python-client>=2.140

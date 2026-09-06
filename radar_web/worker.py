@@ -40,6 +40,12 @@ _last_dump_check = 0.0
 AUTO_MAINT_EVERY = {"canonicalize": 7 * 86400, "profile_labels": 7 * 86400, "build_graph": 30 * 86400}
 _last_auto_maint_check = 0.0
 
+# RECOS RADAR (lot 1, candidats seulement) : opt-in via RADAR_RECOS_SCAN=1, un scan par
+# jour. Fonctionnalité personnelle (un seul owner en pratique) -> pas de round-robin par
+# utilisateur nécessaire, mêmes conventions que les scans ci-dessus.
+RECOS_SCAN_EVERY = 86400
+_last_recos_check = 0.0
+
 
 def _maybe_weekly_scan():
     """Enfile scan_catalog (owner) si aucun vendeur n'a été scanné depuis 7 j."""
@@ -127,6 +133,25 @@ def _maybe_auto_maintenance():
         print(f"[worker] auto maintenance check : {e}", file=sys.stderr, flush=True)
 
 
+def _maybe_recos_scan():
+    """Enfile scan_recos (owner) une fois par jour — remplit recos_candidates.json,
+    consommé plus tard par l'ajout à la playlist YouTube (lot 2, pas encore fait)."""
+    global _last_recos_check
+    if os.environ.get("RADAR_RECOS_SCAN") != "1":
+        return
+    if time.time() - _last_recos_check < 3600:
+        return
+    _last_recos_check = time.time()
+    try:
+        queued_names = {j["name"] for j in jobs.load_queue()}
+        if "scan_recos" in queued_names or time.time() - _last_successful_run("scan_recos") < RECOS_SCAN_EVERY:
+            return
+        jobs.launch("scan_recos", {}, uid=paths.DEFAULT_UID)
+        print("[worker] scan_recos quotidien enfilé", file=sys.stderr, flush=True)
+    except Exception as e:                       # noqa: BLE001
+        print(f"[worker] recos scan check : {e}", file=sys.stderr, flush=True)
+
+
 def _pick(q, last_uid):
     pend = [j for j in q if j["state"] == "queued"]
     if not pend:
@@ -162,6 +187,7 @@ def main():
             _maybe_weekly_scan()
             _maybe_monthly_dump_sync()
             _maybe_auto_maintenance()
+            _maybe_recos_scan()
             time.sleep(POLL)
             continue
         job["state"] = "running"

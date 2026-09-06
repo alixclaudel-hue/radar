@@ -54,6 +54,10 @@ _PER_USER = {
     "artist_graphs": "artist_graphs.json",
     "cart": "cart.json",
     "ui_notes": "ui_notes.json",
+    "recos_seen": "recos_seen.json",
+    "recos_candidates": "recos_candidates.json",
+    "recos_history": "recos_playlist_history.json",
+    "youtube_oauth": "youtube_oauth.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

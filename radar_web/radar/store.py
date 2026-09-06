@@ -98,6 +98,7 @@ DEFAULT_SCORING = {
               "max_credits": 6, "max_levels": 4, "level_decay": 0.5, "node_cap": 150},
     "sources": {"discogs_collection": 1.0, "discogs_want": 0.6, "youtube": 0.5,
                 "spotify": 0.5, "bandcamp": 0.9, "djset": 0.4},
+    "recos": {"min_score": 60, "max_new_releases": 20},
     "label_affinity_floor": 0,
     "learn": {"l2": 2.0, "min_feedback": 12, "min_per_class": 3},
 }

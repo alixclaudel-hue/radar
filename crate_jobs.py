@@ -82,6 +82,10 @@ DJSET_INPUT_PATH = os.path.join(JOBS_USER_DIR, "djsets.input.json")
 DJSET_SEEN_PATH = os.path.join(USER_DIR, "djset_seen.json")
 SELLERS_SEEN_PATH = os.path.join(USER_DIR, "sellers_seen.json")
 SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
+RECOS_SEEN_PATH = os.path.join(USER_DIR, "recos_seen.json")
+RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
+RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
+RECOS_PLAYLIST_NAME = "RECOS RADAR"
 
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
@@ -2004,6 +2008,164 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
+def job_scan_recos(job, params):
+    """Candidats pour la playlist YouTube "RECOS RADAR" (Fonctionnalité 1, lot 1) :
+    liste les sorties du référentiel Discogs local (radar/discogs_dump.py) sur les
+    labels suivis (base + veille implicite), les note avec Ctx.album_score (même
+    système que la Recherche — pas une nouvelle formule), garde celles au-dessus du
+    seuil configuré (scoring.recos.min_score) triées par score décroissant, et
+    récupère leur tracklist réelle (API Discogs à la demande — le dump n'en
+    contient pas, cf. discogs_dump.py) pour empiler des candidats PAR PISTE dans
+    recos_candidates.json. Ne cherche/n'ajoute rien sur YouTube ici : la recherche
+    vidéo + l'écriture sur la playlist (OAuth2) sont un job séparé (lot 2) qui
+    consommera cette file — ce découpage isole tout ce qui a besoin d'un token
+    d'écriture YouTube de ce qui n'en a pas besoin.
+
+    recos_seen.json évite de retraiter une sortie déjà vue à chaque lancement : un
+    dump est un instantané mensuel, search_local() renverrait sinon indéfiniment
+    les mêmes releases tant que le mois ne change pas."""
+    from radar_web.radar import discogs_dump as dd
+    from radar_web.radar.scoring import Ctx, real_tracks
+
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    if not token:
+        return job.finish(error="Pas de token Discogs.")
+    if not dd.available():
+        return job.finish(error="Référentiel Discogs local indisponible (dump pas encore importé).")
+
+    rc = cfg.get("scoring", {}).get("recos", {})
+    min_score = float(params.get("min_score", rc.get("min_score", 60)))
+    max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
+
+    names = list(cfg.get("labels", [])) + [w for w in cfg.get("watchlist", []) if w and w.strip()]
+    label_keys = sorted({normalize_label(n) for n in names if n and n.strip()})
+    if not label_keys:
+        return job.finish("Aucun label suivi (base ou veille) — rien à scanner.")
+
+    seen = set(load_json(RECOS_SEEN_PATH, []))
+    rows = dd.search_local(label_keys=label_keys, limit=5000)
+    ctx = Ctx(uid=RADAR_UID)
+    scored = []
+    for row in rows:
+        if row["id"] in seen:
+            continue
+        title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
+        r = {"label": [row["label"]] if row.get("label") else [],
+             "title": title, "style": row["styles"].split(", ") if row.get("styles") else []}
+        score, _ = ctx.album_score(r)
+        if score is not None and score >= min_score:
+            scored.append((score, row))
+    scored.sort(key=lambda x: -x[0])
+    targets = scored[:max_new]
+    job.st["total"] = len(targets)
+    if not targets:
+        _chain_publish_recos()
+        return job.finish(f"{len(rows)} sortie(s) sur tes labels, aucune au-dessus de {min_score:g}.")
+
+    job.msg(f"{len(targets)} sortie(s) retenue(s) sur {len(rows)} scannée(s).")
+    candidates = load_json(RECOS_CANDIDATES_PATH, [])
+    known_tracks = {(style_key(c.get("artist")), style_key(c.get("title"))) for c in candidates}
+    now = datetime.now().isoformat(timespec="seconds")
+    n_tracks = 0
+    for score, row in targets:
+        if job.stopped():
+            break
+        seen.add(row["id"])
+        d = discogs_get(token, f"/releases/{row['id']}")
+        tracks = real_tracks(d.get("tracklist", [])) if d else []
+        art = row.get("artist") or ""
+        for t in tracks:
+            ttl = (t.get("title") or "").strip()
+            k = (style_key(art), style_key(ttl))
+            if not ttl or k in known_tracks:
+                continue
+            known_tracks.add(k)
+            candidates.append({
+                "artist": art, "title": ttl, "release_id": row["id"],
+                "release_title": row.get("title") or "", "label": row.get("label"),
+                "year": row.get("year"), "album_score": score, "added_at": now,
+            })
+            n_tracks += 1
+        job.tick(f"{art} — {row.get('title')} ({score}) : +{len(tracks)} piste(s)"
+                 if d else f"{art} — {row.get('title')} : sortie indisponible (API)")
+        save_json(RECOS_SEEN_PATH, sorted(seen))
+        save_json(RECOS_CANDIDATES_PATH, candidates)
+        time.sleep(1.1)
+    save_json(RECOS_SEEN_PATH, sorted(seen))
+    save_json(RECOS_CANDIDATES_PATH, candidates)
+    _chain_publish_recos()
+    job.finish(f"+{n_tracks} piste(s) candidate(s) sur {len(targets)} sortie(s) — file : {len(candidates)}.")
+
+
+def _chain_publish_recos():
+    """Enfile publish_recos après scan_recos, que le scan ait trouvé du neuf ou non :
+    une file laissée en plan par un précédent quota YouTube épuisé doit continuer à se
+    vider aux scans suivants (cf. job_publish_recos)."""
+    from radar_web.radar import jobs as job_queue
+    if not any(j["name"] == "publish_recos" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
+        job_queue.launch("publish_recos", {}, uid=RADAR_UID)
+
+
+def job_publish_recos(job, params):
+    """Recherche YouTube + ajout à la playlist "RECOS RADAR" (Fonctionnalité 1, lot 2) —
+    consomme la file produite par job_scan_recos (recos_candidates.json), aucun
+    scoring/matching ici. Nécessite YouTube connecté en écriture (OAuth2, cf.
+    radar/ytwrite.py, jeton par utilisateur) ; la recherche vidéo (lecture, moins
+    coûteuse) passe par ytcache (cache partagé + cascade de clés déjà en place,
+    Option A étape 5a) — deux quotas YouTube bien distincts, ce job ne consomme QUE
+    celui d'écriture (playlistItems.insert)."""
+    from radar_web.radar import ytwrite as yw
+
+    candidates = load_json(RECOS_CANDIDATES_PATH, [])
+    if not candidates:
+        return job.finish("Aucun candidat en attente.")
+    try:
+        client = yw.get_client(RADAR_UID)
+    except yw.YouTubeAuthError as e:
+        return job.finish(error=f"YouTube non connecté en écriture : {e}")
+
+    playlist_name = params.get("playlist_name") or RECOS_PLAYLIST_NAME
+    try:
+        playlist_id = yw.get_or_create_playlist(client, playlist_name)
+        current = yw.existing_video_ids(client, playlist_id)
+    except Exception as e:                       # noqa: BLE001 — API Google, forme d'erreur variable
+        return job.finish(error=f"Playlist YouTube « {playlist_name} » : {type(e).__name__}: {e}")
+
+    cfg = cfg_load()
+    keys = ytcache.youtube_keys(cfg)
+    history = set(load_json(RECOS_HISTORY_PATH, []))
+    job.st["total"] = len(candidates)
+    remaining, added, quota_hit = [], 0, False
+    for c in candidates:
+        if job.stopped() or quota_hit:
+            remaining.append(c)
+            continue
+        vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys)
+        if not vid:
+            job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée")
+            continue
+        if vid in history or vid in current:
+            history.add(vid)
+            job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")
+            continue
+        try:
+            yw.add_video(client, playlist_id, vid)
+        except yw.YouTubeQuotaExhausted:
+            job.msg("Quota YouTube (écriture) épuisé — reprendra au prochain scan.")
+            quota_hit = True
+            remaining.append(c)
+            continue
+        history.add(vid)
+        current[vid] = None
+        added += 1
+        job.tick(f"{c['artist']} — {c['title']} : ajoutée")
+        save_json(RECOS_HISTORY_PATH, sorted(history))
+    save_json(RECOS_HISTORY_PATH, sorted(history))
+    save_json(RECOS_CANDIDATES_PATH, remaining)
+    job.finish(f"+{added} piste(s) ajoutée(s) à « {playlist_name} » — {len(remaining)} en attente.")
+
+
 def job_scan_catalog(job, params):
     """Parcourt le catalogue partagé de vendeurs Discogs (radar/sellers.py) :
     vérifie chaque compte, prend un snapshot de son inventaire « For Sale »
@@ -2324,6 +2486,8 @@ JOBS = {
     "enrich": job_enrich,
     "canonicalize": job_canonicalize,
     "scan_veille": job_scan_veille,
+    "scan_recos": job_scan_recos,
+    "publish_recos": job_publish_recos,
 }
 
 

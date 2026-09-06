@@ -312,12 +312,14 @@ def _last_import(job):
 
 
 @app.get("/patte", response_class=HTMLResponse)
-def patte_page(request: Request, saved: int = 0):
+def patte_page(request: Request, saved: int = 0, yt_connected: int = 0, yt_error: str = ""):
+    from .radar import ytwrite     # import local : dépendance lourde optionnelle (cf. CI, oauth_youtube_start)
     c = Ctx()
     pl_urls = [u for u in (c.cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
     last = {j: _last_import(j) for j in
-           ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
+           ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets",
+            "scan_recos")}
     st = c.stats()
     # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
     onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
@@ -325,7 +327,65 @@ def patte_page(request: Request, saved: int = 0):
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
-                  src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding)
+                  src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding,
+                  recos_connected=ytwrite.is_connected(c.uid),
+                  recos_pending=len(load(_pu().recos_candidates, [])),
+                  yt_connected=yt_connected, yt_error=yt_error)
+
+
+def _yt_oauth_redirect_uri(request):
+    """Callback fixe côté appli — HTTPS déjà en place (radar.hubclaudel.fr), donc
+    utilisable tel quel comme redirect_uri d'un client OAuth Google de type
+    Web application (cf. radar/ytwrite.py, docstring)."""
+    scheme = "https" if _https(request) else "http"
+    host = request.headers.get("host") or request.url.hostname
+    return f"{scheme}://{host}/oauth/youtube/callback"
+
+
+def _yt_oauth_error_redirect(msg):
+    return RedirectResponse(f"/patte?yt_error={quote_plus(msg)}", status_code=303)
+
+
+@app.get("/oauth/youtube/start")
+def oauth_youtube_start(request: Request):
+    """« Connecter YouTube (playlist RECOS RADAR) » — redirige vers l'écran de
+    consentement Google. `state` posé en cookie court, revérifié au retour
+    (cf. callback) : seule protection CSRF nécessaire pour ce flux, comme
+    recommandé par Google."""
+    from .radar import ytwrite
+    try:
+        url, state = ytwrite.authorization_url(_yt_oauth_redirect_uri(request))
+    except ytwrite.YouTubeAuthError as e:
+        return _yt_oauth_error_redirect(str(e))
+    resp = RedirectResponse(url, status_code=303)
+    secure = os.environ.get("RADAR_SECURE_COOKIE") == "1" or _https(request)
+    resp.set_cookie("yt_oauth_state", state, max_age=600, httponly=True, samesite="lax", secure=secure)
+    return resp
+
+
+@app.get("/oauth/youtube/callback")
+def oauth_youtube_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    from .radar import ytwrite
+    if error:
+        return _yt_oauth_error_redirect(f"Autorisation refusée ({error}).")
+    expected = request.cookies.get("yt_oauth_state", "")
+    if not code or not state or not expected or state != expected:
+        return _yt_oauth_error_redirect("Échange OAuth invalide (état expiré ou incohérent) — réessaie.")
+    try:
+        creds = ytwrite.exchange_code(_yt_oauth_redirect_uri(request), code)
+    except Exception as e:                       # noqa: BLE001 — flux Google, forme d'erreur variable
+        return _yt_oauth_error_redirect(f"Échange du code YouTube : {type(e).__name__}: {e}")
+    ytwrite.save_credentials(store.current_uid(), creds)
+    resp = RedirectResponse("/patte?yt_connected=1", status_code=303)
+    resp.delete_cookie("yt_oauth_state")
+    return resp
+
+
+@app.post("/oauth/youtube/disconnect")
+def oauth_youtube_disconnect():
+    from .radar import ytwrite
+    ytwrite.disconnect(store.current_uid())
+    return RedirectResponse("/patte", status_code=303)
 
 
 def _apply_patte_form(f):
@@ -1931,7 +1991,7 @@ def univers_artists_export():
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
               "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog",
-              "import_discogs_dump"}
+              "import_discogs_dump", "scan_recos", "publish_recos"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 
@@ -2139,7 +2199,8 @@ async def settings_save(request: Request):
     sc = c["scoring"]
     for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link")),
                       ("album", ("label", "artist", "style", "artist_max_vs_mean")),
-                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link"))):
+                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link")),
+                      ("recos", ("min_score", "max_new_releases"))):
         for key in keys:
             v = f.get(f"{grp}__{key}")
             if v not in (None, ""):

@@ -99,6 +99,19 @@
     </div>
   </div>
 
+  <h3>🎯 RECOS RADAR
+    {{ reset_btn([['recos__min_score', sc.recos.min_score],
+                  ['recos__max_new_releases', sc.recos.max_new_releases]]) }}
+  </h3>
+  <p class="muted small">Seuil et volume du scan quotidien des labels suivis pour la playlist YouTube
+    « RECOS RADAR » (Mes sources → RECOS RADAR).</p>
+  <div class="row wgroup__fields">
+    <div class="field"><label>Score album minimum
+      <input name="recos__min_score" type="number" step="1" value="{{ sc.recos.min_score }}"></label></div>
+    <div class="field"><label>Sorties max par scan
+      <input name="recos__max_new_releases" type="number" step="1" value="{{ sc.recos.max_new_releases }}"></label></div>
+  </div>
+
   <hr>
   <button class="primary" type="submit">💾 Enregistrer</button>
 </form>

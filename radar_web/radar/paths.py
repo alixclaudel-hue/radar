@@ -58,6 +58,7 @@ _PER_USER = {
     "recos_candidates": "recos_candidates.json",
     "recos_history": "recos_playlist_history.json",
     "youtube_oauth": "youtube_oauth.json",
+    "youtube_watch_state": "youtube_watch_state.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

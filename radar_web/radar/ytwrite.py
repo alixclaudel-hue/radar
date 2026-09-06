@@ -52,17 +52,24 @@ def client_config(redirect_uri):
 
 
 def authorization_url(redirect_uri):
-    """URL de consentement Google + state (à revalider au retour, cf. route callback)."""
+    """URL de consentement Google + state + code_verifier PKCE — les deux à
+    revalider/réutiliser au retour (cf. route callback). `Flow.authorization_url()`
+    génère le code_verifier et n'envoie que le code_challenge (dérivé) à Google ;
+    il faut donc le transporter nous-mêmes jusqu'à l'échange (google-auth-oauthlib
+    ne le fait pas pour nous entre deux objets Flow distincts, un par requête HTTP
+    ici) — sinon Google répond invalid_grant: Missing code verifier."""
     flow = Flow.from_client_config(client_config(redirect_uri), scopes=SCOPES, redirect_uri=redirect_uri)
     url, state = flow.authorization_url(
         access_type="offline", prompt="consent", include_granted_scopes="true")
-    return url, state
+    return url, state, flow.code_verifier
 
 
-def exchange_code(redirect_uri, code):
+def exchange_code(redirect_uri, code, code_verifier):
     """Échange le code d'autorisation contre des identifiants — à appeler depuis
-    la route de callback, puis `save_credentials(uid, creds)`."""
-    flow = Flow.from_client_config(client_config(redirect_uri), scopes=SCOPES, redirect_uri=redirect_uri)
+    la route de callback avec le MÊME code_verifier que celui généré par
+    authorization_url() (cf. sa docstring), puis `save_credentials(uid, creds)`."""
+    flow = Flow.from_client_config(client_config(redirect_uri), scopes=SCOPES,
+                                   redirect_uri=redirect_uri, code_verifier=code_verifier)
     flow.fetch_token(code=code)
     return flow.credentials
 

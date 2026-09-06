@@ -313,7 +313,7 @@ def _last_import(job):
 
 @app.get("/patte", response_class=HTMLResponse)
 def patte_page(request: Request, saved: int = 0, yt_connected: int = 0, yt_error: str = ""):
-    from .radar import ytwrite     # import local : dépendance lourde optionnelle (cf. CI, oauth_youtube_start)
+    from .radar import ytwatch, ytwrite   # imports locaux : dépendances optionnelles (cf. CI)
     c = Ctx()
     pl_urls = [u for u in (c.cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
     sp_urls = [u for u in (c.cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
@@ -330,6 +330,7 @@ def patte_page(request: Request, saved: int = 0, yt_connected: int = 0, yt_error
                   src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding,
                   recos_connected=ytwrite.is_connected(c.uid),
                   recos_pending=len(load(_pu().recos_candidates, [])),
+                  recos_watch_session=ytwatch.has_session(c.uid),
                   yt_connected=yt_connected, yt_error=yt_error)
 
 
@@ -354,12 +355,16 @@ def oauth_youtube_start(request: Request):
     recommandé par Google."""
     from .radar import ytwrite
     try:
-        url, state = ytwrite.authorization_url(_yt_oauth_redirect_uri(request))
+        url, state, code_verifier = ytwrite.authorization_url(_yt_oauth_redirect_uri(request))
     except ytwrite.YouTubeAuthError as e:
         return _yt_oauth_error_redirect(str(e))
     resp = RedirectResponse(url, status_code=303)
     secure = os.environ.get("RADAR_SECURE_COOKIE") == "1" or _https(request)
     resp.set_cookie("yt_oauth_state", state, max_age=600, httponly=True, samesite="lax", secure=secure)
+    # PKCE : le code_verifier généré ici doit être réutilisé tel quel à l'échange
+    # (cf. ytwrite.authorization_url) — transporté comme le state, par cookie court.
+    resp.set_cookie("yt_oauth_verifier", code_verifier, max_age=600, httponly=True,
+                    samesite="lax", secure=secure)
     return resp
 
 
@@ -369,15 +374,17 @@ def oauth_youtube_callback(request: Request, code: str = "", state: str = "", er
     if error:
         return _yt_oauth_error_redirect(f"Autorisation refusée ({error}).")
     expected = request.cookies.get("yt_oauth_state", "")
-    if not code or not state or not expected or state != expected:
+    code_verifier = request.cookies.get("yt_oauth_verifier", "")
+    if not code or not state or not expected or state != expected or not code_verifier:
         return _yt_oauth_error_redirect("Échange OAuth invalide (état expiré ou incohérent) — réessaie.")
     try:
-        creds = ytwrite.exchange_code(_yt_oauth_redirect_uri(request), code)
+        creds = ytwrite.exchange_code(_yt_oauth_redirect_uri(request), code, code_verifier)
     except Exception as e:                       # noqa: BLE001 — flux Google, forme d'erreur variable
         return _yt_oauth_error_redirect(f"Échange du code YouTube : {type(e).__name__}: {e}")
     ytwrite.save_credentials(store.current_uid(), creds)
     resp = RedirectResponse("/patte?yt_connected=1", status_code=303)
     resp.delete_cookie("yt_oauth_state")
+    resp.delete_cookie("yt_oauth_verifier")
     return resp
 
 
@@ -385,6 +392,24 @@ def oauth_youtube_callback(request: Request, code: str = "", state: str = "", er
 def oauth_youtube_disconnect():
     from .radar import ytwrite
     ytwrite.disconnect(store.current_uid())
+    return RedirectResponse("/patte", status_code=303)
+
+
+@app.post("/patte/youtube-session/upload")
+async def youtube_session_upload(file: UploadFile):
+    """Import de storage_state.json (session de visionnage YouTube, cf.
+    scripts/export_youtube_session.py) — sert au nettoyage automatique de RECOS RADAR
+    (lot 3, radar/ytwatch.py), jamais à la playlist elle-même (OAuth2, ytwrite.py)."""
+    from .radar import ytwatch
+    raw = await file.read()
+    ytwatch.save_session(store.current_uid(), raw)
+    return RedirectResponse("/patte?yt_connected=1", status_code=303)
+
+
+@app.post("/patte/youtube-session/clear")
+def youtube_session_clear():
+    from .radar import ytwatch
+    ytwatch.clear_session(store.current_uid())
     return RedirectResponse("/patte", status_code=303)
 
 
@@ -1991,7 +2016,7 @@ def univers_artists_export():
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
               "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog",
-              "import_discogs_dump", "scan_recos", "publish_recos"}
+              "import_discogs_dump", "scan_recos", "publish_recos", "clean_recos"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 

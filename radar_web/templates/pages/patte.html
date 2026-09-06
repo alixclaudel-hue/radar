@@ -93,6 +93,28 @@
       </div>
       {% endif %}
       <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+
+      <hr style="margin:12px 0">
+      <p class="small"><b>Nettoyage automatique</b> — retire de la playlist ce que tu as déjà écouté
+        (lu depuis ta page d'historique YouTube, pas d'API officielle pour ça).
+        <span class="tag">{% if recos_watch_session %}<span class="ok">✓ session importée</span>{% else %}session absente{% endif %}</span></p>
+      <p class="small muted">Génère le fichier de session une fois, en local, avec
+        <code>scripts/export_youtube_session.py</code> (ouvre un vrai Chrome, tu te connectes à la main),
+        puis importe-le ici.</p>
+      <form method="post" action="/patte/youtube-session/upload" enctype="multipart/form-data"
+            style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="file" name="file" accept=".json" required>
+        <button type="submit" class="small">Importer la session de visionnage</button>
+      </form>
+      {% if recos_watch_session %}
+      <div class="btnrow" style="margin-top:6px">
+        <button type="button" class="small" hx-post="/patte/run/clean_recos" hx-target="#job-clean_recos" hx-swap="outerHTML">🧹 Nettoyer maintenant</button>
+        <form method="post" action="/patte/youtube-session/clear" style="display:inline">
+          <button type="submit" class="small" hx-confirm="Retirer la session de visionnage importée ?">Retirer la session</button>
+        </form>
+      </div>
+      <div id="job-clean_recos" hx-get="/jobs/clean_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+      {% endif %}
     </div>
   </details>
 

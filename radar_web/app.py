@@ -355,12 +355,16 @@ def oauth_youtube_start(request: Request):
     recommandé par Google."""
     from .radar import ytwrite
     try:
-        url, state = ytwrite.authorization_url(_yt_oauth_redirect_uri(request))
+        url, state, code_verifier = ytwrite.authorization_url(_yt_oauth_redirect_uri(request))
     except ytwrite.YouTubeAuthError as e:
         return _yt_oauth_error_redirect(str(e))
     resp = RedirectResponse(url, status_code=303)
     secure = os.environ.get("RADAR_SECURE_COOKIE") == "1" or _https(request)
     resp.set_cookie("yt_oauth_state", state, max_age=600, httponly=True, samesite="lax", secure=secure)
+    # PKCE : le code_verifier généré ici doit être réutilisé tel quel à l'échange
+    # (cf. ytwrite.authorization_url) — transporté comme le state, par cookie court.
+    resp.set_cookie("yt_oauth_verifier", code_verifier, max_age=600, httponly=True,
+                    samesite="lax", secure=secure)
     return resp
 
 
@@ -370,15 +374,17 @@ def oauth_youtube_callback(request: Request, code: str = "", state: str = "", er
     if error:
         return _yt_oauth_error_redirect(f"Autorisation refusée ({error}).")
     expected = request.cookies.get("yt_oauth_state", "")
-    if not code or not state or not expected or state != expected:
+    code_verifier = request.cookies.get("yt_oauth_verifier", "")
+    if not code or not state or not expected or state != expected or not code_verifier:
         return _yt_oauth_error_redirect("Échange OAuth invalide (état expiré ou incohérent) — réessaie.")
     try:
-        creds = ytwrite.exchange_code(_yt_oauth_redirect_uri(request), code)
+        creds = ytwrite.exchange_code(_yt_oauth_redirect_uri(request), code, code_verifier)
     except Exception as e:                       # noqa: BLE001 — flux Google, forme d'erreur variable
         return _yt_oauth_error_redirect(f"Échange du code YouTube : {type(e).__name__}: {e}")
     ytwrite.save_credentials(store.current_uid(), creds)
     resp = RedirectResponse("/patte?yt_connected=1", status_code=303)
     resp.delete_cookie("yt_oauth_state")
+    resp.delete_cookie("yt_oauth_verifier")
     return resp
 
 

@@ -5,6 +5,12 @@ description: Boucle dev cloud ↔ diagnostic VPS. À lire par la session de dev 
 
 # Boucle dev cloud ↔ diag VPS
 
+> **⏸️ EN PAUSE depuis le 2026-09-06.** L'utilisateur a jugé la boucle non
+> fonctionnelle et a désactivé le trigger `diag-vps` (`enabled: false`). Ne
+> déclenche rien de ce qui suit (pas de `fire_trigger`, pas d'issue `Diag
+> <sha>`) sans demande explicite de sa part. Ce fichier reste comme
+> référence pour une reprise éventuelle.
+
 Tu es la session de dev cloud. Tu codes, tu ouvres les PR, tu merges. Tu ne vois
 ni la base réelle, ni les conteneurs, ni les jobs : c'est la session de
 diagnostic sur le VPS qui les voit (contrat : `.claude/skills/diag/SKILL.md`).

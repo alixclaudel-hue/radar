@@ -30,13 +30,13 @@ quand un détail précis manque au résumé ci-dessous.
    ce fichier + `docs/` sont la source de vérité. Marche : éditer, `py_compile`, smoke
    test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub
    uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour un appel réel).
-5. **Deux sessions complémentaires** : dev cloud (celle-ci — code/PR/merge, seule à
-   parler à l'utilisateur) + diagnostic VPS (`session_01KbkY8jHGMbLLgkkQb8Kj6d` — lecture
-   seule sur code/données réelles, ne corrige jamais). Boucle : merge → déploiement auto →
-   dev cloud réveille la diag → rapport en commentaire GitHub `Diag <sha>` → dev cloud
-   corrige et synthétise. Contrats : `.claude/skills/diag/SKILL.md` +
-   `.claude/skills/dev-loop/SKILL.md`. Max 3 allers-retours par déploiement, puis
-   escalade à l'utilisateur.
+5. **Boucle diag VPS — en pause depuis le 2026-09-06** (jugée non fonctionnelle par
+   l'utilisateur, latence de livraison jamais fiabilisée). Le trigger `diag-vps` est
+   désactivé (`enabled: false`) : **ne pas le réactiver, ne pas ouvrir d'issue `Diag <sha>`,
+   ne pas appeler `fire_trigger` dessus**, sans demande explicite de l'utilisateur. Reprise
+   possible plus tard. Contrats (gelés, gardés pour référence) : `.claude/skills/diag/SKILL.md`
+   + `.claude/skills/dev-loop/SKILL.md`. La session `session_01KbkY8jHGMbLLgkkQb8Kj6d`
+   (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
 6. **Conventions** : `py_compile` + smoke test local avant chaque push (double de la CI) ;
    **jamais `git add -A`** (ajouter les fichiers nommément, relire `git status`) ;
    commits/commentaires **en français** ; pas de commentaires superflus (le *pourquoi*,

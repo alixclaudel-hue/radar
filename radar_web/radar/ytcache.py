@@ -92,7 +92,8 @@ def request(path, params, keys, timeout=15):
 
 
 def search_video(query, keys, ttl=7 * 86400):
-    """videoId de la 1re vidéo pour `query` (mise en cache). None si rien / pas de clé."""
+    """videoId de la meilleure vidéo pour `query`, encore lisible (mise en cache).
+    None si rien / pas de clé."""
     q = " ".join((query or "").split())
     if not q or not keys:
         return None
@@ -100,8 +101,30 @@ def search_video(query, keys, ttl=7 * 86400):
     hit = cache_get(ckey, ttl)
     if hit is not None:
         return hit or None
-    d = request("/search", {"part": "id", "type": "video", "maxResults": 1, "q": q}, keys)
-    items = d.get("items", [])
-    vid = (items[0].get("id", {}) or {}).get("videoId", "") if items else ""
+    d = request("/search", {"part": "id", "type": "video", "maxResults": 5, "q": q}, keys)
+    ids = [((it.get("id") or {}).get("videoId") or "") for it in d.get("items", [])]
+    ids = [i for i in ids if i]
+    vid = _first_playable(ids, keys) if ids else ""
     cache_put(ckey, vid)
     return vid or None
+
+
+def _first_playable(ids, keys):
+    """1er id parmi `ids` (ordre de pertinence) dont YouTube confirme le statut lisible
+    (uploadStatus "processed", pas privé) — une recherche peut remonter une vidéo
+    supprimée/privée entre l'indexation et l'affichage (retour nt_b10a9ba00f : "cette
+    vidéo n'est plus disponible"). Repli sur le 1er id brut si l'appel de vérif échoue,
+    plutôt que de ne rien renvoyer."""
+    try:
+        d = request("/videos", {"part": "status", "id": ",".join(ids)}, keys)
+    except (QuotaExhausted, RuntimeError):
+        return ids[0]
+    ok = {}
+    for it in d.get("items", []):
+        st = it.get("status", {})
+        ok[it.get("id")] = (st.get("uploadStatus") == "processed"
+                             and st.get("privacyStatus") in ("public", "unlisted"))
+    for i in ids:
+        if ok.get(i):
+            return i
+    return ids[0]

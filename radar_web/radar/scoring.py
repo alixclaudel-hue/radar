@@ -394,7 +394,15 @@ class Ctx:
         return agg
 
     def label_artist_signal(self):
-        """{label_norm: (somme des scores d'artiste / 100, nb)} — via le corpus (v0)."""
+        """{label_norm: (somme des scores d'artiste / 100, nb)} — via le corpus (v0).
+
+        Différent de `label_db_signal` (db_link) malgré l'objet commun ("un artiste
+        aimé est-il lié à ce label ?") : ici seulement les labels réellement ÉCOUTÉS
+        (corpus YouTube/Spotify/Bandcamp/DJ sets), pondéré par le score de l'artiste —
+        signal comportemental, étroit mais fiable. `db_link` couvre tout le catalogue
+        Discogs (même jamais écouté) — signal structurel, large mais indirect. Les deux
+        se chevauchent quand un titre écouté est aussi au catalogue (cas courant),
+        volontairement : ni redondant ni bug (retour nt_9af67eaeb8)."""
         asc = self.ascore
         out = {}
         for r in self.corpus:

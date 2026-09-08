@@ -1180,13 +1180,19 @@ def _notes_sorted():
     return sorted(load(_pu().ui_notes, []), key=lambda n: n.get("ts", ""), reverse=True)
 
 
+def _gh_feedback_headers(token):
+    return {"Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json", "User-Agent": "Radar/1.0"}
+
+
 def _post_feedback_to_github(note):
     """Relaie une note sur l'issue GitHub permanente (#62) — best-effort : sans
     token configuré (RADAR_FEEDBACK_GH_TOKEN) ou en cas d'erreur réseau, la note
-    reste de toute façon dans ui_notes.json, rien n'est perdu."""
+    reste de toute façon dans ui_notes.json, rien n'est perdu.
+    Renvoie l'id du commentaire créé (pour pouvoir le supprimer plus tard), ou None."""
     token = os.environ.get("RADAR_FEEDBACK_GH_TOKEN", "")
     if not token:
-        return False
+        return None
     body = f"**Nouveau retour** — `{note['page']}`\n\n"
     if note.get("target"):
         body += f"> à propos de : {note['target']}\n\n"
@@ -1194,12 +1200,52 @@ def _post_feedback_to_github(note):
     try:
         r = requests.post(
             f"https://api.github.com/repos/{FEEDBACK_GH_REPO}/issues/{FEEDBACK_GH_ISSUE}/comments",
-            json={"body": body}, timeout=10,
-            headers={"Authorization": f"Bearer {token}",
-                     "Accept": "application/vnd.github+json", "User-Agent": "Radar/1.0"})
-        return r.ok
+            json={"body": body}, timeout=10, headers=_gh_feedback_headers(token))
+        return r.json().get("id") if r.ok else None
     except requests.RequestException:
-        return False
+        return None
+
+
+def _find_gh_comment_id(headers, note_id):
+    """Retrouve l'id du commentaire GitHub d'une note qui n'a pas de gh_comment_id
+    stocké (notes créées avant son ajout) — recherche sur le marqueur `_id: ...`
+    inséré dans le corps par `_post_feedback_to_github`. Pagine jusqu'à la fin."""
+    page = 1
+    while True:
+        try:
+            r = requests.get(
+                f"https://api.github.com/repos/{FEEDBACK_GH_REPO}/issues/{FEEDBACK_GH_ISSUE}/comments",
+                params={"per_page": 100, "page": page}, timeout=10, headers=headers)
+        except requests.RequestException:
+            return None
+        if not r.ok:
+            return None
+        items = r.json()
+        for c in items:
+            if f"_id: {note_id}_" in (c.get("body") or ""):
+                return c.get("id")
+        if len(items) < 100:
+            return None
+        page += 1
+
+
+def _delete_feedback_from_github(note):
+    """Supprime le commentaire GitHub associé à une note traitée — best-effort comme
+    _post_feedback_to_github : sans token ou en cas d'erreur réseau, la note locale
+    est quand même supprimée (elle est traitée, rien à rattraper côté appli)."""
+    token = os.environ.get("RADAR_FEEDBACK_GH_TOKEN", "")
+    if not token:
+        return
+    headers = _gh_feedback_headers(token)
+    cid = note.get("gh_comment_id") or _find_gh_comment_id(headers, note.get("id", ""))
+    if not cid:
+        return
+    try:
+        requests.delete(
+            f"https://api.github.com/repos/{FEEDBACK_GH_REPO}/issues/comments/{cid}",
+            timeout=10, headers=headers)
+    except requests.RequestException:
+        pass
 
 
 @app.get("/feedback", response_class=HTMLResponse)
@@ -1215,7 +1261,8 @@ def feedback_add(page: str = Form(""), target: str = Form(""), note: str = Form(
     n = {"id": "nt_" + hashlib.md5(f"{time.time()}{note}".encode()).hexdigest()[:10],
          "ts": time.strftime("%Y-%m-%d %H:%M"), "page": page.strip(), "target": target.strip(),
          "note": note, "status": "nouveau"}
-    n["gh_posted"] = _post_feedback_to_github(n)
+    gh_id = _post_feedback_to_github(n)
+    n["gh_posted"], n["gh_comment_id"] = bool(gh_id), gh_id
     notes = load(_pu().ui_notes, [])
     notes.insert(0, n)
     save(_pu().ui_notes, notes)
@@ -1237,8 +1284,23 @@ def feedback_retry(request: Request, id: str = Form("")):
     notes = load(_pu().ui_notes, [])
     for n in notes:
         if n.get("id") == id:
-            n["gh_posted"] = _post_feedback_to_github(n)
+            gh_id = _post_feedback_to_github(n)
+            n["gh_posted"], n["gh_comment_id"] = bool(gh_id), gh_id
     save(_pu().ui_notes, notes)
+    return frag(request, "partials/feedback_list.html", notes=_notes_sorted())
+
+
+@app.post("/feedback/delete", response_class=HTMLResponse)
+def feedback_delete(request: Request, id: str = Form("")):
+    """Supprime une note traitée : côté appli (ui_notes.json) et, best-effort,
+    le commentaire GitHub associé sur l'issue #62 — une note supprimée ici ne doit
+    pas laisser de trace orpheline sur l'issue."""
+    notes = load(_pu().ui_notes, [])
+    note = next((n for n in notes if n.get("id") == id), None)
+    if note:
+        _delete_feedback_from_github(note)
+        notes = [n for n in notes if n.get("id") != id]
+        save(_pu().ui_notes, notes)
     return frag(request, "partials/feedback_list.html", notes=_notes_sorted())
 
 

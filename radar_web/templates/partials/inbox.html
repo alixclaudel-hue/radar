@@ -37,19 +37,20 @@
             </span>
           </div>
           <span class="wl-chevron" aria-hidden="true">{{ icons.tracks() }}</span>
+          <button type="button" class="small" onclick="event.stopPropagation()"
+                  hx-post="/inbox/{{ key_ns }}/dismiss"
+                  hx-vals='{"rid": "{{ it.release_id or it.listing_id }}"}'
+                  hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer">✕</button>
         </div>
         <div class="tracklist" hidden></div>
-        <div class="row" style="justify-content:space-between;align-items:center;padding:2px 2px 8px">
-          {% if r.score is not none %}
+        {% if r.score is not none %}
+        <div class="row" style="justify-content:flex-end;align-items:center;padding:2px 2px 8px">
           <span class="vote" hx-swap="outerHTML">
             <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
             <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
           </span>
-          {% else %}<span></span>{% endif %}
-          <button class="small" hx-post="/inbox/{{ key_ns }}/dismiss"
-                  hx-vals='{"rid": "{{ it.release_id or it.listing_id }}"}'
-                  hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer">✕</button>
         </div>
+        {% endif %}
       </div>
     {% endfor %}
   {% endif %}

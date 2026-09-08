@@ -89,8 +89,8 @@
   <p class="muted small">Poids appliqué selon le rang que tu donnes à un style ou un artiste : Cœur (référence)
     compte plus que Aimés (+) dans les scores ci-dessus — c'est ici qu'on règle l'écart entre les deux.</p>
   <div class="wgroup">
-    {{ wr.toile([['taste_tiers__1','style ♥'], ['artist_tiers__1','artiste ♥'],
-                 ['taste_tiers__2','style +'], ['artist_tiers__2','artiste +']]) }}
+    {{ wr.toile([['taste_tiers__1','style cat.1'], ['artist_tiers__1','artiste cat.1'],
+                 ['taste_tiers__2','style cat.2'], ['artist_tiers__2','artiste cat.2']]) }}
     <div class="row wgroup__fields">
       <div class="field"><label>Style — Cœur<input name="taste_tiers__1" type="number" step="0.05" value="{{ sc.taste_tiers['1'] }}"></label></div>
       <div class="field"><label>Style — Aimés<input name="taste_tiers__2" type="number" step="0.05" value="{{ sc.taste_tiers['2'] }}"></label></div>

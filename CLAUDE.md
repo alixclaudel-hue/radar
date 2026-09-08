@@ -5,13 +5,19 @@ Spotify, Bandcamp, DJ sets), profile tes labels/artistes, et note des sorties Di
 selon ton goût. Voir `docs/architecture.md` pour la cible multi-utilisateur (chantier en
 cours).
 
-**Reprise de contexte : lire `docs/etat.md`** — où en est le chantier, ce qui reste à
-faire (code + opérationnel), et les pièges déjà appris.
+**Reprise de contexte : ce fichier suffit** — l'état du chantier, la TODO et les pièges
+appris sont dans le résumé ci-dessous (fusionnés depuis l'ancien `docs/etat.md` lors du
+ménage du 2026-09-08).
 
 **Historique complet et détails techniques dans `claude_archive.md`** (mécanique du dump
-Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) — ce fichier est dans
-`.claudeignore` (non lu automatiquement) : le lire explicitement (`Read claude_archive.md`)
-quand un détail précis manque au résumé ci-dessous.
+Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et dans `docs/archive/`
+(anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) —
+ces fichiers sont dans `.claudeignore` (non lus automatiquement) : les lire explicitement
+(`Read <fichier>`) quand un détail précis manque au résumé ci-dessous.
+
+**Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`,
+`claude_archive.md`) : demander à l'utilisateur si c'est pertinent plutôt que le lire
+d'emblée.
 
 ## État actuel du projet — résumé
 
@@ -34,8 +40,10 @@ quand un détail précis manque au résumé ci-dessous.
    l'utilisateur, latence de livraison jamais fiabilisée). Le trigger `diag-vps` est
    désactivé (`enabled: false`) : **ne pas le réactiver, ne pas ouvrir d'issue `Diag <sha>`,
    ne pas appeler `fire_trigger` dessus**, sans demande explicite de l'utilisateur. Reprise
-   possible plus tard. Contrats (gelés, gardés pour référence) : `.claude/skills/diag/SKILL.md`
-   + `.claude/skills/dev-loop/SKILL.md`. La session `session_01KbkY8jHGMbLLgkkQb8Kj6d`
+   possible plus tard. Contrats (gelés, gardés pour référence, **déplacés hors
+   `.claude/skills/` donc non invocables** en l'état) : `docs/archive/skill-diag.md` +
+   `docs/archive/skill-dev-loop.md`. Pour réactiver `/diag`/`/dev-loop`, les replacer dans
+   `.claude/skills/<nom>/SKILL.md`. La session `session_01KbkY8jHGMbLLgkkQb8Kj6d`
    (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
 6. **Conventions** : `py_compile` + smoke test local avant chaque push (double de la CI) ;
    **jamais `git add -A`** (ajouter les fichiers nommément, relire `git status`) ;
@@ -71,3 +79,17 @@ quand un détail précis manque au résumé ci-dessous.
     Jobs `scan_recos` → `publish_recos` (chaînés), `clean_recos` (volontairement séparé,
     `RADAR_RECOS_CLEANUP` distinct de `RADAR_RECOS_SCAN`, pas encore validé en réel).
     Wantlist RADAR (2ᵉ feature du même chantier) : pas commencée.
+18. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
+    faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
+    partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —
+    besoin d'un nom de domaine pointant sur le VPS), puis l'étape 5b (OAuth
+    Discogs/Spotify — exige aussi 2 apps développeur enregistrées). À la reprise de 5b,
+    envisager `/model` Opus pour l'implémentation OAuth + toute migration de schéma.
+19. **TODO opérationnel** : lancer le scan vendeurs une fois à la main (Réglages →
+    Catalogue de vendeurs, ~1 h pour 141 vendeurs), puis poser `RADAR_SELLER_SCAN=1` sur
+    le service `radar-worker` (compose, pas le `.env` VPS) pour activer le scan hebdo
+    automatique.
+20. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
+    `.tbl` partagé (recopié dans 3 partials), multi-selects genre/style, `<label for>` non
+    reliés (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche,
+    UI de revue des artistes « approx », suppression par track/DJ dans Mes sets.

@@ -19,6 +19,10 @@
         <option value="{{ s }}" {{ 'selected' if n.status == s }}>{{ s }}</option>
         {% endfor %}
       </select>
+      <button type="button" class="small" hx-post="/feedback/delete" hx-vals='{"id": "{{ n.id }}"}'
+              hx-target="#fb-list" hx-swap="outerHTML" style="flex:0 0 auto"
+              hx-confirm="Supprimer définitivement cette note (et son commentaire GitHub) ?"
+              title="Supprimer (retour déjà traité)">🗑</button>
     </div>
     {% endfor %}
   </div>

@@ -10,11 +10,6 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
 
 **Mode caveman par défaut** : invoquer skill `caveman` (`.claude/skills/caveman/SKILL.md`, niveau `full`) en début de session, sauf demande contraire. S'applique aux réponses conversationnelles ; code, commits, doc, tickets restent en prose normale (cf. Boundaries du skill).
 
-**Mode caveman par défaut** : invoquer le skill `caveman`
-(`.claude/skills/caveman/SKILL.md`, niveau `full`) en tout début de session, sauf
-demande contraire de l'utilisateur. S'applique aux réponses conversationnelles ; le code,
-les commits, la doc et les tickets restent en prose normale (cf. Boundaries du skill).
-
 ## État actuel du projet — résumé
 
 1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, interface) ; `crate_jobs.py` (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli Streamlit, retirée 2026-09-01, **ne pas y toucher**).
@@ -80,3 +75,47 @@ les commits, la doc et les tickets restent en prose normale (cf. Boundaries du s
     `.tbl` partagé (recopié dans 3 partials), multi-selects genre/style, `<label for>` non
     reliés (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche,
     UI de revue des artistes « approx », suppression par track/DJ dans Mes sets.
+24. **Piège — `step` HTML5 sans `min`** (`settings.html`) : le pas (`step="0.05"`) prend la
+    valeur initiale du champ comme base si `min` est absent — un poids par défaut non
+    multiple de ce pas (ex. `artist_score.corpus: 0.18`) rend le champ invalide dès qu'on
+    le modifie via la toile de pondération, ce qui bloque tout le formulaire en silence
+    (champ masqué une fois la toile chargée → aucune bulle d'erreur visible, "Enregistrer"
+    ne fait rien). Corrigé (PR #85) : `step="any"` sur les 7 groupes de poids de Réglages —
+    à vérifier sur tout nouveau champ de poids ajouté.
+25. **Boutiques vérifiées en vente** (`radar/volumo.py`, résultats de recherche, PR #86) :
+    le bouton 🛍️ ne montre un lien que si le disque est confirmé en vente (plus de liste
+    statique de recherche à l'aveugle, cf. retour issue #62 du 09/09). Volumo a une vraie
+    API JSON publique et stable (`/api/v1/{tracks,albums}/search`, utilisée par leur propre
+    site Next.js) → seule boutique intégrée. Écartés après vérification réseau réelle :
+    Beatport et Traxsource (Cloudflare, challenge JS, même piège que le Marketplace
+    Discogs point 7), Bleep (AWS WAF), 7digital (`/search` bloqué par AWS WAF/captcha même
+    une fois le sous-domaine régional `us.7digital.com` atteint), Junodownload (site fermé).
+26. **Piège — export session YouTube** (`scripts/export_youtube_session.py`, RECOS RADAR
+    lot 3) : deux blocages Google/Chrome distincts rencontrés en conditions réelles
+    (Windows), corrigés en itérant sur 3 PR (#87-#89) — à relire avant de retoucher ce
+    script :
+    - Un Chrome vierge piloté par Playwright dirigé vers la connexion Google est détecté
+      comme automatisé et refusé (« ce navigateur ou cette application n'est pas
+      sécurisée »). Corrigé en réutilisant le vrai profil Chrome de l'utilisateur (déjà
+      connecté au quotidien) via `launch_persistent_context` — aucune connexion n'est
+      tentée dans l'automation.
+    - Chrome refuse d'activer le pilotage à distance (nécessaire à Playwright) si
+      `--user-data-dir` pointe vers l'emplacement par défaut du système (mesure anti-
+      malware, indépendante de channel/OS). Corrigé en copiant le profil (hors dossiers
+      de cache) dans un dossier temporaire avant de le piloter, supprimé après usage.
+    Nettoyage RECOS RADAR (`clean_recos`/`ytwatch.py`) toujours pas confirmé fonctionnel
+    de bout en bout au moment de la rédaction (import de session pas encore réussi côté
+    utilisateur) — à vérifier au prochain retour avant de considérer ce lot terminé.
+27. **TODO RECOS RADAR — plafond playlist** (retour utilisateur du 09/09) : plafonner la
+    playlist à 100 pistes, réapprovisionner chaque jour à hauteur des pistes retirées,
+    sans doublon entre générations. Décision actée avec l'utilisateur : retrait
+    **uniquement** par écoute réelle (`clean_recos`), pas de repli par ancienneté — donc
+    bloqué tant que le nettoyage par historique n'est pas confirmé fonctionnel (point 26).
+    Le plafond lui-même n'existe pas encore dans le code (aucune limite de taille sur la
+    playlist à ce jour).
+28. **TODO identifié — pertinence recherche YouTube** (`ytcache.search_video`) : prend le
+    1er résultat de recherche sans vérifier la pertinence (contrairement à
+    `bandcamp.py`/`volumo.py` qui scorent par recouvrement de mots artiste/titre) — cause
+    de vidéos hors-sujet ajoutées à RECOS RADAR (retour utilisateur du 09/09). Piste de
+    correction identifiée (même principe de score, quasi gratuit en quota car `/videos`
+    est déjà appelé pour vérifier la lisibilité), pas encore implémentée.

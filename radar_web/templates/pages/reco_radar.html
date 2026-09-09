@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Reco Radar · Radar{% endblock %}
+{% block content %}
+<h1>🎯 Reco Radar</h1>
+<p class="muted small">Playlist alimentée automatiquement à partir des sorties de tes labels suivis
+  (score album ≥ seuil réglable dans Réglages) — {{ n_playlist }}/{{ max_tracks }} piste{{ 's' if n_playlist > 1 }}.
+  Au-delà de {{ max_tracks }}, la plus ancienne est retirée pour laisser la place à la suivante.</p>
+
+<p class="small">
+  <span class="tag">{{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} en attente{% if last_scan %} · dernier scan {{ last_scan }}{% endif %}{% if last_publish %} · dernière publication {{ last_publish }}{% endif %}</span>
+</p>
+<div class="btnrow">
+  <button type="button" class="small" hx-post="/patte/run/scan_recos" hx-target="#job-scan_recos" hx-swap="outerHTML">🔄 Scanner maintenant</button>
+</div>
+<div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+<div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+
+{% if not playlist %}
+<p class="muted small" style="margin-top:16px">Playlist vide — lance un scan ci-dessus (nécessite un token Discogs et
+  au moins un label suivi, cf. <a href="/patte">Mes sources</a>).</p>
+{% else %}
+<div class="yt-player-wrap"><div id="yt-player"></div></div>
+
+<div class="tbl-wrap">
+<table class="tbl">
+  <thead><tr>
+    <th style="width:34px">#</th>
+    <th>Piste</th>
+    <th>Label</th>
+    <th class="num" style="width:60px">Année</th>
+    <th class="num" style="width:60px">Score</th>
+  </tr></thead>
+  <tbody id="reco-rows">
+    {% for t in playlist %}
+    <tr data-index="{{ loop.index0 }}">
+      <td class="small muted">{{ loop.index }}</td>
+      <td>{{ t.artist }} — {{ t.title }}</td>
+      <td>{% if t.label %}<a href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}</td>
+      <td class="num small muted">{{ t.year or '—' }}</td>
+      <td class="num small muted">{{ t.album_score }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+(() => {
+  const videoIds = {{ playlist | map(attribute='video_id') | list | tojson }};
+  const rows = document.querySelectorAll('#reco-rows tr');
+  let player = null;
+
+  function highlight(index) {
+    rows.forEach(r => r.classList.toggle('now-playing', Number(r.dataset.index) === index));
+    const active = rows[index];
+    if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  rows.forEach(r => r.addEventListener('click', () => {
+    if (player) player.playVideoAt(Number(r.dataset.index));
+  }));
+
+  window.onYouTubeIframeAPIReady = () => {
+    player = new YT.Player('yt-player', {
+      playerVars: { playsinline: 1 },
+      events: {
+        onReady: () => player.loadPlaylist({ playlist: videoIds, index: 0 }),
+        onStateChange: () => highlight(player.getPlaylistIndex()),
+      },
+    });
+  };
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.body.appendChild(tag);
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -40,18 +40,12 @@ _last_dump_check = 0.0
 AUTO_MAINT_EVERY = {"canonicalize": 7 * 86400, "profile_labels": 7 * 86400, "build_graph": 30 * 86400}
 _last_auto_maint_check = 0.0
 
-# RECOS RADAR (lots 1+2, candidats + publication) : opt-in via RADAR_RECOS_SCAN=1, un
-# scan par jour. Fonctionnalité personnelle (un seul owner en pratique) -> pas de
-# round-robin par utilisateur nécessaire, mêmes conventions que les scans ci-dessus.
+# RECOS RADAR (candidats + publication dans la playlist interne à Radar, cf.
+# crate_jobs.job_publish_recos) : opt-in via RADAR_RECOS_SCAN=1, un scan par jour.
+# Fonctionnalité personnelle (un seul owner en pratique) -> pas de round-robin par
+# utilisateur nécessaire, mêmes conventions que les scans ci-dessus.
 RECOS_SCAN_EVERY = 86400
 _last_recos_check = 0.0
-
-# RECOS RADAR (lot 3, nettoyage par historique de visionnage) : opt-in SÉPARÉ via
-# RADAR_RECOS_CLEANUP=1 — seule vraie inconnue technique du lot (scraping Playwright
-# non documenté, cf. radar/ytwatch.py) : un opt-in dédié pour ne jamais bloquer
-# scan_recos/publish_recos (API stables) si ce nettoyage casse.
-RECOS_CLEANUP_EVERY = 86400
-_last_recos_cleanup_check = 0.0
 
 
 def _maybe_weekly_scan():
@@ -142,7 +136,8 @@ def _maybe_auto_maintenance():
 
 def _maybe_recos_scan():
     """Enfile scan_recos (owner) une fois par jour — remplit recos_candidates.json,
-    consommé plus tard par l'ajout à la playlist YouTube (lot 2, pas encore fait)."""
+    consommé par publish_recos (chaîné automatiquement) pour alimenter la playlist
+    RECOS RADAR interne à Radar (recos_playlist.json, lue par /reco-radar)."""
     global _last_recos_check
     if os.environ.get("RADAR_RECOS_SCAN") != "1":
         return
@@ -157,27 +152,6 @@ def _maybe_recos_scan():
         print("[worker] scan_recos quotidien enfilé", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] recos scan check : {e}", file=sys.stderr, flush=True)
-
-
-def _maybe_recos_cleanup():
-    """Enfile clean_recos (owner) une fois par jour — retire de la playlist RECOS
-    RADAR ce qui a déjà été écouté. Opt-in séparé de scan_recos/publish_recos (cf.
-    RECOS_CLEANUP_EVERY plus haut)."""
-    global _last_recos_cleanup_check
-    if os.environ.get("RADAR_RECOS_CLEANUP") != "1":
-        return
-    if time.time() - _last_recos_cleanup_check < 3600:
-        return
-    _last_recos_cleanup_check = time.time()
-    try:
-        queued_names = {j["name"] for j in jobs.load_queue()}
-        if ("clean_recos" in queued_names
-                or time.time() - _last_successful_run("clean_recos") < RECOS_CLEANUP_EVERY):
-            return
-        jobs.launch("clean_recos", {}, uid=paths.DEFAULT_UID)
-        print("[worker] clean_recos quotidien enfilé", file=sys.stderr, flush=True)
-    except Exception as e:                       # noqa: BLE001
-        print(f"[worker] recos cleanup check : {e}", file=sys.stderr, flush=True)
 
 
 def _pick(q, last_uid):
@@ -216,7 +190,6 @@ def main():
             _maybe_monthly_dump_sync()
             _maybe_auto_maintenance()
             _maybe_recos_scan()
-            _maybe_recos_cleanup()
             time.sleep(POLL)
             continue
         job["state"] = "running"

@@ -85,7 +85,8 @@ SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
 RECOS_SEEN_PATH = os.path.join(USER_DIR, "recos_seen.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
-RECOS_PLAYLIST_NAME = "RECOS RADAR"
+RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
+RECOS_MAX_TRACKS = 100
 
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
@@ -2009,17 +2010,15 @@ def job_scan_veille(job, params):
 
 
 def job_scan_recos(job, params):
-    """Candidats pour la playlist YouTube "RECOS RADAR" (Fonctionnalité 1, lot 1) :
-    liste les sorties du référentiel Discogs local (radar/discogs_dump.py) sur les
-    labels suivis (base + veille implicite), les note avec Ctx.album_score (même
-    système que la Recherche — pas une nouvelle formule), garde celles au-dessus du
-    seuil configuré (scoring.recos.min_score) triées par score décroissant, et
-    récupère leur tracklist réelle (API Discogs à la demande — le dump n'en
-    contient pas, cf. discogs_dump.py) pour empiler des candidats PAR PISTE dans
-    recos_candidates.json. Ne cherche/n'ajoute rien sur YouTube ici : la recherche
-    vidéo + l'écriture sur la playlist (OAuth2) sont un job séparé (lot 2) qui
-    consommera cette file — ce découpage isole tout ce qui a besoin d'un token
-    d'écriture YouTube de ce qui n'en a pas besoin.
+    """Candidats pour la playlist RECOS RADAR (Fonctionnalité 1, lot 1) : liste les
+    sorties du référentiel Discogs local (radar/discogs_dump.py) sur les labels suivis
+    (base + veille implicite), les note avec Ctx.album_score (même système que la
+    Recherche — pas une nouvelle formule), garde celles au-dessus du seuil configuré
+    (scoring.recos.min_score) triées par score décroissant, et récupère leur tracklist
+    réelle (API Discogs à la demande — le dump n'en contient pas, cf. discogs_dump.py)
+    pour empiler des candidats PAR PISTE dans recos_candidates.json. Ne cherche rien sur
+    YouTube ici : la recherche vidéo (job séparé, lot 2, cf. job_publish_recos) consommera
+    cette file.
 
     recos_seen.json évite de retraiter une sortie déjà vue à chaque lancement : un
     dump est un instantané mensuel, search_local() renverrait sinon indéfiniment
@@ -2108,115 +2107,59 @@ def _chain_publish_recos():
 
 
 def job_publish_recos(job, params):
-    """Recherche YouTube + ajout à la playlist "RECOS RADAR" (Fonctionnalité 1, lot 2) —
-    consomme la file produite par job_scan_recos (recos_candidates.json), aucun
-    scoring/matching ici. Nécessite YouTube connecté en écriture (OAuth2, cf.
-    radar/ytwrite.py, jeton par utilisateur) ; la recherche vidéo (lecture, moins
-    coûteuse) passe par ytcache (cache partagé + cascade de clés déjà en place,
-    Option A étape 5a) — deux quotas YouTube bien distincts, ce job ne consomme QUE
-    celui d'écriture (playlistItems.insert)."""
-    from radar_web.radar import ytwrite as yw
+    """Recherche YouTube + ajout à la playlist RECOS RADAR (Fonctionnalité 1, lot 2) —
+    consomme la file produite par job_scan_recos (recos_candidates.json). La playlist
+    est interne à Radar (recos_playlist.json), pas une vraie playlist YouTube : rien à
+    créer/gérer côté compte Google, la page /reco-radar lit ce fichier et lit les
+    vidéos via l'API IFrame Player. Seul appel réseau ici : la recherche vidéo (lecture
+    seule) via ytcache (cache partagé + cascade de clés, Option A étape 5a).
 
+    Plafonnée à RECOS_MAX_TRACKS pistes : au-delà, la plus ancienne est retirée avant
+    d'ajouter la nouvelle (FIFO) — pas de détection d'écoute réelle (l'ancien lot 3,
+    scraping Playwright de l'historique YouTube, a été abandonné, cf. CLAUDE.md)."""
     candidates = load_json(RECOS_CANDIDATES_PATH, [])
     if not candidates:
         return job.finish("Aucun candidat en attente.")
-    try:
-        client = yw.get_client(RADAR_UID)
-    except yw.YouTubeAuthError as e:
-        return job.finish(error=f"YouTube non connecté en écriture : {e}")
 
-    playlist_name = params.get("playlist_name") or RECOS_PLAYLIST_NAME
-    try:
-        playlist_id = yw.get_or_create_playlist(client, playlist_name)
-        current = yw.existing_video_ids(client, playlist_id)
-    except Exception as e:                       # noqa: BLE001 — API Google, forme d'erreur variable
-        return job.finish(error=f"Playlist YouTube « {playlist_name} » : {type(e).__name__}: {e}")
-
+    playlist = load_json(RECOS_PLAYLIST_PATH, [])
     cfg = cfg_load()
     keys = ytcache.youtube_keys(cfg)
     history = set(load_json(RECOS_HISTORY_PATH, []))
     job.st["total"] = len(candidates)
     remaining, added, quota_hit = [], 0, False
+    now = datetime.now().isoformat(timespec="seconds")
     for c in candidates:
         if job.stopped() or quota_hit:
             remaining.append(c)
             continue
-        vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys)
-        if not vid:
-            job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée")
-            continue
-        if vid in history or vid in current:
-            history.add(vid)
-            job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")
-            continue
         try:
-            yw.add_video(client, playlist_id, vid)
-        except yw.YouTubeQuotaExhausted:
-            job.msg("Quota YouTube (écriture) épuisé — reprendra au prochain scan.")
+            vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys)
+        except ytcache.QuotaExhausted:
+            job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
             quota_hit = True
             remaining.append(c)
             continue
+        if not vid:
+            job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée")
+            continue
+        if vid in history:
+            job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")
+            continue
+        playlist.append({**c, "video_id": vid, "published_at": now})
         history.add(vid)
-        current[vid] = None
         added += 1
         job.tick(f"{c['artist']} — {c['title']} : ajoutée")
+        if len(playlist) > RECOS_MAX_TRACKS:
+            dropped = playlist.pop(0)
+            job.tick(f"{dropped.get('artist')} — {dropped.get('title')} : retirée "
+                     f"(plafond {RECOS_MAX_TRACKS})")
         save_json(RECOS_HISTORY_PATH, sorted(history))
+        save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_HISTORY_PATH, sorted(history))
+    save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_CANDIDATES_PATH, remaining)
-    job.finish(f"+{added} piste(s) ajoutée(s) à « {playlist_name} » — {len(remaining)} en attente.")
-
-
-def job_clean_recos(job, params):
-    """Nettoyage RECOS RADAR (Fonctionnalité 1, lot 3) : retire de la playlist les
-    pistes déjà écoutées, détectées via l'historique de visionnage YouTube (scraping
-    Playwright, cf. radar/ytwatch.py — aucune API officielle pour ça). Nécessite deux
-    jetons distincts : YouTube connecté en écriture (ytwrite, pour retirer de la
-    playlist) ET une session de visionnage importée à la main (ytwatch, pour lire
-    l'historique — un jeton OAuth applicatif ne donne accès à aucune page grand public).
-
-    Volontairement PAS chaîné depuis job_scan_recos/job_publish_recos : c'est la seule
-    vraie inconnue technique du lot (sélecteurs non documentés, page susceptible de
-    changer sans préavis) — opt-in séparé (RADAR_RECOS_CLEANUP) pour qu'un scraping
-    cassé ne bloque jamais le scan/la publication, qui reposent sur des API stables."""
-    from radar_web.radar import ytwatch, ytwrite as yw
-
-    try:
-        client = yw.get_client(RADAR_UID)
-    except yw.YouTubeAuthError as e:
-        return job.finish(error=f"YouTube non connecté en écriture : {e}")
-
-    playlist_name = params.get("playlist_name") or RECOS_PLAYLIST_NAME
-    try:
-        playlist_id = yw.get_or_create_playlist(client, playlist_name)
-        current = yw.existing_video_ids(client, playlist_id)     # {videoId: playlistItemId}
-    except Exception as e:                       # noqa: BLE001 — API Google, forme d'erreur variable
-        return job.finish(error=f"Playlist YouTube « {playlist_name} » : {type(e).__name__}: {e}")
-    if not current:
-        return job.finish("Playlist vide — rien à nettoyer.")
-
-    try:
-        watched = set(ytwatch.fetch_watched_video_ids(RADAR_UID))
-    except ytwatch.WatchSessionError as e:
-        return job.finish(error=f"Historique YouTube : {e}")
-    except Exception as e:                       # noqa: BLE001 — scraping, forme d'erreur imprévisible
-        return job.finish(error=f"Historique YouTube (scraping) : {type(e).__name__}: {e}")
-
-    to_remove = [vid for vid in current if vid in watched]
-    job.st["total"] = len(to_remove)
-    if not to_remove:
-        return job.finish(f"{len(current)} piste(s) dans la playlist, aucune déjà écoutée.")
-
-    removed = 0
-    for vid in to_remove:
-        if job.stopped():
-            break
-        try:
-            yw.remove_item(client, current[vid])
-            removed += 1
-            job.tick(f"{vid} : retirée (déjà écoutée)")
-        except Exception as e:                   # noqa: BLE001
-            job.tick(f"{vid} : erreur au retrait ({type(e).__name__})")
-    job.finish(f"{removed} piste(s) retirée(s) de « {playlist_name} » (déjà écoutée(s)).")
+    job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{RECOS_MAX_TRACKS}, "
+               f"{len(remaining)} en attente.")
 
 
 def job_scan_catalog(job, params):
@@ -2541,7 +2484,6 @@ JOBS = {
     "scan_veille": job_scan_veille,
     "scan_recos": job_scan_recos,
     "publish_recos": job_publish_recos,
-    "clean_recos": job_clean_recos,
 }
 
 

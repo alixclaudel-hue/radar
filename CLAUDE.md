@@ -12,8 +12,8 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
 
 ## État actuel du projet — résumé
 
-1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, interface) ; `crate_jobs.py` (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli Streamlit, retirée 2026-09-01, **ne pas y toucher**).
-2. **Déploiement** : `git push` → GitHub (`alixclaudel-hue/radar`) → merge sur `main` → `.github/workflows/deploy.yml` (VPS OVH : `git pull` + rebuild Docker + health-check, rollback si KO — rollback impossible si échec avant `reset --hard`, ex. disque VPS saturé, cf. piège backup point 13). Manuel (dépannage) : **toujours `git fetch` avant `reset --hard origin/main`** ; `--force-recreate` si conteneur reste "Running" après changement d'env. Coordonnées VPS : Secrets Actions + note perso non versionnée.
+1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, interface) ; `crate_jobs.py` (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli Streamlit, retirée 2026-09-01, **ne pas y toucher**). Nav : Mes sources · Chercher un disque · Nouveautés · Mes labels & artistes · Reco Radar · Réglages.
+2. **Déploiement** : `git push` → GitHub (`alixclaudel-hue/radar`) → merge sur `main` → `.github/workflows/deploy.yml` (VPS OVH : `git pull` + rebuild Docker + health-check, rollback si KO — rollback impossible si échec avant `reset --hard`, ex. disque VPS saturé, cf. piège backup point 12). Manuel (dépannage) : **toujours `git fetch` avant `reset --hard origin/main`** ; `--force-recreate` si conteneur reste "Running" après changement d'env. Coordonnées VPS : Secrets Actions + note perso non versionnée.
 3. **Données** : `/data` sur VPS (JSON — labels, corpus, graphe, profils, config avec token Discogs). Rien dans git. Local : `export CRATE_DATA_DIR=$PWD/data`.
 4. **Session cloud (celle-ci)** : dépôt cloné frais, **pas de** `/data`/`.env`/token Discogs, pas de Playwright/yt-dlp, pas d'accès SSH VPS, pas de mémoire perso Claude — ce fichier + `docs/` = source de vérité. Marche : éditer, `py_compile`, smoke test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour appel réel). Pas d'accès OVH Manager/identifiants VPS : dépannage VPS = guider l'utilisateur pas à pas, jamais demander ses identifiants.
 5. **Boucle diag VPS — en pause depuis 2026-09-06** (jugée non fonctionnelle par l'utilisateur, latence de livraison jamais fiabilisée). Trigger `diag-vps` désactivé (`enabled: false`) : **ne pas réactiver, ne pas ouvrir d'issue `Diag <sha>`, ne pas appeler `fire_trigger` dessus**, sans demande explicite. Reprise possible plus tard. Contrats (gelés, gardés pour référence, **déplacés hors `.claude/skills/` donc non invocables** en l'état) : `docs/archive/skill-diag.md` + `docs/archive/skill-dev-loop.md`. Pour réactiver `/diag`/`/dev-loop`, les replacer dans `.claude/skills/<nom>/SKILL.md`. Session `session_01KbkY8jHGMbLLgkkQb8Kj6d` (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
@@ -24,10 +24,7 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
 10. **Piège — `discogs_get()`** : ne lève jamais d'exception, renvoie `{}` sur échec.
 11. **Piège — dump Discogs** : `data.discogs.com` sert via `?download=...` (paramètre
     requête), pas le chemin direct — déjà corrigé dans `dump_url()`/`checksum_url()`.
-12. **Piège — PKCE OAuth YouTube** (`ytwrite.py`) : `code_verifier` généré par
-    `authorization_url()` doit être transporté explicitement (cookie) jusqu'à
-    `exchange_code()` — deux objets `Flow` distincts ne le partagent pas.
-13. **Piège — backup quotidien pouvait saturer disque VPS** (`scripts/backup.sh`) :
+12. **Piège — backup quotidien pouvait saturer disque VPS** (`scripts/backup.sh`) :
     archivait tout `/data` sans distinction, y compris le référentiel Discogs local
     (`shared/discogs_dump.sqlite3`, ~3G, reconstructible depuis le dump mensuel) →
     croissance anormale des archives (672M → 25G en 4 jours, cause exacte non identifiée)
@@ -36,53 +33,60 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
     `tar` + relevé de taille par sous-dossier ajouté à `backup.log` (diagnostic sans SSH).
     À surveiller : la vraie source de la croissance des backups restants n'est pas
     confirmée — vérifier `backup.log` après le prochain run (04:00 UTC).
-14. **Piège — recherche YouTube** (`ytcache.search_video`) : premier résultat peut être
+13. **Piège — recherche YouTube** (`ytcache.search_video`) : premier résultat peut être
     une vidéo supprimée/privée. Corrigé : vérifie le statut des 5 premiers résultats,
     retient le premier encore lisible (`_first_playable`).
-15. **Référentiel Discogs local** (`discogs_dump.py`) : index SQLite du dump mensuel
+14. **Référentiel Discogs local** (`discogs_dump.py`) : index SQLite du dump mensuel
     (catalogue seulement, pas le marketplace), reprenable, bascule atomique. Alimente
     recherche locale, ranking labels/artistes, graphe de co-crédits multi-niveaux
     (mode `taste` = graines Cœur+Aimés+corpus). Détail complet → archive.
-16. **Entretien de fond** (`RADAR_AUTO_MAINTENANCE=1`) : `canonicalize` (hebdo),
+15. **Entretien de fond** (`RADAR_AUTO_MAINTENANCE=1`) : `canonicalize` (hebdo),
     `profile_labels` (hebdo), `build_graph` mode `taste` (mensuel) — plus de boutons
     dans Réglages, tout automatique.
-17. **Le "cerveau"** (`scoring.py`, classe `Ctx`) : `album_score`, `ascore`, `reco_rows` —
+16. **Le "cerveau"** (`scoring.py`, classe `Ctx`) : `album_score`, `ascore`, `reco_rows` —
     recalculé à chaque requête depuis `/data` (cache mtime).
-18. **Jobs** (`crate_jobs.py`) : tâches longues en sous-processus, statuts dans
+17. **Jobs** (`crate_jobs.py`) : tâches longues en sous-processus, statuts dans
     `/data/jobs/*.status.json`, reprenables via `*.state.json`. Ne pas rebuild le
     conteneur pendant qu'un job tourne.
-19. **Mes retours** (page feedback, issue #62) : bouton 🗑 pour supprimer note déjà
+18. **Mes retours** (page feedback, issue #62) : bouton 🗑 pour supprimer note déjà
     traitée — supprime à la fois côté appli (`ui_notes.json`) et le commentaire GitHub
     correspondant sur l'issue #62 (best-effort, comme l'envoi initial).
-20. **RECOS RADAR** (feature sept. 2026, livrée en 3 PR) : playlist YouTube
-    auto-alimentée par les nouvelles sorties des labels suivis (scoring `album_score`),
-    écriture OAuth2 (`ytwrite.py`), nettoyage par scraping Playwright de l'historique de
-    visionnage (`ytwatch.py`, session exportée manuellement, pas de login automatisé).
-    Jobs `scan_recos` → `publish_recos` (chaînés), `clean_recos` (volontairement séparé,
-    `RADAR_RECOS_CLEANUP` distinct de `RADAR_RECOS_SCAN`, pas encore validé en réel).
-    Wantlist RADAR (2ᵉ feature du même chantier) : pas commencée.
-21. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
+19. **RECOS RADAR** (feature sept. 2026, refondue le 09/09) : playlist **interne à
+    Radar** (`recos_playlist.json` par utilisateur), pas une vraie playlist YouTube —
+    aucun compte Google à connecter, aucune app OAuth à enregistrer. Page dédiée
+    `/reco-radar` (même niveau de nav que Mes sources/Réglages) : lit le fichier et
+    joue les vidéos via l'**API IFrame Player** YouTube côté client (`cuePlaylist`
+    avec la liste d'ids vidéo). Jobs `scan_recos` (candidats notés par `album_score`
+    sur les sorties des labels suivis) → `publish_recos` (chaînés ; recherche vidéo
+    via `ytcache`, seule dépendance réseau restante — clé API YouTube déjà utilisée
+    ailleurs, pas d'écriture). Plafond 100 pistes, **FIFO** : au-delà, la plus
+    ancienne est retirée avant d'ajouter la nouvelle (retrait par ancienneté, pas par
+    écoute réelle — l'ancien lot 3, nettoyage par scraping Playwright de l'historique
+    de visionnage, a été abandonné : `ytwrite.py`, `ytwatch.py`,
+    `scripts/export_youtube_session.py` et le job `clean_recos` supprimés). Wantlist
+    RADAR (2ᵉ feature du même chantier) : pas commencée.
+20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —
     besoin d'un nom de domaine pointant sur le VPS), puis l'étape 5b (OAuth
     Discogs/Spotify — exige aussi 2 apps développeur enregistrées). À la reprise de 5b,
     envisager `/model` Opus pour l'implémentation OAuth + toute migration de schéma.
-22. **TODO opérationnel** : lancer scan vendeurs une fois à la main (Réglages →
+21. **TODO opérationnel** : lancer scan vendeurs une fois à la main (Réglages →
     Catalogue de vendeurs, ~1 h pour 141 vendeurs), puis poser `RADAR_SELLER_SCAN=1` sur
     le service `radar-worker` (compose, pas le `.env` VPS) pour activer le scan hebdo
     automatique.
-23. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
+22. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
     `.tbl` partagé (recopié dans 3 partials), multi-selects genre/style, `<label for>` non
     reliés (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche,
     UI de revue des artistes « approx », suppression par track/DJ dans Mes sets.
-24. **Piège — `step` HTML5 sans `min`** (`settings.html`) : le pas (`step="0.05"`) prend la
+23. **Piège — `step` HTML5 sans `min`** (`settings.html`) : le pas (`step="0.05"`) prend la
     valeur initiale du champ comme base si `min` est absent — un poids par défaut non
     multiple de ce pas (ex. `artist_score.corpus: 0.18`) rend le champ invalide dès qu'on
     le modifie via la toile de pondération, ce qui bloque tout le formulaire en silence
     (champ masqué une fois la toile chargée → aucune bulle d'erreur visible, "Enregistrer"
     ne fait rien). Corrigé (PR #85) : `step="any"` sur les 7 groupes de poids de Réglages —
     à vérifier sur tout nouveau champ de poids ajouté.
-25. **Boutiques vérifiées en vente** (`radar/volumo.py`, résultats de recherche, PR #86) :
+24. **Boutiques vérifiées en vente** (`radar/volumo.py`, résultats de recherche, PR #86) :
     le bouton 🛍️ ne montre un lien que si le disque est confirmé en vente (plus de liste
     statique de recherche à l'aveugle, cf. retour issue #62 du 09/09). Volumo a une vraie
     API JSON publique et stable (`/api/v1/{tracks,albums}/search`, utilisée par leur propre
@@ -90,32 +94,9 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
     Beatport et Traxsource (Cloudflare, challenge JS, même piège que le Marketplace
     Discogs point 7), Bleep (AWS WAF), 7digital (`/search` bloqué par AWS WAF/captcha même
     une fois le sous-domaine régional `us.7digital.com` atteint), Junodownload (site fermé).
-26. **Piège — export session YouTube** (`scripts/export_youtube_session.py`, RECOS RADAR
-    lot 3) : deux blocages Google/Chrome distincts rencontrés en conditions réelles
-    (Windows), corrigés en itérant sur 3 PR (#87-#89) — à relire avant de retoucher ce
-    script :
-    - Un Chrome vierge piloté par Playwright dirigé vers la connexion Google est détecté
-      comme automatisé et refusé (« ce navigateur ou cette application n'est pas
-      sécurisée »). Corrigé en réutilisant le vrai profil Chrome de l'utilisateur (déjà
-      connecté au quotidien) via `launch_persistent_context` — aucune connexion n'est
-      tentée dans l'automation.
-    - Chrome refuse d'activer le pilotage à distance (nécessaire à Playwright) si
-      `--user-data-dir` pointe vers l'emplacement par défaut du système (mesure anti-
-      malware, indépendante de channel/OS). Corrigé en copiant le profil (hors dossiers
-      de cache) dans un dossier temporaire avant de le piloter, supprimé après usage.
-    Nettoyage RECOS RADAR (`clean_recos`/`ytwatch.py`) toujours pas confirmé fonctionnel
-    de bout en bout au moment de la rédaction (import de session pas encore réussi côté
-    utilisateur) — à vérifier au prochain retour avant de considérer ce lot terminé.
-27. **TODO RECOS RADAR — plafond playlist** (retour utilisateur du 09/09) : plafonner la
-    playlist à 100 pistes, réapprovisionner chaque jour à hauteur des pistes retirées,
-    sans doublon entre générations. Décision actée avec l'utilisateur : retrait
-    **uniquement** par écoute réelle (`clean_recos`), pas de repli par ancienneté — donc
-    bloqué tant que le nettoyage par historique n'est pas confirmé fonctionnel (point 26).
-    Le plafond lui-même n'existe pas encore dans le code (aucune limite de taille sur la
-    playlist à ce jour).
-28. **TODO identifié — pertinence recherche YouTube** (`ytcache.search_video`) : prend le
+25. **TODO identifié — pertinence recherche YouTube** (`ytcache.search_video`) : prend le
     1er résultat de recherche sans vérifier la pertinence (contrairement à
     `bandcamp.py`/`volumo.py` qui scorent par recouvrement de mots artiste/titre) — cause
-    de vidéos hors-sujet ajoutées à RECOS RADAR (retour utilisateur du 09/09). Piste de
-    correction identifiée (même principe de score, quasi gratuit en quota car `/videos`
+    de vidéos hors-sujet dans la playlist RECOS RADAR (retour utilisateur du 09/09). Piste
+    de correction identifiée (même principe de score, quasi gratuit en quota car `/videos`
     est déjà appelé pour vérifier la lisibilité), pas encore implémentée.

@@ -99,8 +99,8 @@
         (lu depuis ta page d'historique YouTube, pas d'API officielle pour ça).
         <span class="tag">{% if recos_watch_session %}<span class="ok">✓ session importée</span>{% else %}session absente{% endif %}</span></p>
       <p class="small muted">Génère le fichier de session une fois, en local, avec
-        <code>scripts/export_youtube_session.py</code> (ouvre un vrai Chrome, tu te connectes à la main),
-        puis importe-le ici.</p>
+        <code>scripts/export_youtube_session.py</code> (ferme Chrome avant de lancer — le script
+        réutilise ton profil déjà connecté, un Chrome vierge est bloqué par Google), puis importe-le ici.</p>
       <form method="post" action="/patte/youtube-session/upload" enctype="multipart/form-data"
             style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="file" name="file" accept=".json" required>

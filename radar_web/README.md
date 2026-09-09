@@ -1,7 +1,7 @@
 # Radar — interface web (FastAPI + HTMX)
 
-Interface active du projet (voir `CLAUDE.md` à la racine pour le contexte général).
-L'ancienne appli Streamlit est retirée et gelée dans `archive/`.
+Interface active du projet (contexte général : `CLAUDE.md` racine).
+Ancienne appli Streamlit retirée, gelée dans `archive/`.
 
 ## Lancer en local
 
@@ -12,7 +12,7 @@ export CRATE_DATA_DIR=$PWD/data RADAR_NO_AUTH=1
 uvicorn radar_web.app:app --reload --port 8600
 ```
 
-→ http://localhost:8600. Sans `RADAR_NO_AUTH=1`, un login est exigé même sans compte.
+→ http://localhost:8600. Sans `RADAR_NO_AUTH=1`, login exigé même sans compte.
 
 ## Architecture
 
@@ -30,7 +30,7 @@ radar_web/
   static/app.css      thème « Sleeve »
 ```
 
-La logique des tâches longues (`crate_jobs.py`, à la racine) est réutilisée telle quelle.
+Logique des tâches longues (`crate_jobs.py`, racine) réutilisée telle quelle.
 
 ## Docker
 

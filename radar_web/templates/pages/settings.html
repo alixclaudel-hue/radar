@@ -29,7 +29,7 @@
     <div class="row wgroup__fields">
       {% for k in ['collection','corpus','artist','affinity','want_factor','db_link'] %}
       <div class="field"><label>{{ k }}
-        <input name="reco__{{ k }}" type="number" step="0.05" value="{{ sc.reco[k] }}"></label></div>
+        <input name="reco__{{ k }}" type="number" step="any" value="{{ sc.reco[k] }}"></label></div>
       {% endfor %}
       <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)
         <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></label></div>
@@ -51,7 +51,7 @@
     <div class="row wgroup__fields">
       {% for k in ['label','artist','style','artist_max_vs_mean'] %}
       <div class="field"><label>{{ k }}
-        <input name="album__{{ k }}" type="number" step="0.05" value="{{ sc.album[k] }}"></label></div>
+        <input name="album__{{ k }}" type="number" step="any" value="{{ sc.album[k] }}"></label></div>
       {% endfor %}
     </div>
   </div>
@@ -73,7 +73,7 @@
     <div class="row wgroup__fields">
       {% for k in ['manual','corpus','collection','graph','djset','label_link'] %}
       <div class="field"><label>{{ k }}
-        <input name="artist_score__{{ k }}" type="number" step="0.05" value="{{ sc.artist_score[k] }}"></label></div>
+        <input name="artist_score__{{ k }}" type="number" step="any" value="{{ sc.artist_score[k] }}"></label></div>
       {% endfor %}
     </div>
     <p class="muted small">« label aimé » : l'artiste a un disque chez un label que tu suis déjà
@@ -92,10 +92,10 @@
     {{ wr.toile([['taste_tiers__1','style cat.1'], ['artist_tiers__1','artiste cat.1'],
                  ['taste_tiers__2','style cat.2'], ['artist_tiers__2','artiste cat.2']]) }}
     <div class="row wgroup__fields">
-      <div class="field"><label>Style — Cœur<input name="taste_tiers__1" type="number" step="0.05" value="{{ sc.taste_tiers['1'] }}"></label></div>
-      <div class="field"><label>Style — Aimés<input name="taste_tiers__2" type="number" step="0.05" value="{{ sc.taste_tiers['2'] }}"></label></div>
-      <div class="field"><label>Artiste — Cœur<input name="artist_tiers__1" type="number" step="0.05" value="{{ sc.artist_tiers['1'] }}"></label></div>
-      <div class="field"><label>Artiste — Aimés<input name="artist_tiers__2" type="number" step="0.05" value="{{ sc.artist_tiers['2'] }}"></label></div>
+      <div class="field"><label>Style — Cœur<input name="taste_tiers__1" type="number" step="any" value="{{ sc.taste_tiers['1'] }}"></label></div>
+      <div class="field"><label>Style — Aimés<input name="taste_tiers__2" type="number" step="any" value="{{ sc.taste_tiers['2'] }}"></label></div>
+      <div class="field"><label>Artiste — Cœur<input name="artist_tiers__1" type="number" step="any" value="{{ sc.artist_tiers['1'] }}"></label></div>
+      <div class="field"><label>Artiste — Aimés<input name="artist_tiers__2" type="number" step="any" value="{{ sc.artist_tiers['2'] }}"></label></div>
     </div>
   </div>
 

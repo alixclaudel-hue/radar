@@ -1,23 +1,14 @@
 # Radar — instructions projet
 
-Outil perso de crate-digging vinyle basé sur Discogs : ingère ton écoute (YouTube,
-Spotify, Bandcamp, DJ sets), profile tes labels/artistes, et note des sorties Discogs
-selon ton goût. Voir `docs/architecture.md` pour la cible multi-utilisateur (chantier en
-cours).
+Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, Spotify, Bandcamp, DJ sets), profile labels/artistes, note sorties Discogs selon goût. Cible multi-utilisateur (chantier en cours) → `docs/architecture.md`.
 
-**Reprise de contexte : ce fichier suffit** — l'état du chantier, la TODO et les pièges
-appris sont dans le résumé ci-dessous (fusionnés depuis l'ancien `docs/etat.md` lors du
-ménage du 2026-09-08).
+**Reprise de contexte : ce fichier suffit** — état du chantier, TODO et pièges appris dans le résumé ci-dessous (fusionné depuis l'ancien `docs/etat.md`, ménage 2026-09-08).
 
-**Historique complet et détails techniques dans `claude_archive.md`** (mécanique du dump
-Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et dans `docs/archive/`
-(anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) —
-ces fichiers sont dans `.claudeignore` (non lus automatiquement) : les lire explicitement
-(`Read <fichier>`) quand un détail précis manque au résumé ci-dessous.
+**Historique complet et détails techniques** : `claude_archive.md` (dump Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et `docs/archive/` (anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) — fichiers dans `.claudeignore` (non lus automatiquement) : lire explicitement (`Read <fichier>`) si détail précis manquant.
 
-**Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`,
-`claude_archive.md`) : demander à l'utilisateur si c'est pertinent plutôt que le lire
-d'emblée.
+**Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent plutôt que lire d'emblée.
+
+**Mode caveman par défaut** : invoquer skill `caveman` (`.claude/skills/caveman/SKILL.md`, niveau `full`) en début de session, sauf demande contraire. S'applique aux réponses conversationnelles ; code, commits, doc, tickets restent en prose normale (cf. Boundaries du skill).
 
 **Mode caveman par défaut** : invoquer le skill `caveman`
 (`.claude/skills/caveman/SKILL.md`, niveau `full`) en tout début de session, sauf
@@ -26,50 +17,22 @@ les commits, la doc et les tickets restent en prose normale (cf. Boundaries du s
 
 ## État actuel du projet — résumé
 
-1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, l'interface) ; `crate_jobs.py`
-   (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli
-   Streamlit, retirée 2026-09-01, **ne pas y toucher**).
-2. **Déploiement** : `git push` → GitHub (`alixclaudel-hue/radar`) → merge sur `main` →
-   `.github/workflows/deploy.yml` (VPS OVH : `git pull` + rebuild Docker + health-check,
-   rollback si KO — rollback impossible si l'échec survient avant le `reset --hard`, ex.
-   disque VPS saturé, cf. piège backup au point 13). Manuel (dépannage) : **toujours
-   `git fetch` avant `reset --hard origin/main`** ; `--force-recreate` si le conteneur
-   reste "Running" après un changement d'env. Coordonnées VPS : Secrets Actions + note
-   perso non versionnée.
-3. **Données** : `/data` sur le VPS (JSON — labels, corpus, graphe, profils, config avec
-   token Discogs). Rien n'est dans git. Local : `export CRATE_DATA_DIR=$PWD/data`.
-4. **Session cloud (celle-ci)** : dépôt cloné frais, **pas de** `/data`/`.env`/token
-   Discogs, pas de Playwright/yt-dlp, pas d'accès SSH VPS, pas de mémoire perso Claude —
-   ce fichier + `docs/` sont la source de vérité. Marche : éditer, `py_compile`, smoke
-   test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub
-   uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour un appel réel).
-   Pas d'accès OVH Manager/identifiants VPS non plus : dépannage VPS = guider
-   l'utilisateur pas à pas, jamais demander ses identifiants.
-5. **Boucle diag VPS — en pause depuis le 2026-09-06** (jugée non fonctionnelle par
-   l'utilisateur, latence de livraison jamais fiabilisée). Le trigger `diag-vps` est
-   désactivé (`enabled: false`) : **ne pas le réactiver, ne pas ouvrir d'issue `Diag <sha>`,
-   ne pas appeler `fire_trigger` dessus**, sans demande explicite de l'utilisateur. Reprise
-   possible plus tard. Contrats (gelés, gardés pour référence, **déplacés hors
-   `.claude/skills/` donc non invocables** en l'état) : `docs/archive/skill-diag.md` +
-   `docs/archive/skill-dev-loop.md`. Pour réactiver `/diag`/`/dev-loop`, les replacer dans
-   `.claude/skills/<nom>/SKILL.md`. La session `session_01KbkY8jHGMbLLgkkQb8Kj6d`
-   (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
-6. **Conventions** : `py_compile` + smoke test local avant chaque push (double de la CI) ;
-   **jamais `git add -A`** (ajouter les fichiers nommément, relire `git status`) ;
-   commits/commentaires **en français** ; pas de commentaires superflus (le *pourquoi*,
-   pas le *quoi*).
-7. **Piège — Marketplace Discogs** : prix/annonces/décompte FR **inobtenables**
-   (Cloudflare bloque). Abandonné — garder lien `🇫🇷 voir` + pastille API.
+1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, interface) ; `crate_jobs.py` (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli Streamlit, retirée 2026-09-01, **ne pas y toucher**).
+2. **Déploiement** : `git push` → GitHub (`alixclaudel-hue/radar`) → merge sur `main` → `.github/workflows/deploy.yml` (VPS OVH : `git pull` + rebuild Docker + health-check, rollback si KO — rollback impossible si échec avant `reset --hard`, ex. disque VPS saturé, cf. piège backup point 13). Manuel (dépannage) : **toujours `git fetch` avant `reset --hard origin/main`** ; `--force-recreate` si conteneur reste "Running" après changement d'env. Coordonnées VPS : Secrets Actions + note perso non versionnée.
+3. **Données** : `/data` sur VPS (JSON — labels, corpus, graphe, profils, config avec token Discogs). Rien dans git. Local : `export CRATE_DATA_DIR=$PWD/data`.
+4. **Session cloud (celle-ci)** : dépôt cloné frais, **pas de** `/data`/`.env`/token Discogs, pas de Playwright/yt-dlp, pas d'accès SSH VPS, pas de mémoire perso Claude — ce fichier + `docs/` = source de vérité. Marche : éditer, `py_compile`, smoke test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour appel réel). Pas d'accès OVH Manager/identifiants VPS : dépannage VPS = guider l'utilisateur pas à pas, jamais demander ses identifiants.
+5. **Boucle diag VPS — en pause depuis 2026-09-06** (jugée non fonctionnelle par l'utilisateur, latence de livraison jamais fiabilisée). Trigger `diag-vps` désactivé (`enabled: false`) : **ne pas réactiver, ne pas ouvrir d'issue `Diag <sha>`, ne pas appeler `fire_trigger` dessus**, sans demande explicite. Reprise possible plus tard. Contrats (gelés, gardés pour référence, **déplacés hors `.claude/skills/` donc non invocables** en l'état) : `docs/archive/skill-diag.md` + `docs/archive/skill-dev-loop.md`. Pour réactiver `/diag`/`/dev-loop`, les replacer dans `.claude/skills/<nom>/SKILL.md`. Session `session_01KbkY8jHGMbLLgkkQb8Kj6d` (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
+6. **Conventions** : `py_compile` + smoke test local avant chaque push (double de la CI) ; **jamais `git add -A`** (ajouter fichiers nommément, relire `git status`) ; commits/commentaires **en français** ; pas de commentaires superflus (le *pourquoi*, pas le *quoi*).
+7. **Piège — Marketplace Discogs** : prix/annonces/décompte FR **inobtenables** (Cloudflare bloque). Abandonné — garder lien `🇫🇷 voir` + pastille API.
 8. **Piège — Streamlit** : archivé et mort, ne jamais y reporter d'évolutions.
-9. **Piège — Bandcamp** (`bcsearch_public_api`) : endpoint non documenté, peut
-   disparaître ; repli URL de recherche suffit, pas de "vraie" API depuis 2022.
+9. **Piège — Bandcamp** (`bcsearch_public_api`) : endpoint non documenté, peut disparaître ; repli URL de recherche suffit, pas de "vraie" API depuis 2022.
 10. **Piège — `discogs_get()`** : ne lève jamais d'exception, renvoie `{}` sur échec.
 11. **Piège — dump Discogs** : `data.discogs.com` sert via `?download=...` (paramètre
     requête), pas le chemin direct — déjà corrigé dans `dump_url()`/`checksum_url()`.
-12. **Piège — PKCE OAuth YouTube** (`ytwrite.py`) : le `code_verifier` généré par
+12. **Piège — PKCE OAuth YouTube** (`ytwrite.py`) : `code_verifier` généré par
     `authorization_url()` doit être transporté explicitement (cookie) jusqu'à
     `exchange_code()` — deux objets `Flow` distincts ne le partagent pas.
-13. **Piège — backup quotidien pouvait saturer le disque VPS** (`scripts/backup.sh`) :
+13. **Piège — backup quotidien pouvait saturer disque VPS** (`scripts/backup.sh`) :
     archivait tout `/data` sans distinction, y compris le référentiel Discogs local
     (`shared/discogs_dump.sqlite3`, ~3G, reconstructible depuis le dump mensuel) →
     croissance anormale des archives (672M → 25G en 4 jours, cause exacte non identifiée)
@@ -78,7 +41,7 @@ les commits, la doc et les tickets restent en prose normale (cf. Boundaries du s
     `tar` + relevé de taille par sous-dossier ajouté à `backup.log` (diagnostic sans SSH).
     À surveiller : la vraie source de la croissance des backups restants n'est pas
     confirmée — vérifier `backup.log` après le prochain run (04:00 UTC).
-14. **Piège — recherche YouTube** (`ytcache.search_video`) : le premier résultat peut être
+14. **Piège — recherche YouTube** (`ytcache.search_video`) : premier résultat peut être
     une vidéo supprimée/privée. Corrigé : vérifie le statut des 5 premiers résultats,
     retient le premier encore lisible (`_first_playable`).
 15. **Référentiel Discogs local** (`discogs_dump.py`) : index SQLite du dump mensuel
@@ -93,7 +56,7 @@ les commits, la doc et les tickets restent en prose normale (cf. Boundaries du s
 18. **Jobs** (`crate_jobs.py`) : tâches longues en sous-processus, statuts dans
     `/data/jobs/*.status.json`, reprenables via `*.state.json`. Ne pas rebuild le
     conteneur pendant qu'un job tourne.
-19. **Mes retours** (page feedback, issue #62) : bouton 🗑 pour supprimer une note déjà
+19. **Mes retours** (page feedback, issue #62) : bouton 🗑 pour supprimer note déjà
     traitée — supprime à la fois côté appli (`ui_notes.json`) et le commentaire GitHub
     correspondant sur l'issue #62 (best-effort, comme l'envoi initial).
 20. **RECOS RADAR** (feature sept. 2026, livrée en 3 PR) : playlist YouTube
@@ -109,7 +72,7 @@ les commits, la doc et les tickets restent en prose normale (cf. Boundaries du s
     besoin d'un nom de domaine pointant sur le VPS), puis l'étape 5b (OAuth
     Discogs/Spotify — exige aussi 2 apps développeur enregistrées). À la reprise de 5b,
     envisager `/model` Opus pour l'implémentation OAuth + toute migration de schéma.
-22. **TODO opérationnel** : lancer le scan vendeurs une fois à la main (Réglages →
+22. **TODO opérationnel** : lancer scan vendeurs une fois à la main (Réglages →
     Catalogue de vendeurs, ~1 h pour 141 vendeurs), puis poser `RADAR_SELLER_SCAN=1` sur
     le service `radar-worker` (compose, pas le `.env` VPS) pour activer le scan hebdo
     automatique.

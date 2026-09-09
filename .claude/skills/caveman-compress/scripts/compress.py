@@ -463,7 +463,16 @@ def call_claude(prompt: str) -> str:
 
 def build_compress_prompt(original: str) -> str:
     return f"""
-Compress this markdown into caveman format.
+Compress this markdown to save tokens. Terse, technical, sober register —
+NOT a caveman-speak parody ("me thinky", "ugh", broken grammar for flavor).
+Drop only what costs tokens and adds nothing: articles, filler, pleasantries,
+hedging, redundant phrasing. Fragments OK. Never invent slang or abbreviations.
+
+LANGUAGE — HIGHEST PRIORITY RULE:
+- Write the compressed text in the EXACT SAME language as the input text.
+- Do NOT translate. Do NOT switch language, even partially, even for a single sentence.
+- If the input is French, output French. If English, output English. Detect from
+  the TEXT below, not from these instructions (which are in English).
 
 STRICT RULES:
 - Do NOT modify anything inside ``` code blocks
@@ -472,6 +481,7 @@ STRICT RULES:
 - Preserve ALL URLs exactly
 - Preserve ALL headings exactly
 - Preserve file paths and commands
+- Preserve technical terms, proper nouns, acronyms, numbers, units exactly
 - Return ONLY the compressed markdown body — do NOT wrap the entire output in a ```markdown fence or any other fence. Inner code blocks from the original stay as-is; do not add a new outer fence around the whole file.
 
 Only compress natural language.
@@ -483,13 +493,14 @@ TEXT:
 
 def build_fix_prompt(original: str, compressed: str, errors: List[str]) -> str:
     errors_str = "\n".join(f"- {e}" for e in errors)
-    return f"""You are fixing a caveman-compressed markdown file. Specific validation errors were found.
+    return f"""You are fixing a compressed markdown file. Specific validation errors were found.
 
 CRITICAL RULES:
 - DO NOT recompress or rephrase the file
 - ONLY fix the listed errors — leave everything else exactly as-is
 - The ORIGINAL is provided as reference only (to restore missing content)
-- Preserve caveman style in all untouched sections
+- Preserve the compressed file's language exactly (same language as ORIGINAL) — never translate
+- Preserve terse technical style in all untouched sections
 
 ERRORS TO FIX:
 {errors_str}

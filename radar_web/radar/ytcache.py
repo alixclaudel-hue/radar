@@ -74,18 +74,30 @@ def _reason(resp):
         return set()
 
 
+def _is_quota_response(r):
+    """Quota épuisé, sous deux formats Google vus en réel : l'ancien (403,
+    `error.errors[].reason` dans _QUOTA_REASONS) et le nouveau (429, juste
+    `error.code`/`error.message`, repéré au texte "quota" du message — cf.
+    retour utilisateur du 09/09, `Quota Queries per day` en 429)."""
+    if r.status_code not in (403, 429):
+        return False
+    if _reason(r) & _QUOTA_REASONS:
+        return True
+    return "quota" in r.text.lower()
+
+
 def request(path, params, keys, timeout=15):
-    """GET {API}{path} en essayant chaque clé. QuotaExhausted si toutes en 403 quota."""
+    """GET {API}{path} en essayant chaque clé. QuotaExhausted si toutes en quota."""
     last = None
     for k in keys:
         r = requests.get(f"{API}{path}", params={**params, "key": k}, timeout=timeout)
         if r.ok:
             return r.json()
         last = r
-        if r.status_code == 403 and _reason(r) & _QUOTA_REASONS:
+        if _is_quota_response(r):
             continue                      # clé épuisée -> suivante
         raise RuntimeError(f"YouTube {r.status_code}: {r.text[:200]}")
-    if last is not None and last.status_code == 403:
+    if last is not None and _is_quota_response(last):
         raise QuotaExhausted("Quota YouTube épuisé (toutes les clés). "
                              "Réessaie demain ou ajoute ta clé perso dans « Mes sources ».")
     raise RuntimeError("Aucune clé YouTube utilisable.")

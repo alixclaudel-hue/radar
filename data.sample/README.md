@@ -8,6 +8,6 @@ cd radar_web && python -m uvicorn radar_web.app:app --reload --port 8600
 ```
 
 Contient juste un `crate_radar_config.json` (quelques labels, deux catégories de
-goût). Tout le reste (corpus, graphe, profils…) se construit via les jobs une fois
-ton token Discogs saisi dans l'appli. Ces fichiers de données réels ne sont **pas**
+goût). Le reste (corpus, graphe, profils…) se construit via les jobs une fois
+le token Discogs saisi dans l'appli. Ces fichiers de données réels ne sont **pas**
 versionnés (cf. `.gitignore`).

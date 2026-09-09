@@ -10,6 +10,11 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
 
 **Mode caveman par défaut** : invoquer skill `caveman` (`.claude/skills/caveman/SKILL.md`, niveau `full`) en début de session, sauf demande contraire. S'applique aux réponses conversationnelles ; code, commits, doc, tickets restent en prose normale (cf. Boundaries du skill).
 
+**Mode caveman par défaut** : invoquer le skill `caveman`
+(`.claude/skills/caveman/SKILL.md`, niveau `full`) en tout début de session, sauf
+demande contraire de l'utilisateur. S'applique aux réponses conversationnelles ; le code,
+les commits, la doc et les tickets restent en prose normale (cf. Boundaries du skill).
+
 ## État actuel du projet — résumé
 
 1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, interface) ; `crate_jobs.py` (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli Streamlit, retirée 2026-09-01, **ne pas y toucher**).

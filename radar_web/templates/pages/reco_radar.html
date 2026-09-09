@@ -14,6 +14,10 @@
 </div>
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+<p class="small muted">
+  <a href="/jobs/scan_recos/log" download>⬇ journal scan</a> ·
+  <a href="/jobs/publish_recos/log" download>⬇ journal publication</a>
+</p>
 
 {% if not playlist %}
 <p class="muted small" style="margin-top:16px">Playlist vide — lance un scan ci-dessus (nécessite un token Discogs et

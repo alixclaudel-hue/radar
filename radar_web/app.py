@@ -2136,6 +2136,17 @@ def job_status_frag(name: str):
     return HTMLResponse(f"<div id='job-{name}' {poll}>{inner}</div>")
 
 
+@app.get("/jobs/{name}/log")
+def job_log_download(name: str):
+    """Journal complet du job en .txt — diagnostic depuis un mobile sans accès au
+    fichier status.json sur le VPS (retour utilisateur 09/09)."""
+    s = jobs.status(name)
+    lines = (s or {}).get("log") or []
+    body = "\n".join(lines) if lines else "(journal vide)"
+    headers = {"Content-Disposition": f'attachment; filename="{name}.log.txt"'}
+    return Response(body, media_type="text/plain; charset=utf-8", headers=headers)
+
+
 # ============================================================ 🎛️ Réglages
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, saved: int = 0):

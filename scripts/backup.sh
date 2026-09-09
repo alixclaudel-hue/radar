@@ -20,11 +20,18 @@ mkdir -p "$OUT_DIR"
 ts=$(date -u +%Y%m%dT%H%M%SZ)
 out="$OUT_DIR/data-$ts.tgz.enc"
 
-# tout /data SAUF les backups -> tar -> chiffrement (flux, rien en clair sur disque)
-sudo tar czf - --exclude="$OUT_DIR" -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" \
+# tout /data SAUF les backups et le référentiel Discogs (shared/, reconstructible
+# depuis le dump mensuel Discogs, cf. discogs_dump.py — pas une donnée utilisateur,
+# inutile de le réencrypter en entier chaque jour) -> tar -> chiffrement (flux,
+# rien en clair sur disque)
+sudo tar czf - --exclude="$OUT_DIR" --exclude="$DATA_DIR/shared/discogs_dump.sqlite3*" \
+  -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" \
   | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASS -out "$out"
 chown "$(id -u):$(id -g)" "$out" 2>/dev/null || true
 echo "$(date -u +%FT%TZ)  ok  $(basename "$out")  $(du -h "$out" | cut -f1)"
+
+# repères de taille par sous-dossier (diagnostic dérive, sans passer par SSH)
+du -sh "$DATA_DIR"/*/ 2>/dev/null | sort -rh
 
 # rétention : ne garde que les KEEP plus récents
 ls -1t "$OUT_DIR"/data-*.tgz.enc 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f

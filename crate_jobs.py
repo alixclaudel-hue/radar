@@ -87,6 +87,11 @@ RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
 RECOS_MAX_TRACKS = 100
+RECOS_DAILY_SEARCH_BUDGET = 90
+# marge sous le quota gratuit YouTube Data API (10 000 unités/jour ÷ 100 unités par
+# recherche = 100) : évite que scan_recos empile plus de candidats que publish_recos
+# ne peut en chercher sur YouTube en une journée (retour utilisateur du 09/09 : file à
+# 417 candidats, quota épuisé dès la 1re publication).
 
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
@@ -2075,11 +2080,20 @@ def job_scan_recos(job, params):
 
     job.msg(f"{len(targets)} sortie(s) retenue(s) sur {len(rows)} scannée(s).")
     candidates = load_json(RECOS_CANDIDATES_PATH, [])
+    if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
+        _chain_publish_recos()
+        return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"
+                           f"{RECOS_DAILY_SEARCH_BUDGET} recherches/jour) — scan sauté, "
+                           "laisse la publication rattraper le retard.")
     known_tracks = {(style_key(c.get("artist")), style_key(c.get("title"))) for c in candidates}
     now = datetime.now().isoformat(timespec="seconds")
     n_tracks = 0
+    cap_hit = False
     for score, row in targets:
         if job.stopped():
+            break
+        if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
+            cap_hit = True
             break
         seen.add(row["id"])
         d = discogs_get(token, f"/releases/{row['id']}")
@@ -2105,7 +2119,8 @@ def job_scan_recos(job, params):
     save_json(RECOS_SEEN_PATH, sorted(seen))
     save_json(RECOS_CANDIDATES_PATH, candidates)
     _chain_publish_recos()
-    job.finish(f"+{n_tracks} piste(s) candidate(s) sur {len(targets)} sortie(s) — file : {len(candidates)}.")
+    note = " — limite journalière atteinte, reste des sorties retenues au prochain scan." if cap_hit else ""
+    job.finish(f"+{n_tracks} piste(s) candidate(s) sur {len(targets)} sortie(s) — file : {len(candidates)}.{note}")
 
 
 def _chain_publish_recos():

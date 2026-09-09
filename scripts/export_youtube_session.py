@@ -13,6 +13,13 @@ tentative de connexion elle-même, indépendamment de l'OS ou de l'IP. En pointa
 Playwright sur un profil Chrome où tu es DÉJÀ connecté (usage normal, au quotidien),
 aucune connexion n'est tentée dans l'automation : rien à bloquer.
 
+Pourquoi une COPIE du profil et pas l'original directement : Chrome refuse d'activer
+le pilotage à distance (nécessaire à Playwright) quand `--user-data-dir` pointe vers
+l'emplacement par défaut du système (mesure de sécurité anti-malware — retour terrain :
+« DevTools remote debugging requires a non-default data directory »). Le script copie
+donc le profil (hors caches, pour rester rapide) dans un dossier temporaire, lance
+Chrome dessus, puis supprime la copie à la fin.
+
 Usage :
     pip install playwright
     playwright install chromium
@@ -26,7 +33,8 @@ Usage :
        (visible dans Chrome, à l'adresse chrome://version → « Chemin du profil »).
        Colle le chemin TEL QUEL affiché par chrome://version (le script sépare
        lui-même le sous-dossier "Default"/"Profile X" du reste).
-    4. Une fenêtre Chrome s'ouvre déjà connectée. Vérifie que tu es bien sur YouTube
+    4. Le script copie le profil (peut prendre quelques dizaines de secondes) puis
+       ouvre une fenêtre Chrome déjà connectée. Vérifie que tu es bien sur YouTube
        connecté, reviens ici, appuie sur Entrée.
 
 Le fichier `youtube_session.json` généré à côté de ce script est à importer dans Radar.
@@ -36,13 +44,40 @@ signale une session expirée, relance simplement ce script et réimporte le nouv
 fichier."""
 import os
 import re
+import shutil
 import sys
+import tempfile
 
 from playwright.sync_api import sync_playwright
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "youtube_session.json")
 _PROFILE_SUBDIR_RE = re.compile(r"^(Default|Profile \d+)$", re.I)
+# Dossiers de cache : volumineux (peuvent faire plusieurs Go), inutiles pour une
+# session de connexion — exclus de la copie pour rester rapide.
+_IGNORE_DIRS = {"Cache", "Code Cache", "GPUCache", "DawnCache", "DawnGraphiteCache",
+                "ShaderCache", "GrShaderCache", "CacheStorage", "component_crx_cache",
+                "extensions_crx_cache", "Crashpad", "BrowserMetrics",
+                "optimization_guide_model_store"}
+
+
+def _safe_copy(src, dst):
+    """Comme shutil.copy2, mais un fichier verrouillé (résidu Chrome pas
+    complètement fermé) est juste ignoré plutôt que de faire échouer toute la
+    copie — on n'a besoin que des cookies/stockage local, pas de 100% du profil."""
+    try:
+        shutil.copy2(src, dst)
+    except OSError as e:
+        print(f"  (ignoré, verrouillé : {os.path.basename(src)} — {e})")
+
+
+def copy_profile(src_root, tmp_root):
+    """Copie src_root (dossier "User Data") vers tmp_root, hors caches — inclut
+    "Local State" à la racine (clé de déchiffrement des cookies) et le(s)
+    sous-profil(s)."""
+    shutil.copytree(src_root, tmp_root, dirs_exist_ok=True,
+                     ignore=shutil.ignore_patterns(*_IGNORE_DIRS),
+                     copy_function=_safe_copy)
 
 
 def default_profile_dir():
@@ -81,33 +116,44 @@ def main():
         print("Colle le chemin exact affiché par Chrome à l'adresse chrome://version, "
               "champ « Chemin du profil ».")
         return
-    print(f"Profil utilisé : {profile_dir} (sous-profil « {sub_profile} »)")
+    print(f"Profil source : {profile_dir} (sous-profil « {sub_profile} »)")
 
-    with sync_playwright() as p:
-        try:
-            context = p.chromium.launch_persistent_context(
-                profile_dir, channel="chrome", headless=False,
-                args=[f"--profile-directory={sub_profile}"])
-        except Exception as e:
-            print(f"Échec du lancement de Chrome ({type(e).__name__}: {e}) — vérifie "
-                  "qu'aucun processus chrome.exe ne tourne encore (Gestionnaire des tâches).")
-            return
-        try:
-            page = context.pages[0] if context.pages else context.new_page()
-            page.goto("https://www.youtube.com")
-            input("Vérifie que tu es bien connecté sur YouTube dans la fenêtre, "
-                  "puis appuie sur Entrée ici... ")
-            context.storage_state(path=OUT)
-        except Exception as e:
-            print(f"La fenêtre Chrome s'est fermée ou a planté avant la fin "
-                  f"({type(e).__name__}: {e}) — vérifie qu'aucun autre processus "
-                  "chrome.exe ne verrouillait le profil, puis relance.")
-            return
-        finally:
+    tmp_root = tempfile.mkdtemp(prefix="radar_chrome_profile_")
+    print(f"Copie du profil vers {tmp_root} (hors caches, patiente quelques secondes)...")
+    try:
+        copy_profile(profile_dir, tmp_root)
+    except OSError as e:
+        print(f"Échec de la copie du profil ({type(e).__name__}: {e}).")
+        shutil.rmtree(tmp_root, ignore_errors=True)
+        return
+
+    try:
+        with sync_playwright() as p:
             try:
-                context.close()
-            except Exception:
-                pass
+                context = p.chromium.launch_persistent_context(
+                    tmp_root, channel="chrome", headless=False,
+                    args=[f"--profile-directory={sub_profile}"])
+            except Exception as e:
+                print(f"Échec du lancement de Chrome ({type(e).__name__}: {e}) — vérifie "
+                      "qu'aucun processus chrome.exe ne tourne encore (Gestionnaire des tâches).")
+                return
+            try:
+                page = context.pages[0] if context.pages else context.new_page()
+                page.goto("https://www.youtube.com")
+                input("Vérifie que tu es bien connecté sur YouTube dans la fenêtre, "
+                      "puis appuie sur Entrée ici... ")
+                context.storage_state(path=OUT)
+            except Exception as e:
+                print(f"La fenêtre Chrome s'est fermée ou a planté avant la fin "
+                      f"({type(e).__name__}: {e}) — relance le script.")
+                return
+            finally:
+                try:
+                    context.close()
+                except Exception:
+                    pass
+    finally:
+        shutil.rmtree(tmp_root, ignore_errors=True)
     print(f"Session sauvegardée dans {OUT} — importe ce fichier dans Radar "
           f"(Mes sources → RECOS RADAR → Importer la session de visionnage).")
 

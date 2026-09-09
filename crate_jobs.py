@@ -155,10 +155,18 @@ class Job:
         if os.path.exists(self.stop_path):
             os.remove(self.stop_path)
         self.st = {"job": name, "running": True, "done": 0, "total": total,
-                   "last": "", "message": "", "error": None,
+                   "last": "", "message": "", "error": None, "log": [],
                    "started_at": datetime.now().isoformat(timespec="seconds"),
                    "finished_at": None}
         self.flush()
+
+    def _log(self, line):
+        """Journal complet (contrairement à `last`, écrasé à chaque tick) —
+        sert au diagnostic à distance (bouton télécharger, cf. page Reco Radar)."""
+        if not line:
+            return
+        self.st.setdefault("log", []).append(line)
+        self.st["log"] = self.st["log"][-1000:]
 
     def flush(self):
         save_json(self.status_path, self.st)
@@ -170,12 +178,14 @@ class Job:
         self.st["done"] += inc
         if last:
             self.st["last"] = last
+            self._log(last)
         if total is not None:
             self.st["total"] = total
         self.flush()
 
     def msg(self, m):
         self.st["message"] = m
+        self._log(m)
         self.flush()
 
     def sub(self, done=None, total=None, label=None):
@@ -192,6 +202,7 @@ class Job:
     def finish(self, message="", error=None):
         self.st.update(running=False, message=message or self.st["message"],
                        error=error, finished_at=datetime.now().isoformat(timespec="seconds"))
+        self._log(message or error)
         if self.stopped():
             os.remove(self.stop_path)
         self.flush()

@@ -47,7 +47,6 @@
   {% for r in results %}
     {% set rr = r.raw %}
     {% set artist, sep, album = (rr.title or '').partition(' - ') %}
-    {% set bq = (artist ~ ' ' ~ album) if sep else rr.title %}
     <div class="card">
       <div class="cover {{ 'empty' if not rr.thumb }}" id="cover-{{ rr.id }}">
         {% if rr.thumb %}<img src="{{ rr.thumb }}" alt="" loading="lazy">{% endif %}
@@ -79,26 +78,13 @@
             <button type="submit" class="ic-btn" title="Ajouter à la wantlist">{{ icons.cart() }}</button>
           </form>
           {% endif %}
-          <button type="button" class="ic-btn" title="Autres boutiques"
-                  onclick="var t=document.getElementById('stores-{{ rr.id }}'); t.hidden = !t.hidden;">🛍️</button>
+          <button type="button" class="ic-btn" title="Boutiques (vérifiées en vente)"
+                  onclick="var t=document.getElementById('stores-{{ rr.id }}'); if(t.dataset.loaded==='1'){t.hidden=!t.hidden;}else{t.dataset.loaded='1';t.hidden=false;htmx.ajax('GET','/release/stores',{target:t,swap:'innerHTML',values:{artist:{{ (artist if sep else '')|tojson }},title:{{ (album if sep else rr.title)|tojson }}}});}">🛍️</button>
         </div>
         <div class="tracklist" id="tracks-{{ rr.id }}"></div>
-        {# Pas d'API publique sur ces boutiques : simples liens de recherche
-           (même principe que Bandcamp), pas de résultat garanti. #}
-        <div class="chip-list" id="stores-{{ rr.id }}" hidden>
-          <a class="chip small" target="_blank" rel="noopener" title="7digital"
-             href="https://www.7digital.com/search?q={{ bq|urlencode }}">7digital</a>
-          <a class="chip small" target="_blank" rel="noopener" title="Volumo"
-             href="https://volumo.com/search?q={{ bq|urlencode }}">Volumo</a>
-          <a class="chip small" target="_blank" rel="noopener" title="Beatport"
-             href="https://www.beatport.com/search?q={{ bq|urlencode }}">Beatport</a>
-          <a class="chip small" target="_blank" rel="noopener" title="Traxsource"
-             href="https://www.traxsource.com/search?term={{ bq|urlencode }}">Traxsource</a>
-          <a class="chip small" target="_blank" rel="noopener" title="Junodownload"
-             href="https://www.junodownload.com/search/?q%5Ball%5D%5B%5D={{ bq|urlencode }}">Junodownload</a>
-          <a class="chip small" target="_blank" rel="noopener" title="Bleep"
-             href="https://bleep.com/search?q={{ bq|urlencode }}">Bleep</a>
-        </div>
+        {# Vérifié en vrai (pas un lien de recherche à l'aveugle) : cf. retour
+           issue #62 du 09/09, "seulement si la track est bien en vente". #}
+        <div class="chip-list" id="stores-{{ rr.id }}" hidden></div>
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>

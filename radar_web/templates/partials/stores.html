@@ -1,0 +1,6 @@
+{% if hit %}
+<a class="chip small" target="_blank" rel="noopener" title="En vente sur Volumo"
+   href="{{ hit.url }}">🛍️ Volumo</a>
+{% else %}
+<span class="small muted">Pas trouvé en vente sur les boutiques suivies</span>
+{% endif %}

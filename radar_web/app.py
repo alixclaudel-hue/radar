@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, learn,
-                    paths, sellers, store, vocab, ytcache)
+                    paths, sellers, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 
@@ -1372,6 +1372,17 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
     except Exception:                       # noqa: BLE001 — repli toujours possible
         pass
     return RedirectResponse(bandcamp.search_url(a, t, kind), status_code=302)
+
+
+@app.get("/release/stores", response_class=HTMLResponse)
+def release_stores(request: Request, artist: str = "", title: str = ""):
+    """Boutiques où le disque est vérifié en vente (pas de lien si aucune ne
+    le propose — cf. retour issue #62 du 09/09)."""
+    try:
+        hit = volumo.search(artist, title, kind="a")
+    except Exception:                       # noqa: BLE001 — jamais bloquant pour l'UI
+        hit = None
+    return frag(request, "partials/stores.html", hit=hit)
 
 
 RELEASE_META_TTL = 86400

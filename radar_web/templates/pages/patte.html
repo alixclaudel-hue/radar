@@ -72,52 +72,6 @@
     </div>
   </details>
 
-  <!-- ============ RECOS RADAR ============ -->
-  <details class="acc">
-    <summary>
-      🎯 RECOS RADAR
-      <span class="tag">{% if recos_connected %}<span class="ok">✓ YouTube connecté</span>{% else %}YouTube non connecté{% endif %} · {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} en attente{% if last.scan_recos %} · dernier scan {{ last.scan_recos }}{% endif %}</span>
-    </summary>
-    <div class="acc__body">
-      <p class="small muted">Playlist YouTube alimentée automatiquement à partir des sorties de tes labels
-        suivis (score album ≥ seuil réglable dans Réglages) : les pistes trouvées sont cherchées sur YouTube
-        puis ajoutées à la playlist « RECOS RADAR ».</p>
-      {% if not recos_connected %}
-      <a class="small primary" href="/oauth/youtube/start" style="display:inline-block;text-decoration:none;padding:.35rem .8rem;border-radius:6px">Connecter YouTube (écriture playlist)</a>
-      {% else %}
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/run/scan_recos" hx-target="#job-scan_recos" hx-swap="outerHTML">🔄 Scanner maintenant</button>
-        <form method="post" action="/oauth/youtube/disconnect" style="display:inline">
-          <button type="submit" class="small" hx-confirm="Déconnecter YouTube ? La playlist ne sera plus alimentée tant que tu ne te reconnectes pas.">Déconnecter YouTube</button>
-        </form>
-      </div>
-      {% endif %}
-      <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-
-      <hr style="margin:12px 0">
-      <p class="small"><b>Nettoyage automatique</b> — retire de la playlist ce que tu as déjà écouté
-        (lu depuis ta page d'historique YouTube, pas d'API officielle pour ça).
-        <span class="tag">{% if recos_watch_session %}<span class="ok">✓ session importée</span>{% else %}session absente{% endif %}</span></p>
-      <p class="small muted">Génère le fichier de session une fois, en local, avec
-        <code>scripts/export_youtube_session.py</code> (ferme Chrome avant de lancer — le script
-        réutilise ton profil déjà connecté, un Chrome vierge est bloqué par Google), puis importe-le ici.</p>
-      <form method="post" action="/patte/youtube-session/upload" enctype="multipart/form-data"
-            style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="file" name="file" accept=".json" required>
-        <button type="submit" class="small">Importer la session de visionnage</button>
-      </form>
-      {% if recos_watch_session %}
-      <div class="btnrow" style="margin-top:6px">
-        <button type="button" class="small" hx-post="/patte/run/clean_recos" hx-target="#job-clean_recos" hx-swap="outerHTML">🧹 Nettoyer maintenant</button>
-        <form method="post" action="/patte/youtube-session/clear" style="display:inline">
-          <button type="submit" class="small" hx-confirm="Retirer la session de visionnage importée ?">Retirer la session</button>
-        </form>
-      </div>
-      <div id="job-clean_recos" hx-get="/jobs/clean_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-      {% endif %}
-    </div>
-  </details>
-
   <!-- ============ Spotify ============ -->
   <details class="acc">
     <summary>

@@ -26,9 +26,11 @@ d'emblée.
    Streamlit, retirée 2026-09-01, **ne pas y toucher**).
 2. **Déploiement** : `git push` → GitHub (`alixclaudel-hue/radar`) → merge sur `main` →
    `.github/workflows/deploy.yml` (VPS OVH : `git pull` + rebuild Docker + health-check,
-   rollback si KO). Manuel (dépannage) : **toujours `git fetch` avant `reset --hard
-   origin/main`** ; `--force-recreate` si le conteneur reste "Running" après un
-   changement d'env. Coordonnées VPS : Secrets Actions + note perso non versionnée.
+   rollback si KO — rollback impossible si l'échec survient avant le `reset --hard`, ex.
+   disque VPS saturé, cf. piège backup au point 13). Manuel (dépannage) : **toujours
+   `git fetch` avant `reset --hard origin/main`** ; `--force-recreate` si le conteneur
+   reste "Running" après un changement d'env. Coordonnées VPS : Secrets Actions + note
+   perso non versionnée.
 3. **Données** : `/data` sur le VPS (JSON — labels, corpus, graphe, profils, config avec
    token Discogs). Rien n'est dans git. Local : `export CRATE_DATA_DIR=$PWD/data`.
 4. **Session cloud (celle-ci)** : dépôt cloné frais, **pas de** `/data`/`.env`/token
@@ -36,6 +38,8 @@ d'emblée.
    ce fichier + `docs/` sont la source de vérité. Marche : éditer, `py_compile`, smoke
    test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub
    uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour un appel réel).
+   Pas d'accès OVH Manager/identifiants VPS non plus : dépannage VPS = guider
+   l'utilisateur pas à pas, jamais demander ses identifiants.
 5. **Boucle diag VPS — en pause depuis le 2026-09-06** (jugée non fonctionnelle par
    l'utilisateur, latence de livraison jamais fiabilisée). Le trigger `diag-vps` est
    désactivé (`enabled: false`) : **ne pas le réactiver, ne pas ouvrir d'issue `Diag <sha>`,
@@ -60,36 +64,51 @@ d'emblée.
 12. **Piège — PKCE OAuth YouTube** (`ytwrite.py`) : le `code_verifier` généré par
     `authorization_url()` doit être transporté explicitement (cookie) jusqu'à
     `exchange_code()` — deux objets `Flow` distincts ne le partagent pas.
-13. **Référentiel Discogs local** (`discogs_dump.py`) : index SQLite du dump mensuel
+13. **Piège — backup quotidien pouvait saturer le disque VPS** (`scripts/backup.sh`) :
+    archivait tout `/data` sans distinction, y compris le référentiel Discogs local
+    (`shared/discogs_dump.sqlite3`, ~3G, reconstructible depuis le dump mensuel) →
+    croissance anormale des archives (672M → 25G en 4 jours, cause exacte non identifiée)
+    → disque plein → `git fetch` en échec au déploiement (`No space left on device`,
+    incident du 2026-09-09 ayant bloqué la PR #77). Corrigé (PR #78) : dump exclu du
+    `tar` + relevé de taille par sous-dossier ajouté à `backup.log` (diagnostic sans SSH).
+    À surveiller : la vraie source de la croissance des backups restants n'est pas
+    confirmée — vérifier `backup.log` après le prochain run (04:00 UTC).
+14. **Piège — recherche YouTube** (`ytcache.search_video`) : le premier résultat peut être
+    une vidéo supprimée/privée. Corrigé : vérifie le statut des 5 premiers résultats,
+    retient le premier encore lisible (`_first_playable`).
+15. **Référentiel Discogs local** (`discogs_dump.py`) : index SQLite du dump mensuel
     (catalogue seulement, pas le marketplace), reprenable, bascule atomique. Alimente
     recherche locale, ranking labels/artistes, graphe de co-crédits multi-niveaux
     (mode `taste` = graines Cœur+Aimés+corpus). Détail complet → archive.
-14. **Entretien de fond** (`RADAR_AUTO_MAINTENANCE=1`) : `canonicalize` (hebdo),
+16. **Entretien de fond** (`RADAR_AUTO_MAINTENANCE=1`) : `canonicalize` (hebdo),
     `profile_labels` (hebdo), `build_graph` mode `taste` (mensuel) — plus de boutons
     dans Réglages, tout automatique.
-15. **Le "cerveau"** (`scoring.py`, classe `Ctx`) : `album_score`, `ascore`, `reco_rows` —
+17. **Le "cerveau"** (`scoring.py`, classe `Ctx`) : `album_score`, `ascore`, `reco_rows` —
     recalculé à chaque requête depuis `/data` (cache mtime).
-16. **Jobs** (`crate_jobs.py`) : tâches longues en sous-processus, statuts dans
+18. **Jobs** (`crate_jobs.py`) : tâches longues en sous-processus, statuts dans
     `/data/jobs/*.status.json`, reprenables via `*.state.json`. Ne pas rebuild le
     conteneur pendant qu'un job tourne.
-17. **RECOS RADAR** (feature sept. 2026, livrée en 3 PR) : playlist YouTube
+19. **Mes retours** (page feedback, issue #62) : bouton 🗑 pour supprimer une note déjà
+    traitée — supprime à la fois côté appli (`ui_notes.json`) et le commentaire GitHub
+    correspondant sur l'issue #62 (best-effort, comme l'envoi initial).
+20. **RECOS RADAR** (feature sept. 2026, livrée en 3 PR) : playlist YouTube
     auto-alimentée par les nouvelles sorties des labels suivis (scoring `album_score`),
     écriture OAuth2 (`ytwrite.py`), nettoyage par scraping Playwright de l'historique de
     visionnage (`ytwatch.py`, session exportée manuellement, pas de login automatisé).
     Jobs `scan_recos` → `publish_recos` (chaînés), `clean_recos` (volontairement séparé,
     `RADAR_RECOS_CLEANUP` distinct de `RADAR_RECOS_SCAN`, pas encore validé en réel).
     Wantlist RADAR (2ᵉ feature du même chantier) : pas commencée.
-18. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
+21. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —
     besoin d'un nom de domaine pointant sur le VPS), puis l'étape 5b (OAuth
     Discogs/Spotify — exige aussi 2 apps développeur enregistrées). À la reprise de 5b,
     envisager `/model` Opus pour l'implémentation OAuth + toute migration de schéma.
-19. **TODO opérationnel** : lancer le scan vendeurs une fois à la main (Réglages →
+22. **TODO opérationnel** : lancer le scan vendeurs une fois à la main (Réglages →
     Catalogue de vendeurs, ~1 h pour 141 vendeurs), puis poser `RADAR_SELLER_SCAN=1` sur
     le service `radar-worker` (compose, pas le `.env` VPS) pour activer le scan hebdo
     automatique.
-20. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
+23. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
     `.tbl` partagé (recopié dans 3 partials), multi-selects genre/style, `<label for>` non
     reliés (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche,
     UI de revue des artistes « approx », suppression par track/DJ dans Mes sets.

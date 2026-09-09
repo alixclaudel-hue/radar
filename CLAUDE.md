@@ -19,6 +19,11 @@ ces fichiers sont dans `.claudeignore` (non lus automatiquement) : les lire expl
 `claude_archive.md`) : demander à l'utilisateur si c'est pertinent plutôt que le lire
 d'emblée.
 
+**Mode caveman par défaut** : invoquer le skill `caveman`
+(`.claude/skills/caveman/SKILL.md`, niveau `full`) en tout début de session, sauf
+demande contraire de l'utilisateur. S'applique aux réponses conversationnelles ; le code,
+les commits, la doc et les tickets restent en prose normale (cf. Boundaries du skill).
+
 ## État actuel du projet — résumé
 
 1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, l'interface) ; `crate_jobs.py`

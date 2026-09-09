@@ -1,8 +1,8 @@
 # Radar — instructions projet
 
-Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, Spotify, Bandcamp, DJ sets), profile labels/artistes, note sorties Discogs selon goût. Cible multi-utilisateur (chantier en cours) → `docs/architecture.md`.
+Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, Spotify, Bandcamp, DJ sets), profile labels/artistes, note sorties Discogs selon goût. Cible multi-utilisateur (chantier en cours) → `docs/architecture.md`.
 
-**Reprise de contexte : ce fichier suffit** — état du chantier, TODO et pièges appris dans le résumé ci-dessous (fusionné depuis l'ancien `docs/etat.md`, ménage 2026-09-08).
+**Reprise de contexte : ce fichier suffit** — état, TODO et pièges appris dans résumé ci-dessous (fusionné depuis ancien `docs/etat.md`, ménage 2026-09-08).
 
 **Historique complet et détails techniques** : `claude_archive.md` (dump Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et `docs/archive/` (anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) — fichiers dans `.claudeignore` (non lus automatiquement) : lire explicitement (`Read <fichier>`) si détail précis manquant.
 
@@ -19,7 +19,7 @@ Outil perso de crate-digging vinyle basé sur Discogs : ingère écoute (YouTube
 5. **Boucle diag VPS — en pause depuis 2026-09-06** (jugée non fonctionnelle par l'utilisateur, latence de livraison jamais fiabilisée). Trigger `diag-vps` désactivé (`enabled: false`) : **ne pas réactiver, ne pas ouvrir d'issue `Diag <sha>`, ne pas appeler `fire_trigger` dessus**, sans demande explicite. Reprise possible plus tard. Contrats (gelés, gardés pour référence, **déplacés hors `.claude/skills/` donc non invocables** en l'état) : `docs/archive/skill-diag.md` + `docs/archive/skill-dev-loop.md`. Pour réactiver `/diag`/`/dev-loop`, les replacer dans `.claude/skills/<nom>/SKILL.md`. Session `session_01KbkY8jHGMbLLgkkQb8Kj6d` (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
 6. **Conventions** : `py_compile` + smoke test local avant chaque push (double de la CI) ; **jamais `git add -A`** (ajouter fichiers nommément, relire `git status`) ; commits/commentaires **en français** ; pas de commentaires superflus (le *pourquoi*, pas le *quoi*).
 7. **Piège — Marketplace Discogs** : prix/annonces/décompte FR **inobtenables** (Cloudflare bloque). Abandonné — garder lien `🇫🇷 voir` + pastille API.
-8. **Piège — Streamlit** : archivé et mort, ne jamais y reporter d'évolutions.
+8. **Piège — Streamlit** : archivé et mort, jamais y reporter d'évolutions.
 9. **Piège — Bandcamp** (`bcsearch_public_api`) : endpoint non documenté, peut disparaître ; repli URL de recherche suffit, pas de "vraie" API depuis 2022.
 10. **Piège — `discogs_get()`** : ne lève jamais d'exception, renvoie `{}` sur échec.
 11. **Piège — dump Discogs** : `data.discogs.com` sert via `?download=...` (paramètre

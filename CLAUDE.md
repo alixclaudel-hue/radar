@@ -271,8 +271,37 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     au prochain scan. »). Vérifié par smoke test hors-ligne (statut
     `publish_recos` simulé en quota épuisé, file à 56/45) : le message de
     `scan_recos` inclut bien la raison — pas testé en conditions réelles.
+33. **Piège — candidat RECOS détruit définitivement au 1er échec YouTube**
+    (`job_publish_recos`, corrigé le 10/09, retour utilisateur : « aucune vidéo
+    trouvée » toujours après le correctif scoring du point précédent [9f1eb04],
+    « tu n'as rien fait de nouveau ») : le `continue` du cas « vidéo introuvable »
+    ne remettait jamais le candidat dans `remaining` — il disparaissait de
+    `recos_candidates.json` dès le 1er échec, alors que sa sortie reste marquée
+    « vue » dans `recos_seen.json` (`job_scan_recos`) et n'est donc plus jamais
+    reproposée. Chaque échec de recherche perdait la piste pour toujours,
+    indépendamment de la qualité du scoring : le correctif `ytcache._best_match`
+    de la session précédente ne pouvait donc avoir aucun effet visible, la file
+    finissant systématiquement vidée sans jamais rien publier — c'est ce
+    mécanisme, pas le scoring, qui expliquait le symptôme signalé. Corrigé :
+    nouvelle constante `RECOS_MAX_ATTEMPTS` (3) — candidat sans vidéo remis en
+    file pour retenter au prochain lancement (le cache négatif `NEG_TTL` de
+    `ytcache` expire sous 6h, laissant une chance à une meilleure indexation
+    YouTube), abandonné explicitement (journalisé) seulement après 3 échecs.
+    Vérifié par simulation hors-ligne (3 candidats : échec permanent / échec
+    puis succès au 2e essai / succès immédiat) — le candidat « échec puis
+    succès » est bien récupéré au 2e lancement au lieu d'être perdu dès le 1er.
+    Non testé contre l'API YouTube réelle (pas d'accès réseau/clé depuis cette
+    session cloud).
 
 ## TODO — prochaine session
+
+- **Vérifier le correctif du point 33** (candidat détruit au 1er échec YouTube)
+  sur le VPS après déploiement : lancer « ▶ Alimenter la playlist » plusieurs
+  fois de suite sur une file encombrée d'échecs et confirmer au journal qu'un
+  candidat retenté finit par être ajouté (ou abandonné après 3 tentatives avec
+  message explicite), au lieu de disparaître sans trace dès le 1er échec — et
+  surtout, confirmer qu'au moins une vidéo est désormais ajoutée à la playlist
+  (le symptôme central signalé le 10/09).
 
 - **Vérifier le correctif du point 32** (message « file pleine » sans raison) sur
   le VPS après déploiement : provoquer une file pleine (quota épuisé ou file > 45)

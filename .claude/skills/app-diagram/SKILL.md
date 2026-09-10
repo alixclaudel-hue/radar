@@ -1,15 +1,60 @@
 ---
 name: app-diagram
-description: "Three-step workflow: generate a structured app overview doc (docs/app-overview.md) via the app-overview agent if one doesn't exist, produce a diagram brief (docs/app-diagram-brief.md), then render it straight to docs/app-overview.excalidraw. Use when the user asks for an architecture diagram, 'diagram the app', 'visualize the app structure', 'show the app architecture', 'draw the tech stack', 'how does the app work as a diagram', or any request that combines an app overview with a visual. The doc step is cached -- if docs/app-overview.md already exists, only the diagram and render steps run."
+description: "Three-step workflow: generate a structured app overview doc (docs/app-overview.md) via the app-overview agent if one doesn't exist, produce a diagram brief (docs/app-diagram-brief.md), then render it straight to docs/app-overview.excalidraw. Use when the user asks for an architecture diagram, 'diagram the app', 'visualize the app structure', 'show the app architecture', 'draw the tech stack', 'how does the app work as a diagram', or any request that combines an app overview with a visual. Accepts an optional argument naming a module, a folder or a feature ('/app-diagram pipeline/', '/app-diagram the data refresh chain') to diagram just that part, written to its own files. The doc step is cached -- if the overview doc already exists and the code has not moved, only the diagram and render steps run."
 ---
 
 # App Diagram Workflow
 
 Orchestrates three steps in sequence: produce `docs/app-overview.md` via the `app-overview` agent, turn it into a diagram brief via the `diagram-brief` skill, then render that brief into an Excalidraw file with the bundled generator script.
 
+Called on its own it documents the whole project. Given an argument -- a folder,
+a file, or a feature described in words -- it documents only that, and writes to
+its own set of files. Step 0 settles which.
+
 The separation matters: the overview agent reads every significant file in the codebase, in its own context, and writes a file rather than reporting back. The diagram step only reads the cached markdown. The render step reads nothing at all -- it runs a script.
 
 Only step 1 spawns an agent, and only when the doc is missing or stale. Steps 2 and 3 stay in this conversation on purpose: a brief is a few hundred tokens, and rendering is a single script call. Spawning an agent for either would cost more than doing it here.
+
+---
+
+## Step 0 -- Decide what to document
+
+Read the arguments given to this skill. They arrive after `ARGUMENTS:` and are
+empty when the user typed `/app-diagram` on its own.
+
+**No arguments -- the whole project.** Use these names, unchanged from before so
+existing projects keep their files:
+
+```
+doc      = docs/app-overview.md
+brief    = docs/app-diagram-brief.md
+drawing  = docs/app-overview.excalidraw
+meta_key = app-overview
+focus    = (none)
+```
+
+**Arguments given -- one module, folder or feature.** For example
+`/app-diagram pipeline/`, `/app-diagram the data refresh chain`, or
+`/app-diagram app/workload.tsx and what feeds it`. Take the argument text as
+`focus`, and build a slug from it: lowercase, every run of non-alphanumeric
+characters becomes a single `-`, trimmed, at most 40 characters. Then:
+
+```
+doc      = docs/app-overview-<slug>.md
+brief    = docs/app-diagram-brief-<slug>.md
+drawing  = docs/app-overview-<slug>.excalidraw
+meta_key = app-overview:<slug>
+```
+
+Separate names are not a detail: a module drawing that overwrote the
+whole-project one would quietly destroy work. Never mix the two.
+
+If the argument is a path that exists in the repository (check with Bash), keep
+it as `focus_paths` -- Step 1 uses it to decide whether the doc is stale. A
+feature described in prose has no `focus_paths`, and that is fine.
+
+Everywhere below, `<doc>`, `<brief>`, `<drawing>` and `<meta_key>` mean the
+values decided here.
 
 ---
 
@@ -24,12 +69,12 @@ Run these in sequence:
      set `current_commit = null`. There is then nothing to compare and no cache
      to keep: go straight to Branch A and skip Step 1c.
 2. Use Read tool on `docs/.doc-meta.json`:
-   - If the file exists, parse the JSON and extract `app-overview.commit` as `last_commit`
-   - Also extract `app-overview.scope` as `scope` if present -- a list of git
+   - If the file exists, parse the JSON and extract `<meta_key>.commit` as `last_commit`
+   - Also extract `<meta_key>.scope` as `scope` if present -- a list of git
      pathspecs recorded by a previous run
    - If the file does not exist or the key is missing, set `last_commit = null`
      and `scope = null`
-3. Use Read tool on `docs/app-overview.md`:
+3. Use Read tool on `<doc>`:
    - If the file does not exist, set `doc_exists = false`; otherwise `doc_exists = true`
 
 Nothing here assumes a particular project layout, and nothing below should
@@ -45,23 +90,41 @@ Full generation: spawn the app-overview agent:
 Use the Agent tool with:
 - `subagent_type`: `"app-overview"`
 - `description`: `"Generate app overview doc"`
-- `prompt`: `"Generate a full app overview for this project following your documented format. Write the output to docs/app-overview.md (create docs/ if needed). Do not print the overview to the conversation -- only write the file."`
+- `prompt`: `"Generate a full app overview for this project following your documented format. Write the output to <doc> (create docs/ if needed). Do not print the overview to the conversation -- only write the file."`
+
+When `focus` is set, append this to the prompt instead of asking for the whole
+project:
+
+```
+Document only this part of the project: <focus>.
+
+Read whatever else you need in order to understand it -- what calls into it,
+what it calls, what data it reads and writes -- but describe only this part.
+Name the boundary explicitly: say what is inside and what you treated as
+external to it. If the focus turns out not to exist, or to be far larger than
+described, say so in the document rather than guessing.
+```
+
+The agent starts with no knowledge of this conversation, so `focus` has to be
+spelled out in the prompt; a folder name alone is often not enough.
 
 Wait for the agent to complete. Then go to Step 1c.
 
 **Branch B — doc_exists is true AND last_commit == current_commit**
 
 The doc is already up to date. Tell the user:
-`"docs/app-overview.md is current (last documented at <last_commit[:7]>, matches HEAD). Skipping doc generation."`
+`"<doc> is current (last documented at <last_commit[:7]>, matches HEAD). Skipping doc generation."`
 
-Read `docs/app-overview.md` into context, then proceed to Step 2.
+Read `<doc>` into context, then proceed to Step 2.
 
 **Branch C — doc_exists is true AND last_commit != current_commit**
 
 First decide the pathspec to compare, in this order:
 
-- If `scope` was found in `.doc-meta.json` and is a non-empty list, use it:
-  `-- <scope[0]> <scope[1]> ...`
+- If `focus_paths` was set in Step 0, use it: a drawing of one folder goes stale
+  when that folder changes, not when the rest of the repository does.
+- Otherwise, if `scope` was found in `.doc-meta.json` and is a non-empty list,
+  use it: `-- <scope[0]> <scope[1]> ...`
 - Otherwise compare the **whole repository except the docs folder**:
   `-- . ':(exclude)docs/'`
 
@@ -86,14 +149,14 @@ git diff <last_commit>..<current_commit> -- <pathspec decided above>
 
 Run via Bash: `git log --oneline <last_commit>..<current_commit>`
 
-Read the current contents of `docs/app-overview.md`.
+Read the current contents of `<doc>`.
 
 Use the Agent tool with:
 - `subagent_type`: `"general-purpose"`
 - `description`: `"Patch app overview doc"`
 - `prompt`:
 ```
-docs/app-overview.md was last generated at commit <last_commit>.
+<doc> was last generated at commit <last_commit>.
 Since then, the following commits landed:
 
 <git log output>
@@ -102,18 +165,18 @@ Here is the diff of all changed files (scope: <pathspec used above>):
 
 <git diff output>
 
-Here is the current contents of docs/app-overview.md:
+Here is the current contents of <doc>:
 
 <doc contents>
 
-Your task: update docs/app-overview.md to reflect only what changed in the diff.
+Your task: update <doc> to reflect only what changed in the diff.
 Rules:
 - Add sections or entries for newly added files, components, routes, or tech stack items
 - Remove sections or entries for deleted files or components
 - Update descriptions for modified components, routes, state, or configuration
 - Do NOT touch sections whose source files do not appear in the diff
 - Preserve the exact document format, heading structure, and writing style verbatim
-- Write the complete updated file to docs/app-overview.md
+- Write the complete updated file to <doc>
 ```
 
 Wait for the agent to complete. Then go to Step 1c.
@@ -125,12 +188,15 @@ record.
 
 Otherwise use the Read tool to get the current `docs/.doc-meta.json` content
 (treat a missing file as `{}`), then use the Write tool to save it back with
-`app-overview.commit` set to `current_commit`. Preserve every other key
+`<meta_key>.commit` set to `current_commit`. Preserve every other key
 unchanged, including any `scope` already recorded -- a project that has narrowed
-its scope by hand should keep it. Do not invent a `scope`: its absence is what
+its scope by hand should keep it.
+
+Record `scope` yourself only when Step 0 produced `focus_paths`; that is a real
+pathspec, not a guess. Otherwise leave `scope` absent: its absence is what
 selects the broad default above.
 
-Read `docs/app-overview.md` into context so you have the architecture data for Step 2.
+Read `<doc>` into context so you have the architecture data for Step 2.
 
 ---
 
@@ -144,7 +210,7 @@ yet, this is simply the first time they are built.
 Use the Skill tool to invoke `diagram-brief` with these args:
 
 ```
-Read docs/app-overview.md and produce a diagram brief at docs/app-diagram-brief.md.
+Read <doc> and produce a diagram brief at <brief>.
 
 Layout: top-to-bottom (layered architecture following the main flow).
 Flow summary: Show how data or requests enter the project, what receives them, what does the work, and where the results end up.
@@ -172,8 +238,19 @@ Scale:
 - Medium project (10-20 key files): group by feature area or by stage
 - Large project (>20 key files): layers + the 8-10 most architecturally significant units; note the rest as "+N more"
 
-Save output to docs/app-diagram-brief.md.
+Save output to <brief>.
 ```
+
+When Step 0 set a `focus`, add these lines to the args as well:
+
+```
+This diagram covers only <focus>, not the whole project. Draw that part in
+detail, and represent everything outside it as a single box per external
+dependency -- named, but not opened up. Say in the Notes what the boundary is.
+```
+
+Without that, the brief happily draws the whole document and the drawing stops
+matching what was asked for.
 
 ---
 
@@ -186,7 +263,7 @@ script does the whole transform in well under a second.
 Run via Bash, from the project root:
 
 ```
-python "$HOME/.claude/skills/brief-to-excalidraw/scripts/brief_to_excalidraw.py" docs/app-diagram-brief.md docs/app-overview.excalidraw
+python "$HOME/.claude/skills/brief-to-excalidraw/scripts/brief_to_excalidraw.py" <brief> <drawing>
 ```
 
 Notes:
@@ -200,7 +277,7 @@ Notes:
   expects. In that case invoke the `brief-to-excalidraw` skill with the Skill
   tool and let it handle the fallback, rather than patching the JSON by hand.
 
-The output overwrites `docs/app-overview.excalidraw` if it already exists, which
+The output overwrites `<drawing>` if it already exists, which
 is what we want -- the file tracks the current architecture.
 
 ---
@@ -208,8 +285,12 @@ is what we want -- the file tracks the current architecture.
 ## Final output to report to user
 
 Once both steps are complete, tell the user:
-- `docs/app-overview.md` -- full text overview of the app architecture (reusable, regenerate any time the app changes significantly)
-- `docs/app-diagram-brief.md` -- step-by-step drawing instructions for the layered architecture diagram, in case the drawing needs adjusting by hand
-- `docs/app-overview.excalidraw` -- the diagram itself, ready to open at excalidraw.com or in the VS Code Excalidraw extension
+- `<doc>` -- full text overview, reusable and worth regenerating whenever the code moves
+- `<brief>` -- step-by-step drawing instructions, in case the drawing needs adjusting by hand
+- `<drawing>` -- the diagram itself, ready to open at excalidraw.com or in the VS Code Excalidraw extension
+
+Say what the drawing covers: the whole project, or the `focus` that was asked
+for. When a focus was used, mention that the whole-project files, if any, were
+left untouched.
 
 Report the script's `groups / boxes / arrows` counts so the user knows how big the drawing is before opening it.

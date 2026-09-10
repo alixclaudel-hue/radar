@@ -68,8 +68,13 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     par `video_id`) — retire de `recos_playlist.json` uniquement, `recos_history.json`
     conservé (la vidéo ne sera pas réajoutée automatiquement). Rechargement complet de
     page (pas htmx) : le lecteur IFrame charge sa liste une fois au chargement, une
-    suppression en place le désynchroniserait des lignes. Wantlist RADAR (2ᵉ feature du
-    même chantier) : pas commencée.
+    suppression en place le désynchroniserait des lignes. Bouton « 🗑️🔄 Forcer (tout
+    rescanner) » (10/09, phase de test) : `scan_recos` avec `force=1` — vide
+    `recos_seen.json` ET `recos_candidates.json` avant de scanner, pour reconstruire la
+    file d'attente à neuf avec le scoring courant (ex. après un changement de
+    pondération) au lieu de ne repérer que les sorties jamais vues. Ne touche ni
+    `recos_playlist.json` (déjà publié) ni `recos_history.json`. Wantlist RADAR (2ᵉ
+    feature du même chantier) : pas commencée.
 20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —

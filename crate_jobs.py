@@ -2041,7 +2041,14 @@ def job_scan_recos(job, params):
 
     recos_seen.json évite de retraiter une sortie déjà vue à chaque lancement : un
     dump est un instantané mensuel, search_local() renverrait sinon indéfiniment
-    les mêmes releases tant que le mois ne change pas."""
+    les mêmes releases tant que le mois ne change pas.
+
+    `force` (case "forcer (tout rescanner)", phase de test — retour utilisateur
+    2026-09-10) : ignore recos_seen.json ET vide recos_candidates.json avant de
+    scanner, pour reconstruire la file d'attente à neuf avec le scoring courant
+    (ex. après un changement de pondération) au lieu de ne repérer que les
+    sorties jamais vues. Ne touche ni recos_playlist.json (déjà publié) ni
+    recos_history.json (vidéos déjà proposées, jamais réajoutées)."""
     from radar_web.radar import discogs_dump as dd
     from radar_web.radar.scoring import Ctx, real_tracks
 
@@ -2055,13 +2062,14 @@ def job_scan_recos(job, params):
     rc = cfg.get("scoring", {}).get("recos", {})
     min_score = float(params.get("min_score", rc.get("min_score", 60)))
     max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
+    force = bool(params.get("force"))
 
     names = list(cfg.get("labels", [])) + [w for w in cfg.get("watchlist", []) if w and w.strip()]
     label_keys = sorted({normalize_label(n) for n in names if n and n.strip()})
     if not label_keys:
         return job.finish("Aucun label suivi (base ou veille) — rien à scanner.")
 
-    seen = set(load_json(RECOS_SEEN_PATH, []))
+    seen = set() if force else set(load_json(RECOS_SEEN_PATH, []))
     rows = dd.search_local(label_keys=label_keys, limit=5000)
     ctx = Ctx(uid=RADAR_UID)
     scored = []
@@ -2082,7 +2090,7 @@ def job_scan_recos(job, params):
         return job.finish(f"{len(rows)} sortie(s) sur tes labels, aucune au-dessus de {min_score:g}.")
 
     job.msg(f"{len(targets)} sortie(s) retenue(s) sur {len(rows)} scannée(s).")
-    candidates = load_json(RECOS_CANDIDATES_PATH, [])
+    candidates = [] if force else load_json(RECOS_CANDIDATES_PATH, [])
     if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
         _chain_publish_recos()
         return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"

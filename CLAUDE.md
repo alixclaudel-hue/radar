@@ -119,12 +119,19 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     Beatport et Traxsource (Cloudflare, challenge JS, même piège que le Marketplace
     Discogs point 7), Bleep (AWS WAF), 7digital (`/search` bloqué par AWS WAF/captcha même
     une fois le sous-domaine régional `us.7digital.com` atteint), Junodownload (site fermé).
-25. **TODO identifié — pertinence recherche YouTube** (`ytcache.search_video`) : prend le
-    1er résultat de recherche sans vérifier la pertinence (contrairement à
-    `bandcamp.py`/`volumo.py` qui scorent par recouvrement de mots artiste/titre) — cause
-    de vidéos hors-sujet dans la playlist RECOS RADAR (retour utilisateur du 09/09). Piste
-    de correction identifiée (même principe de score, quasi gratuit en quota car `/videos`
-    est déjà appelé pour vérifier la lisibilité), pas encore implémentée.
+25. **Pertinence recherche YouTube** (`ytcache.search_video`, corrigé le 10/09) : prenait
+    le 1er résultat de recherche sans vérifier la pertinence — plus de la moitié des
+    vidéos ajoutées à RECOS RADAR étaient hors-sujet (retour utilisateur du 09/09, confirmé
+    et chiffré le 10/09 : ">50% sur 20 pistes testées"). Corrigé avec le même principe que
+    `bandcamp.py`/`volumo.py` (score par recouvrement de mots), appliqué aux métadonnées de
+    la vidéo (`part=snippet` — titre + nom de chaîne) croisées avec artiste/titre/label de
+    la piste demandée : pénalise les résultats hors-sujet, les versions non demandées
+    (remix/live/cover…), et bonifie une chaîne officielle du label suivi. Coût quota
+    inchangé : `snippet` est demandé dans la MÊME requête `/videos` que la vérification de
+    lisibilité déjà existante (part `status`) — `videos.list` coûte 1 unité quel que soit
+    le nombre de parts, à la différence de `search.list` (100 unités). Repli sur le 1er
+    résultat lisible (ordre de pertinence YouTube) si rien ne dépasse le seuil de
+    recoupement — faux négatif plutôt qu'aucune vidéo du tout.
 26. **Piège — lien artiste↔label sans croisement de style** (`Ctx.artist_label_signal`,
     terme `label_link` de `ascore`) : partager un label suivi (base/watchlist) suffisait à
     booster n'importe quel artiste, même hors-style (ex. featuring rap sur un label

@@ -8,6 +8,7 @@
 import hashlib
 import json
 import os
+import re
 import time
 
 import requests
@@ -18,6 +19,25 @@ CACHE_PATH = os.path.join(paths.SHARED_DIR, "youtube_cache.json")
 API = "https://www.googleapis.com/youtube/v3"
 _QUOTA_REASONS = {"quotaexceeded", "dailylimitexceeded", "ratelimitexceeded",
                   "userratelimitexceeded"}
+
+# Pertinence du résultat (retour utilisateur 2026-09-10 : plus de la moitié des
+# vidéos ajoutées à RECOS RADAR n'avaient aucun rapport avec la piste demandée —
+# search_video prenait le 1er résultat de recherche sans vérifier qu'il
+# correspondait vraiment, contrairement à bandcamp.py/volumo.py qui scorent par
+# recouvrement de mots. Même principe ici, appliqué au titre/à la chaîne de la
+# vidéo (part `snippet`) — mots vides et mots trahissant une autre version que
+# celle demandée (remix, live, cover…).
+_FILLER = {"pt", "part", "i", "ii", "iii", "iv", "v", "vi", "the", "a", "an",
+           "ft", "feat", "featuring", "and"}
+_ALT_VERSION = {"remix", "rework", "bootleg", "edit", "flip", "refix", "vip",
+                "reprise", "mashup", "cover", "live", "tutorial", "lesson",
+                "reaction", "review", "lyrics", "karaoke", "instrumental",
+                "acapella", "sped", "slowed", "nightcore", "8d", "loop"}
+MIN_MATCH_SCORE = 0.5
+
+
+def _toks(s):
+    return set(re.findall(r"[a-z0-9]+", (s or "").lower())) - _FILLER
 
 
 class QuotaExhausted(RuntimeError):
@@ -103,40 +123,77 @@ def request(path, params, keys, timeout=15):
     raise RuntimeError("Aucune clé YouTube utilisable.")
 
 
-def search_video(query, keys, ttl=7 * 86400):
-    """videoId de la meilleure vidéo pour `query`, encore lisible (mise en cache).
-    None si rien / pas de clé."""
+def search_video(query, keys, ttl=7 * 86400, artist=None, title=None, label=""):
+    """videoId de la MEILLEURE vidéo pour `query` parmi les 5 premiers résultats,
+    encore lisible ET dont les métadonnées (titre, chaîne) recoupent le mieux
+    `artist`/`title`/`label` (mise en cache). `artist`/`title`/`label` sont
+    optionnels (repli sur un simple recoupement contre les mots de `query`
+    quand absents, cf. /yt/first qui n'a qu'une chaîne de recherche déjà
+    composée). None si rien / pas de clé."""
     q = " ".join((query or "").split())
     if not q or not keys:
         return None
-    ckey = "search:" + hashlib.sha1(q.encode()).hexdigest()[:20]
+    ckey = "search:" + hashlib.sha1(f"{q}|{artist or ''}|{title or ''}|{label}".encode()).hexdigest()[:20]
     hit = cache_get(ckey, ttl)
     if hit is not None:
         return hit or None
     d = request("/search", {"part": "id", "type": "video", "maxResults": 5, "q": q}, keys)
     ids = [((it.get("id") or {}).get("videoId") or "") for it in d.get("items", [])]
     ids = [i for i in ids if i]
-    vid = _first_playable(ids, keys) if ids else ""
+    vid = _best_match(ids, q, artist, title, label, keys) if ids else ""
     cache_put(ckey, vid)
     return vid or None
 
 
-def _first_playable(ids, keys):
-    """1er id parmi `ids` (ordre de pertinence) dont YouTube confirme le statut lisible
-    (uploadStatus "processed", pas privé) — une recherche peut remonter une vidéo
-    supprimée/privée entre l'indexation et l'affichage (retour nt_b10a9ba00f : "cette
-    vidéo n'est plus disponible"). Repli sur le 1er id brut si l'appel de vérif échoue,
-    plutôt que de ne rien renvoyer."""
+def _best_match(ids, query, artist, title, label, keys):
+    """1er id lisible parmi `ids` (ordre de pertinence YouTube), en priorité celui
+    dont les métadonnées (part `snippet`) recoupent le mieux la piste demandée —
+    coût quota inchangé : `snippet` est demandé dans la MÊME requête `/videos`
+    que la vérification de lisibilité existante (part `status`), qui coûte 1
+    unité quel que soit le nombre de parts demandées (contrairement à `search`,
+    100 unités). Repli sur le 1er id encore lisible si rien ne dépasse le seuil
+    de recoupement (métadonnées pauvres côté vidéo — faux négatif préférable à
+    aucune vidéo du tout) ou si l'appel `/videos` échoue."""
     try:
-        d = request("/videos", {"part": "status", "id": ",".join(ids)}, keys)
+        d = request("/videos", {"part": "snippet,status", "id": ",".join(ids)}, keys)
     except (QuotaExhausted, RuntimeError):
         return ids[0]
-    ok = {}
-    for it in d.get("items", []):
+    items = {it.get("id"): it for it in d.get("items", [])}
+
+    def playable(i):
+        it = items.get(i)
+        if not it:
+            return False
         st = it.get("status", {})
-        ok[it.get("id")] = (st.get("uploadStatus") == "processed"
-                             and st.get("privacyStatus") in ("public", "unlisted"))
+        return st.get("uploadStatus") == "processed" and st.get("privacyStatus") in ("public", "unlisted")
+
+    want = _toks(query)
+    a_toks, t_toks, l_toks = _toks(artist or ""), _toks(title or ""), _toks(label or "")
+    best_id, best_score = None, 0.0
     for i in ids:
-        if ok.get(i):
+        if not playable(i):
+            continue
+        sn = items[i].get("snippet", {})
+        vt_toks = _toks(sn.get("title", ""))
+        ch_toks = _toks(sn.get("channelTitle", ""))
+        cand = vt_toks | ch_toks
+        if not want or not cand:
+            continue
+        score = len(want & cand) / len(want)
+        if l_toks and (l_toks & ch_toks):          # chaîne officielle du label suivi
+            score += 0.15
+        foreign = vt_toks - want
+        if foreign & _ALT_VERSION:                 # remix/live/cover... non demandé
+            score *= 0.4
+        if t_toks and len(t_toks & vt_toks) / len(t_toks) < 0.4:
+            score *= 0.5                           # le cœur du titre doit être dans la vidéo
+        if a_toks and len(a_toks & cand) / len(a_toks) < 0.4:
+            score *= 0.5                           # l'artiste doit être dans le titre OU la chaîne
+        if score > best_score:
+            best_id, best_score = i, score
+    if best_id is not None and best_score >= MIN_MATCH_SCORE:
+        return best_id
+    for i in ids:                                  # repli : ordre de pertinence YouTube
+        if playable(i):
             return i
     return ids[0]

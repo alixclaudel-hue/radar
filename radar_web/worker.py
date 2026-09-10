@@ -141,7 +141,14 @@ def _maybe_recos_scan():
     """Toutes les heures (si RADAR_RECOS_SCAN=1) : publish_recos si des candidats
     attendent déjà dans recos_candidates.json (draine la file avant d'aller
     chercher autre chose), sinon scan_recos pour en trouver de nouveaux (qui
-    rechaîne lui-même publish_recos à la fin, cf. crate_jobs._chain_publish_recos)."""
+    rechaîne lui-même publish_recos à la fin, cf. crate_jobs._chain_publish_recos).
+
+    En pause depuis le 10/09 (retour utilisateur, phase de test, plafond de
+    playlist réduit à 5 pistes, cf. crate_jobs.RECOS_MAX_TRACKS) : désactivé au
+    niveau code plutôt que côté variable d'environnement VPS (hors d'atteinte
+    depuis cette session cloud, cf. CLAUDE.md) — retirer ce `return` pour
+    réactiver, même principe que la pause de la boucle diag VPS."""
+    return
     global _last_recos_check
     if os.environ.get("RADAR_RECOS_SCAN") != "1":
         return

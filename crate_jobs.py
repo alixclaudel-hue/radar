@@ -86,7 +86,7 @@ RECOS_SEEN_PATH = os.path.join(USER_DIR, "recos_seen.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
-RECOS_MAX_TRACKS = 100
+RECOS_MAX_TRACKS = 5  # limite de test (10/09, retour utilisateur) — remonter une fois validé
 RECOS_DAILY_SEARCH_BUDGET = 90
 # marge sous le quota gratuit YouTube Data API (10 000 unités/jour ÷ 100 unités par
 # recherche = 100) : évite que scan_recos empile plus de candidats que publish_recos

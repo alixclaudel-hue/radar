@@ -59,8 +59,9 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     avec la liste d'ids vidéo). Jobs `scan_recos` (candidats notés par `album_score`
     sur les sorties des labels suivis) → `publish_recos` (chaînés ; recherche vidéo
     via `ytcache`, seule dépendance réseau restante — clé API YouTube déjà utilisée
-    ailleurs, pas d'écriture). Plafond 100 pistes, **FIFO** : au-delà, la plus
-    ancienne est retirée avant d'ajouter la nouvelle (retrait par ancienneté, pas par
+    ailleurs, pas d'écriture). Plafond **5 pistes** (limite de test, 10/09 — était 100,
+    cf. `RECOS_MAX_TRACKS` dans `crate_jobs.py` ET `radar_web/app.py`, à resynchroniser
+    si modifié), **FIFO** : au-delà, la plus ancienne est retirée avant d'ajouter la nouvelle (retrait par ancienneté, pas par
     écoute réelle — l'ancien lot 3, nettoyage par scraping Playwright de l'historique
     de visionnage, a été abandonné : `ytwrite.py`, `ytwatch.py`,
     `scripts/export_youtube_session.py` et le job `clean_recos` supprimés). Suppression
@@ -88,8 +89,15 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     2026-09-10 : « pas forcément dans la playlist à l'instant, elle a pu être
     supprimée »). Anciennes entrées d'historique (avant ce correctif, simples chaînes
     `video_id`) restent dédoublonnées par vidéo seulement, pas par identité de piste
-    (pas d'artiste/titre à en tirer). Wantlist RADAR (2ᵉ feature du même chantier) :
-    pas commencée.
+    (pas d'artiste/titre à en tirer). **Job automatique en pause depuis le 10/09**
+    (retour utilisateur, phase de test avec le plafond réduit à 5) : `_maybe_recos_scan`
+    retourne immédiatement (`return` ajouté en tête de fonction, avant même la
+    vérification de `RADAR_RECOS_SCAN` — variable d'environnement du `.env` VPS, hors
+    d'atteinte depuis cette session cloud) — même principe que la pause de la boucle
+    diag VPS (point 5). Pour reprendre l'alimentation automatique : retirer ce `return`
+    dans `worker.py`. En attendant, alimentation uniquement manuelle depuis
+    `/reco-radar` (« 🔄 Scanner maintenant », « ▶ Alimenter la playlist », « 🗑️🔄
+    Forcer »). Wantlist RADAR (2ᵉ feature du même chantier) : pas commencée.
 20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —

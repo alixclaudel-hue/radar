@@ -34,7 +34,7 @@ def _pu():
     return paths.user_paths(store.current_uid())
 
 # Doit rester aligné avec crate_jobs.RECOS_MAX_TRACKS (affichage seulement).
-RECOS_MAX_TRACKS = 100
+RECOS_MAX_TRACKS = 5  # limite de test (10/09, retour utilisateur) — remonter une fois validé
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))

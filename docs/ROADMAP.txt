@@ -1,0 +1,38 @@
+# Roadmap : Optimisation de l'API YouTube & Gestion du Quota
+
+## 🎯 Objectif
+Réduire la dépendance à l'API YouTube Data v3, éliminer la consommation inutile de quotas et préparer l'application pour une montée en charge (plus d'utilisateurs).
+
+## 🚀 Étapes d'implémentation
+
+### 1. Mise en place d'une stratégie de Cache (Priorité Haute)
+L'objectif est de ne jamais effectuer deux fois la même recherche API.
+- [ ] **Base de données :** Créer une table `youtube_cache` (ou similaire).
+    - Champs : `search_query` (unique), `video_id`, `title`, `thumbnail_url`, `created_at`.
+- [ ] **Backend Middleware :** Avant chaque appel API `search.list` :
+    - Vérifier en DB si la requête existe déjà.
+    - Si oui : retourner les données du cache.
+    - Si non : appeler l'API, enregistrer la réponse en base, puis retourner les données.
+- [ ] **Maintenance :** Ajouter un script pour nettoyer les entrées vieilles de plus de X jours si nécessaire.
+
+### 2. Optimisation des appels API (Priorité Moyenne)
+- [ ] **Utilisation oEmbed :** Remplacer les appels `videos.list` (pour les détails) par l'API gratuite [oEmbed de YouTube](https://www.youtube.com/oembed) pour récupérer les métadonnées et le code d'intégration HTML.
+- [ ] **Architecture Backend :** S'assurer que les appels API sont faits **exclusivement côté serveur** pour masquer la clé API et centraliser le cache.
+
+### 3. Alternative de secours : yt-dlp (Priorité Basse)
+- [ ] **Fallback :** Installer `yt-dlp` sur le serveur pour gérer les cas de dépassement de quota ou les recherches très spécifiques.
+- [ ] **Wrapper :** Créer une fonction de secours (`fallback_search`) qui utilise `yt-dlp` si l'API YouTube retourne une erreur 403 (Quota Exceeded).
+
+### 4. Authentification & UX (Long Terme)
+- [ ] **OAuth 2.0 :** Implémenter la connexion Google pour l'utilisateur (simplifie l'expérience et évite la saisie de clé API manuelle).
+- [ ] **Gestion des comptes :** Associer les playlists aux utilisateurs dans votre base de données.
+
+### 5. Mise à l'échelle (Production)
+- [ ] **Audit de conformité :** Une fois le volume d'utilisateurs atteint, préparer le dossier pour soumettre une **demande d'augmentation de quota** dans la Google Cloud Console.
+- [ ] **Monitoring :** Mettre en place un log des erreurs API pour identifier rapidement les pics de consommation.
+
+---
+## 💡 Rappels techniques
+- **Quotas :** 100 recherches = 10 000 unités. Se réinitialise à 08:00 (heure française) ou 09:00 (selon heure d'été).
+- **Règle d'or :** Ne jamais exposer la Clé API côté client (Frontend).
+- **Architecture :** Cache local = performance accrue + économie de quota.

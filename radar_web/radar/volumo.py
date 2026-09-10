@@ -9,40 +9,19 @@ le disque).
 
 Cache partagé : un couple (artiste, titre) -> résultat change rarement.
 """
-import json
 import os
-import re
 import time
 
 import requests
 
-from . import paths
+from . import paths, store
+from .textmatch import overlap, toks
 
 CACHE_PATH = os.path.join(paths.SHARED_DIR, "volumo_cache.json")
 API = "https://volumo.com/api/v1"
 UA = "Mozilla/5.0 (Radar; +personal-use)"
 TTL = 30 * 86400
 MIN_SCORE = 0.62
-
-
-def _toks(s):
-    return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
-
-
-def _load():
-    try:
-        with open(CACHE_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
-def _save(d):
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = CACHE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, CACHE_PATH)
 
 
 def _api(kind, query):
@@ -62,12 +41,12 @@ def search(artist, title, kind="a"):
         return None
 
     ck = f"{kind}|{artist.lower()}|{title.lower()}"
-    cache = _load()
+    cache = store.load(CACHE_PATH, {})
     hit = cache.get(ck)
     if hit is not None and time.time() - hit.get("ts", 0) < TTL:
         return hit.get("v")
 
-    want = _toks(f"{artist} {title}")
+    want = toks(f"{artist} {title}")
     try:
         results = _api(kind, f"{artist} {title}".strip())
     except (requests.RequestException, ValueError):
@@ -77,11 +56,9 @@ def search(artist, title, kind="a"):
     for r in results:
         band_toks = set()
         for a in r.get("artists") or []:
-            band_toks |= _toks(a.get("name"))
-        cand = band_toks | _toks(r.get("title"))
-        if not cand or not want:
-            continue
-        sc = len(want & cand) / len(want)
+            band_toks |= toks(a.get("name"))
+        cand = band_toks | toks(r.get("title"))
+        sc = overlap(want, cand)
         if sc > best_sc:
             best, best_sc = r, sc
 
@@ -97,5 +74,5 @@ def search(artist, title, kind="a"):
     if len(cache) > 5000:
         cache = {}
     cache[ck] = {"ts": time.time(), "v": out}
-    _save(cache)
+    store.save(CACHE_PATH, cache, indent=None)
     return out

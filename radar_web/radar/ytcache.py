@@ -6,14 +6,13 @@
   (`YOUTUBE_API_KEY`) ; sur 403 quotaExceeded on passe à la suivante.
 """
 import hashlib
-import json
 import os
-import re
 import time
 
 import requests
 
-from . import paths
+from . import paths, store
+from .textmatch import overlap, toks
 
 CACHE_PATH = os.path.join(paths.SHARED_DIR, "youtube_cache.json")
 API = "https://www.googleapis.com/youtube/v3"
@@ -37,7 +36,7 @@ MIN_MATCH_SCORE = 0.5
 
 
 def _toks(s):
-    return set(re.findall(r"[a-z0-9]+", (s or "").lower())) - _FILLER
+    return toks(s, _FILLER)
 
 
 class QuotaExhausted(RuntimeError):
@@ -54,36 +53,20 @@ def youtube_keys(cfg):
     return out
 
 
-def _load():
-    try:
-        with open(CACHE_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
-def _save(d):
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = CACHE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, CACHE_PATH)
-
-
 def cache_get(key, max_age):
-    e = _load().get(key)
+    e = store.load(CACHE_PATH, {}).get(key)
     if e and (time.time() - e.get("ts", 0)) < max_age:
         return e.get("v")
     return None
 
 
 def cache_put(key, value):
-    d = _load()
+    d = store.load(CACHE_PATH, {})
     d[key] = {"ts": time.time(), "v": value}
     if len(d) > 20000:
         for k in sorted(d, key=lambda k: d[k].get("ts", 0))[:5000]:
             d.pop(k, None)
-    _save(d)
+    store.save(CACHE_PATH, d, indent=None)
 
 
 def _reason(resp):
@@ -199,20 +182,20 @@ def _best_match(ids, query, artist, title, label, keys):
         cand_wide = cand | desc_toks
         if not want or not cand:
             continue
-        score = len(want & cand) / len(want)
+        score = overlap(want, cand)
         desc_extra = (want - cand) & desc_toks
         if desc_extra:
             score += 0.1 * len(desc_extra) / len(want)
         if l_toks and (l_toks & ch_toks):
             score += 0.2
-        if a_toks and len(a_toks & ch_toks) / len(a_toks) >= 0.5:
+        if overlap(a_toks, ch_toks) >= 0.5:
             score += 0.1
         foreign = vt_toks - want
         if foreign & _ALT_VERSION:
             score *= 0.4
-        if t_toks and len(t_toks & (vt_toks | desc_toks)) / len(t_toks) < 0.4:
+        if t_toks and overlap(t_toks, vt_toks | desc_toks) < 0.4:
             score *= 0.5
-        if a_toks and len(a_toks & cand_wide) / len(a_toks) < 0.4:
+        if a_toks and overlap(a_toks, cand_wide) < 0.4:
             score *= 0.5
         if score > best_score:
             best_id, best_score = i, score

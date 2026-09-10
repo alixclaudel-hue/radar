@@ -6,7 +6,6 @@ en round-robin entre utilisateurs, et lance `crate_jobs.py` avec RADAR_UID.
 Le suivi par utilisateur est écrit par `crate_jobs.Job` dans
 /data/jobs/<uid>/<name>.status.json.
 """
-import json
 import os
 import secrets
 import time
@@ -27,30 +26,23 @@ def _status_path(name, uid):
 
 
 def load_queue():
-    try:
-        with open(QUEUE_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return []
+    return store.load(QUEUE_PATH, [])
 
 
 def save_queue(q):
-    os.makedirs(paths.JOBS_DIR, exist_ok=True)
-    tmp = QUEUE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(q, f)
-    os.replace(tmp, QUEUE_PATH)
+    store.save(QUEUE_PATH, q, indent=None)
 
 
 def _raw_status(name, uid):
     p = _status_path(name, uid)
-    try:
-        with open(p, encoding="utf-8") as f:
-            s = json.load(f)
-        s["_age"] = time.time() - os.path.getmtime(p)
-        return s
-    except (OSError, ValueError):
+    s = store.load(p, None)
+    if s is None:
         return None
+    try:
+        s["_age"] = time.time() - os.path.getmtime(p)
+    except OSError:
+        return None
+    return s
 
 
 def status(name, uid=None):
@@ -114,18 +106,11 @@ def reap_orphans():
         return orphans
     for j in orphans:
         p = _status_path(j["name"], j["uid"])
-        try:
-            with open(p, encoding="utf-8") as f:
-                s = json.load(f)
-        except (OSError, ValueError):
-            continue
-        if not s.get("running"):
+        s = store.load(p, None)
+        if s is None or not s.get("running"):
             continue
         s["running"] = False
         s["message"] = (s.get("message") or "").strip() + " — interrompu par un redéploiement, relance le job."
-        tmp = p + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(s, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, p)
+        store.save(p, s)
     save_queue([j for j in q if j["state"] != "running"])
     return orphans

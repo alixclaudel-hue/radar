@@ -12,7 +12,6 @@ Jobs : ingest_youtube · ingest_bandcamp · fetch_collection · profile_labels
 
 import hashlib
 import json
-import math
 import os
 import re
 import sqlite3
@@ -23,7 +22,7 @@ from datetime import datetime
 
 import requests
 
-from radar_web.radar import ytcache
+from radar_web.radar import store, ytcache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Répertoire des données : partagé avec radar_web via CRATE_DATA_DIR (volume
@@ -137,6 +136,10 @@ ARTIST_STOPWORDS = {"various artists", "various", "va", "unknown artist", "unkno
 # ============================================================= util
 
 def load_json(path, default):
+    """Volontairement PAS `store.load` : un JSON corrompu doit faire échouer le
+    job bruyamment. Ici la plupart des lectures sont suivies d'une réécriture du
+    même fichier (corpus, caches, seen) — retomber en silence sur le défaut vide
+    écraserait les données au lieu de signaler le problème."""
     if os.path.exists(path):
         with open(path, encoding="utf-8") as f:
             return json.load(f)
@@ -144,10 +147,9 @@ def load_json(path, default):
 
 
 def save_json(path, data):
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
+    """Écriture atomique partagée avec l'appli web (nom temporaire unique :
+    worker et web écrivent les mêmes fichiers, cf. store.save)."""
+    store.save(path, data)
 
 
 def cfg_load():

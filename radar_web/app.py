@@ -27,6 +27,7 @@ from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, 
                     paths, sellers, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
+from .radar.textmatch import overlap, toks
 
 
 def _pu():
@@ -302,6 +303,128 @@ def _cfg():
     return store.load_config()
 
 
+def _err(msg, tag="span"):
+    """Message d'erreur pour une cible htmx (`tag` selon que la cible attend
+    de l'inline ou un bloc)."""
+    return HTMLResponse(f"<{tag} class='small msg-err'>{html.escape(str(msg))}</{tag}>")
+
+
+def _ok(msg):
+    return HTMLResponse(f"<span class='small ok'>{html.escape(str(msg))}</span>")
+
+
+def _clamp_int(raw, lo, hi, default):
+    """Entier de formulaire borné à [lo, hi] (`hi=None` : pas de borne haute) ;
+    `default` si vide ou illisible."""
+    try:
+        v = max(lo, int(raw or default))
+    except (TypeError, ValueError):
+        return default
+    return v if hi is None else min(hi, v)
+
+
+def _paginate(rows, page, size):
+    """(tranche affichée, numéro de page corrigé, nombre de pages, total)."""
+    total = len(rows)
+    pages = max(1, -(-total // size))          # division entière arrondie au sup.
+    try:
+        page = max(1, int(page))
+    except (TypeError, ValueError):
+        page = 1
+    page = min(page, pages)
+    return rows[(page - 1) * size: page * size], page, pages, total
+
+
+class _TtlCache:
+    """Cache mémoire par process, vidé en bloc au-delà de `maxlen` — suffisant
+    pour des suggestions/discographies qu'un rechargement peut refaire."""
+
+    def __init__(self, ttl, maxlen):
+        self.ttl, self.maxlen, self._d = ttl, maxlen, {}
+
+    def get(self, key):
+        hit = self._d.get(key)
+        return hit[1] if hit and time.time() - hit[0] < self.ttl else None
+
+    def put(self, key, value):
+        if len(self._d) > self.maxlen:
+            self._d.clear()
+        self._d[key] = (time.time(), value)
+
+
+def _queue_enrich(kind, names):
+    """Empile des labels/artistes à enrichir et lance le job `enrich`.
+    `kind` : "labels" ou "artists"."""
+    names = [n for n in names if n]
+    if not names:
+        return
+    q = load(_pu().pending_enrich, {})
+    q.setdefault(kind, []).extend(names)
+    save(_pu().pending_enrich, q)
+    jobs.launch("enrich")
+
+
+def _csv_first_column(raw):
+    """Première colonne d'un CSV, en-tête sautée, valeurs vides écartées."""
+    return [line.split(",")[0].strip().strip('"')
+            for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
+
+
+def _add_labels(c, names, replace=False):
+    """Ajoute des labels à la base (dédoublonnés par nom canonique).
+    Modifie `c` sans l'enregistrer — l'appelant décide quand sauver."""
+    if replace:
+        c["labels"] = []
+    have = {normalize_label(x) for x in c["labels"]}
+    added = 0
+    for n in names:
+        if normalize_label(n) not in have:
+            have.add(normalize_label(n))
+            c["labels"].append(n)
+            added += 1
+    return added
+
+
+def _taste_styles(c):
+    """Styles des catégories de goût, dans l'ordre, dédoublonnés (insensible à
+    la casse)."""
+    cats = c.cfg.get("taste_categories", {})
+    out, seen = [], set()
+    for cid in ("1", "2"):
+        for s in cats.get(cid, []):
+            s = (s or "").strip()
+            if s and s.lower() not in seen:
+                seen.add(s.lower())
+                out.append(s)
+    return out
+
+
+def _scored_rows(c, raw, keep_styles=None):
+    """Sorties Discogs brutes -> lignes notées pour results.html / disco.html.
+    Dédoublonne par id ; `keep_styles` (minuscules) filtre sur le style."""
+    seen, out = set(), []
+    for r in raw:
+        rid = r.get("id")
+        if not rid or rid in seen:
+            continue
+        seen.add(rid)
+        rstyles = r.get("style") or []
+        if keep_styles and not any((s or "").lower() in keep_styles for s in rstyles):
+            continue
+        sc, det = c.album_score(r)
+        out.append({"raw": {"id": rid, "title": r.get("title", ""),
+                            "label1": next((x for x in (r.get("label") or []) if x), ""),
+                            "style": rstyles, "catno": r.get("catno", ""),
+                            "year": r.get("year", ""),
+                            "thumb": r.get("cover_image") or r.get("thumb"),
+                            "uri": r.get("uri", "")},
+                    "score": sc,
+                    "detail": {"label": det.get("label"), "artist": det.get("artist"),
+                               "style": det.get("style")}})
+    out.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
+    return out
+
+
 # --------------------------------------------------------------------- home
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -409,6 +532,15 @@ async def patte_run(request: Request, job: str):
     return job_launch(job)
 
 
+def _write_djset_input(sources):
+    """Paramètres du prochain `ingest_djsets` (lu par crate_jobs au démarrage)."""
+    d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
+    os.makedirs(d, exist_ok=True)
+    save(os.path.join(d, "djsets.input.json"),
+         {"sources": sources, "max_per_source": 25, "min_minutes": 35,
+          "require_hint": True, "deep": True})
+
+
 def _scanned_djs(c):
     by = {}
     for r in c.corpus:
@@ -442,11 +574,7 @@ def patte_djset_scan(request: Request, name: str = Form("")):
         have.append(name)
         c["djset_sources"] = "\n".join(have)
         store.save_config(c)
-    d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
-    os.makedirs(d, exist_ok=True)
-    save(os.path.join(d, "djsets.input.json"),
-         {"sources": [name], "max_per_source": 25, "min_minutes": 35,
-          "require_hint": True, "deep": True})
+    _write_djset_input([name])
     jobs.launch("ingest_djsets")
     return frag(request, "partials/djset_panel.html",
                 scanned=_scanned_djs(Ctx()), job=jobs.status("ingest_djsets"))
@@ -456,8 +584,7 @@ def patte_djset_scan(request: Request, name: str = Form("")):
 async def patte_import_csv(request: Request, kind: str = "labels", file: UploadFile = None,
                            replace: str = Form(""), tier: str = Form("2")):
     raw = (await file.read()).decode("utf-8", "ignore") if file else ""
-    names = [line.split(",")[0].strip().strip('"')
-             for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
+    names = _csv_first_column(raw)
     c = _cfg()
     if kind == "artists":
         ac = c.setdefault("artist_categories", {"1": [], "2": []})
@@ -469,21 +596,10 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
                 have.add(normalize_label(n))
                 ac.setdefault(t, []).append(n)
                 added += 1
-        q = load(_pu().pending_enrich, {})
-        q.setdefault("artists", []).extend(names)
-        save(_pu().pending_enrich, q)
-        jobs.launch("enrich")
+        _queue_enrich("artists", names)
         store.save_config(c)
         return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
-    if replace:
-        c["labels"] = []
-    have = {normalize_label(x) for x in c["labels"]}
-    added = 0
-    for n in names:
-        if normalize_label(n) not in have:
-            have.add(normalize_label(n))
-            c["labels"].append(n)
-            added += 1
+    added = _add_labels(c, names, replace=bool(replace))
     store.save_config(c)
     return HTMLResponse(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
 
@@ -516,16 +632,9 @@ def _year_param(year_from, year_to):
 def _search_styles(c):
     """Styles proposés : d'abord les catégories de goût de l'utilisateur
     (noms canoniques), puis le reste du vocabulaire Discogs."""
-    cats = c.cfg.get("taste_categories", {})
-    mine, seen = [], set()
-    for cid in ("1", "2"):
-        for s in cats.get(cid, []):
-            s = (s or "").strip()
-            if s and s.lower() not in seen:
-                seen.add(s.lower())
-                mine.append(s)
-    more = [s for s in vocab.STYLES if s.lower() not in seen]
-    return mine, more
+    mine = _taste_styles(c)
+    seen = {s.lower() for s in mine}
+    return mine, [s for s in vocab.STYLES if s.lower() not in seen]
 
 
 SEARCH_HIST_MAX = 20
@@ -685,7 +794,7 @@ def suggest_genres(request: Request, q: str = ""):
     return _suggest_vocab(request, vocab.GENRES, q, "genres")
 
 
-_DISCOGS_SUGGEST_CACHE = {}  # (type, term) -> (ts, rows)
+_DISCOGS_SUGGEST_CACHE = _TtlCache(ttl=300, maxlen=200)    # (type, terme) -> lignes
 
 
 @app.get("/suggest/discogs", response_class=HTMLResponse)
@@ -711,10 +820,8 @@ def suggest_discogs(request: Request, q: str = "", type: str = "label"):
         return frag(request, "partials/suggest.html", rows=[],
                     empty="Token Discogs manquant (Ma patte → Connexions).")
     key = (dtype, term.lower())
-    hit = _DISCOGS_SUGGEST_CACHE.get(key)
-    if hit and time.time() - hit[0] < 300:
-        rows = hit[1]
-    else:
+    rows = _DISCOGS_SUGGEST_CACHE.get(key)
+    if rows is None:
         try:
             res = discogs.search(token=token, type=dtype, q=term, per_page=12).get("results", [])
         except discogs.DiscogsError as e:
@@ -727,9 +834,7 @@ def suggest_discogs(request: Request, q: str = "", type: str = "label"):
                 continue
             seen.add(nk)
             rows.append({"v": name, "meta": str(r.get("id") or ""), "dim": True})
-        if len(_DISCOGS_SUGGEST_CACHE) > 200:
-            _DISCOGS_SUGGEST_CACHE.clear()
-        _DISCOGS_SUGGEST_CACHE[key] = (time.time(), rows)
+        _DISCOGS_SUGGEST_CACHE.put(key, rows)
     label = "label" if dtype == "label" else "artiste"
     header = f"Discogs — {len(rows)} {label}{'s' if len(rows) != 1 else ''}"
     return frag(request, "partials/suggest.html", rows=rows, header=header,
@@ -779,10 +884,7 @@ def search_run(request: Request, label: str = Form(""),
     year = _year_param(year_from, year_to)
     genres = [g.strip() for g in genre.splitlines() if g.strip()]
     styles = [s.strip() for s in style.splitlines() if s.strip()]
-    try:
-        npages = max(1, min(4, int(pages or 2)))
-    except ValueError:
-        npages = 2
+    npages = _clamp_int(pages, 1, 4, 2)
 
     # mode « chercher dans mes labels » : prend le pas sur le label unique
     base_metric = (base_metric or "").strip()
@@ -852,38 +954,17 @@ def search_run(request: Request, label: str = Form(""),
         except discogs.DiscogsError as e:
             if not raw:              # le local a déjà des résultats : ne pas tout perdre sur un raté API
                 return frag(request, "partials/results.html", error=str(e))
-    seen, scored = set(), []
-    for r in raw:
-        rid = r.get("id")
-        if not rid or rid in seen:
-            continue
-        seen.add(rid)
-        sc, det = c.album_score(r)
-        thumb = r.get("cover_image") or r.get("thumb")
-        lab1 = next((x for x in (r.get("label") or []) if x), "")
-        scored.append({"raw": {"id": rid, "title": r.get("title", ""), "label1": lab1,
-                               "style": r.get("style") or [], "catno": r.get("catno", ""),
-                               "year": r.get("year", ""), "thumb": thumb, "uri": r.get("uri", "")},
-                       "score": sc,
-                       "detail": {"label": det.get("label"), "artist": det.get("artist"),
-                                  "style": det.get("style")}})
+    scored = _scored_rows(c, raw)
     n_before_thresholds = len(scored)
     mins = {"label": _score_min(label_min), "artist": _score_min(artist_min)}
     if any(v is not None for v in mins.values()):
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     n_matches = len(scored)
-    scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
     # pagination (100/page) : montrer TOUS les matches plutôt que tronquer au
     # premier écran — cf. diagnostic utilisateur, un plafond fixe (48) masquait
     # la quasi-totalité des correspondances sur une recherche large.
-    total_pages = max(1, -(-n_matches // SEARCH_PAGE_SIZE))       # division entière arrondie au sup.
-    try:
-        page_num = max(1, int(page))
-    except (ValueError, TypeError):
-        page_num = 1
-    page_num = min(page_num, total_pages)
-    page_results = scored[(page_num - 1) * SEARCH_PAGE_SIZE: page_num * SEARCH_PAGE_SIZE]
+    page_results, page_num, total_pages, _ = _paginate(scored, page, SEARCH_PAGE_SIZE)
     # X4 : état vide explicite — distinguer les causes déjà connues côté serveur
     empty_reason = None
     if not n_matches:
@@ -913,19 +994,7 @@ def search_run(request: Request, label: str = Form(""),
                 page=page_num, total_pages=total_pages)
 
 
-_DISCO_CACHE = {}  # (kind, key) -> (ts, raw releases)
-
-
-def _disco_taste_styles(c):
-    cats = c.cfg.get("taste_categories", {})
-    out, seen = [], set()
-    for cid in ("1", "2"):
-        for s in cats.get(cid, []):
-            s = (s or "").strip()
-            if s and s.lower() not in seen:
-                seen.add(s.lower())
-                out.append(s)
-    return out
+_DISCO_CACHE = _TtlCache(ttl=300, maxlen=60)      # (kind, key) -> sorties brutes
 
 
 def _disco_resolve(c, kind, key):
@@ -951,52 +1020,27 @@ def disco_page(request: Request, kind: str = "artist", key: str = "",
     c = Ctx()
     token = c.cfg.get("token", "")
     name, qval = _disco_resolve(c, kind, key)
-    try:
-        npages = max(1, min(5, int(pages or 3)))
-    except ValueError:
-        npages = 3
-    ck = (kind, key)
-    hit = _DISCO_CACHE.get(ck)
-    if hit and time.time() - hit[0] < 300:
-        raw = hit[1]
-    elif not token:
+    npages = _clamp_int(pages, 1, 5, 3)
+
+    def err(msg):
         return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
-                      results=None, mystyles=[], sel=[],
-                      error="Token Discogs manquant (Ma patte → Connexions).")
-    else:
+                      results=None, mystyles=[], sel=[], error=msg)
+
+    raw = _DISCO_CACHE.get((kind, key))
+    if raw is None:
+        if not token:
+            return err("Token Discogs manquant (Ma patte → Connexions).")
         try:
             fn = discogs.search_label_releases if kind == "label" else discogs.search_artist_releases
             raw = fn(token, qval, fmt="Vinyl", max_pages=npages)
         except discogs.DiscogsError as e:
-            return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
-                          results=None, mystyles=[], sel=[], error=str(e))
-        if len(_DISCO_CACHE) > 60:
-            _DISCO_CACHE.clear()
-        _DISCO_CACHE[ck] = (time.time(), raw)
+            return err(str(e))
+        _DISCO_CACHE.put((kind, key), raw)
 
     sel = [s for s in (styles or "").split(",") if s.strip()]
-    sel_lc = {s.lower() for s in sel}
-    seen, scored = set(), []
-    for r in raw:
-        rid = r.get("id")
-        if not rid or rid in seen:
-            continue
-        seen.add(rid)
-        rstyles = r.get("style") or []
-        if sel_lc and not any((s or "").lower() in sel_lc for s in rstyles):
-            continue
-        sc, det = c.album_score(r)
-        thumb = r.get("cover_image") or r.get("thumb")
-        lab1 = next((x for x in (r.get("label") or []) if x), "")
-        scored.append({"raw": {"id": rid, "title": r.get("title", ""), "label1": lab1,
-                               "style": rstyles, "catno": r.get("catno", ""),
-                               "year": r.get("year", ""), "thumb": thumb, "uri": r.get("uri", "")},
-                       "score": sc,
-                       "detail": {"label": det.get("label"), "artist": det.get("artist"),
-                                  "style": det.get("style")}})
-    scored.sort(key=lambda x: (x["score"] is None, -(x["score"] or 0)))
+    scored = _scored_rows(c, raw, keep_styles={s.lower() for s in sel})
     return render(request, "pages/disco.html", active="", name=name, kind=kind, key=key,
-                  results=scored[:120], mystyles=_disco_taste_styles(c), sel=sel,
+                  results=scored[:120], mystyles=_taste_styles(c), sel=sel,
                   voted=_voted_map(), in_cart=_cart_ids(), total_raw=len(raw))
 
 
@@ -1026,11 +1070,11 @@ def release_matches(request: Request, a: str = "", t: str = ""):
     a, t = a.strip(), t.strip()
     token = _cfg().get("token", "")
     if not token:
-        return HTMLResponse("<p class='small msg-err'>Token Discogs manquant.</p>")
+        return _err("Token Discogs manquant.", "p")
     try:
         res = discogs.search(token, artist=a, track=t, per_page=25).get("results", [])
     except discogs.DiscogsError as e:
-        return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
+        return _err(e, "p")
     vinyl = [r for r in res if "vinyl" in " ".join(r.get("format") or []).lower()]
     rows = [{"id": r.get("id"), "title": r.get("title"), "label": r.get("label") or [],
              "year": r.get("year"), "format": r.get("format") or [],
@@ -1048,25 +1092,25 @@ def cart_add(rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
              thumb: str = Form(""), label: str = Form("")):
     rid = (rid or "").strip()
     if not rid:
-        return HTMLResponse("<span class='small msg-err'>id manquant</span>")
+        return _err("id manquant")
     cfg = _cfg()
     token = cfg.get("token", "")
     if not token:
-        return HTMLResponse("<span class='small msg-err'>Token Discogs manquant.</span>")
+        return _err("Token Discogs manquant.")
     try:
         user = _discogs_username(cfg, token)
         if not user:
-            return HTMLResponse("<span class='small msg-err'>Identité Discogs illisible.</span>")
+            return _err("Identité Discogs illisible.")
         discogs.add_to_wantlist(token, user, rid)
     except discogs.DiscogsError as e:
-        return HTMLResponse(f"<span class='small msg-err'>{html.escape(str(e))}</span>")
+        return _err(e)
     cart = load(_pu().cart, [])
     if rid not in {str(x.get("id")) for x in cart}:
         cart.insert(0, {"id": rid, "title": title.strip(), "artist": artist.strip(),
                         "thumb": thumb.strip(), "label": label.strip(),
                         "added_at": time.strftime("%Y-%m-%d")})
         save(_pu().cart, cart)
-    return HTMLResponse("<span class='small ok'>✓ en wantlist</span>")
+    return _ok("✓ en wantlist")
 
 
 @app.post("/cart/remove", response_class=HTMLResponse)
@@ -1080,7 +1124,7 @@ def cart_remove(request: Request, rid: str = Form("")):
             if user:
                 discogs.remove_from_wantlist(token, user, rid)
         except discogs.DiscogsError as e:
-            return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
+            return _err(e, "p")
     cart = [x for x in load(_pu().cart, []) if str(x.get("id")) != rid]
     save(_pu().cart, cart)
     return frag(request, "partials/cart.html", cart=cart)
@@ -1094,11 +1138,11 @@ def cart_sync(request: Request):
     cfg = _cfg()
     token = cfg.get("token", "")
     if not token:
-        return HTMLResponse("<p class='small msg-err'>Token Discogs manquant.</p>")
+        return _err("Token Discogs manquant.", "p")
     try:
         user = _discogs_username(cfg, token)
         if not user:
-            return HTMLResponse("<p class='small msg-err'>Identité Discogs illisible.</p>")
+            return _err("Identité Discogs illisible.", "p")
         items, page, pages = [], 1, 1
         while page <= pages and page <= 20:
             d = discogs.wants(token, user, page=page, per_page=100)
@@ -1106,7 +1150,7 @@ def cart_sync(request: Request):
             pages = d.get("pagination", {}).get("pages", 1)
             page += 1
     except discogs.DiscogsError as e:
-        return HTMLResponse(f"<p class='small msg-err'>{html.escape(str(e))}</p>")
+        return _err(e, "p")
     cart = []
     for w in items:
         bi = w.get("basic_information", {}) or {}
@@ -1215,7 +1259,7 @@ def feedback_page(request: Request):
 def feedback_add(page: str = Form(""), target: str = Form(""), note: str = Form("")):
     note = note.strip()
     if not note:
-        return HTMLResponse("<span class='small msg-err'>note vide</span>")
+        return _err("note vide")
     n = {"id": "nt_" + hashlib.md5(f"{time.time()}{note}".encode()).hexdigest()[:10],
          "ts": time.strftime("%Y-%m-%d %H:%M"), "page": page.strip(), "target": target.strip(),
          "note": note, "status": "nouveau"}
@@ -1224,7 +1268,7 @@ def feedback_add(page: str = Form(""), target: str = Form(""), note: str = Form(
     notes = load(_pu().ui_notes, [])
     notes.insert(0, n)
     save(_pu().ui_notes, notes)
-    return HTMLResponse("<span class='small ok'>✓ envoyé</span>")
+    return _ok("✓ envoyé")
 
 
 @app.post("/feedback/status", response_class=HTMLResponse)
@@ -1262,10 +1306,6 @@ def feedback_delete(request: Request, id: str = Form("")):
     return frag(request, "partials/feedback_list.html", notes=_notes_sorted())
 
 
-def _toks(s):
-    return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
-
-
 @app.get("/release/{rid}/tracks", response_class=HTMLResponse)
 def tracklist(request: Request, rid: int):
     c = Ctx()
@@ -1277,18 +1317,16 @@ def tracklist(request: Request, rid: int):
     labels = data.get("labels") or []
     label1 = (labels[0].get("name") if labels and isinstance(labels[0], dict) else "") or ""
     year = data.get("year") or ""
-    videos = [{"uri": v.get("uri"), "tok": _toks(v.get("title"))}
+    videos = [{"uri": v.get("uri"), "tok": toks(v.get("title"))}
               for v in (data.get("videos") or []) if v.get("uri")]
     rows = []
     for t in real_tracks(data.get("tracklist", [])):
         ttl = (t.get("title") or "").strip()
         tart = ", ".join(a.get("name", "") for a in t.get("artists", [])) or ra
-        want = _toks(f"{tart} {ttl}")
+        want = toks(f"{tart} {ttl}")
         best, best_sc = None, 0.0
         for v in videos:
-            if not v["tok"] or not want:
-                continue
-            sc = len(want & v["tok"]) / len(want)
+            sc = overlap(want, v["tok"])
             if sc > best_sc:
                 best, best_sc = v, sc
         if best and best_sc >= 0.55:
@@ -1556,10 +1594,7 @@ def reco_label(name: str = Form(""), dest: str = Form("base")):
             c["labels"].append(name)
         if dest in ("veille", "both") and nk not in {normalize_label(x) for x in c.get("watchlist", [])}:
             c.setdefault("watchlist", []).append(name)
-        q = load(_pu().pending_enrich, {})
-        q.setdefault("labels", []).append(name)
-        save(_pu().pending_enrich, q)
-        jobs.launch("enrich")
+        _queue_enrich("labels", [name])
         store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
@@ -1573,10 +1608,7 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
         nk = normalize_label(name)
         if nk not in {normalize_label(x) for cid in ("1", "2") for x in ac.get(cid, [])}:
             ac.setdefault(tier, []).append(name)
-            q = load(_pu().pending_enrich, {})
-            q.setdefault("artists", []).append(name)
-            save(_pu().pending_enrich, q)
-            jobs.launch("enrich")
+            _queue_enrich("artists", [name])
             store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
@@ -1694,10 +1726,7 @@ def univers_labels_table(request: Request, flt: str = "", page: int = 1):
     if flt:
         f = flt.lower()
         rows = [r for r in rows if f in r["disp"].lower()]
-    total = len(rows)
-    pages = max(1, -(-total // LABELS_PAGE_SIZE))
-    page = max(1, min(page, pages))
-    shown = rows[(page - 1) * LABELS_PAGE_SIZE: page * LABELS_PAGE_SIZE]
+    shown, page, pages, total = _paginate(rows, page, LABELS_PAGE_SIZE)
     for r in shown:
         r["url"] = (f"https://www.discogs.com/label/{r['id']}" if r.get("id")
                     else f"https://www.discogs.com/search/?q={quote_plus(r['disp'])}&type=label")
@@ -1715,10 +1744,7 @@ def univers_labels_add(request: Request, name: str = Form("")):
             msg = f"« {name} » est déjà dans ta base."
         else:
             c["labels"].append(name)
-            q = load(_pu().pending_enrich, {})
-            q.setdefault("labels", []).append(name)
-            save(_pu().pending_enrich, q)
-            jobs.launch("enrich")
+            _queue_enrich("labels", [name])
             store.save_config(c)
             ok, msg = True, f"✓ « {name} » ajouté."
     return HTMLResponse(f"<span class='small {'ok' if ok else 'notice warn'}'>{html.escape(msg)}</span>")
@@ -1795,11 +1821,18 @@ def _graph_extras(entry, kind):
     return notes, infos
 
 
-def _label_graph_render(request, entry):
+def _graph_render(request, entry, kind):
     pos = labelgraph.layout(entry["nodes"])
-    notes, infos = _graph_extras(entry, "label")
+    notes, infos = _graph_extras(entry, kind)
     return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos,
-                kind="label", notes=notes, infos=infos)
+                kind=kind, notes=notes, infos=infos)
+
+
+def _graph_show(request, path, kind, gid):
+    entry = next((e for e in load(path, []) if e.get("id") == gid), None)
+    if not entry:
+        return HTMLResponse("<p class='muted small'>Graphe introuvable (supprimé ?).</p>")
+    return _graph_render(request, entry, kind)
 
 
 @app.post("/univers/labels/graph/build", response_class=HTMLResponse)
@@ -1808,14 +1841,8 @@ async def univers_label_graph_build(request: Request):
     seeds = [s.strip() for s in f.get("seeds", "").splitlines() if s.strip()]
     if not seeds:
         return HTMLResponse("<p class='notice warn small'>Au moins un label de départ.</p>")
-    try:
-        depth = max(1, min(2, int(f.get("depth") or 1)))
-    except ValueError:
-        depth = 1
-    try:
-        min_shared = max(1, int(f.get("min_shared") or 1))
-    except ValueError:
-        min_shared = 1
+    depth = _clamp_int(f.get("depth"), 1, 2, 1)
+    min_shared = _clamp_int(f.get("min_shared"), 1, None, 1)
     c = Ctx()
     built = labelgraph.build(c.graph or {}, seeds, depth=depth, min_shared=min_shared)
     if len(built["nodes"]) <= len(seeds):
@@ -1829,15 +1856,12 @@ async def univers_label_graph_build(request: Request):
     hist = load(_pu().label_graphs, [])
     hist.insert(0, entry)
     save(_pu().label_graphs, hist[:15])
-    return _label_graph_render(request, entry)
+    return _graph_render(request, entry, "label")
 
 
 @app.get("/univers/labels/graph/{gid}", response_class=HTMLResponse)
 def univers_label_graph_show(request: Request, gid: str):
-    entry = next((e for e in load(_pu().label_graphs, []) if e.get("id") == gid), None)
-    if not entry:
-        return HTMLResponse("<p class='muted small'>Graphe introuvable (supprimé ?).</p>")
-    return _label_graph_render(request, entry)
+    return _graph_show(request, _pu().label_graphs, "label", gid)
 
 
 ARTISTS_PAGE_SIZE = 25
@@ -1863,10 +1887,7 @@ def univers_artists_table(request: Request, flt: str = "", hide: str = "", page:
             continue
         rows.append({"name": name, "note": note, "cat": catn.get(t, "—"), "key": ck})
     rows.sort(key=lambda r: -r["note"])
-    total = len(rows)
-    pages = max(1, -(-total // ARTISTS_PAGE_SIZE))
-    page = max(1, min(page, pages))
-    shown = rows[(page - 1) * ARTISTS_PAGE_SIZE: page * ARTISTS_PAGE_SIZE]
+    shown, page, pages, total = _paginate(rows, page, ARTISTS_PAGE_SIZE)
     return frag(request, "partials/artists_table.html", rows=shown, n=total,
                 page=page, pages=pages, flt=flt, hide=hide)
 
@@ -1881,19 +1902,9 @@ def univers_artist_set(name: str = Form(""), cat: str = Form("")):
     tgt = {"Cœur": "1", "Aimé": "2"}.get(cat)
     if tgt:
         ac.setdefault(tgt, []).append(name)
-        q = load(_pu().pending_enrich, {})
-        q.setdefault("artists", []).append(name)
-        save(_pu().pending_enrich, q)
-        jobs.launch("enrich")
+        _queue_enrich("artists", [name])
     store.save_config(c)
-    return HTMLResponse("<span class='small ok'>✓</span>")
-
-
-def _artist_graph_render(request, entry):
-    pos = labelgraph.layout(entry["nodes"])
-    notes, infos = _graph_extras(entry, "artist")
-    return frag(request, "partials/label_graph_svg.html", graph=entry, pos=pos,
-                kind="artist", notes=notes, infos=infos)
+    return _ok("✓")
 
 
 @app.get("/univers/artists/suggest", response_class=HTMLResponse)
@@ -1923,31 +1934,25 @@ async def univers_artist_graph_build(request: Request):
         return HTMLResponse(
             "<p class='notice warn small'>Aucun voisin trouvé — reconstruis d'abord le graphe producteur "
             "avec ces graines (Constructeur de graphe ci-dessus), ou choisis d'autres graines.</p>")
-    entry = {"id": hashlib.md5(f"{time.time()}{seed_keys}".encode()).hexdigest()[:10],
+    entry = {"id": hashlib.md5(f"{time.time()}{names}".encode()).hexdigest()[:10],
              "ts": time.strftime("%Y-%m-%d %H:%M"), "depth": 1, "min_shared": None,
              **built}
     hist = load(_pu().artist_graphs, [])
     hist.insert(0, entry)
     save(_pu().artist_graphs, hist[:15])
-    return _artist_graph_render(request, entry)
+    return _graph_render(request, entry, "artist")
 
 
 @app.get("/univers/artists/graph/{gid}", response_class=HTMLResponse)
 def univers_artist_graph_show(request: Request, gid: str):
-    entry = next((e for e in load(_pu().artist_graphs, []) if e.get("id") == gid), None)
-    if not entry:
-        return HTMLResponse("<p class='muted small'>Graphe introuvable (supprimé ?).</p>")
-    return _artist_graph_render(request, entry)
+    return _graph_show(request, _pu().artist_graphs, "artist", gid)
 
 
 @app.post("/univers/graph/build", response_class=HTMLResponse)
 async def univers_graph_build(request: Request):
     f = await request.form()
     mode = f.get("mode", "top")
-    try:
-        pages = max(1, min(3, int(f.get("pages") or 2)))
-    except ValueError:
-        pages = 2
+    pages = _clamp_int(f.get("pages"), 1, 3, 2)
     params = {"pages": pages, "incremental": f.get("incremental") == "on"}
     if mode == "global":
         params["mode"] = "global"
@@ -1955,10 +1960,7 @@ async def univers_graph_build(request: Request):
         params["seed_names"] = [x.strip() for x in f.get("seed_names", "").splitlines() if x.strip()]
     else:
         params["mode"] = "top"
-        try:
-            params["seeds"] = max(5, min(400, int(f.get("top_n") or 40)))
-        except ValueError:
-            params["seeds"] = 40
+        params["seeds"] = _clamp_int(f.get("top_n"), 5, 400, 40)
     jobs.launch("build_graph", params)
     return job_status_frag("build_graph")
 
@@ -2003,21 +2005,10 @@ def univers_sets_delete_track(rid: str = Form("")):
 @app.post("/univers/labels/import", response_class=HTMLResponse)
 async def univers_labels_import(request: Request, file: UploadFile, replace: str = Form("")):
     raw = (await file.read()).decode("utf-8", "ignore")
-    names = [line.split(",")[0].strip().strip('"')
-             for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
     c = _cfg()
-    if replace:
-        c["labels"] = []
-    have = {normalize_label(x) for x in c["labels"]}
-    added = 0
-    for n in names:
-        if normalize_label(n) not in have:
-            have.add(normalize_label(n))
-            c["labels"].append(n)
-            added += 1
+    added = _add_labels(c, _csv_first_column(raw), replace=bool(replace))
     store.save_config(c)
-    return HTMLResponse(f"<span class='small ok'>✓ {added} label(s) ajouté(s) "
-                        f"(base : {len(c['labels'])}).</span>")
+    return _ok(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
 
 
 def _csv_cell(s):
@@ -2059,11 +2050,7 @@ def job_launch(name: str, force: str = Form("")):
         if not srcs:
             return HTMLResponse("<div id='job-ingest_djsets' class='notice warn small'>"
                                 "Aucune source DJ — renseigne-les dans « Mes sources → DJ sets ».</div>")
-        d = os.path.join(store.paths.JOBS_DIR, store.current_uid())
-        os.makedirs(d, exist_ok=True)
-        save(os.path.join(d, "djsets.input.json"),
-             {"sources": srcs, "max_per_source": 25, "min_minutes": 35,
-              "require_hint": True, "deep": True})
+        _write_djset_input(srcs)
     if name in VALID_JOBS:
         # le paramètre "force" (bouton "forcer" de scan_catalog/import_discogs_dump,
         # envoyé via hx-vals) n'était jamais lu ici : la route ignorait tout hors de

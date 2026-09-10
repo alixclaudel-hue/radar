@@ -16,16 +16,14 @@ reconstruit l'index en entier.
 """
 import gzip
 import io
-import json
 import os
 import re
 import sqlite3
-import time
 
 import requests
 
 from . import paths
-from .store import normalize_label
+from .store import load, normalize_label, save
 
 DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_meta.json")
@@ -127,40 +125,24 @@ def _create_indexes(con):
 
 
 def get_meta():
-    try:
-        with open(META_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
+    return load(META_PATH, {})
 
 
 def save_meta(d):
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = META_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, META_PATH)
+    save(META_PATH, d)
 
 
 def load_import_state():
     """{} si aucun import interrompu en attente de reprise, ou si le fichier est
     absent/corrompu (on repart alors de zéro plutôt que de planter dessus)."""
-    try:
-        with open(IMPORT_STATE_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
+    return load(IMPORT_STATE_PATH, {})
 
 
 def save_import_state(d):
     """Appelé après chaque lot commité pendant import_releases (~toutes les 20k
     sorties) : le point de reprise doit toujours correspondre à des données déjà
     committées dans le .new, jamais à un état intermédiaire."""
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = IMPORT_STATE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, IMPORT_STATE_PATH)
+    save(IMPORT_STATE_PATH, d, indent=None)
 
 
 def clear_import_state():

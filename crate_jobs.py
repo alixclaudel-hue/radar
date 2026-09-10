@@ -96,6 +96,14 @@ RECOS_DAILY_SEARCH_BUDGET = 45
 # « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
 RECOS_SEARCHES_PER_RUN = 5
 RECOS_MAX_ATTEMPTS = 3
+RECOS_PER_LABEL_LIMIT = 500
+# search_local(label_keys=<tous les labels suivis>, limit=5000) faisait une seule
+# requête globale ORDER BY year DESC : les labels les plus prolifiques de l'année
+# en cours remplissaient à eux seuls les 5000 lignes, écrasant les autres labels
+# suivis (même mieux notés, même possédés) qui n'atteignaient jamais le scoring —
+# tous les candidats RECOS finissaient datés de la même année récente (retour
+# utilisateur 2026-09-10). Une requête PAR label (ce plafond) donne à chaque label
+# sa juste part, indépendamment du volume des autres.
 # plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
 # ajouts réussis (correctif 10/09, retour utilisateur) : un plafond sur les seuls
 # ajouts laissait la boucle chercher sur tous les candidats en échec (cf. points
@@ -2085,7 +2093,15 @@ def job_scan_recos(job, params):
         return job.finish("Aucun label suivi (base ou veille) — rien à scanner.")
 
     seen = set() if force else set(load_json(RECOS_SEEN_PATH, []))
-    rows = dd.search_local(label_keys=label_keys, limit=5000)
+    # Requête par label plutôt qu'une requête globale (cf. RECOS_PER_LABEL_LIMIT) :
+    # chaque label suivi garde sa part du scan, un label prolifique cette année ne
+    # peut plus faire disparaître les sorties des autres avant même le scoring.
+    rows, row_ids = [], set()
+    for lk in label_keys:
+        for row in dd.search_local(label_keys=[lk], limit=RECOS_PER_LABEL_LIMIT):
+            if row["id"] not in row_ids:
+                row_ids.add(row["id"])
+                rows.append(row)
     ctx = Ctx(uid=RADAR_UID)
     scored = []
     for row in rows:

@@ -313,8 +313,36 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     (`recos_seen.json` la marque « vue ») — seul « 🗑️🔄 Forcer (tout rescanner) »
     la refait réapparaître comme nouveau candidat (attempts repart à 0). Non testé
     contre l'API YouTube réelle (pas d'accès réseau/clé depuis cette session cloud).
+35. **Piège — scan RECOS toujours daté de l'année en cours** (`job_scan_recos`, corrigé
+    le 10/09, retour utilisateur : « toutes les tracks sont de 2026 ») :
+    `dd.search_local(label_keys=<tous les labels suivis>, limit=5000)` était UNE
+    requête globale `ORDER BY year DESC LIMIT 5000` — un label prolifique l'année en
+    cours remplit à lui seul les 5000 lignes, écrasant les autres labels suivis
+    (même mieux notés, même possédés) qui n'atteignent jamais `Ctx.album_score` : pas
+    un défaut de scoring, un défaut d'alimentation en amont (même classe de bug que le
+    diagnostic D6 déjà connu pour style+année sans label, jamais corrigé pour label
+    seul). Les 3 critères demandés par l'utilisateur (styles aimés, meilleur score
+    reco label, possédé chez ce label) sont en fait DÉJÀ dans `album_score` : style via
+    `style_affinity_of`(`wmap`), score label via `reco_index` (`_compute_reco_rows`),
+    possédé via `collection.label_counts` déjà dans la feature `collection` de
+    `reco_index` — mais aucun n'a jamais l'occasion de s'exprimer si la sortie n'entre
+    même pas dans `rows`. Corrigé : requête PAR label (`RECOS_PER_LABEL_LIMIT = 500`)
+    au lieu d'une requête globale — chaque label suivi garde sa part indépendamment du
+    volume des autres. Filtre style à l'affichage volontairement resté SOUPLE (pas de
+    `styles=` en dur sur la requête SQL) : un style non renseigné (tag manquant) doit
+    rester "non classé", pas être confondu avec "goût opposé" (même principe que N4).
+    Vérifié par smoke test hors-ligne (label A : 600 sorties 2026 ; label B : 3
+    sorties 2012 mieux scorées) : label B atteint désormais le scoring malgré le
+    volume de label A. Non testé contre le vrai référentiel Discogs (pas d'accès
+    réseau depuis cette session cloud).
 
 ## TODO — prochaine session
+
+- **Vérifier le correctif du point 35** (scan toujours daté de l'année en cours) sur
+  le VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) », confirmer au
+  journal des sorties d'ANNÉES variées (pas uniquement l'année en cours), et que les
+  labels à fort volume ne monopolisent plus la file au détriment des autres labels
+  suivis.
 
 - **Vérifier le correctif du point 34** (tentatives qui ne recherchaient jamais
   rien) sur le VPS après déploiement : relancer « ▶ Alimenter la playlist » sur

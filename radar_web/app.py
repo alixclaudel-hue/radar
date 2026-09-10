@@ -527,9 +527,19 @@ async def patte_save_frag(request: Request):
 @app.post("/patte/run/{job}", response_class=HTMLResponse)
 async def patte_run(request: Request, job: str):
     """Enregistre les identifiants/champs saisis PUIS lance le job (pour que le job
-    utilise bien ce qui vient d'être tapé, sans étape « Enregistrer » séparée)."""
+    utilise bien ce qui vient d'être tapé, sans étape « Enregistrer » séparée).
+
+    force="" explicite : job_launch(job) sans 2e argument laissait `force` à son
+    défaut Form("") non résolu (appel Python direct, pas de passage par FastAPI) —
+    cet objet Form est truthy (bool(Form("")) vaut True), donc `if force:` dans
+    job_launch valait toujours vrai. Tout job lancé via cette route tournait donc
+    avec force=True en permanence, y compris scan_recos (bouton "Scanner
+    maintenant" de /reco-radar) : recos_seen.json + recos_candidates.json vidés à
+    chaque clic, d'où les mêmes sorties rescannées à l'identique (retour
+    utilisateur, journaux scan_recos.log confirmant 2 scans strictement
+    identiques)."""
     _apply_patte_form(await request.form())
-    return job_launch(job)
+    return job_launch(job, force="")
 
 
 def _write_djset_input(sources):

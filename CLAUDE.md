@@ -209,10 +209,65 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     l'`artist` stocké dans `recos_candidates.json`/`recos_history.json` garde le nom
     Discogs d'origine, sinon le dédoublonnage par identité de piste (point 19)
     changerait de clé et laisserait revenir des pistes déjà publiées.
+30. **Piège — budget de recherche YouTube calé sur les ajouts réussis, pas les
+    recherches** (`job_publish_recos`, `RECOS_MAX_ADD_PER_RUN` renommé
+    `RECOS_SEARCHES_PER_RUN`, corrigé le 10/09, retour utilisateur) : la boucle
+    s'arrêtait après 5 pistes **ajoutées**, pas après 5 **recherches** — si la
+    plupart des candidats échouaient à matcher (cf. points 27/28 : 92 candidats
+    "Various" en échec), elle continuait à chercher sur YouTube pour tout le reste
+    de la file avant de s'arrêter, brûlant le quota journalier pour 0 ajout. Le
+    plafond de test (5) avait justement été mis en place pour "réduire la conso
+    quota" (commentaire d'origine) mais ne le faisait pas dans ce cas. Corrigé :
+    la boucle s'arrête après `RECOS_SEARCHES_PER_RUN` recherches réseau tentées
+    (succès ou échec), pas après 5 ajouts — un candidat déjà identifié via
+    l'historique (`ck in history_keys`, aucun appel réseau) ne compte pas dans ce
+    budget. Effet : une alimentation ne cherche plus jamais que sur les ~5
+    premiers candidats de la file par lancement, quoi qu'il arrive. Vérifié par
+    smoke test hors-ligne (`ytcache.search_video_diag` simulé, 5 échecs suivis de
+    15 candidats qui auraient matché) : exactement 5 recherches effectuées, 15
+    candidats laissés en attente pour le prochain run — pas testé contre l'API
+    YouTube réelle (pas d'accès réseau/token depuis cette session cloud).
+31. **Piège — bouton "Scanner maintenant" forçait un rescan complet à chaque clic**
+    (`patte_run`, `radar_web/app.py`, corrigé le 10/09, retour utilisateur +
+    journaux `scan_recos.log` à l'appui) : le bouton « 🔄 Scanner maintenant » de
+    `/reco-radar` poste sur `/patte/run/scan_recos`, dont le handler appelait
+    `job_launch(job)` — un appel Python **direct**, pas un passage par FastAPI.
+    Le paramètre `force: str = Form("")` de `job_launch` gardait alors son
+    marqueur `Form("")` non résolu au lieu de la chaîne vide, et
+    `bool(Form(""))` vaut **True** (objet FastAPI, pas la valeur par défaut
+    qu'il représente) — donc `if force:` dans `job_launch` était toujours vrai,
+    et TOUT job lancé via `/patte/run/<job>` tournait avec `force=True` en
+    permanence. Pour `scan_recos`, ça revient à cliquer "Forcer (tout rescanner)"
+    à chaque clic de "Scanner maintenant" : `recos_seen.json` et
+    `recos_candidates.json` vidés avant chaque scan, d'où les mêmes 20 sorties
+    (mêmes scores, même ordre) et la même file de 56 candidats produits deux fois
+    de suite à l'identique — confirmé en comparant les journaux fournis par
+    l'utilisateur pour 2 scans consécutifs. Le point 19 (doc RECOS RADAR) et ma
+    réponse précédente supposaient à tort que ce bouton respectait le cache et
+    qu'un usage répété de "Forcer" en était la cause — les journaux ont infirmé
+    cette piste. Corrigé : `patte_run` appelle `job_launch(job, force="")`,
+    fixant explicitement l'argument en Python plutôt que de compter sur le
+    défaut `Form(...)`, qui n'est résolu que lors d'un appel HTTP réel passant
+    par FastAPI. N'affectait que `scan_recos` parmi les jobs lancés via cette
+    route (seul à lire `params.get("force")` ; `fetch_collection`,
+    `ingest_youtube/spotify/bandcamp` l'ignorent). Vérifié par test isolé
+    (`bool(Form(""))` → `True` sans l'argument explicite, `False` avec) — pas
+    testé en conditions réelles (pas de token Discogs depuis cette session
+    cloud, donc pas de vrai `job_scan_recos` lancé de bout en bout).
 
 
 ## TODO — prochaine session
 
+- **Vérifier le correctif du point 31** (bouton "Scanner maintenant" forçait un
+  rescan complet) sur le VPS après déploiement : cliquer « 🔄 Scanner maintenant »
+  deux fois de suite sur `/reco-radar` et confirmer au journal que le 2ᵉ scan
+  traite des sorties DIFFÉRENTES du 1er (ou dit "aucune nouveauté" si tout est
+  déjà vu), au lieu de relister exactement les mêmes 20 sorties.
+- **Vérifier le correctif du point 30** (budget de recherche calé sur les
+  recherches, pas les ajouts) sur le VPS après déploiement : lancer « ▶ Alimenter
+  la playlist » avec une file encombrée de candidats voués à l'échec et confirmer
+  au journal que le job s'arrête bien après 5 recherches (`RECOS_SEARCHES_PER_RUN`)
+  plutôt que de vider toute la file.
 - **Vérifier l'effet du correctif PR #112** (artiste "Various", point 27) sur le
   VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) » sur
   `/reco-radar`, relancer « ▶ Alimenter la playlist », confirmer que les pistes de

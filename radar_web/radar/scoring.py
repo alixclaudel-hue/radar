@@ -469,7 +469,23 @@ class Ctx:
         if not liked_keys:
             return {}
         hits = dd.artist_ids_for_labels(liked_keys)
-        counts = {f"id:{aid}": v["n"] for aid, v in hits.items()}
+        counts = {}
+        for aid, v in hits.items():
+            styles = v.get("styles") or {}
+            # croisement de style (retour utilisateur 2026-09-10) : partager un label
+            # suivi ne suffit pas si LA SORTIE créditée est hors de mon goût (ex. un
+            # featuring rap sur un label sinon house) — sinon n'importe quel artiste
+            # d'un style totalement différent se retrouve poussé juste pour ce lien.
+            # Sortie sans style renseigné (tag manquant) : on ne peut pas trancher,
+            # crédit conservé tel quel plutôt que rejeté à tort (même logique que N4).
+            if styles:
+                liked_n = sum(n for s, n in styles.items() if self.wmap.get(style_key(s), 0) > 0)
+                if not liked_n:
+                    continue
+                n = liked_n
+            else:
+                n = v["n"]
+            counts[f"id:{aid}"] = n
         scale = _robust_scale(counts)
         return {k: _log_ratio(n, scale) for k, n in counts.items()}
 

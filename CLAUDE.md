@@ -100,3 +100,16 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     de vidéos hors-sujet dans la playlist RECOS RADAR (retour utilisateur du 09/09). Piste
     de correction identifiée (même principe de score, quasi gratuit en quota car `/videos`
     est déjà appelé pour vérifier la lisibilité), pas encore implémentée.
+26. **Piège — lien artiste↔label sans croisement de style** (`Ctx.artist_label_signal`,
+    terme `label_link` de `ascore`) : partager un label suivi (base/watchlist) suffisait à
+    booster n'importe quel artiste, même hors-style (ex. featuring rap sur un label
+    par ailleurs house) — poussait des artistes hors-goût dans RECOS RADAR (retour
+    utilisateur du 10/09). Corrigé : `discogs_dump.artist_ids_for_labels` renvoie aussi
+    les styles DE LA SORTIE créditée précise (`release_styles`, pas le profil agrégé du
+    label) ; `_compute_artist_label_signal` ne compte que les crédits dont au moins un
+    style est dans `wmap` (goût courant) — crédit conservé tel quel si la sortie n'a
+    aucun style renseigné (tag manquant, indécidable, même logique que le point N4 de
+    l'archive : ne pas confondre "non classé" et "goût opposé"). Limité à ce signal
+    direct ; le graphe de co-crédits (`job_build_graph`, vraies collaborations sur une
+    même sortie) n'est pas concerné — piste distincte si le souci persiste après
+    reconstruction du graphe (`build_graph` mode `taste`, mensuel).

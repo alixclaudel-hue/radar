@@ -15,11 +15,16 @@
           hx-target="#job-scan_recos" hx-swap="outerHTML"
           hx-confirm="Vider la file d'attente et tout rescanner avec le scoring actuel ?">🗑️🔄 Forcer (tout rescanner)</button>
   <button type="button" class="small" hx-post="/jobs/publish_recos/launch" hx-target="#job-publish_recos" hx-swap="outerHTML">▶ Alimenter la playlist</button>
+  <form method="post" action="/reco-radar/clear-candidates" style="display:inline"
+        onsubmit="return confirm('Vider la file d\'attente ({{ recos_pending }} candidat{{ 's' if recos_pending > 1 }}) sans rescanner ?');">
+    <button type="submit" class="small" title="Vide la file d'attente sans relancer de scan">🗑️ Vider la file d'attente</button>
+  </form>
 </div>
 <p class="small muted">« Scanner » cherche de nouvelles sorties chez tes labels suivis. « Forcer » vide la file
   d'attente et rescanne TOUTES les sorties de tes labels suivis avec le scoring actuel (utile en phase de test
   après un changement de pondération). « Alimenter » reprend juste les
-  {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente, sans rescanner.</p>
+  {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente, sans rescanner. « Vider la file
+  d'attente » retire ces candidats sans rescanner ni forcer les sorties déjà vues à revenir.</p>
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">

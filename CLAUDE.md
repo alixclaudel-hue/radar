@@ -73,8 +73,15 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     `recos_seen.json` ET `recos_candidates.json` avant de scanner, pour reconstruire la
     file d'attente à neuf avec le scoring courant (ex. après un changement de
     pondération) au lieu de ne repérer que les sorties jamais vues. Ne touche ni
-    `recos_playlist.json` (déjà publié) ni `recos_history.json`. Wantlist RADAR (2ᵉ
-    feature du même chantier) : pas commencée.
+    `recos_playlist.json` (déjà publié) ni `recos_history.json`. Cadence auto revue
+    (10/09, `worker._maybe_recos_scan`, `RADAR_RECOS_SCAN=1`) : c'était un scan fixe une
+    fois par jour (donc au mieux 5 pistes/jour même file d'attente pleine, cf.
+    `RECOS_MAX_ADD_PER_RUN`) — vérifie maintenant `recos_candidates.json` toutes les
+    heures, lance `publish_recos` (draine la file) si elle n'est pas vide, `scan_recos`
+    (qui rechaîne lui-même `publish_recos`) seulement si elle l'est. Dédoublonnage
+    étendu à la playlist déjà publiée (`job_scan_recos`, pas seulement la file), pour
+    qu'un rescan (forcé ou non) ne remette jamais en file une piste déjà en lecture.
+    Wantlist RADAR (2ᵉ feature du même chantier) : pas commencée.
 20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —

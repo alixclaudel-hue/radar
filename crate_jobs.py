@@ -95,6 +95,7 @@ RECOS_DAILY_SEARCH_BUDGET = 45
 # la file entière brûlait le quota du jour et les candidats suivants tombaient en
 # « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
 RECOS_SEARCHES_PER_RUN = 5
+RECOS_MAX_ATTEMPTS = 3
 # plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
 # ajouts réussis (correctif 10/09, retour utilisateur) : un plafond sur les seuls
 # ajouts laissait la boucle chercher sur tous les candidats en échec (cf. points
@@ -2233,7 +2234,25 @@ def job_publish_recos(job, params):
             remaining.append(c)
             continue
         if not vid:
-            job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why})")
+            # BUG trouvé le 10/09 (retour utilisateur : "aucune vidéo trouvée"
+            # systématique malgré le correctif scoring de 9f1eb04) : ce `continue`
+            # ne remettait PAS `c` dans `remaining` — le candidat était détruit dès
+            # le 1er échec, alors que sa sortie reste marquée "vue" dans
+            # recos_seen.json (job_scan_recos) et ne sera donc jamais re-proposée.
+            # Résultat : chaque échec de recherche perdait la piste pour toujours,
+            # jusqu'à vider la file sans jamais rien publier. On retente désormais
+            # RECOS_MAX_ATTEMPTS fois (le cache négatif NEG_TTL de ytcache expire
+            # sous 6h, laissant une chance à une meilleure indexation YouTube ou un
+            # changement de scoring) avant d'abandonner explicitement.
+            c["attempts"] = c.get("attempts", 0) + 1
+            if c["attempts"] < RECOS_MAX_ATTEMPTS:
+                job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why}) "
+                         f"— nouvelle tentative au prochain lancement "
+                         f"({c['attempts']}/{RECOS_MAX_ATTEMPTS}).")
+                remaining.append(c)
+            else:
+                job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why}) "
+                         f"— abandonnée après {RECOS_MAX_ATTEMPTS} tentatives.")
             continue
         if vid in history:
             job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")

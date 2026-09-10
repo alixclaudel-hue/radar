@@ -39,6 +39,12 @@ MIN_MATCH_SCORE = 0.5
 # cache aussi longtemps qu'un succès gèle la piste (incident du 2026-09-10 : une
 # file entière rendue « aucune vidéo trouvée » pour 7 jours).
 NEG_TTL = 6 * 3600
+# Un succès, lui, est une vérité stable (le clip d'une piste ne change pas) : le
+# recacher tous les 7 jours ne sert qu'à reconsommer du quota de recherche pour
+# retrouver le même résultat (retour utilisateur 2026-09-10 : « limiter les
+# tokens de recherche »). Cache partagé (SHARED_DIR) entre tous les appelants
+# (RECOS RADAR, /yt/first) et, à terme, tous les utilisateurs.
+DEFAULT_TTL = 365 * 86400
 
 
 def _toks(s):
@@ -129,12 +135,12 @@ def request(path, params, keys, timeout=15):
     raise RuntimeError("Aucune clé YouTube utilisable.")
 
 
-def search_video(query, keys, ttl=7 * 86400, artist=None, title=None, label=""):
+def search_video(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, label=""):
     """videoId de la meilleure vidéo pour `query`, ou None. Voir search_video_diag."""
     return search_video_diag(query, keys, ttl, artist, title, label)[0]
 
 
-def search_video_diag(query, keys, ttl=7 * 86400, artist=None, title=None, label=""):
+def search_video_diag(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, label=""):
     """(videoId | None, raison d'échec) pour `query` parmi les 15 premiers résultats,
     en ne gardant qu'une vidéo lisible dont les métadonnées (titre, chaîne,
     description) recoupent le mieux `artist`/`title`/`label` (mise en cache).

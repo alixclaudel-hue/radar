@@ -94,9 +94,12 @@ RECOS_DAILY_SEARCH_BUDGET = 45
 # qui ne trouve rien en coûte 202 (recherche avec label, puis sans, plus /videos) :
 # la file entière brûlait le quota du jour et les candidats suivants tombaient en
 # « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
-RECOS_MAX_ADD_PER_RUN = 5
-# limite de test (10/09) : réduit la conso quota pendant la mise au point de RECOS
-# RADAR — à remonter/retirer une fois les tests terminés.
+RECOS_SEARCHES_PER_RUN = 5
+# plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
+# ajouts réussis (correctif 10/09, retour utilisateur) : un plafond sur les seuls
+# ajouts laissait la boucle chercher sur tous les candidats en échec (cf. points
+# 27/28 CLAUDE.md — 92 candidats en échec, quota grillé, 0 ajout) avant de s'arrêter.
+# Limite de test — à remonter/retirer une fois les tests terminés.
 
 
 def _recos_history_load():
@@ -2178,7 +2181,10 @@ def job_publish_recos(job, params):
     d'ajouter la nouvelle (FIFO) — pas de détection d'écoute réelle (l'ancien lot 3,
     scraping Playwright de l'historique YouTube, a été abandonné, cf. CLAUDE.md).
 
-    Limite RECOS_MAX_ADD_PER_RUN par lancement (phase de test, réduit la conso quota)."""
+    Au plus RECOS_SEARCHES_PER_RUN recherches YouTube par lancement — sur le nombre de
+    RECHERCHES tentées, pas seulement les ajouts réussis, pour que la conso quota reste
+    bornée même si la plupart des candidats échouent à matcher (cf. commentaire de la
+    constante)."""
     candidates = load_json(RECOS_CANDIDATES_PATH, [])
     if not candidates:
         return job.finish("Aucun candidat en attente.")
@@ -2192,18 +2198,20 @@ def job_publish_recos(job, params):
     history = _recos_history_load()
     history_keys = _recos_history_track_keys(history)
     job.st["total"] = len(candidates)
-    remaining, added, quota_hit, cap_hit = [], 0, False, False
+    remaining, added, searched, quota_hit = [], 0, 0, False
     now = datetime.now().isoformat(timespec="seconds")
     for c in candidates:
-        if job.stopped() or quota_hit or cap_hit:
+        if job.stopped() or quota_hit or searched >= RECOS_SEARCHES_PER_RUN:
             remaining.append(c)
             continue
         ck = (style_key(c.get("artist")), style_key(c.get("title")))
         if ck in history_keys:
+            # identité déjà connue : aucune recherche réseau, ne compte pas dans le budget.
             job.tick(f"{c['artist']} — {c['title']} : déjà publiée par le passé")
             continue
         art_q = _strip_discogs_suffix(c.get("artist"))
         label_q = _strip_discogs_suffix(c.get("label") or "")
+        searched += 1
         try:
             vid, why = ytcache.search_video_diag(
                 f"{art_q} {c['title']}", keys,
@@ -2224,8 +2232,6 @@ def job_publish_recos(job, params):
         history_keys.add(ck)
         added += 1
         job.tick(f"{c['artist']} — {c['title']} : ajoutée")
-        if added >= RECOS_MAX_ADD_PER_RUN:
-            cap_hit = True
         if len(playlist) > RECOS_MAX_TRACKS:
             dropped = playlist.pop(0)
             job.tick(f"{dropped.get('artist')} — {dropped.get('title')} : retirée "
@@ -2235,7 +2241,8 @@ def job_publish_recos(job, params):
     save_json(RECOS_HISTORY_PATH, list(history.values()))
     save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_CANDIDATES_PATH, remaining)
-    note = f" — limite de test ({RECOS_MAX_ADD_PER_RUN} ajouts) atteinte." if cap_hit else ""
+    note = (f" — limite de recherche ({RECOS_SEARCHES_PER_RUN}) atteinte."
+            if searched >= RECOS_SEARCHES_PER_RUN else "")
     job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{RECOS_MAX_TRACKS}, "
                f"{len(remaining)} en attente.{note}")
 

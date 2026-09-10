@@ -11,7 +11,10 @@
 </p>
 <div class="btnrow">
   <button type="button" class="small" hx-post="/patte/run/scan_recos" hx-target="#job-scan_recos" hx-swap="outerHTML">🔄 Scanner maintenant</button>
+  <button type="button" class="small" hx-post="/jobs/publish_recos/launch" hx-target="#job-publish_recos" hx-swap="outerHTML">▶ Alimenter la playlist</button>
 </div>
+<p class="small muted">« Scanner » cherche de nouvelles sorties chez tes labels suivis. « Alimenter » reprend juste les
+  {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente, sans rescanner.</p>
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">

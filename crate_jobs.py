@@ -2014,6 +2014,18 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
+def _track_credit_artist(t, fallback):
+    """Artiste réel d'une piste Discogs : `tracklist[].artists` (crédit par piste,
+    rempli seulement quand il diffère de l'artiste de la sortie — cas des
+    compilations « Various ») sinon `fallback` (artiste de la sortie). Corrige la
+    recherche YouTube RECOS RADAR qui recevait "Various" comme artiste — pénalisé
+    à tort par ytcache._best_match (mot absent des métadonnées vidéo), rejetant
+    quasi toutes les pistes de compilation (retour utilisateur 2026-09-10)."""
+    arts = [(a.get("anv") or a.get("name") or "").strip() for a in (t.get("artists") or [])]
+    arts = [a for a in arts if a]
+    return ", ".join(arts) if arts else fallback
+
+
 def job_scan_recos(job, params):
     """Candidats pour la playlist RECOS RADAR (Fonctionnalité 1, lot 1) : liste les
     sorties du référentiel Discogs local (radar/discogs_dump.py) sur les labels suivis
@@ -2107,12 +2119,13 @@ def job_scan_recos(job, params):
         art = row.get("artist") or ""
         for t in tracks:
             ttl = (t.get("title") or "").strip()
-            k = (style_key(art), style_key(ttl))
+            track_art = _track_credit_artist(t, art)
+            k = (style_key(track_art), style_key(ttl))
             if not ttl or k in known_tracks:
                 continue
             known_tracks.add(k)
             candidates.append({
-                "artist": art, "title": ttl, "release_id": row["id"],
+                "artist": track_art, "title": ttl, "release_id": row["id"],
                 "release_title": row.get("title") or "", "label": row.get("label"),
                 "year": row.get("year"), "album_score": score, "added_at": now,
                 "d_label": detail.get("label"), "d_artist": detail.get("artist"),

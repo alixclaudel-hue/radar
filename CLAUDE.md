@@ -108,10 +108,14 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     Catalogue de vendeurs, ~1 h pour 141 vendeurs), puis poser `RADAR_SELLER_SCAN=1` sur
     le service `radar-worker` (compose, pas le `.env` VPS) pour activer le scan hebdo
     automatique.
-22. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
-    `.tbl` partagé (recopié dans 3 partials), multi-selects genre/style, `<label for>` non
-    reliés (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche,
-    UI de revue des artistes « approx », suppression par track/DJ dans Mes sets.
+22. **TODO code identifié** : multi-selects genre/style, `<label for>` non reliés
+    (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche, UI de
+    revue des artistes « approx », suppression par track/DJ dans Mes sets. Retirés de
+    cette liste (déjà faits, constaté le 10/09 en reprenant cette TODO) : pagination
+    table artistes (`univers_artists_table`, `_paginate`/`ARTISTS_PAGE_SIZE`,
+    `radar_web/app.py`) et composant CSS `.tbl` partagé — `review.html`/`learn.html`
+    étaient les 2 seuls partials avec table encore stylée en inline au lieu de la
+    classe `.tbl` (`app.css`), corrigé.
 23. **Piège — `step` HTML5 sans `min`** (`settings.html`) : le pas (`step="0.05"`) prend la
     valeur initiale du champ comme base si `min` est absent — un poids par défaut non
     multiple de ce pas (ex. `artist_score.corpus: 0.18`) rend le champ invalide dès qu'on
@@ -151,3 +155,16 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     direct ; le graphe de co-crédits (`job_build_graph`, vraies collaborations sur une
     même sortie) n'est pas concerné — piste distincte si le souci persiste après
     reconstruction du graphe (`build_graph` mode `taste`, mensuel).
+
+## TODO — prochaine session
+
+- **Factorisation jobs d'ingestion — code fait, ingestion réelle à vérifier** :
+  `job_ingest_youtube`/`spotify`/`bandcamp` (`crate_jobs.py`) partagent maintenant
+  `_ingest_lookup_loop` (dédoublonnage corpus, boucle `discogs_lookup`, flush tous
+  les 15, `corpus_merge`, `finish`) — 43 lignes en moins. Fait depuis cette session
+  cloud (pas de token Discogs/YouTube/Spotify ici) : `py_compile` OK + smoke tests
+  (chemins d'erreur sans identifiants, boucle testée avec `discogs_lookup` simulé —
+  dédoublonnage et skip du lookup si label déjà connu confirmés). **Reste à faire** :
+  tester une vraie ingestion (YouTube au moins) contre l'API réelle avant de
+  considérer le skill `factorize` clos sur `crate_jobs.py` — depuis une session
+  avec accès réseau + tokens (VPS ou réseau Custom + secrets).

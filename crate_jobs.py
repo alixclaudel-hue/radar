@@ -464,6 +464,39 @@ def corpus_merge(new_rows, source):
 
 # ============================================================= JOBS
 
+def _ingest_lookup_loop(job, source, raw, token, cache, deep=True, kind="track"):
+    """Boucle commune aux jobs ingest_* : dédoublonnage contre le corpus, lookup
+    Discogs titre par titre, flush périodique, merge final. `raw` : liste de
+    dicts artist/title (+ label/genre/url optionnels, déjà connus pour certaines
+    sources et donc sautant le lookup)."""
+    corpus = load_json(CORPUS_PATH, [])
+    seen = {(source, style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
+    todo = [r for r in raw if (source, style_key(r["artist"]), style_key(r["title"])) not in seen]
+    job.st["total"] = len(todo)
+    job.msg(f"{len(raw)} titres, {len(todo)} à traiter.")
+    acc = []
+    for i, r in enumerate(todo):
+        if job.stopped():
+            break
+        label, rid, style, calls = r.get("label"), None, [], 0
+        if not label and (r["artist"] or r["title"]):
+            hit, calls = discogs_lookup(token, r["artist"], r["title"], cache, kind=kind, deep=deep)
+            if hit:
+                label, rid, style = hit["label"], hit["release_id"], hit["style"]
+        acc.append({"artist": r["artist"], "title": r["title"], "label": label,
+                    "release_id": rid, "style": style, "genre": r.get("genre"), "url": r.get("url")})
+        job.tick(f"{r['artist']} — {r['title']}" + (f"  → {label}" if label else "  → —"))
+        if calls:
+            time.sleep(max(0.2, 1.1 * calls - 0.3 * (calls - 1)))
+        if (i + 1) % 15 == 0:
+            corpus_merge(acc, source)
+            acc = []
+            save_json(LOOKUP_CACHE_PATH, cache)
+    add, tot = corpus_merge(acc, source)
+    save_json(LOOKUP_CACHE_PATH, cache)
+    job.finish(f"+{job.st['done']} traités. Corpus : {tot}.")
+
+
 def job_ingest_youtube(job, params):
     cfg = cfg_load()
     token = cfg.get("token", "")
@@ -495,33 +528,7 @@ def job_ingest_youtube(job, params):
                      "imported_at": datetime.now().isoformat(timespec="seconds")}
     save_json(YOUTUBE_META_PATH, meta)
     cache = load_json(LOOKUP_CACHE_PATH, {})
-    corpus = load_json(CORPUS_PATH, [])
-    seen = {("youtube", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
-    todo = [r for r in raw if ("youtube", style_key(r["artist"]), style_key(r["title"])) not in seen]
-    job.st["total"] = len(todo)
-    job.msg(f"{len(raw)} titres, {len(todo)} à traiter.")
-    acc = []
-    for i, r in enumerate(todo):
-        if job.stopped():
-            break
-        label = r["label"]
-        rid, style, calls = None, [], 0
-        if not label and (r["artist"] or r["title"]):
-            hit, calls = discogs_lookup(token, r["artist"], r["title"], cache, deep=deep)
-            if hit:
-                label, rid, style = hit["label"], hit["release_id"], hit["style"]
-        acc.append({"artist": r["artist"], "title": r["title"], "label": label,
-                    "release_id": rid, "style": style, "genre": None, "url": None})
-        job.tick(f"{r['artist']} — {r['title']}" + (f"  → {label}" if label else "  → —"))
-        if calls:
-            time.sleep(max(0.2, 1.1 * calls - 0.3 * (calls - 1)))
-        if (i + 1) % 15 == 0:
-            corpus_merge(acc, "youtube")
-            acc = []
-            save_json(LOOKUP_CACHE_PATH, cache)
-    add, tot = corpus_merge(acc, "youtube")
-    save_json(LOOKUP_CACHE_PATH, cache)
-    job.finish(f"+{job.st['done']} traités. Corpus : {tot}.")
+    _ingest_lookup_loop(job, "youtube", raw, token, cache, deep=deep)
 
 
 def job_ingest_spotify(job, params):
@@ -562,32 +569,7 @@ def job_ingest_spotify(job, params):
                      "imported_at": datetime.now().isoformat(timespec="seconds")}
     save_json(SPOTIFY_META_PATH, meta)
     cache = load_json(LOOKUP_CACHE_PATH, {})
-    corpus = load_json(CORPUS_PATH, [])
-    seen = {("spotify", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
-    todo = [r for r in raw if ("spotify", style_key(r["artist"]), style_key(r["title"])) not in seen]
-    job.st["total"] = len(todo)
-    job.msg(f"{len(raw)} titres, {len(todo)} à traiter.")
-    acc = []
-    for i, r in enumerate(todo):
-        if job.stopped():
-            break
-        label, rid, style, calls = None, None, [], 0
-        if r["artist"] or r["title"]:
-            hit, calls = discogs_lookup(token, r["artist"], r["title"], cache, deep=deep)
-            if hit:
-                label, rid, style = hit["label"], hit["release_id"], hit["style"]
-        acc.append({"artist": r["artist"], "title": r["title"], "label": label,
-                    "release_id": rid, "style": style, "genre": None, "url": None})
-        job.tick(f"{r['artist']} — {r['title']}" + (f"  → {label}" if label else "  → —"))
-        if calls:
-            time.sleep(max(0.2, 1.1 * calls - 0.3 * (calls - 1)))
-        if (i + 1) % 15 == 0:
-            corpus_merge(acc, "spotify")
-            acc = []
-            save_json(LOOKUP_CACHE_PATH, cache)
-    add, tot = corpus_merge(acc, "spotify")
-    save_json(LOOKUP_CACHE_PATH, cache)
-    job.finish(f"+{job.st['done']} traités. Corpus : {tot}.")
+    _ingest_lookup_loop(job, "spotify", raw, token, cache, deep=deep)
 
 
 def job_ingest_bandcamp(job, params):
@@ -601,32 +583,7 @@ def job_ingest_bandcamp(job, params):
     job.msg("Lecture de la collection Bandcamp…")
     albums = bandcamp_albums(u, pw)
     cache = load_json(LOOKUP_CACHE_PATH, {})
-    corpus = load_json(CORPUS_PATH, [])
-    seen = {("bandcamp", style_key(r.get("artist", "")), style_key(r.get("title", ""))) for r in corpus}
-    todo = [a for a in albums if ("bandcamp", style_key(a["artist"]), style_key(a["title"])) not in seen]
-    job.st["total"] = len(todo)
-    job.msg(f"{len(albums)} albums, {len(todo)} à traiter.")
-    acc = []
-    for i, a in enumerate(todo):
-        if job.stopped():
-            break
-        label, rid, style, calls = None, None, [], 0
-        if a["artist"] or a["title"]:
-            hit, calls = discogs_lookup(token, a["artist"], a["title"], cache, kind="release", deep=deep)
-            if hit:
-                label, rid, style = hit["label"], hit["release_id"], hit["style"]
-        acc.append({"artist": a["artist"], "title": a["title"], "label": label,
-                    "release_id": rid, "style": style, "genre": a.get("genre"), "url": None})
-        job.tick(f"{a['artist']} — {a['title']}" + (f"  → {label}" if label else "  → —"))
-        if calls:
-            time.sleep(max(0.2, 1.1 * calls - 0.3 * (calls - 1)))
-        if (i + 1) % 15 == 0:
-            corpus_merge(acc, "bandcamp")
-            acc = []
-            save_json(LOOKUP_CACHE_PATH, cache)
-    add, tot = corpus_merge(acc, "bandcamp")
-    save_json(LOOKUP_CACHE_PATH, cache)
-    job.finish(f"+{job.st['done']} traités. Corpus : {tot}.")
+    _ingest_lookup_loop(job, "bandcamp", albums, token, cache, deep=deep, kind="release")
 
 
 def job_fetch_collection(job, params):

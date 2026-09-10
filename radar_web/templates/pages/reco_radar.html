@@ -42,20 +42,55 @@
 <table class="tbl">
   <thead><tr>
     <th style="width:34px">#</th>
+    <th>Artiste</th>
     <th>Piste</th>
+    <th>Release</th>
     <th>Label</th>
     <th class="num" style="width:60px">Année</th>
     <th class="num" style="width:60px">Score</th>
+    <th style="width:64px"></th>
+    <th style="width:34px"></th>
+    <th style="width:34px"></th>
     <th style="width:34px"></th>
   </tr></thead>
   <tbody id="reco-rows">
     {% for t in playlist %}
     <tr data-index="{{ loop.index0 }}">
       <td class="small muted">{{ loop.index }}</td>
-      <td>{{ t.artist }} — {{ t.title }}</td>
+      <td>{{ t.artist }}</td>
+      <td>{{ t.title }}</td>
+      <td>{{ t.release_title or '—' }}</td>
       <td>{% if t.label %}<a href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}</td>
       <td class="num small muted">{{ t.year or '—' }}</td>
       <td class="num small muted">{{ t.album_score }}</td>
+      <td>
+        {% set v = (voted or {}).get(t.release_id) %}
+        <span class="vote" hx-swap="outerHTML">
+          {% if v %}
+            <span class="small muted {{ 'up' if v == 'up' else 'down' }}">{{ icons.thumbup() if v == 'up' else icons.thumbdown() }}</span>
+          {% else %}
+          <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ t.release_id }}","name":{{ (t.release_title or "")|tojson }},"verdict":"up","score":"{{ t.album_score }}","f_label":"{{ (t.d_label or 0)/100 }}","f_artist":"{{ (t.d_artist or 0)/100 }}","f_style":"{{ (t.d_style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
+          <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ t.release_id }}","name":{{ (t.release_title or "")|tojson }},"verdict":"down","score":"{{ t.album_score }}","f_label":"{{ (t.d_label or 0)/100 }}","f_artist":"{{ (t.d_artist or 0)/100 }}","f_style":"{{ (t.d_style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
+          {% endif %}
+        </span>
+      </td>
+      <td>
+        <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t"
+           target="_blank" rel="noopener" class="ic-btn" title="Chercher sur Bandcamp">{{ icons.bandcamp() }}</a>
+      </td>
+      <td>
+        {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
+          <span class="small ok" title="Déjà en wantlist">✓</span>
+        {% else %}
+        <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
+          <input type="hidden" name="rid" value="{{ t.release_id }}">
+          <input type="hidden" name="title" value="{{ t.release_title }}">
+          <input type="hidden" name="artist" value="{{ t.artist }}">
+          <input type="hidden" name="label" value="{{ t.label or '' }}">
+          <button type="submit" class="ic-btn" title="Ajouter le release à la wantlist Discogs">{{ icons.cart() }}</button>
+        </form>
+        {% endif %}
+      </td>
       <td>
         <form method="post" action="/reco-radar/delete"
               onsubmit="return confirm('Retirer cette piste de la playlist RECOS RADAR ?');">
@@ -81,7 +116,8 @@
     if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  rows.forEach(r => r.addEventListener('click', () => {
+  rows.forEach(r => r.addEventListener('click', (e) => {
+    if (e.target.closest('button, a, form')) return;
     if (player) player.playVideoAt(Number(r.dataset.index));
   }));
 

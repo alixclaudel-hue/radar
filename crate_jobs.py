@@ -2106,9 +2106,9 @@ def job_scan_recos(job, params):
         title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
         r = {"label": [row["label"]] if row.get("label") else [],
              "title": title, "style": row["styles"].split(", ") if row.get("styles") else []}
-        score, _ = ctx.album_score(r)
+        score, detail = ctx.album_score(r)
         if score is not None and score >= min_score:
-            scored.append((score, row))
+            scored.append((score, row, detail))
     scored.sort(key=lambda x: -x[0])
     targets = scored[:max_new]
     job.st["total"] = len(targets)
@@ -2136,7 +2136,7 @@ def job_scan_recos(job, params):
     now = datetime.now().isoformat(timespec="seconds")
     n_tracks = 0
     cap_hit = False
-    for score, row in targets:
+    for score, row, detail in targets:
         if job.stopped():
             break
         if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
@@ -2156,6 +2156,8 @@ def job_scan_recos(job, params):
                 "artist": art, "title": ttl, "release_id": row["id"],
                 "release_title": row.get("title") or "", "label": row.get("label"),
                 "year": row.get("year"), "album_score": score, "added_at": now,
+                "d_label": detail.get("label"), "d_artist": detail.get("artist"),
+                "d_style": detail.get("style"),
             })
             n_tracks += 1
         job.tick(f"{art} — {row.get('title')} ({score}) : +{len(tracks)} piste(s)"

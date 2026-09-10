@@ -63,8 +63,13 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     ancienne est retirée avant d'ajouter la nouvelle (retrait par ancienneté, pas par
     écoute réelle — l'ancien lot 3, nettoyage par scraping Playwright de l'historique
     de visionnage, a été abandonné : `ytwrite.py`, `ytwatch.py`,
-    `scripts/export_youtube_session.py` et le job `clean_recos` supprimés). Wantlist
-    RADAR (2ᵉ feature du même chantier) : pas commencée.
+    `scripts/export_youtube_session.py` et le job `clean_recos` supprimés). Suppression
+    manuelle d'une piste (10/09) : bouton 🗑️ sur `/reco-radar` (`POST /reco-radar/delete`,
+    par `video_id`) — retire de `recos_playlist.json` uniquement, `recos_history.json`
+    conservé (la vidéo ne sera pas réajoutée automatiquement). Rechargement complet de
+    page (pas htmx) : le lecteur IFrame charge sa liste une fois au chargement, une
+    suppression en place le désynchroniserait des lignes. Wantlist RADAR (2ᵉ feature du
+    même chantier) : pas commencée.
 20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —

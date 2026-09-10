@@ -1,3 +1,13 @@
+---
+name: factorize
+description: >
+  Refactoring et principe DRY (Don't Repeat Yourself) : repérer les duplications
+  de code et les extraire en fonctions/hooks/modules réutilisables avant
+  d'ajouter du nouveau code. Utiliser pour /factorize, "factorise", "refactor",
+  "DRY", "évite la duplication", ou avant toute tâche qui répéterait une
+  logique déjà présente ailleurs dans le code.
+---
+
 # Instructions de Développement - Refactoring & DRY
 
 ## Règle d'Or : DRY (Don't Repeat Yourself)

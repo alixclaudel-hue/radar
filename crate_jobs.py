@@ -2225,9 +2225,15 @@ def job_publish_recos(job, params):
         label_q = _strip_discogs_suffix(c.get("label") or "")
         searched += 1
         try:
+            # force=True dès la 1re relance (attempts >= 1) : sinon la nouvelle
+            # tentative ne fait que relire le même échec en cache (NEG_TTL 6h,
+            # cf. ytcache.search_video_diag) au lieu de vraiment réinterroger
+            # l'API — les RECOS_MAX_ATTEMPTS tentatives ne cherchaient donc
+            # jamais rien de nouveau (retour utilisateur 2026-09-10).
             vid, why = ytcache.search_video_diag(
                 f"{art_q} {c['title']}", keys,
-                artist=art_q, title=c.get("title"), label=label_q)
+                artist=art_q, title=c.get("title"), label=label_q,
+                force=bool(c.get("attempts")))
         except ytcache.QuotaExhausted:
             job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
             quota_hit = True

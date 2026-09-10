@@ -292,9 +292,38 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     succès » est bien récupéré au 2e lancement au lieu d'être perdu dès le 1er.
     Non testé contre l'API YouTube réelle (pas d'accès réseau/clé depuis cette
     session cloud).
+34. **Piège — les tentatives du point 33 ne recherchaient jamais rien** (`ytcache`,
+    corrigé le 10/09, retour utilisateur : 5 pistes trouvables en 2 clics à la main
+    toutes en « aucune vidéo trouvée (aucun match, en cache) », l'une abandonnée
+    après ses 3 tentatives) : `search_video_diag` sert tel quel un résultat négatif
+    en cache tant que `NEG_TTL` (6h) n'est pas écoulé — mais chaque relance d'un
+    candidat (`RECOS_MAX_ATTEMPTS`, point 33) rejouait la MÊME clé de cache que le
+    tout premier échec, donc lisait toujours ce même résultat négatif sans jamais
+    réinterroger l'API, quel que soit un correctif de scoring déployé entre-temps
+    (`9f1eb04` notamment). Les « 3 tentatives » ne cherchaient donc jamais rien de
+    nouveau : le mécanisme du point 33 ne pouvait pas fonctionner. Corrigé :
+    nouveau paramètre `force` sur `search_video`/`search_video_diag` — ignore un
+    résultat négatif en cache (jamais un résultat positif, réutilisé tel quel,
+    coût nul) pour forcer une vraie recherche. `job_publish_recos` passe
+    `force=bool(c.get("attempts"))` : la 1re tentative respecte le cache normalement,
+    toute relance (attempts ≥ 1) force une recherche réelle. Vérifié par smoke test
+    hors-ligne (cache négatif pré-rempli : 0 appel réseau sans `force`, appel réel
+    déclenché et vidéo retrouvée avec `force=True`). Effet secondaire : une piste
+    déjà abandonnée après ses 3 tentatives AVANT ce correctif reste perdue
+    (`recos_seen.json` la marque « vue ») — seul « 🗑️🔄 Forcer (tout rescanner) »
+    la refait réapparaître comme nouveau candidat (attempts repart à 0). Non testé
+    contre l'API YouTube réelle (pas d'accès réseau/clé depuis cette session cloud).
 
 ## TODO — prochaine session
 
+- **Vérifier le correctif du point 34** (tentatives qui ne recherchaient jamais
+  rien) sur le VPS après déploiement : relancer « ▶ Alimenter la playlist » sur
+  les pistes actuellement à 2/3 tentatives (ex. Noir/Haze — Around, Candi Staton —
+  Hallelujah Anyway, Flashmob — Need In Me, Shakedown — At Night) et confirmer au
+  journal une VRAIE recherche (raison différente de « aucun match, en cache », ou
+  une vidéo enfin ajoutée). Pour récupérer Kings Of Tomorrow/Julie McKnight —
+  Finally (déjà abandonnée avant ce correctif) : cliquer « 🗑️🔄 Forcer (tout
+  rescanner) » pour qu'elle redevienne un candidat neuf.
 - **Vérifier le correctif du point 33** (candidat détruit au 1er échec YouTube)
   sur le VPS après déploiement : lancer « ▶ Alimenter la playlist » plusieurs
   fois de suite sur une file encombrée d'échecs et confirmer au journal qu'un

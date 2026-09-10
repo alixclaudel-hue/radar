@@ -139,12 +139,12 @@ def request(path, params, keys, timeout=15):
     raise RuntimeError("Aucune clé YouTube utilisable.")
 
 
-def search_video(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, label=""):
+def search_video(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, label="", force=False):
     """videoId de la meilleure vidéo pour `query`, ou None. Voir search_video_diag."""
-    return search_video_diag(query, keys, ttl, artist, title, label)[0]
+    return search_video_diag(query, keys, ttl, artist, title, label, force)[0]
 
 
-def search_video_diag(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, label=""):
+def search_video_diag(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, label="", force=False):
     """(videoId | None, raison d'échec) pour `query` parmi les 15 premiers résultats,
     en ne gardant qu'une vidéo lisible dont les métadonnées (titre, chaîne,
     description) recoupent le mieux `artist`/`title`/`label` (mise en cache).
@@ -160,7 +160,17 @@ def search_video_diag(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, lab
 
     QuotaExhausted remonte à l'appelant au lieu d'être avalée : le quota épuisé se
     lisait sinon « aucune vidéo trouvée », la file de candidats se vidait pour rien
-    et l'échec était mis en cache comme un vrai résultat négatif."""
+    et l'échec était mis en cache comme un vrai résultat négatif.
+
+    `force` ignore un résultat négatif déjà en cache pour retenter une vraie
+    recherche (un résultat positif reste toujours servi tel quel, il ne coûte
+    rien de le réutiliser). Sans ça, les relances de `job_publish_recos` sur un
+    candidat déjà tenté (point 33 CLAUDE.md, `RECOS_MAX_ATTEMPTS`) ne faisaient
+    que relire le même échec mis en cache jusqu'à 6h plus tôt (`NEG_TTL`) sans
+    jamais réinterroger l'API — les 3 tentatives ne cherchaient donc rien de
+    nouveau, quel que soit un correctif de scoring déployé entre-temps (retour
+    utilisateur 2026-09-10 : « aucun match, en cache » sur des pistes retrouvées
+    en 2 clics à la main)."""
     q = " ".join((query or "").split())
     if not q:
         return None, "requête vide"
@@ -172,8 +182,10 @@ def search_video_diag(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, lab
         f"{q_rich}|{artist or ''}|{title or ''}|{label}".encode()
     ).hexdigest()[:20]
     hit = cache_get(ckey, ttl, NEG_TTL)
-    if hit is not None:
-        return (hit or None), ("" if hit else "aucun match, en cache")
+    if hit:
+        return hit, ""
+    if hit is not None and not force:
+        return None, "aucun match, en cache"
     vid, why = "", "aucun résultat"
     seen = set()
     for attempt in (q_rich, q) if label_s else (q,):

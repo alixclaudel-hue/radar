@@ -1729,19 +1729,42 @@ def univers_page(request: Request, tab: str = "labels"):
 LABELS_PAGE_SIZE = 25
 
 
+_LABELS_SORT_FIELDS = {"label": "disp", "aff": "aff", "reco": "_reco", "owned": "owned"}
+
+
+def _sort_rows(rows, field, reverse):
+    """Trie `rows` sur `field`, valeur None toujours en dernier quel que soit
+    `reverse` (un label "pas profilé" ne doit pas remonter en tête en tri
+    croissant — cf. N4, ne pas confondre "non classé" et "goût opposé")."""
+    if field == "disp":
+        rows.sort(key=lambda r: r["disp"].lower(), reverse=reverse)
+        return rows
+    def key(r):
+        v = r.get(field)
+        if v is None:
+            return (1, 0.0)
+        return (0, -float(v) if reverse else float(v))
+    rows.sort(key=key)
+    return rows
+
+
 @app.get("/univers/labels/table", response_class=HTMLResponse)
-def univers_labels_table(request: Request, flt: str = "", page: int = 1):
+def univers_labels_table(request: Request, flt: str = "", page: int = 1,
+                          sort: str = "", dir: str = "desc"):
     c = Ctx()
     rows = _base_labels_ranked(c)
     if flt:
         f = flt.lower()
         rows = [r for r in rows if f in r["disp"].lower()]
+    field = _LABELS_SORT_FIELDS.get(sort)
+    if field:
+        rows = _sort_rows(rows, field, dir != "asc")
     shown, page, pages, total = _paginate(rows, page, LABELS_PAGE_SIZE)
     for r in shown:
         r["url"] = (f"https://www.discogs.com/label/{r['id']}" if r.get("id")
                     else f"https://www.discogs.com/search/?q={quote_plus(r['disp'])}&type=label")
     return frag(request, "partials/labels_table.html", rows=shown, total=total,
-                page=page, pages=pages, flt=flt)
+                page=page, pages=pages, flt=flt, sort=sort, dir=dir)
 
 
 @app.post("/univers/labels/add", response_class=HTMLResponse)
@@ -1762,11 +1785,11 @@ def univers_labels_add(request: Request, name: str = Form("")):
 
 @app.post("/univers/labels/remove", response_class=HTMLResponse)
 def univers_labels_remove(request: Request, name: str = Form(""), flt: str = Form(""),
-                          page: int = Form(1)):
+                          page: int = Form(1), sort: str = Form(""), dir: str = Form("desc")):
     c = _cfg()
     c["labels"] = [l for l in c["labels"] if l != name]
     store.save_config(c)
-    return univers_labels_table(request, flt=flt, page=page)
+    return univers_labels_table(request, flt=flt, page=page, sort=sort, dir=dir)
 
 
 def _graph_link_facts(deg, weight, unit):

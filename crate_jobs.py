@@ -2107,9 +2107,11 @@ def job_scan_recos(job, params):
     candidates = [] if force else load_json(RECOS_CANDIDATES_PATH, [])
     if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
         _chain_publish_recos()
+        last = _publish_recos_last_message()
+        cause = f" Dernière publication : {last}" if last else ""
         return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"
                            f"{RECOS_DAILY_SEARCH_BUDGET} recherches/jour) — scan sauté, "
-                           "laisse la publication rattraper le retard.")
+                           f"laisse la publication rattraper le retard.{cause}")
     # inclut aussi TOUT ce qui a déjà été publié un jour (recos_history.json,
     # jamais purgé), pas seulement la playlist ou la file d'attente courantes :
     # une piste retirée depuis (FIFO ou suppression manuelle) ne doit pas
@@ -2167,6 +2169,15 @@ def _chain_publish_recos():
     from radar_web.radar import jobs as job_queue
     if not any(j["name"] == "publish_recos" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
         job_queue.launch("publish_recos", {}, uid=RADAR_UID)
+
+
+def _publish_recos_last_message():
+    """Dernier message connu de publish_recos (ex. « Quota YouTube épuisé ») — affiché
+    dans le message « file pleine » de scan_recos pour éviter à l'utilisateur d'avoir
+    à ouvrir un second journal pour comprendre pourquoi la file ne se vide pas
+    (retour utilisateur 2026-09-10 : « scan sauté » sans explication de la cause)."""
+    s = load_json(os.path.join(JOBS_USER_DIR, "publish_recos.status.json"), {})
+    return (s.get("message") or "").strip()
 
 
 def job_publish_recos(job, params):

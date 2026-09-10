@@ -254,10 +254,30 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     (`bool(Form(""))` → `True` sans l'argument explicite, `False` avec) — pas
     testé en conditions réelles (pas de token Discogs depuis cette session
     cloud, donc pas de vrai `job_scan_recos` lancé de bout en bout).
-
+32. **File RECOS pleine sans explication** (`job_scan_recos`, corrigé le 10/09,
+    retour utilisateur : 2 scans consécutifs annonçant « file déjà pleine, 56 en
+    attente » sans que la file ne descende) : quand `scan_recos` saute le scan
+    faute de place (`len(candidates) >= RECOS_DAILY_SEARCH_BUDGET`), il chaîne
+    bien `publish_recos` (point 30) mais celui-ci butait sur le quota YouTube
+    journalier épuisé (confirmé par l'utilisateur via le journal `publish_recos` :
+    « Quota YouTube (recherche) épuisé ») — comportement correct (la file se
+    vide au reset du quota, minuit heure Pacifique) mais invisible : le message
+    de `scan_recos` ne disait que « scan sauté », sans dire pourquoi la file ne
+    descendait pas, obligeant à ouvrir un second journal (`publish_recos`) pour
+    comprendre. Corrigé : nouvelle `_publish_recos_last_message()` lit le
+    dernier message connu de `publish_recos.status.json` et l'ajoute au message
+    de `scan_recos` (ex. « ... scan sauté, laisse la publication rattraper le
+    retard. Dernière publication : Quota YouTube (recherche) épuisé — reprendra
+    au prochain scan. »). Vérifié par smoke test hors-ligne (statut
+    `publish_recos` simulé en quota épuisé, file à 56/45) : le message de
+    `scan_recos` inclut bien la raison — pas testé en conditions réelles.
 
 ## TODO — prochaine session
 
+- **Vérifier le correctif du point 32** (message « file pleine » sans raison) sur
+  le VPS après déploiement : provoquer une file pleine (quota épuisé ou file > 45)
+  et confirmer que le message de `scan_recos` affiche bien « Dernière publication :
+  ... » avec la vraie raison de blocage, pas juste « scan sauté ».
 - **Vérifier le correctif du point 31** (bouton "Scanner maintenant" forçait un
   rescan complet) sur le VPS après déploiement : cliquer « 🔄 Scanner maintenant »
   deux fois de suite sur `/reco-radar` et confirmer au journal que le 2ᵉ scan

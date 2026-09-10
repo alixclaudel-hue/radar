@@ -155,9 +155,32 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     direct ; le graphe de co-crédits (`job_build_graph`, vraies collaborations sur une
     même sortie) n'est pas concerné — piste distincte si le souci persiste après
     reconstruction du graphe (`build_graph` mode `taste`, mensuel).
+27. **Piège — artiste "Various" pénalisé dans la recherche YouTube RECOS RADAR**
+    (`job_scan_recos`, PR #112 mergée le 10/09) : pour les compilations, Discogs
+    renvoie "Various" comme artiste de la sortie — `job_scan_recos` passait ce mot
+    tel quel à `ytcache.search_video()` comme artiste de la piste. `_best_match`
+    pénalise (×0.5) tout résultat où l'artiste n'apparaît pas dans les métadonnées
+    vidéo (titre/chaîne/description) — or "Various" n'apparaît jamais, puisque ce
+    n'est pas un vrai nom d'artiste. Combiné au seuil `MIN_MATCH_SCORE = 0.5`, ça
+    rejetait quasi toutes les pistes de compilation ("aucune vidéo trouvée").
+    Diagnostiqué via le journal `publish_recos` fourni par l'utilisateur (90/91
+    candidats "Various" en échec, playlist bloquée à 1/5) — pas un problème de
+    quota YouTube (journalier, pas hebdomadaire comme initialement suspecté par
+    l'utilisateur — RAS de ce côté). Corrigé : `_track_credit_artist()`
+    (`crate_jobs.py`) utilise le crédit réel par piste que Discogs fournit déjà
+    (`tracklist[].artists`, rempli précisément pour ce cas), repli sur l'artiste de
+    la sortie si absent (sorties normales, comportement inchangé). **File
+    d'attente déjà scannée avant ce correctif à régénérer** : cliquer « 🗑️🔄
+    Forcer (tout rescanner) » sur `/reco-radar` une fois le déploiement fait, sinon
+    les candidats gardent l'ancien "Various" figé dans `recos_candidates.json`.
 
 ## TODO — prochaine session
 
+- **Vérifier l'effet du correctif PR #112** (artiste "Various", point 27) sur le
+  VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) » sur
+  `/reco-radar`, relancer « ▶ Alimenter la playlist », confirmer que les pistes de
+  compilation (ex. Aquasonic Vol. 1, Defected Classics) trouvent enfin une vidéo au
+  lieu de "aucune vidéo trouvée".
 - **Ingestion réelle non testée depuis la factorisation** (PR #111, mergée sur `main`
   le 10/09) : `job_ingest_youtube`/`spotify`/`bandcamp` (`crate_jobs.py`) partagent
   maintenant `_ingest_lookup_loop` (dédoublonnage corpus, boucle `discogs_lookup`,

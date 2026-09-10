@@ -63,8 +63,13 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     ancienne est retirée avant d'ajouter la nouvelle (retrait par ancienneté, pas par
     écoute réelle — l'ancien lot 3, nettoyage par scraping Playwright de l'historique
     de visionnage, a été abandonné : `ytwrite.py`, `ytwatch.py`,
-    `scripts/export_youtube_session.py` et le job `clean_recos` supprimés). Wantlist
-    RADAR (2ᵉ feature du même chantier) : pas commencée.
+    `scripts/export_youtube_session.py` et le job `clean_recos` supprimés). Suppression
+    manuelle d'une piste (10/09) : bouton 🗑️ sur `/reco-radar` (`POST /reco-radar/delete`,
+    par `video_id`) — retire de `recos_playlist.json` uniquement, `recos_history.json`
+    conservé (la vidéo ne sera pas réajoutée automatiquement). Rechargement complet de
+    page (pas htmx) : le lecteur IFrame charge sa liste une fois au chargement, une
+    suppression en place le désynchroniserait des lignes. Wantlist RADAR (2ᵉ feature du
+    même chantier) : pas commencée.
 20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —
@@ -100,3 +105,16 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     de vidéos hors-sujet dans la playlist RECOS RADAR (retour utilisateur du 09/09). Piste
     de correction identifiée (même principe de score, quasi gratuit en quota car `/videos`
     est déjà appelé pour vérifier la lisibilité), pas encore implémentée.
+26. **Piège — lien artiste↔label sans croisement de style** (`Ctx.artist_label_signal`,
+    terme `label_link` de `ascore`) : partager un label suivi (base/watchlist) suffisait à
+    booster n'importe quel artiste, même hors-style (ex. featuring rap sur un label
+    par ailleurs house) — poussait des artistes hors-goût dans RECOS RADAR (retour
+    utilisateur du 10/09). Corrigé : `discogs_dump.artist_ids_for_labels` renvoie aussi
+    les styles DE LA SORTIE créditée précise (`release_styles`, pas le profil agrégé du
+    label) ; `_compute_artist_label_signal` ne compte que les crédits dont au moins un
+    style est dans `wmap` (goût courant) — crédit conservé tel quel si la sortie n'a
+    aucun style renseigné (tag manquant, indécidable, même logique que le point N4 de
+    l'archive : ne pas confondre "non classé" et "goût opposé"). Limité à ce signal
+    direct ; le graphe de co-crédits (`job_build_graph`, vraies collaborations sur une
+    même sortie) n'est pas concerné — piste distincte si le souci persiste après
+    reconstruction du graphe (`build_graph` mode `taste`, mensuel).

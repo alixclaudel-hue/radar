@@ -344,6 +344,21 @@ def reco_radar_page(request: Request):
                   last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"))
 
 
+@app.post("/reco-radar/delete")
+def reco_radar_delete_track(video_id: str = Form("")):
+    """Retire UNE piste de la playlist RECOS RADAR à la main (retour utilisateur
+    2026-09-10). N'efface pas recos_history.json : la vidéo reste marquée « déjà
+    proposée » et ne sera pas réajoutée automatiquement par un futur scan. Rechargement
+    complet de la page (pas de htmx) : le lecteur IFrame charge sa liste de vidéos une
+    fois au chargement, une suppression en place la désynchroniserait des lignes."""
+    if video_id:
+        playlist = load(_pu().recos_playlist, [])
+        new_playlist = [t for t in playlist if t.get("video_id") != video_id]
+        if len(new_playlist) != len(playlist):
+            save(_pu().recos_playlist, new_playlist)
+    return RedirectResponse("/reco-radar", status_code=303)
+
+
 def _apply_patte_form(f):
     c = _cfg()
     for k in ("token", "youtube_api_key", "spotify_client_id", "spotify_client_secret",

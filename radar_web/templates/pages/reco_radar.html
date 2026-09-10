@@ -36,6 +36,7 @@
     <th>Label</th>
     <th class="num" style="width:60px">Année</th>
     <th class="num" style="width:60px">Score</th>
+    <th style="width:34px"></th>
   </tr></thead>
   <tbody id="reco-rows">
     {% for t in playlist %}
@@ -45,6 +46,13 @@
       <td>{% if t.label %}<a href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}</td>
       <td class="num small muted">{{ t.year or '—' }}</td>
       <td class="num small muted">{{ t.album_score }}</td>
+      <td>
+        <form method="post" action="/reco-radar/delete"
+              onsubmit="return confirm('Retirer cette piste de la playlist RECOS RADAR ?');">
+          <input type="hidden" name="video_id" value="{{ t.video_id }}">
+          <button type="submit" class="small" title="Retirer cette piste de la playlist">🗑️</button>
+        </form>
+      </td>
     </tr>
     {% endfor %}
   </tbody>

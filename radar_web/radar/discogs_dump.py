@@ -1013,11 +1013,17 @@ def label_ids_for_artists(artist_ids, con=None):
 
 
 def artist_ids_for_labels(label_keys, con=None):
-    """{artist_id: {"name": str, "n": int}} — artistes crédités sur au moins
-    un des label_keys donnés (release_artists JOIN releases), l'artiste
-    générique "Various" (id 194, cf. crate_jobs.VARIOUS_ARTIST_ID) exclu.
-    Mirroir de `label_ids_for_artists` pour le ranking artistes : "cet
-    artiste a-t-il un disque chez un label que je suis déjà"."""
+    """{artist_id: {"name": str, "n": int, "styles": {style: n}}} — artistes
+    crédités sur au moins un des label_keys donnés (release_artists JOIN
+    releases), l'artiste générique "Various" (id 194, cf.
+    crate_jobs.VARIOUS_ARTIST_ID) exclu. Mirroir de `label_ids_for_artists`
+    pour le ranking artistes : "cet artiste a-t-il un disque chez un label
+    que je suis déjà". `styles` (styles DE CES SORTIES PRÉCISES, pas du label
+    en général) permet à l'appelant de croiser le style de la sortie créditée
+    avec son propre goût avant d'accorder le crédit — sans ça, un featuring
+    hors-style sur un label par ailleurs électro (ex. rap sur un label house)
+    boostait n'importe quel artiste juste pour avoir partagé le label (retour
+    utilisateur 2026-09-10)."""
     keys = [k for k in dict.fromkeys(label_keys) if k]
     if not keys or not available():
         return {}
@@ -1032,12 +1038,20 @@ def artist_ids_for_labels(label_keys, con=None):
             "JOIN releases r ON r.id = ra.release_id LEFT JOIN artists a ON a.id = ra.artist_id "
             "WHERE r.label_key IN ({}) AND ra.artist_id != 194 GROUP BY ra.artist_id",
             keys)
+        style_rows = _in_chunks(con,
+            "SELECT ra.artist_id, rs.style, COUNT(DISTINCT ra.release_id) FROM release_artists ra "
+            "JOIN releases r ON r.id = ra.release_id JOIN release_styles rs ON rs.release_id = r.id "
+            "WHERE r.label_key IN ({}) AND ra.artist_id != 194 GROUP BY ra.artist_id, rs.style",
+            keys)
     except sqlite3.OperationalError:
         return {}
     finally:
         if owns:
             con.close()
-    return {aid: {"name": name, "n": n} for aid, name, n in rows}
+    out = {aid: {"name": name, "n": n, "styles": {}} for aid, name, n in rows}
+    for aid, style, n in style_rows:
+        out.setdefault(aid, {"name": None, "n": 0, "styles": {}})["styles"][style] = n
+    return out
 
 
 def search_local(label_keys=None, styles=None, year_range=None, limit=5000):

@@ -1,23 +1,35 @@
 {% import "partials/_icons.html" as icons %}
 {% import "partials/_pager.html" as pager %}
+{% macro sort_th(field, label, default_dir='desc', cls='', style='') %}
+{% set active = (sort == field) %}
+{% set next_dir = 'asc' if (active and dir == 'desc') else ('desc' if active else default_dir) %}
+<th class="{{ cls }}"{% if style %} style="{{ style }}"{% endif %}>
+  <a href="#" class="sort-link{{ ' active' if active }}"
+     hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
+     hx-vals='{{ {"flt": flt, "sort": field, "dir": next_dir, "page": 1} | tojson }}'>{{ label }}{% if active %} {{ '▲' if dir == 'asc' else '▼' }}{% endif %}</a>
+</th>
+{% endmacro %}
 <div id="labels-table">
   <div class="field" style="max-width:320px">
     <label>Filtrer
     <input name="flt" value="{{ flt }}" placeholder="nom…" autocomplete="off"
            hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
-           hx-trigger="input changed delay:250ms" hx-include="this"></label>
+           hx-trigger="input changed delay:250ms" hx-include="this"
+           hx-vals='{{ {"sort": sort, "dir": dir, "page": 1} | tojson }}'></label>
   </div>
-  <p class="small muted">{{ total }} label{{ 's' if total > 1 }} au total{% if flt %} (filtre « {{ flt }} »){% endif %} · page {{ page }}/{{ pages }} · triés par affinité</p>
+  <p class="small muted">{{ total }} label{{ 's' if total > 1 }} au total{% if flt %} (filtre « {{ flt }} »){% endif %} · page {{ page }}/{{ pages }}
+    {% set sort_names = {"label": "nom", "aff": "affinité", "reco": "score reco", "owned": "possédés"} %}
+    · triés par {{ sort_names.get(sort, "affinité") }}{% if sort %} ({{ "croissant" if dir == "asc" else "décroissant" }}){% endif %}</p>
   {% if not rows %}
     <p class="muted small">Aucun label.</p>
   {% else %}
   <div class="tbl-wrap">
   <table class="tbl">
     <thead><tr>
-      <th>Label</th>
-      <th style="width:90px">Affinité</th>
-      <th class="num" style="width:60px">Reco</th>
-      <th class="num" style="width:70px">Possédés</th>
+      {{ sort_th("label", "Label", "asc") }}
+      {{ sort_th("aff", "Affinité", "desc", "", "width:90px") }}
+      {{ sort_th("reco", "Reco", "desc", "num", "width:60px") }}
+      {{ sort_th("owned", "Possédés", "desc", "num", "width:70px") }}
       <th></th></tr></thead>
     <tbody>
       {% for r in rows %}
@@ -38,13 +50,13 @@
           <button class="small" title="retirer de la base"
                   hx-post="/univers/labels/remove" hx-confirm="Retirer « {{ r.disp }} » de ta base ?"
                   hx-target="#labels-table" hx-swap="outerHTML"
-                  hx-vals='{"name": {{ r.disp|tojson }}, "flt": {{ flt|tojson }}, "page": "{{ page }}"}'>✕</button>
+                  hx-vals='{{ {"name": r.disp, "flt": flt, "page": page, "sort": sort, "dir": dir} | tojson }}'>✕</button>
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
-  {{ pager.pager("/univers/labels/table", "#labels-table", page, pages, {"flt": flt}) }}
+  {{ pager.pager("/univers/labels/table", "#labels-table", page, pages, {"flt": flt, "sort": sort, "dir": dir}) }}
   {% endif %}
 </div>

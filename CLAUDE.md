@@ -108,10 +108,14 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     Catalogue de vendeurs, ~1 h pour 141 vendeurs), puis poser `RADAR_SELLER_SCAN=1` sur
     le service `radar-worker` (compose, pas le `.env` VPS) pour activer le scan hebdo
     automatique.
-22. **TODO code identifié (non commencé)** : pagination table artistes, composant CSS
-    `.tbl` partagé (recopié dans 3 partials), multi-selects genre/style, `<label for>` non
-    reliés (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche,
-    UI de revue des artistes « approx », suppression par track/DJ dans Mes sets.
+22. **TODO code identifié** : multi-selects genre/style, `<label for>` non reliés
+    (~30 champs), libellés FR dans Réglages, liens `/disco` depuis reco/recherche, UI de
+    revue des artistes « approx », suppression par track/DJ dans Mes sets. Retirés de
+    cette liste (déjà faits, constaté le 10/09 en reprenant cette TODO) : pagination
+    table artistes (`univers_artists_table`, `_paginate`/`ARTISTS_PAGE_SIZE`,
+    `radar_web/app.py`) et composant CSS `.tbl` partagé — `review.html`/`learn.html`
+    étaient les 2 seuls partials avec table encore stylée en inline au lieu de la
+    classe `.tbl` (`app.css`), corrigé.
 23. **Piège — `step` HTML5 sans `min`** (`settings.html`) : le pas (`step="0.05"`) prend la
     valeur initiale du champ comme base si `min` est absent — un poids par défaut non
     multiple de ce pas (ex. `artist_score.corpus: 0.18`) rend le champ invalide dès qu'on

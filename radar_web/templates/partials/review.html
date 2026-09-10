@@ -3,14 +3,14 @@
   {% set n_nf = review.labels_not_found|length + review.artists_not_found|length %}
   {% if n_approx %}
   <p class="small">{{ n_approx }} résolution{{ 's' if n_approx > 1 }} deviné{{ 's' if n_approx > 1 }} (pas certain) à vérifier :</p>
-  <div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:13px">
+  <div class="tbl-wrap">
+  <table class="tbl">
     <tbody>
       {% for r in review.labels_approx %}
-      <tr style="border-top:1px solid var(--line)">
-        <td style="padding:6px 8px">{{ r.original }}</td>
-        <td style="padding:6px 8px" class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
-        <td style="padding:6px 8px;white-space:nowrap">
+      <tr>
+        <td>{{ r.original }}</td>
+        <td class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
+        <td style="white-space:nowrap">
           <button class="small" hx-post="/univers/review/label/confirm" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
           <button class="small" hx-post="/univers/review/label/reject" hx-target="#review-panel" hx-swap="outerHTML"
@@ -19,10 +19,10 @@
       </tr>
       {% endfor %}
       {% for r in review.artists_approx %}
-      <tr style="border-top:1px solid var(--line)">
-        <td style="padding:6px 8px">{{ r.original }} <span class="muted small">(artiste)</span></td>
-        <td style="padding:6px 8px" class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
-        <td style="padding:6px 8px;white-space:nowrap">
+      <tr>
+        <td>{{ r.original }} <span class="muted small">(artiste)</span></td>
+        <td class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
+        <td style="white-space:nowrap">
           <button class="small" hx-post="/univers/review/artist/confirm" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
           <button class="small" hx-post="/univers/review/artist/reject" hx-target="#review-panel" hx-swap="outerHTML"

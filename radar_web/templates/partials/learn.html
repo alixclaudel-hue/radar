@@ -4,17 +4,17 @@
   <b>{{ 'Poids score label' if kind=='label' else 'Poids score album' }}</b>
   <span class="small muted"> — {{ d.n }} retours · 👍 {{ d.up }} · 👎 {{ d.down }}</span>
   {% if d.n %}
-  <div style="overflow-x:auto;margin-top:8px"><table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr style="text-align:left;color:var(--soft)"><th style="padding:4px 8px">signal</th><th style="padding:4px 8px">moy. 👍</th><th style="padding:4px 8px">moy. 👎</th><th style="padding:4px 8px">écart</th>
-      {% if d.proposal %}<th style="padding:4px 8px">actuel</th><th style="padding:4px 8px">proposé</th>{% endif %}</tr></thead>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>signal</th><th>moy. 👍</th><th>moy. 👎</th><th>écart</th>
+      {% if d.proposal %}<th>actuel</th><th>proposé</th>{% endif %}</tr></thead>
     <tbody>
     {% for f in d.feat %}
     {% set p = (d.proposal or [])|selectattr('k','equalto',f.k)|first %}
-    <tr style="border-top:1px solid var(--line)">
-      <td style="padding:4px 8px">{{ f.k }}</td><td style="padding:4px 8px">{{ f.up }}</td>
-      <td style="padding:4px 8px">{{ f.down }}</td>
-      <td style="padding:4px 8px">{{ '%+.3f'|format(f.gap) }}</td>
-      {% if d.proposal %}<td style="padding:4px 8px">{{ p.cur }}</td><td style="padding:4px 8px"><b>{{ p.new }}</b> <span class="muted">({{ '%+.3f'|format(p.d) }})</span></td>{% endif %}
+    <tr>
+      <td>{{ f.k }}</td><td>{{ f.up }}</td>
+      <td>{{ f.down }}</td>
+      <td>{{ '%+.3f'|format(f.gap) }}</td>
+      {% if d.proposal %}<td>{{ p.cur }}</td><td><b>{{ p.new }}</b> <span class="muted">({{ '%+.3f'|format(p.d) }})</span></td>{% endif %}
     </tr>
     {% endfor %}
     </tbody></table></div>

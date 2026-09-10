@@ -341,7 +341,8 @@ def reco_radar_page(request: Request):
     return render(request, "pages/reco_radar.html", active="reco_radar",
                   playlist=playlist, n_playlist=len(playlist), max_tracks=RECOS_MAX_TRACKS,
                   recos_pending=len(load(_pu().recos_candidates, [])),
-                  last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"))
+                  last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"),
+                  in_cart=_cart_ids(), voted=_voted_map())
 
 
 @app.post("/reco-radar/delete")

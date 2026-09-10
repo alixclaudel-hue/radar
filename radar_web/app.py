@@ -34,8 +34,10 @@ def _pu():
     """Chemins de données de l'utilisateur de la requête courante."""
     return paths.user_paths(store.current_uid())
 
-# Doit rester aligné avec crate_jobs.RECOS_MAX_TRACKS (affichage seulement).
-RECOS_MAX_TRACKS = 5  # limite de test (10/09, retour utilisateur) — remonter une fois validé
+# Valeur de repli si cfg["scoring"]["recos"]["max_tracks"] est absente (config
+# jamais réglée) -- réglable désormais via le curseur de /settings, affichage
+# seulement (crate_jobs.job_publish_recos lit la même clé pour la vraie limite).
+RECOS_MAX_TRACKS = 5
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
@@ -461,8 +463,9 @@ def reco_radar_page(request: Request):
     jobs scan_recos/publish_recos), lue via l'API IFrame Player YouTube côté client :
     aucune playlist n'est créée sur un compte YouTube (cf. CLAUDE.md)."""
     playlist = load(_pu().recos_playlist, [])
+    max_tracks = int(_cfg().get("scoring", {}).get("recos", {}).get("max_tracks", RECOS_MAX_TRACKS))
     return render(request, "pages/reco_radar.html", active="reco_radar",
-                  playlist=playlist, n_playlist=len(playlist), max_tracks=RECOS_MAX_TRACKS,
+                  playlist=playlist, n_playlist=len(playlist), max_tracks=max_tracks,
                   recos_pending=len(load(_pu().recos_candidates, [])),
                   last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"),
                   in_cart=_cart_ids(), voted=_voted_map())
@@ -2287,7 +2290,8 @@ async def settings_save(request: Request):
     for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link")),
                       ("album", ("label", "artist", "style", "artist_max_vs_mean")),
                       ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link")),
-                      ("recos", ("min_score", "max_new_releases"))):
+                      ("recos", ("min_score", "max_new_releases",
+                                 "searches_per_run", "max_tracks"))):
         for key in keys:
             v = f.get(f"{grp}__{key}")
             if v not in (None, ""):

@@ -124,40 +124,56 @@ def request(path, params, keys, timeout=15):
 
 
 def search_video(query, keys, ttl=7 * 86400, artist=None, title=None, label=""):
-    """videoId de la MEILLEURE vidéo pour `query` parmi les 5 premiers résultats,
-    encore lisible ET dont les métadonnées (titre, chaîne) recoupent le mieux
-    `artist`/`title`/`label` (mise en cache). `artist`/`title`/`label` sont
-    optionnels (repli sur un simple recoupement contre les mots de `query`
-    quand absents, cf. /yt/first qui n'a qu'une chaîne de recherche déjà
-    composée). None si rien / pas de clé."""
+    """videoId de la MEILLEURE vidéo pour `query` parmi les 15 premiers résultats,
+    encore lisible ET dont les métadonnées (titre, chaîne, description) recoupent
+    le mieux `artist`/`title`/`label` (mise en cache). Enrichit la requête avec le
+    label si disponible (très discriminant en musique électronique) ; si aucun bon
+    match, retente sans le label (100 unités supplémentaires, seulement en cas
+    d'échec). Quand `artist`/`title` sont fournis et qu'aucun résultat ne dépasse
+    le seuil, renvoie None (une mauvaise vidéo est pire que pas de vidéo)."""
     q = " ".join((query or "").split())
     if not q or not keys:
         return None
-    ckey = "search:" + hashlib.sha1(f"{q}|{artist or ''}|{title or ''}|{label}".encode()).hexdigest()[:20]
+    label_s = (label or "").strip()
+    q_rich = f"{q} {label_s}" if label_s else q
+    ckey = "search:" + hashlib.sha1(
+        f"{q_rich}|{artist or ''}|{title or ''}|{label}".encode()
+    ).hexdigest()[:20]
     hit = cache_get(ckey, ttl)
     if hit is not None:
         return hit or None
-    d = request("/search", {"part": "id", "type": "video", "maxResults": 5, "q": q}, keys)
-    ids = [((it.get("id") or {}).get("videoId") or "") for it in d.get("items", [])]
-    ids = [i for i in ids if i]
-    vid = _best_match(ids, q, artist, title, label, keys) if ids else ""
+    vid = ""
+    seen = set()
+    for attempt in (q_rich, q) if label_s else (q,):
+        try:
+            d = request("/search", {"part": "id", "type": "video",
+                                     "maxResults": 15, "q": attempt}, keys)
+        except QuotaExhausted:
+            break
+        ids = [((it.get("id") or {}).get("videoId") or "")
+               for it in d.get("items", [])]
+        ids = [i for i in ids if i and i not in seen]
+        seen.update(ids)
+        if ids:
+            vid = _best_match(ids, attempt, artist, title, label, keys)
+            if vid:
+                break
     cache_put(ckey, vid)
     return vid or None
 
 
 def _best_match(ids, query, artist, title, label, keys):
-    """1er id lisible parmi `ids` (ordre de pertinence YouTube), en priorité celui
-    dont les métadonnées (part `snippet`) recoupent le mieux la piste demandée —
-    coût quota inchangé : `snippet` est demandé dans la MÊME requête `/videos`
-    que la vérification de lisibilité existante (part `status`), qui coûte 1
-    unité quel que soit le nombre de parts demandées (contrairement à `search`,
-    100 unités). Repli sur le 1er id encore lisible si rien ne dépasse le seuil
-    de recoupement (métadonnées pauvres côté vidéo — faux négatif préférable à
-    aucune vidéo du tout) ou si l'appel `/videos` échoue."""
+    """Meilleur id lisible parmi `ids` selon recoupement métadonnées (snippet :
+    titre, chaîne, description) vs piste demandée. Coût quota inchangé (1 unité
+    pour `/videos` quel que soit le nombre de parts). Quand `artist`/`title` sont
+    fournis et qu'aucun résultat ne dépasse MIN_MATCH_SCORE, renvoie "" (pas de
+    repli permissif : une mauvaise vidéo est pire que pas de vidéo). Sans données
+    structurées (/yt/first), repli sur le 1er résultat lisible."""
+    structured = bool((artist or "").strip() or (title or "").strip())
     try:
         d = request("/videos", {"part": "snippet,status", "id": ",".join(ids)}, keys)
     except (QuotaExhausted, RuntimeError):
-        return ids[0]
+        return "" if structured else ids[0]
     items = {it.get("id"): it for it in d.get("items", [])}
 
     def playable(i):
@@ -168,7 +184,9 @@ def _best_match(ids, query, artist, title, label, keys):
         return st.get("uploadStatus") == "processed" and st.get("privacyStatus") in ("public", "unlisted")
 
     want = _toks(query)
-    a_toks, t_toks, l_toks = _toks(artist or ""), _toks(title or ""), _toks(label or "")
+    a_toks = _toks(artist or "")
+    t_toks = _toks(title or "")
+    l_toks = _toks(label or "")
     best_id, best_score = None, 0.0
     for i in ids:
         if not playable(i):
@@ -176,24 +194,33 @@ def _best_match(ids, query, artist, title, label, keys):
         sn = items[i].get("snippet", {})
         vt_toks = _toks(sn.get("title", ""))
         ch_toks = _toks(sn.get("channelTitle", ""))
+        desc_toks = _toks((sn.get("description") or "")[:500])
         cand = vt_toks | ch_toks
+        cand_wide = cand | desc_toks
         if not want or not cand:
             continue
         score = len(want & cand) / len(want)
-        if l_toks and (l_toks & ch_toks):          # chaîne officielle du label suivi
-            score += 0.15
+        desc_extra = (want - cand) & desc_toks
+        if desc_extra:
+            score += 0.1 * len(desc_extra) / len(want)
+        if l_toks and (l_toks & ch_toks):
+            score += 0.2
+        if a_toks and len(a_toks & ch_toks) / len(a_toks) >= 0.5:
+            score += 0.1
         foreign = vt_toks - want
-        if foreign & _ALT_VERSION:                 # remix/live/cover... non demandé
+        if foreign & _ALT_VERSION:
             score *= 0.4
-        if t_toks and len(t_toks & vt_toks) / len(t_toks) < 0.4:
-            score *= 0.5                           # le cœur du titre doit être dans la vidéo
-        if a_toks and len(a_toks & cand) / len(a_toks) < 0.4:
-            score *= 0.5                           # l'artiste doit être dans le titre OU la chaîne
+        if t_toks and len(t_toks & (vt_toks | desc_toks)) / len(t_toks) < 0.4:
+            score *= 0.5
+        if a_toks and len(a_toks & cand_wide) / len(a_toks) < 0.4:
+            score *= 0.5
         if score > best_score:
             best_id, best_score = i, score
     if best_id is not None and best_score >= MIN_MATCH_SCORE:
         return best_id
-    for i in ids:                                  # repli : ordre de pertinence YouTube
-        if playable(i):
-            return i
-    return ids[0]
+    if not structured:
+        for i in ids:
+            if playable(i):
+                return i
+        return ids[0]
+    return ""

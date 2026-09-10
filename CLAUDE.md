@@ -151,3 +151,16 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     direct ; le graphe de co-crédits (`job_build_graph`, vraies collaborations sur une
     même sortie) n'est pas concerné — piste distincte si le souci persiste après
     reconstruction du graphe (`build_graph` mode `taste`, mensuel).
+
+## TODO — prochaine session
+
+- **Factoriser les jobs d'ingestion** (`crate_jobs.py`) : `job_ingest_youtube`,
+  `job_ingest_spotify`, `job_ingest_bandcamp` recopient ~30 lignes chacun
+  (dédoublonnage corpus, boucle `discogs_lookup`, flush tous les 15, `corpus_merge`,
+  `finish`). Gain estimé ~60 lignes. Reste du skill `factorize`
+  (`.claude/skills/factorize/SKILL.md`, frontmatter ajouté le 10/09, PR #109 + #110
+  mergées, le reste de `radar_web/` + `crate_jobs.py` déjà fait). Pas fait depuis
+  cette session cloud : ces jobs appellent l'API Discogs/YouTube/Spotify réelle,
+  donc pas exécutables/vérifiables sans réseau ni token — à reprendre depuis une
+  session avec accès réseau (VPS ou réseau Custom + tokens), en testant une vraie
+  ingestion avant de merger.

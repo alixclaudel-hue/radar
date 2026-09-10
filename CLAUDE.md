@@ -44,7 +44,9 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     `profile_labels` (hebdo), `build_graph` mode `taste` (mensuel) — plus de boutons
     dans Réglages, tout automatique.
 16. **Le "cerveau"** (`scoring.py`, classe `Ctx`) : `album_score`, `ascore`, `reco_rows` —
-    recalculé à chaque requête depuis `/data` (cache mtime).
+    recalculé à chaque requête depuis `/data` (cache mtime). Vue d'ensemble détaillée
+    (frontière incluse/exclue, toutes les méthodes, appelants, décisions de conception) :
+    `docs/app-overview-du-scoring-brain-de-radar.md` (généré 2026-09-10).
 17. **Jobs** (`crate_jobs.py`) : tâches longues en sous-processus, statuts dans
     `/data/jobs/*.status.json`, reprenables via `*.state.json`. Ne pas rebuild le
     conteneur pendant qu'un job tourne.

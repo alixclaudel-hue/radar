@@ -1,5 +1,8 @@
 {
   "app-overview": {
     "commit": "296b90931afcf93daac40819228a1fbf9a4cd55b"
+  },
+  "app-overview:du-scoring-brain-de-radar": {
+    "commit": "7c7ee8229a1b34e8c03042db975937ab6afd83ca"
   }
 }

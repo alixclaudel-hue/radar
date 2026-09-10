@@ -2216,7 +2216,9 @@ def job_publish_recos(job, params):
             job.tick(f"{c['artist']} — {c['title']} : déjà publiée par le passé")
             continue
         try:
-            vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys)
+            vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys,
+                                        artist=c.get("artist"), title=c.get("title"),
+                                        label=c.get("label") or "")
         except ytcache.QuotaExhausted:
             job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
             quota_hit = True

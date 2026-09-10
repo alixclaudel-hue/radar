@@ -158,13 +158,18 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
 
 ## TODO — prochaine session
 
-- **Factorisation jobs d'ingestion — code fait, ingestion réelle à vérifier** :
-  `job_ingest_youtube`/`spotify`/`bandcamp` (`crate_jobs.py`) partagent maintenant
-  `_ingest_lookup_loop` (dédoublonnage corpus, boucle `discogs_lookup`, flush tous
-  les 15, `corpus_merge`, `finish`) — 43 lignes en moins. Fait depuis cette session
-  cloud (pas de token Discogs/YouTube/Spotify ici) : `py_compile` OK + smoke tests
-  (chemins d'erreur sans identifiants, boucle testée avec `discogs_lookup` simulé —
-  dédoublonnage et skip du lookup si label déjà connu confirmés). **Reste à faire** :
-  tester une vraie ingestion (YouTube au moins) contre l'API réelle avant de
-  considérer le skill `factorize` clos sur `crate_jobs.py` — depuis une session
-  avec accès réseau + tokens (VPS ou réseau Custom + secrets).
+- **Ingestion réelle non testée depuis la factorisation** (PR #111, mergée sur `main`
+  le 10/09) : `job_ingest_youtube`/`spotify`/`bandcamp` (`crate_jobs.py`) partagent
+  maintenant `_ingest_lookup_loop` (dédoublonnage corpus, boucle `discogs_lookup`,
+  flush tous les 15, `corpus_merge`, `finish`) — 43 lignes en moins ; `review.html`/
+  `learn.html` réutilisent aussi la classe CSS `.tbl` (`app.css`) au lieu de styles
+  inline dupliqués. Vérifié depuis cette session cloud (pas de token Discogs/
+  YouTube/Spotify ici) : `py_compile` OK, smoke tests (chemins d'erreur sans
+  identifiants, boucle testée avec `discogs_lookup` simulé — dédoublonnage et skip
+  du lookup si label déjà connu confirmés), rendu Jinja des 2 templates. **Reste à
+  faire** : tester une vraie ingestion (YouTube au moins) contre l'API réelle avant
+  de considérer le skill `factorize` définitivement clos sur `crate_jobs.py` —
+  depuis une session avec accès réseau + tokens (VPS ou réseau Custom + secrets).
+  Reste aussi du point 22 (TODO code identifié) : multi-selects genre/style,
+  `<label for>` non reliés, libellés FR Réglages, liens `/disco` reco/recherche, UI
+  revue artistes « approx », suppression track/DJ dans Mes sets.

@@ -359,6 +359,17 @@ def reco_radar_delete_track(video_id: str = Form("")):
     return RedirectResponse("/reco-radar", status_code=303)
 
 
+@app.post("/reco-radar/clear-candidates")
+def reco_radar_clear_candidates():
+    """Vide UNIQUEMENT la file d'attente des candidats prêts à être recherchés sur
+    YouTube (recos_candidates.json) — sans toucher recos_seen.json (donc sans forcer
+    un rescan des sorties déjà vues), ni la playlist publiée, ni l'historique.
+    Distinct de « Forcer (tout rescanner) » qui vide aussi recos_seen.json et relance
+    un scan complet."""
+    save(_pu().recos_candidates, [])
+    return RedirectResponse("/reco-radar", status_code=303)
+
+
 def _apply_patte_form(f):
     c = _cfg()
     for k in ("token", "youtube_api_key", "spotify_client_id", "spotify_client_secret",

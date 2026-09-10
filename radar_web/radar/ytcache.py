@@ -7,6 +7,7 @@
 """
 import hashlib
 import os
+import re
 import time
 
 import requests
@@ -42,6 +43,15 @@ NEG_TTL = 6 * 3600
 
 def _toks(s):
     return toks(s, _FILLER)
+
+
+def _strip_parens(s):
+    """Retire les segments entre parenthèses/crochets (« (Original Mix) »,
+    « (feat. X) »…) : Discogs les met dans le titre de piste, mais ils
+    n'apparaissent presque jamais tels quels dans les métadonnées YouTube — ils
+    gonflaient `want` au dénominateur et faisaient chuter le score d'un match
+    par ailleurs parfait (diagnostic 2026-09-10)."""
+    return re.sub(r"[\(\[][^)\]]*[\)\]]", " ", s or "")
 
 
 class QuotaExhausted(RuntimeError):
@@ -164,7 +174,11 @@ def search_video_diag(query, keys, ttl=7 * 86400, artist=None, title=None, label
         ids = [i for i in ids if i and i not in seen]
         seen.update(ids)
         if ids:
-            vid, why = _best_match(ids, attempt, artist, title, label, keys)
+            # `q` (sans label) et non `attempt` : le label aide le classement
+            # YouTube mais ne doit pas peser dans le score (point F1, diagnostic
+            # 2026-09-10 — sinon un label de 3 mots suffit à diluer `want` sous
+            # le seuil pour un match par ailleurs parfait).
+            vid, why = _best_match(ids, q, artist, title, label, keys)
             if vid:
                 break
     cache_put(ckey, vid)
@@ -194,9 +208,15 @@ def _best_match(ids, query, artist, title, label, keys):
         st = it.get("status", {})
         return st.get("uploadStatus") == "processed" and st.get("privacyStatus") in ("public", "unlisted")
 
-    want = _toks(query)
+    # `want`/`t_toks` sur le titre "core" (sans mentions de version type
+    # « (Original Mix) ») : ces mentions n'apparaissent presque jamais telles
+    # quelles dans les métadonnées YouTube (point F3). `want_full` (avec)
+    # reste utilisé pour la détection remix/live/edit ci-dessous, pour ne pas
+    # pénaliser une vidéo qui porte justement la bonne mention de version.
+    want_full = _toks(query)
+    want = _toks(_strip_parens(query))
     a_toks = _toks(artist or "")
-    t_toks = _toks(title or "")
+    t_toks = _toks(_strip_parens(title or ""))
     l_toks = _toks(label or "")
     # -1.0 et non 0.0 : un résultat scoré 0 doit quand même être retenu comme
     # « meilleur », pour que la raison d'échec cite la vidéo vue au lieu de laisser
@@ -221,13 +241,20 @@ def _best_match(ids, query, artist, title, label, keys):
             score += 0.2
         if overlap(a_toks, ch_toks) >= 0.5:
             score += 0.1
-        foreign = vt_toks - want
+        foreign = vt_toks - want_full
         if foreign & _ALT_VERSION:
             score *= 0.4
+        # Les deux portes titre/artiste ne se cumulent plus (F4) : un ×0.5 puis
+        # un second ×0.5 valait un veto de fait (×0.25) même sur un match par
+        # ailleurs correct — un seul des deux signaux faibles suffit à motiver
+        # la pénalité, pas les deux ensemble.
+        gate_pens = []
         if t_toks and overlap(t_toks, vt_toks | desc_toks) < 0.4:
-            score *= 0.5
+            gate_pens.append(0.5)
         if a_toks and overlap(a_toks, cand_wide) < 0.4:
-            score *= 0.5
+            gate_pens.append(0.5)
+        if gate_pens:
+            score *= min(gate_pens)
         if score > best_score:
             best_id, best_score, best_title = i, score, sn.get("title", "")
     if best_id is not None and best_score >= MIN_MATCH_SCORE:

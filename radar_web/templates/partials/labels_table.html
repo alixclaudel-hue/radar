@@ -1,4 +1,5 @@
 {% import "partials/_icons.html" as icons %}
+{% import "partials/_pager.html" as pager %}
 <div id="labels-table">
   <div class="field" style="max-width:320px">
     <label>Filtrer
@@ -44,15 +45,6 @@
     </tbody>
   </table>
   </div>
-  <div class="row" style="justify-content:center;gap:8px;margin-top:8px">
-    {% if page > 1 %}
-    <button class="small" hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
-            hx-vals='{"flt": {{ flt|tojson }}, "page": "{{ page - 1 }}"}'>‹ précédent</button>
-    {% endif %}
-    {% if page < pages %}
-    <button class="small" hx-get="/univers/labels/table" hx-target="#labels-table" hx-swap="outerHTML"
-            hx-vals='{"flt": {{ flt|tojson }}, "page": "{{ page + 1 }}"}'>suivant ›</button>
-    {% endif %}
-  </div>
+  {{ pager.pager("/univers/labels/table", "#labels-table", page, pages, {"flt": flt}) }}
   {% endif %}
 </div>

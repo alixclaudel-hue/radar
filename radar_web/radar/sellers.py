@@ -12,11 +12,10 @@
 Aucun appel API ici : la lecture est instantanée. Le remplissage se fait par le
 job `scan_catalog` (crate_jobs.py).
 """
-import json
 import os
 
 from . import paths, sellers_seed
-from .store import load_cached, normalize_label
+from .store import load, load_cached, normalize_label, save
 
 _NOT_12IN = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD")
 
@@ -78,19 +77,11 @@ INV_DIR = os.path.join(paths.SHARED_DIR, "seller_inventory")
 
 
 def load_catalog():
-    try:
-        with open(CATALOG_PATH, encoding="utf-8") as f:
-            return json.load(f) or {}
-    except (OSError, ValueError):
-        return {}
+    return load(CATALOG_PATH, {}) or {}
 
 
 def save_catalog(d):
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = CATALOG_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, CATALOG_PATH)
+    save(CATALOG_PATH, d, indent=1)
 
 
 def ensure_seeded():
@@ -114,19 +105,11 @@ def inv_file(username):
 
 
 def load_inventory(username):
-    try:
-        with open(inv_file(username), encoding="utf-8") as f:
-            return json.load(f) or {}
-    except (OSError, ValueError):
-        return {}
+    return load(inv_file(username), {}) or {}
 
 
 def save_inventory(username, data):
-    os.makedirs(INV_DIR, exist_ok=True)
-    tmp = inv_file(username) + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-    os.replace(tmp, inv_file(username))
+    save(inv_file(username), data, indent=None)
 
 
 INDEX_PATH = os.path.join(paths.SHARED_DIR, "seller_index.json")
@@ -137,11 +120,7 @@ def load_index():
 
 
 def save_index(idx):
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = INDEX_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(idx, f)
-    os.replace(tmp, INDEX_PATH)
+    save(INDEX_PATH, idx, indent=None)
 
 
 def update_index(idx, username, inv):

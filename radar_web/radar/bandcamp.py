@@ -7,7 +7,6 @@ pointer dessus, sinon retomber sur la page de recherche.
 
 Cache partagé : un couple (artiste, titre) -> URL Bandcamp change rarement.
 """
-import json
 import os
 import re
 import time
@@ -15,7 +14,8 @@ from urllib.parse import quote_plus, urlparse
 
 import requests
 
-from . import paths
+from . import paths, store
+from .textmatch import overlap, toks
 
 CACHE_PATH = os.path.join(paths.SHARED_DIR, "bandcamp_cache.json")
 API = "https://bandcamp.com/api/bcsearch_public_api/1/autocomplete_elastic"
@@ -33,10 +33,6 @@ _ALT_VERSION = {"remix", "rework", "bootleg", "edit", "flip", "refix", "vip",
                 "reprise", "mashup", "mix", "version", "rmx", "dub"}
 # jetons courts / de numérotation à ignorer (mouvements, parties)
 _FILLER = {"pt", "part", "i", "ii", "iii", "iv", "v", "vi", "l", "ll", "lll", "a", "b"}
-
-
-def _toks(s):
-    return set(re.findall(r"[a-z0-9]+", (s or "").lower()))
 
 
 def _slug(s):
@@ -61,22 +57,6 @@ def _clean(s):
     return re.sub(r"\s+", " ", _NOISE.sub(" ", s or "")).strip()
 
 
-def _load():
-    try:
-        with open(CACHE_PATH, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, ValueError):
-        return {}
-
-
-def _save(d):
-    os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    tmp = CACHE_PATH + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(d, f)
-    os.replace(tmp, CACHE_PATH)
-
-
 def _api(text, kind):
     r = requests.post(API, timeout=12,
                       headers={"User-Agent": UA, "Content-Type": "application/json"},
@@ -99,16 +79,15 @@ def search(artist, title, kind="t", label=""):
         return None
 
     ck = f"{kind}|{artist.lower()}|{title.lower()}"
-    cache = _load()
+    cache = store.load(CACHE_PATH, {})
     hit = cache.get(ck)
     if hit is not None and time.time() - hit.get("ts", 0) < TTL:
         return hit.get("v")
 
     q = _clean(f"{artist} {title}") or f"{artist} {title}".strip()
-    want = _toks(f"{artist} {title}")
-    a_toks = _toks(artist)
-    l_toks = _toks(label) - {"records", "record", "recordings", "music", "ltd"}
-    t_toks = _toks(_clean(title)) - _FILLER
+    want = toks(f"{artist} {title}")
+    l_toks = toks(label, {"records", "record", "recordings", "music", "ltd"})
+    t_toks = toks(_clean(title), _FILLER)
     try:
         results = _api(q, kind)
     except (requests.RequestException, ValueError):
@@ -118,13 +97,13 @@ def search(artist, title, kind="t", label=""):
     for r in results:
         if r.get("type") != kind:
             continue
-        band_toks = _toks(r.get("band_name", ""))
-        name_toks = _toks(r.get("name", ""))
-        album_toks = _toks(r.get("album_name", ""))
+        band_toks = toks(r.get("band_name", ""))
+        name_toks = toks(r.get("name", ""))
+        album_toks = toks(r.get("album_name", ""))
         cand = band_toks | name_toks
         if not cand or not want:
             continue
-        sc = len(want & cand) / len(want)
+        sc = overlap(want, cand)
         url = r.get("item_url_path") or r.get("item_url_root") or ""
         # Compte de confiance : celui de l'artiste ou de son label, ET dont le
         # sous-domaine bandcamp.com le confirme. Sinon (compte tiers, ou compte
@@ -139,7 +118,7 @@ def search(artist, title, kind="t", label=""):
         if foreign & _ALT_VERSION or len(foreign) >= 2:
             sc *= 0.5
         # le cœur du titre doit être présent
-        if t_toks and len(t_toks & name_toks) / len(t_toks) < 0.5:
+        if t_toks and overlap(t_toks, name_toks) < 0.5:
             sc *= 0.5
         if l_toks and (l_toks & album_toks):
             sc += 0.1
@@ -154,5 +133,5 @@ def search(artist, title, kind="t", label=""):
     if len(cache) > 5000:
         cache = {}
     cache[ck] = {"ts": time.time(), "v": out}
-    _save(cache)
+    store.save(CACHE_PATH, cache, indent=None)
     return out

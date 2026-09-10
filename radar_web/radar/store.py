@@ -52,11 +52,18 @@ def load_cached(path, default):
     return data
 
 
-def save(path, data):
+def save(path, data, indent=2):
+    """Écriture atomique. `indent=None` pour les gros caches partagés, dont
+    l'indentation gonflerait inutilement le disque du VPS.
+
+    Le fichier temporaire passe par `tempfile.mkstemp` (nom unique) et non par un
+    `<path>.tmp` fixe : web et worker écrivent les mêmes caches partagés, deux
+    écritures simultanées sur un nom fixe se corrompraient mutuellement."""
     d = os.path.dirname(path) or "."
+    os.makedirs(d, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
     with os.fdopen(fd, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(data, f, ensure_ascii=False, indent=indent)
     os.replace(tmp, path)
 
 

@@ -222,7 +222,6 @@ class Ctx:
 
     def djset_rows(self):
         """Lignes de corpus djset, notées (score album) et regroupées par DJ puis vidéo."""
-        ridx = self.reco_index
         by_dj = {}
         for r in self.corpus:
             if r.get("source") != "djset":

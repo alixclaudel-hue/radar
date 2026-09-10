@@ -1,4 +1,5 @@
 {% import "partials/_icons.html" as icons %}
+{% import "partials/_pager.html" as pager %}
 <div id="artists-table">
   <p class="small muted">{{ n }} artiste{{ 's' if n > 1 }} au total{% if flt %} (filtre « {{ flt }} »){% endif %} · page {{ page }}/{{ pages }} · triés par note. Change la catégorie d'un clic.</p>
   {% if not rows %}
@@ -32,15 +33,7 @@
     </tbody>
   </table>
   </div>
-  <div class="row" style="justify-content:center;gap:8px;margin-top:8px">
-    {% if page > 1 %}
-    <button class="small" hx-get="/univers/artists/table" hx-target="#artists-table" hx-swap="outerHTML"
-            hx-vals='{"flt": {{ flt|tojson }}, "hide": {{ hide|tojson }}, "page": "{{ page - 1 }}"}'>‹ précédent</button>
-    {% endif %}
-    {% if page < pages %}
-    <button class="small" hx-get="/univers/artists/table" hx-target="#artists-table" hx-swap="outerHTML"
-            hx-vals='{"flt": {{ flt|tojson }}, "hide": {{ hide|tojson }}, "page": "{{ page + 1 }}"}'>suivant ›</button>
-    {% endif %}
-  </div>
+  {{ pager.pager("/univers/artists/table", "#artists-table", page, pages,
+                 {"flt": flt, "hide": hide}) }}
   {% endif %}
 </div>

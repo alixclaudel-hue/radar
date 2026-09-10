@@ -1,6 +1,5 @@
 """Boucle de feedback 👍/👎 + ajustement des poids (régression logistique maison).
 Écrit dans reco_feedback.json — même format que l'appli Streamlit."""
-import hashlib
 import math
 from datetime import datetime
 

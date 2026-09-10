@@ -86,11 +86,14 @@ RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
 RECOS_MAX_TRACKS = 5  # limite de test (10/09, retour utilisateur) — remonter une fois validé
-RECOS_DAILY_SEARCH_BUDGET = 90
-# marge sous le quota gratuit YouTube Data API (10 000 unités/jour ÷ 100 unités par
-# recherche = 100) : évite que scan_recos empile plus de candidats que publish_recos
-# ne peut en chercher sur YouTube en une journée (retour utilisateur du 09/09 : file à
-# 417 candidats, quota épuisé dès la 1re publication).
+RECOS_DAILY_SEARCH_BUDGET = 45
+# marge sous le quota gratuit YouTube Data API (10 000 unités/jour) : évite que
+# scan_recos empile plus de candidats que publish_recos ne peut en chercher sur
+# YouTube en une journée (retour utilisateur du 09/09 : file à 417 candidats, quota
+# épuisé dès la 1re publication). 90 supposait 100 unités par candidat, or une piste
+# qui ne trouve rien en coûte 202 (recherche avec label, puis sans, plus /videos) :
+# la file entière brûlait le quota du jour et les candidats suivants tombaient en
+# « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
 RECOS_MAX_ADD_PER_RUN = 5
 # limite de test (10/09) : réduit la conso quota pendant la mise au point de RECOS
 # RADAR — à remonter/retirer une fois les tests terminés.
@@ -2026,6 +2029,16 @@ def _track_credit_artist(t, fallback):
     return ", ".join(arts) if arts else fallback
 
 
+def _strip_discogs_suffix(name):
+    """Retire les suffixes de désambiguïsation Discogs ("iO (12)", "The Vision (16)",
+    "Rhythm (2)") d'un crédit, artiste par artiste. Ces numéros n'apparaissent dans
+    aucune métadonnée YouTube : ils polluent la requête et pénalisent le scoring de
+    ytcache._best_match. Appliqué à la recherche seulement — l'identité de piste
+    stockée pour le dédoublonnage garde le nom Discogs d'origine."""
+    parts = [re.sub(r"\s*\(\d+\)\s*$", "", p).strip() for p in (name or "").split(",")]
+    return ", ".join(p for p in parts if p)
+
+
 def job_scan_recos(job, params):
     """Candidats pour la playlist RECOS RADAR (Fonctionnalité 1, lot 1) : liste les
     sorties du référentiel Discogs local (radar/discogs_dump.py) sur les labels suivis
@@ -2189,17 +2202,19 @@ def job_publish_recos(job, params):
         if ck in history_keys:
             job.tick(f"{c['artist']} — {c['title']} : déjà publiée par le passé")
             continue
+        art_q = _strip_discogs_suffix(c.get("artist"))
+        label_q = _strip_discogs_suffix(c.get("label") or "")
         try:
-            vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys,
-                                        artist=c.get("artist"), title=c.get("title"),
-                                        label=c.get("label") or "")
+            vid, why = ytcache.search_video_diag(
+                f"{art_q} {c['title']}", keys,
+                artist=art_q, title=c.get("title"), label=label_q)
         except ytcache.QuotaExhausted:
             job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
             quota_hit = True
             remaining.append(c)
             continue
         if not vid:
-            job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée")
+            job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why})")
             continue
         if vid in history:
             job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")

@@ -33,6 +33,11 @@ _ALT_VERSION = {"remix", "rework", "bootleg", "edit", "flip", "refix", "vip",
                 "reaction", "review", "lyrics", "karaoke", "instrumental",
                 "acapella", "sped", "slowed", "nightcore", "8d", "loop"}
 MIN_MATCH_SCORE = 0.5
+# Un échec n'est pas une vérité stable : il peut venir d'un quota épuisé, d'une
+# indexation YouTube encore incomplète ou d'un scoring trop strict. Le mettre en
+# cache aussi longtemps qu'un succès gèle la piste (incident du 2026-09-10 : une
+# file entière rendue « aucune vidéo trouvée » pour 7 jours).
+NEG_TTL = 6 * 3600
 
 
 def _toks(s):
@@ -53,10 +58,18 @@ def youtube_keys(cfg):
     return out
 
 
-def cache_get(key, max_age):
+def cache_get(key, max_age, empty_max_age=None):
+    """Valeur en cache si elle est encore fraîche, sinon None.
+
+    `empty_max_age` donne un âge maximal plus court aux valeurs vides (échec de
+    recherche), qui ne valent pas d'être gardées aussi longtemps qu'un succès."""
     e = store.load(CACHE_PATH, {}).get(key)
-    if e and (time.time() - e.get("ts", 0)) < max_age:
-        return e.get("v")
+    if not e:
+        return None
+    v = e.get("v")
+    limit = max_age if v or empty_max_age is None else empty_max_age
+    if (time.time() - e.get("ts", 0)) < limit:
+        return v
     return None
 
 
@@ -107,56 +120,71 @@ def request(path, params, keys, timeout=15):
 
 
 def search_video(query, keys, ttl=7 * 86400, artist=None, title=None, label=""):
-    """videoId de la MEILLEURE vidéo pour `query` parmi les 15 premiers résultats,
-    encore lisible ET dont les métadonnées (titre, chaîne, description) recoupent
-    le mieux `artist`/`title`/`label` (mise en cache). Enrichit la requête avec le
-    label si disponible (très discriminant en musique électronique) ; si aucun bon
-    match, retente sans le label (100 unités supplémentaires, seulement en cas
-    d'échec). Quand `artist`/`title` sont fournis et qu'aucun résultat ne dépasse
-    le seuil, renvoie None (une mauvaise vidéo est pire que pas de vidéo)."""
+    """videoId de la meilleure vidéo pour `query`, ou None. Voir search_video_diag."""
+    return search_video_diag(query, keys, ttl, artist, title, label)[0]
+
+
+def search_video_diag(query, keys, ttl=7 * 86400, artist=None, title=None, label=""):
+    """(videoId | None, raison d'échec) pour `query` parmi les 15 premiers résultats,
+    en ne gardant qu'une vidéo lisible dont les métadonnées (titre, chaîne,
+    description) recoupent le mieux `artist`/`title`/`label` (mise en cache).
+    Enrichit la requête avec le label si disponible (très discriminant en musique
+    électronique) ; si aucun bon match, retente sans le label (100 unités
+    supplémentaires, seulement en cas d'échec). Quand `artist`/`title` sont fournis
+    et qu'aucun résultat ne dépasse le seuil, renvoie None (une mauvaise vidéo est
+    pire que pas de vidéo).
+
+    La raison distingue « rien trouvé » de « seuil non atteint » : sans elle, un
+    journal RECOS RADAR ne dit pas si la piste est introuvable ou si le scoring est
+    trop strict (incident du 2026-09-10).
+
+    QuotaExhausted remonte à l'appelant au lieu d'être avalée : le quota épuisé se
+    lisait sinon « aucune vidéo trouvée », la file de candidats se vidait pour rien
+    et l'échec était mis en cache comme un vrai résultat négatif."""
     q = " ".join((query or "").split())
-    if not q or not keys:
-        return None
+    if not q:
+        return None, "requête vide"
+    if not keys:
+        return None, "aucune clé YouTube"
     label_s = (label or "").strip()
     q_rich = f"{q} {label_s}" if label_s else q
     ckey = "search:" + hashlib.sha1(
         f"{q_rich}|{artist or ''}|{title or ''}|{label}".encode()
     ).hexdigest()[:20]
-    hit = cache_get(ckey, ttl)
+    hit = cache_get(ckey, ttl, NEG_TTL)
     if hit is not None:
-        return hit or None
-    vid = ""
+        return (hit or None), ("" if hit else "aucun match, en cache")
+    vid, why = "", "aucun résultat"
     seen = set()
     for attempt in (q_rich, q) if label_s else (q,):
-        try:
-            d = request("/search", {"part": "id", "type": "video",
-                                     "maxResults": 15, "q": attempt}, keys)
-        except QuotaExhausted:
-            break
+        d = request("/search", {"part": "id", "type": "video",
+                                "maxResults": 15, "q": attempt}, keys)
         ids = [((it.get("id") or {}).get("videoId") or "")
                for it in d.get("items", [])]
         ids = [i for i in ids if i and i not in seen]
         seen.update(ids)
         if ids:
-            vid = _best_match(ids, attempt, artist, title, label, keys)
+            vid, why = _best_match(ids, attempt, artist, title, label, keys)
             if vid:
                 break
     cache_put(ckey, vid)
-    return vid or None
+    return (vid or None), ("" if vid else why)
 
 
 def _best_match(ids, query, artist, title, label, keys):
-    """Meilleur id lisible parmi `ids` selon recoupement métadonnées (snippet :
-    titre, chaîne, description) vs piste demandée. Coût quota inchangé (1 unité
-    pour `/videos` quel que soit le nombre de parts). Quand `artist`/`title` sont
-    fournis et qu'aucun résultat ne dépasse MIN_MATCH_SCORE, renvoie "" (pas de
-    repli permissif : une mauvaise vidéo est pire que pas de vidéo). Sans données
-    structurées (/yt/first), repli sur le 1er résultat lisible."""
+    """(meilleur id lisible, raison d'échec) parmi `ids`, selon recoupement des
+    métadonnées (snippet : titre, chaîne, description) avec la piste demandée. Coût
+    quota inchangé (1 unité pour `/videos` quel que soit le nombre de parts). Quand
+    `artist`/`title` sont fournis et qu'aucun résultat ne dépasse MIN_MATCH_SCORE,
+    renvoie "" (pas de repli permissif : une mauvaise vidéo est pire que pas de
+    vidéo). Sans données structurées (/yt/first), repli sur le 1er résultat lisible."""
     structured = bool((artist or "").strip() or (title or "").strip())
     try:
         d = request("/videos", {"part": "snippet,status", "id": ",".join(ids)}, keys)
-    except (QuotaExhausted, RuntimeError):
-        return "" if structured else ids[0]
+    except QuotaExhausted:
+        raise
+    except RuntimeError:
+        return ("" if structured else ids[0]), "erreur API /videos"
     items = {it.get("id"): it for it in d.get("items", [])}
 
     def playable(i):
@@ -170,7 +198,10 @@ def _best_match(ids, query, artist, title, label, keys):
     a_toks = _toks(artist or "")
     t_toks = _toks(title or "")
     l_toks = _toks(label or "")
-    best_id, best_score = None, 0.0
+    # -1.0 et non 0.0 : un résultat scoré 0 doit quand même être retenu comme
+    # « meilleur », pour que la raison d'échec cite la vidéo vue au lieu de laisser
+    # croire qu'aucun résultat n'était comparable.
+    best_id, best_score, best_title = None, -1.0, ""
     for i in ids:
         if not playable(i):
             continue
@@ -198,12 +229,14 @@ def _best_match(ids, query, artist, title, label, keys):
         if a_toks and overlap(a_toks, cand_wide) < 0.4:
             score *= 0.5
         if score > best_score:
-            best_id, best_score = i, score
+            best_id, best_score, best_title = i, score, sn.get("title", "")
     if best_id is not None and best_score >= MIN_MATCH_SCORE:
-        return best_id
+        return best_id, ""
     if not structured:
         for i in ids:
             if playable(i):
-                return i
-        return ids[0]
-    return ""
+                return i, ""
+        return ids[0], ""
+    if best_id is None:
+        return "", f"{len(ids)} résultat(s), aucun lisible"
+    return "", f"meilleur score {best_score:.2f} < {MIN_MATCH_SCORE} : « {best_title} »"

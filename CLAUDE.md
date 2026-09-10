@@ -164,15 +164,52 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     n'est pas un vrai nom d'artiste. Combiné au seuil `MIN_MATCH_SCORE = 0.5`, ça
     rejetait quasi toutes les pistes de compilation ("aucune vidéo trouvée").
     Diagnostiqué via le journal `publish_recos` fourni par l'utilisateur (90/91
-    candidats "Various" en échec, playlist bloquée à 1/5) — pas un problème de
-    quota YouTube (journalier, pas hebdomadaire comme initialement suspecté par
-    l'utilisateur — RAS de ce côté). Corrigé : `_track_credit_artist()`
+    candidats "Various" en échec, playlist bloquée à 1/5). Le quota YouTube est
+    journalier, pas hebdomadaire comme initialement suspecté par l'utilisateur —
+    mais l'écarter était prématuré : le journal ne pouvait pas le montrer (cf.
+    point 28, écrit après le run du 10/09 qui a échoué à nouveau, cette fois avec
+    les vrais noms d'artistes). Corrigé : `_track_credit_artist()`
     (`crate_jobs.py`) utilise le crédit réel par piste que Discogs fournit déjà
     (`tracklist[].artists`, rempli précisément pour ce cas), repli sur l'artiste de
     la sortie si absent (sorties normales, comportement inchangé). **File
     d'attente déjà scannée avant ce correctif à régénérer** : cliquer « 🗑️🔄
     Forcer (tout rescanner) » sur `/reco-radar` une fois le déploiement fait, sinon
     les candidats gardent l'ancien "Various" figé dans `recos_candidates.json`.
+28. **Piège — échec de recherche YouTube indistinguable d'un quota épuisé**
+    (`ytcache.search_video`, corrigé le 10/09) : `search_video` avalait
+    `QuotaExhausted` (`except QuotaExhausted: break`), puis mettait le résultat vide
+    en cache 7 jours comme un vrai « pas de match ». Conséquences vues en réel
+    (journal `publish_recos` du 10/09, 92 candidats, 0 ajout) : le quota épuisé
+    s'affichait « aucune vidéo trouvée » pour chaque piste, la file de candidats se
+    vidait entièrement pour rien (`remaining` vide, 0 en attente), et chaque piste
+    restait gelée 7 jours même une fois le quota revenu. Le `except
+    ytcache.QuotaExhausted` de `job_publish_recos` était donc du code mort. Trois
+    correctifs : (a) `QuotaExhausted` remonte à l'appelant (dans `search_video` comme
+    dans `_best_match`) — la file est préservée et le job dit « Quota YouTube
+    épuisé » ; (b) `NEG_TTL = 6 h` pour les résultats vides (`cache_get` accepte un
+    `empty_max_age` distinct), les succès gardent 7 jours ; (c) nouvelle
+    `search_video_diag()` qui renvoie `(video_id, raison)` — `job_publish_recos`
+    journalise la raison (« aucun résultat », « meilleur score 0.32 < 0.5 : <titre
+    de la vidéo vue> », « erreur API /videos »), sans quoi aucun journal ne permet
+    de trancher entre quota, indexation et scoring trop strict. `search_video` reste
+    l'API simple (video_id ou None) pour `/yt/first`.
+    Corollaire quota : `RECOS_DAILY_SEARCH_BUDGET` passe de 90 à 45 — une piste qui
+    ne trouve rien coûte 202 unités (recherche avec label + sans label + `/videos`),
+    pas 100, donc 90 candidats en échec brûlaient ~18 000 unités pour un quota
+    gratuit de 10 000/jour. Réserve : c'est l'explication la plus cohérente avec le
+    journal (échec de TOUTES les recherches réseau alors que les entrées déjà en
+    cache répondaient), **pas une preuve** — le journal d'avant le correctif ne
+    disait pas la cause. Le prochain run tranchera.
+29. **Piège — suffixes de désambiguïsation Discogs dans la requête YouTube**
+    (`_strip_discogs_suffix`, `crate_jobs.py`) : Discogs numérote les homonymes
+    (« iO (12) », « The Vision (16) », « Rhythm (2) »). Ces numéros partaient tels
+    quels dans la requête YouTube et dans les jetons de scoring, où ils n'apparaissent
+    dans aucune métadonnée vidéo. Retirés artiste par artiste (le crédit peut être
+    une liste : « Eliza Rose (4), The Trip (8) ») pour la recherche seulement —
+    l'`artist` stocké dans `recos_candidates.json`/`recos_history.json` garde le nom
+    Discogs d'origine, sinon le dédoublonnage par identité de piste (point 19)
+    changerait de clé et laisserait revenir des pistes déjà publiées.
+
 
 ## TODO — prochaine session
 
@@ -181,6 +218,14 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
   `/reco-radar`, relancer « ▶ Alimenter la playlist », confirmer que les pistes de
   compilation (ex. Aquasonic Vol. 1, Defected Classics) trouvent enfin une vidéo au
   lieu de "aucune vidéo trouvée".
+- **Vérifier le journal `publish_recos` après le prochain déploiement** (points 28-29) :
+  relancer « ▶ Alimenter la playlist » et lire la raison désormais affichée à côté de
+  « aucune vidéo trouvée ». Si c'est « Quota YouTube (recherche) épuisé », attendre la
+  remise à zéro du quota (minuit heure Pacifique) et relancer — la file est maintenant
+  conservée. Si c'est « meilleur score X < 0.5 : <titre> » sur des pistes évidentes
+  (Kerri Chandler — Coro, Midland — Final Credits), le seuil `MIN_MATCH_SCORE` ou le
+  cumul des pénalités de `_best_match` est trop strict : c'est alors la piste à
+  travailler, pas le quota.
 - **Ingestion réelle non testée depuis la factorisation** (PR #111, mergée sur `main`
   le 10/09) : `job_ingest_youtube`/`spotify`/`bandcamp` (`crate_jobs.py`) partagent
   maintenant `_ingest_lookup_loop` (dédoublonnage corpus, boucle `discogs_lookup`,

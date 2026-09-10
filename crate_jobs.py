@@ -96,6 +96,33 @@ RECOS_MAX_ADD_PER_RUN = 5
 # limite de test (10/09) : réduit la conso quota pendant la mise au point de RECOS
 # RADAR — à remonter/retirer une fois les tests terminés.
 
+
+def _recos_history_load():
+    """{video_id: {"video_id","artist","title",...}} depuis recos_history.json —
+    fichier permanent (jamais purgé, même quand une piste sort de la playlist par
+    FIFO ou suppression manuelle) qui sert de mémoire de TOUT ce qui a déjà été
+    ajouté un jour, pas seulement ce qui y est encore (retour utilisateur
+    2026-09-10). Anciennes entrées (avant ce correctif) : simples chaînes
+    video_id sans artiste/titre, gardées telles quelles (dédoublonnage par
+    vidéo seulement pour elles, pas par identité de piste)."""
+    out = {}
+    for h in load_json(RECOS_HISTORY_PATH, []):
+        if isinstance(h, str):
+            out[h] = {"video_id": h, "artist": None, "title": None}
+        elif isinstance(h, dict) and h.get("video_id"):
+            out[h["video_id"]] = h
+    return out
+
+
+def _recos_history_track_keys(history):
+    """{(style_key(artist), style_key(title))} — identité de piste, pour repérer
+    une piste déjà publiée par le passé même si un futur match YouTube tombe sur
+    un video_id différent (ré-upload, autre chaîne) que le dédoublonnage par
+    video_id seul laisserait passer."""
+    return {(style_key(h["artist"]), style_key(h["title"]))
+            for h in history.values() if h.get("artist") and h.get("title")}
+
+
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
 YOUTUBE_API = "https://www.googleapis.com/youtube/v3"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
@@ -2096,14 +2123,16 @@ def job_scan_recos(job, params):
         return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"
                            f"{RECOS_DAILY_SEARCH_BUDGET} recherches/jour) — scan sauté, "
                            "laisse la publication rattraper le retard.")
-    # inclut aussi la playlist déjà publiée, pas seulement la file d'attente courante :
-    # sans ça, un rescan forcé (seen/candidats vidés, cf. `force`) pouvait remettre en
-    # file une piste déjà en train de jouer si YouTube renvoyait un video_id différent
-    # à la re-recherche (recos_history.json ne bloque que le MÊME video_id, cf.
-    # job_publish_recos) — retour utilisateur 2026-09-10.
+    # inclut aussi TOUT ce qui a déjà été publié un jour (recos_history.json,
+    # jamais purgé), pas seulement la playlist ou la file d'attente courantes :
+    # une piste retirée depuis (FIFO ou suppression manuelle) ne doit pas
+    # revenir simplement parce qu'elle n'y est plus à l'instant T — retour
+    # utilisateur 2026-09-10. La playlist courante reste incluse en plus (une
+    # piste tout juste publiée, donc pas encore "vue" par le prochain scan).
     playlist = load_json(RECOS_PLAYLIST_PATH, [])
-    known_tracks = {(style_key(c.get("artist")), style_key(c.get("title")))
-                    for c in candidates + playlist}
+    known_tracks = ({(style_key(c.get("artist")), style_key(c.get("title")))
+                     for c in candidates + playlist}
+                    | _recos_history_track_keys(_recos_history_load()))
     now = datetime.now().isoformat(timespec="seconds")
     n_tracks = 0
     cap_hit = False
@@ -2170,13 +2199,21 @@ def job_publish_recos(job, params):
     playlist = load_json(RECOS_PLAYLIST_PATH, [])
     cfg = cfg_load()
     keys = ytcache.youtube_keys(cfg)
-    history = set(load_json(RECOS_HISTORY_PATH, []))
+    # historique permanent (jamais purgé) : {video_id: entrée} + identité de piste
+    # (artiste/titre) déjà publiée par le passé, même si elle n'est plus dans la
+    # playlist (FIFO ou suppression manuelle) — retour utilisateur 2026-09-10.
+    history = _recos_history_load()
+    history_keys = _recos_history_track_keys(history)
     job.st["total"] = len(candidates)
     remaining, added, quota_hit, cap_hit = [], 0, False, False
     now = datetime.now().isoformat(timespec="seconds")
     for c in candidates:
         if job.stopped() or quota_hit or cap_hit:
             remaining.append(c)
+            continue
+        ck = (style_key(c.get("artist")), style_key(c.get("title")))
+        if ck in history_keys:
+            job.tick(f"{c['artist']} — {c['title']} : déjà publiée par le passé")
             continue
         try:
             vid = ytcache.search_video(f"{c['artist']} {c['title']}", keys)
@@ -2192,7 +2229,8 @@ def job_publish_recos(job, params):
             job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")
             continue
         playlist.append({**c, "video_id": vid, "published_at": now})
-        history.add(vid)
+        history[vid] = {"video_id": vid, "artist": c.get("artist"), "title": c.get("title")}
+        history_keys.add(ck)
         added += 1
         job.tick(f"{c['artist']} — {c['title']} : ajoutée")
         if added >= RECOS_MAX_ADD_PER_RUN:
@@ -2201,9 +2239,9 @@ def job_publish_recos(job, params):
             dropped = playlist.pop(0)
             job.tick(f"{dropped.get('artist')} — {dropped.get('title')} : retirée "
                      f"(plafond {RECOS_MAX_TRACKS})")
-        save_json(RECOS_HISTORY_PATH, sorted(history))
+        save_json(RECOS_HISTORY_PATH, list(history.values()))
         save_json(RECOS_PLAYLIST_PATH, playlist)
-    save_json(RECOS_HISTORY_PATH, sorted(history))
+    save_json(RECOS_HISTORY_PATH, list(history.values()))
     save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_CANDIDATES_PATH, remaining)
     note = f" — limite de test ({RECOS_MAX_ADD_PER_RUN} ajouts) atteinte." if cap_hit else ""

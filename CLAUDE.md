@@ -78,10 +78,18 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     fois par jour (donc au mieux 5 pistes/jour même file d'attente pleine, cf.
     `RECOS_MAX_ADD_PER_RUN`) — vérifie maintenant `recos_candidates.json` toutes les
     heures, lance `publish_recos` (draine la file) si elle n'est pas vide, `scan_recos`
-    (qui rechaîne lui-même `publish_recos`) seulement si elle l'est. Dédoublonnage
-    étendu à la playlist déjà publiée (`job_scan_recos`, pas seulement la file), pour
-    qu'un rescan (forcé ou non) ne remette jamais en file une piste déjà en lecture.
-    Wantlist RADAR (2ᵉ feature du même chantier) : pas commencée.
+    (qui rechaîne lui-même `publish_recos`) seulement si elle l'est. Dédoublonnage par
+    IDENTITÉ DE PISTE (artiste+titre canonique, pas juste le `video_id` de la 1re
+    recherche) contre TOUT ce qui a déjà été publié un jour — `recos_history.json`
+    (jamais purgé) enrichi avec artiste/titre par entrée, pas seulement le `video_id`
+    (`_recos_history_load`/`_recos_history_track_keys`) — donc une piste sortie de la
+    playlist depuis (FIFO ou suppression manuelle) ne peut plus revenir, même si un
+    nouveau match YouTube tombe sur un `video_id` différent (retour utilisateur
+    2026-09-10 : « pas forcément dans la playlist à l'instant, elle a pu être
+    supprimée »). Anciennes entrées d'historique (avant ce correctif, simples chaînes
+    `video_id`) restent dédoublonnées par vidéo seulement, pas par identité de piste
+    (pas d'artiste/titre à en tirer). Wantlist RADAR (2ᵉ feature du même chantier) :
+    pas commencée.
 20. **Chantier multi-utilisateur** (détail complet → `docs/architecture.md`) : étapes 0-7
     faites et déployées (dossiers par utilisateur, comptes, file de jobs, cache YouTube
     partagé, backups chiffrés, Streamlit retiré). Bloqué sur l'étape 4 (HTTPS + domaine —

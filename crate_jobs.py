@@ -2211,10 +2211,7 @@ def job_publish_recos(job, params):
             continue
         art_q = _strip_discogs_suffix(c.get("artist"))
         label_q = _strip_discogs_suffix(c.get("label") or "")
-<<<<<<< HEAD
         searched += 1
-=======
->>>>>>> origin/main
         try:
             vid, why = ytcache.search_video_diag(
                 f"{art_q} {c['title']}", keys,

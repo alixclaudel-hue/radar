@@ -2096,7 +2096,14 @@ def job_scan_recos(job, params):
         return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"
                            f"{RECOS_DAILY_SEARCH_BUDGET} recherches/jour) — scan sauté, "
                            "laisse la publication rattraper le retard.")
-    known_tracks = {(style_key(c.get("artist")), style_key(c.get("title"))) for c in candidates}
+    # inclut aussi la playlist déjà publiée, pas seulement la file d'attente courante :
+    # sans ça, un rescan forcé (seen/candidats vidés, cf. `force`) pouvait remettre en
+    # file une piste déjà en train de jouer si YouTube renvoyait un video_id différent
+    # à la re-recherche (recos_history.json ne bloque que le MÊME video_id, cf.
+    # job_publish_recos) — retour utilisateur 2026-09-10.
+    playlist = load_json(RECOS_PLAYLIST_PATH, [])
+    known_tracks = {(style_key(c.get("artist")), style_key(c.get("title")))
+                    for c in candidates + playlist}
     now = datetime.now().isoformat(timespec="seconds")
     n_tracks = 0
     cap_hit = False

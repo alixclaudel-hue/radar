@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime
 
-from .radar import discogs_dump, jobs, paths, sellers
+from .radar import discogs_dump, jobs, paths, sellers, store
 
 POLL = 2.0
 JOB_TIMEOUT = 6 * 3600
@@ -41,10 +41,13 @@ AUTO_MAINT_EVERY = {"canonicalize": 7 * 86400, "profile_labels": 7 * 86400, "bui
 _last_auto_maint_check = 0.0
 
 # RECOS RADAR (candidats + publication dans la playlist interne à Radar, cf.
-# crate_jobs.job_publish_recos) : opt-in via RADAR_RECOS_SCAN=1, un scan par jour.
-# Fonctionnalité personnelle (un seul owner en pratique) -> pas de round-robin par
+# crate_jobs.job_publish_recos) : opt-in via RADAR_RECOS_SCAN=1. Draine la file
+# d'attente (publish_recos) tant qu'elle n'est pas vide ; ne relance un scan
+# (scan_recos, qui rechaîne lui-même publish_recos) qu'une fois la file vide —
+# pas un scan quotidien fixe qui laissait des candidats déjà en attente sans
+# les publier plus vite (retour utilisateur 2026-09-10). Fonctionnalité
+# personnelle (un seul owner en pratique) -> pas de round-robin par
 # utilisateur nécessaire, mêmes conventions que les scans ci-dessus.
-RECOS_SCAN_EVERY = 86400
 _last_recos_check = 0.0
 
 
@@ -135,9 +138,10 @@ def _maybe_auto_maintenance():
 
 
 def _maybe_recos_scan():
-    """Enfile scan_recos (owner) une fois par jour — remplit recos_candidates.json,
-    consommé par publish_recos (chaîné automatiquement) pour alimenter la playlist
-    RECOS RADAR interne à Radar (recos_playlist.json, lue par /reco-radar)."""
+    """Toutes les heures (si RADAR_RECOS_SCAN=1) : publish_recos si des candidats
+    attendent déjà dans recos_candidates.json (draine la file avant d'aller
+    chercher autre chose), sinon scan_recos pour en trouver de nouveaux (qui
+    rechaîne lui-même publish_recos à la fin, cf. crate_jobs._chain_publish_recos)."""
     global _last_recos_check
     if os.environ.get("RADAR_RECOS_SCAN") != "1":
         return
@@ -146,12 +150,17 @@ def _maybe_recos_scan():
     _last_recos_check = time.time()
     try:
         queued_names = {j["name"] for j in jobs.load_queue()}
-        if "scan_recos" in queued_names or time.time() - _last_successful_run("scan_recos") < RECOS_SCAN_EVERY:
+        if "scan_recos" in queued_names or "publish_recos" in queued_names:
             return
-        jobs.launch("scan_recos", {}, uid=paths.DEFAULT_UID)
-        print("[worker] scan_recos quotidien enfilé", file=sys.stderr, flush=True)
+        pending = store.load(paths.user_paths(paths.DEFAULT_UID).recos_candidates, [])
+        if pending:
+            jobs.launch("publish_recos", {}, uid=paths.DEFAULT_UID)
+            print("[worker] publish_recos enfilé (file d'attente non vide)", file=sys.stderr, flush=True)
+        else:
+            jobs.launch("scan_recos", {}, uid=paths.DEFAULT_UID)
+            print("[worker] scan_recos enfilé (file d'attente vide)", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
-        print(f"[worker] recos scan check : {e}", file=sys.stderr, flush=True)
+        print(f"[worker] recos check : {e}", file=sys.stderr, flush=True)
 
 
 def _pick(q, last_uid):

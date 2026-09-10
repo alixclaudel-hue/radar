@@ -40,11 +40,15 @@ MIN_MATCH_SCORE = 0.5
 # file entière rendue « aucune vidéo trouvée » pour 7 jours).
 NEG_TTL = 6 * 3600
 # Un succès, lui, est une vérité stable (le clip d'une piste ne change pas) : le
-# recacher tous les 7 jours ne sert qu'à reconsommer du quota de recherche pour
+# recacher périodiquement ne sert qu'à reconsommer du quota de recherche pour
 # retrouver le même résultat (retour utilisateur 2026-09-10 : « limiter les
-# tokens de recherche »). Cache partagé (SHARED_DIR) entre tous les appelants
-# (RECOS RADAR, /yt/first) et, à terme, tous les utilisateurs.
-DEFAULT_TTL = 365 * 86400
+# tokens de recherche », puis « je veux que cette base soit gardée en continu »
+# — aucune expiration, pas juste une longue durée). Cache partagé (SHARED_DIR)
+# entre tous les appelants (RECOS RADAR, /yt/first) et, à terme, tous les
+# utilisateurs. Reste borné en taille (pas en âge) par cache_put : au-delà de
+# 20000 entrées, les plus anciennes sont purgées — protection disque (cf.
+# CLAUDE.md, piège backup/disque VPS), pas une expiration de fraîcheur.
+DEFAULT_TTL = float("inf")
 
 
 def _toks(s):

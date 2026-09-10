@@ -11,9 +11,14 @@
 </p>
 <div class="btnrow">
   <button type="button" class="small" hx-post="/patte/run/scan_recos" hx-target="#job-scan_recos" hx-swap="outerHTML">🔄 Scanner maintenant</button>
+  <button type="button" class="small" hx-post="/jobs/scan_recos/launch" hx-vals='{"force": "1"}'
+          hx-target="#job-scan_recos" hx-swap="outerHTML"
+          hx-confirm="Vider la file d'attente et tout rescanner avec le scoring actuel ?">🗑️🔄 Forcer (tout rescanner)</button>
   <button type="button" class="small" hx-post="/jobs/publish_recos/launch" hx-target="#job-publish_recos" hx-swap="outerHTML">▶ Alimenter la playlist</button>
 </div>
-<p class="small muted">« Scanner » cherche de nouvelles sorties chez tes labels suivis. « Alimenter » reprend juste les
+<p class="small muted">« Scanner » cherche de nouvelles sorties chez tes labels suivis. « Forcer » vide la file
+  d'attente et rescanne TOUTES les sorties de tes labels suivis avec le scoring actuel (utile en phase de test
+  après un changement de pondération). « Alimenter » reprend juste les
   {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente, sans rescanner.</p>
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>

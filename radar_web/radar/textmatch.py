@@ -5,13 +5,28 @@ vidéos d'une sortie Discogs à sa tracklist : tous cherchent « ce résultat
 parle-t-il bien de cet artiste et de ce titre ? » avec la même mesure.
 """
 import re
+import unicodedata
+
+# Lettres non décomposables par NFKD (pas de forme "lettre de base + accent") :
+# sans cette table, un mot comme "Bjørn" est coupé en deux jetons {bj, rn} au
+# lieu de matcher la graphie sans accent "Bjorn" qu'utilise souvent YouTube
+# (diagnostic 2026-09-10, RECOS RADAR : matchs parfaits rejetés faute de jeton
+# commun sur un nom d'artiste scandinave/allemand/français).
+_EXTRA_ACCENTS = str.maketrans({
+    "ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "ð": "d", "þ": "th", "ł": "l",
+})
+
+
+def _deaccent(s):
+    s = unicodedata.normalize("NFKD", (s or "").translate(_EXTRA_ACCENTS))
+    return "".join(c for c in s if not unicodedata.combining(c))
 
 
 def toks(s, drop=()):
-    """Mots significatifs d'un libellé (minuscules, alphanumériques).
+    """Mots significatifs d'un libellé (minuscules, sans accents, alphanumériques).
 
     `drop` retire les mots vides propres à l'appelant (articles, « feat »…)."""
-    out = set(re.findall(r"[a-z0-9]+", (s or "").lower()))
+    out = set(re.findall(r"[a-z0-9]+", _deaccent((s or "").lower())))
     return out - set(drop) if drop else out
 
 

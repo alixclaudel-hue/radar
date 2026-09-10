@@ -1,0 +1,13 @@
+# Stratégie de Rotation des Clés API (Multi-Projets)
+
+## ⚠️ Avertissement
+Cette stratégie est une solution de secours temporaire pour gérer les limitations de quota. Elle ne remplace pas une architecture de mise en cache robuste. Google Cloud peut détecter l'usage intensif de plusieurs clés depuis une même IP/serveur.
+
+## ⚙️ Implémentation technique
+
+### 1. Stockage des clés
+Les clés API ne doivent **jamais** être présentes dans le code source (GitHub). Elles doivent être stockées dans vos variables d'environnement (`.env`) ou un gestionnaire de secrets.
+
+**Format suggéré (.env) :**
+```env
+YOUTUBE_API_KEYS=key1,key2,key3,key4,key5,key6

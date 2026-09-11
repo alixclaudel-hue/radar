@@ -17,3 +17,8 @@ venv/
 
 # ancienne appli Streamlit archivée
 archive/
+*.enc
+*.tar
+*.gz
+*.tgz
+*.zip

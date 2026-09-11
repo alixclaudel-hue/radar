@@ -513,9 +513,71 @@ entre-temps.
     confirmer sur le VPS — cf. TODO ci-dessous. **Pas encore mergé** (branche
     `claude/hello-e87dpo`) : attendre la vérification VPS avant de merger,
     comme pour le Lot 1.
+39. **Référentiel Discogs élargi à TOUS les formats** (11/09, décision utilisateur
+    après discussion des tradeoffs, suite du point 38) : `discogs_dump.py`
+    filtrait jusqu'ici les sorties au vinyle 12"/LP uniquement dès l'import
+    (`_is_vinyl`, `_parse_release_elem` renvoyait `None` sinon) — désormais
+    TOUTE sortie est gardée (vinyle, CD, fichier audio, cassette, etc.),
+    nouvelle colonne `releases.is_vinyl` (calculée une fois au parsing,
+    jamais reparsée ensuite) pour qu'un consommateur qui voudrait rester
+    vinyle seul puisse filtrer sans rouvrir la chaîne `format` (index
+    `idx_releases_is_vinyl` ajouté, mais AUCUN filtre appliqué par défaut nulle part).
+    Décision explicitement validée avec ses conséquences : `search_local`
+    (recherche ciblée + `job_scan_recos`), `label_style_counts`/
+    `_materialize_label_styles` (`Ctx.label_affinities`, donc l'affinité de
+    style qui alimente `album_score`/`reco_rows` partout) et
+    `catalog_labelgraph` (Lot 2, point 38) portent maintenant tous sur le
+    catalogue complet, pas seulement le vinyle — améliore la cartographie
+    label/artiste et le profil de style d'un label (discographie entière,
+    pas seulement sa sortie vinyle) mais peut aussi faire remonter des
+    éléments non-vinyle dans une recherche ciblée ou du profilage. Alternative
+    écartée : élargir seulement pour `catalog_labelgraph` (deux vues du dump,
+    plus complexe, impact confiné) — l'utilisateur a choisi l'élargissement
+    complet en connaissance de cause.
+    Le comptage `n_vinyl` (déjà suivi séparément de `n_total` avant ce
+    changement — `n_total` comptait déjà TOUTES les sorties vues dans le flux
+    XML, `n_vinyl` celles retenues) change de sens : avant, `n_vinyl` ==
+    nombre de lignes réellement insérées ; maintenant `n_total` lignes sont
+    TOUTES insérées, `n_vinyl` n'est plus que le sous-compte de celles
+    marquées `is_vinyl=1` — `job_import_discogs_dump` (message de fin) et
+    `discogs_dump_meta.json` reflètent ce nouveau sens.
+    **Effet de bord non traité, à surveiller** : `job_scan_recos` (RECOS
+    RADAR) va désormais voir aussi les rééditions CD/digital d'un même
+    disque comme des lignes `releases` distinctes (déjà vrai avant pour
+    plusieurs pressages vinyle du même disque, mais le volume de doublons
+    potentiels augmente avec tous les formats) — pas de déduplication par
+    disque/piste au-delà de ce qui existait déjà ; à revisiter seulement
+    si ça se traduit par des candidats RECOS dupliqués en pratique.
+    **Coût opérationnel** : la base SQLite résultante sera nettement plus
+    grosse (le flux XML était déjà entièrement lu pour trier vinyle/non-vinyle,
+    donc le temps de téléchargement/parsing ne change presque pas, mais le
+    nombre de lignes insérées et la taille du fichier final augmentent) — à
+    surveiller côté disque VPS (cf. point 12, incident de saturation déjà
+    vécu avec le seul vinyle à ~3G).
+    Vérifié par smoke tests hors-ligne (flux XML de test avec 4 sorties de
+    formats différents — vinyle 12", CD, digital, vinyle 7" non éligible —
+    toutes importées, `is_vinyl` correct pour chacune ; `catalog_labelgraph.build()`
+    capte bien un lien label<->label qui n'existe QUE via une sortie non-vinyle,
+    ce qui aurait été invisible avant ce changement). **Non testé à l'échelle
+    réelle** (pas de vrai dump Discogs depuis cette session cloud) : la taille
+    réelle de la base résultante et le temps d'import restent à confirmer sur
+    le VPS avant de merger — cf. TODO ci-dessous. **Pas encore mergé** (branche
+    `claude/hello-e87dpo`), comme les points 38 et ci-dessus.
 
 ## TODO — prochaine session
 
+- **Vérifier l'élargissement du référentiel à tous les formats (point 39)**
+  sur le VPS — pas encore mergé, à traiter avant de merger : relancer
+  `import_discogs_dump` en entier (pas un `force` sur un dump déjà à jour,
+  il faut un VRAI réimport pour peupler `is_vinyl` et récupérer les formats
+  non-vinyle) et confirmer : taille finale de `discogs_dump.sqlite3` et temps
+  d'import (comparer au ~3G/~1h45 connus pour le vinyle seul — attention
+  disque, cf. point 12), le message de fin donne un `n_total` très supérieur
+  à l'ancien total vinyle avec un `n_vinyl` cohérent en sous-compte. Vérifier
+  ensuite qu'une recherche ciblée (`/search`) ou `job_scan_recos` ne se
+  retrouve pas noyé de doublons CD/digital d'un même disque au point de
+  dégrader l'usage réel (sinon, ajouter un filtre `is_vinyl=1` là où c'est
+  gênant plutôt que de revenir en arrière sur l'élargissement).
 - **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** sur le
   VPS après déploiement — ce lot n'est pas encore mergé, à traiter avant de
   merger (comme le Lot 1) : activer `RADAR_CATALOG_LABELGRAPH=1` sur le

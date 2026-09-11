@@ -2449,11 +2449,14 @@ def job_scan_catalog(job, params):
 def job_import_discogs_dump(job, params):
     """Télécharge le dernier dump mensuel officiel Discogs (Releases, Labels,
     Artists) et reconstruit le référentiel local SQLite (radar/discogs_dump.py)
-    — filtré au vinyle 12"/LP pour les sorties, avec genre/style/label/artiste
-    + crédits par sortie, et l'identité canonique (id Discogs) de chaque label
-    et artiste. Ne concerne QUE le catalogue (données stables) ; le
-    marketplace (vendeurs, prix, inventaire) n'existe pas dans ces dumps et
-    reste toujours en API live.
+    — TOUS formats pour les sorties depuis l'élargissement du 11/09 (vinyle,
+    CD, fichier audio, etc. ; `is_vinyl` marque celles qui sont au format
+    vinyle 12"/LP, pour un filtrage optionnel côté consommateur — cf. module
+    docstring de discogs_dump.py), avec genre/style/label/artiste + crédits
+    par sortie, et l'identité canonique (id Discogs) de chaque label et
+    artiste. Ne concerne QUE le catalogue (données stables) ; le marketplace
+    (vendeurs, prix, inventaire) n'existe pas dans ces dumps et reste
+    toujours en API live.
 
     Les trois dumps vont dans la MÊME base reconstruite (radar/discogs_dump.py
     open_new_db/finalize_new_db) : une seule bascule atomique à la fin, jamais
@@ -2461,7 +2464,10 @@ def job_import_discogs_dump(job, params):
     inversement). Un dump mensuel est un instantané complet, jamais un delta :
     "actualiser" retélécharge et reconstruit l'index en entier (peut prendre
     longtemps selon la bande passante et la taille des fichiers — plusieurs Go
-    au total, l'essentiel pour Releases).
+    au total, l'essentiel pour Releases ; sensiblement plus volumineux depuis
+    l'élargissement tous formats — le téléchargement/parsing XML ne change
+    pas [déjà tout le flux était lu pour trier vinyle/non-vinyle], mais le
+    nombre de lignes réellement insérées en base augmente).
 
     Reprenable : chaque déploiement redéploie le conteneur du worker (tout merge sur
     main, pas seulement ceux qui touchent au dump), ce qui tue ce job en plein milieu
@@ -2609,8 +2615,9 @@ def job_import_discogs_dump(job, params):
     job_queue.launch("canonicalize", {"scope": "corpus"}, uid="owner")
     job_queue.launch("profile_labels", {"limit": 150}, uid="owner")
 
-    job.finish(f"Dump {latest} importé : {n_vinyl} sortie(s) vinyle 12\"/LP retenue(s) sur {n_total} au total, "
-               f"{n_labels} label(s), {n_artists} artiste(s). Canonisation + profilage enfilés.")
+    job.finish(f"Dump {latest} importé : {n_total} sortie(s) tous formats "
+               f"(dont {n_vinyl} vinyle 12\"/LP), {n_labels} label(s), {n_artists} artiste(s). "
+               f"Canonisation + profilage enfilés.")
 
 
 def job_build_catalog_labelgraph(job, params):

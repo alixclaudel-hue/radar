@@ -1,55 +1,52 @@
 # Radar — instructions projet
 
-Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, Spotify, Bandcamp, DJ sets), profile labels/artistes, note sorties Discogs selon goût. Cible multi-utilisateur (chantier en cours) → `docs/architecture.md`.
+Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, Spotify, Bandcamp, DJ sets), profile labels/artistes, note sorties selon goût. Cible multi-utilisateur (chantier en cours) → `docs/architecture.md`.
 
 **Reprise de contexte : ce fichier suffit** — état, TODO, pièges appris ci-dessous (fusionné depuis ancien `docs/etat.md`, ménage 2026-09-08).
 
-**Historique complet + détails techniques** : `claude_archive.md` (dump Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et `docs/archive/` (anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) — fichiers dans `.claudeignore` (non lus automatiquement) : lire explicitement (`Read <fichier>`) si détail précis manquant.
+**Historique complet + détails techniques** : `claude_archive.md` (dump Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et `docs/archive/` (anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) — fichiers dans `.claudeignore` (non lus automatiquement) : lire explicitement (`Read <fichier>`) si détail manquant.
 
-**Doc technique — scoring (Lot 1)** : `docs/app-overview-scoring-lot1.md` — vue d'ensemble
-du moteur de notation (`radar_web/radar/scoring.py` classe `Ctx` : wmap/affinité,
-ascore, label_tier_map, reco_rows/reco_index, graph_rescore, album_score), de la
-migration config `labels`/`watchlist` (2 listes à plat) → `label_categories`
-(Cœur/Aimé, `radar_web/radar/store.py`) et des jobs qui en dépendent
+**Doc technique — scoring (Lot 1)** : `docs/app-overview-scoring-lot1.md` — vue
+d'ensemble du moteur de notation (`radar_web/radar/scoring.py` classe `Ctx` :
+wmap/affinité, ascore, label_tier_map, reco_rows/reco_index, graph_rescore,
+album_score), migration config `labels`/`watchlist` (2 listes à plat) →
+`label_categories` (Cœur/Aimé, `radar_web/radar/store.py`), et jobs dépendants
 (`job_scan_recos`, `job_scan_veille`, `job_profile_labels`, `job_canonicalize`,
 `job_fetch_collection`, `job_merge_corpus`, `job_build_graph`). Généré en session
-cloud le 2026-09-11 à partir du code lu directement (pas de token/accès réseau) —
-à relire si le scoring évolue encore, ce fichier n'est pas mis à jour automatiquement.
-Diagramme associé : `docs/app-diagram-brief-scoring-lot1.md` (instructions de
-dessin) + `docs/app-overview-scoring-lot1.excalidraw` (rendu, 3 groupes/14
-boîtes/22 flèches — à ouvrir sur excalidraw.com ou l'extension VS Code).
+cloud le 2026-09-11 depuis le code lu directement (pas de token/accès réseau) —
+non mis à jour automatiquement, à relire si le scoring évolue. Diagramme associé :
+`docs/app-diagram-brief-scoring-lot1.md` (instructions de dessin) +
+`docs/app-overview-scoring-lot1.excalidraw` (rendu, 3 groupes/14 boîtes/22
+flèches — ouvrir sur excalidraw.com ou l'extension VS Code).
 
 **Doc technique — référentiel Discogs local + scoring** :
 `docs/app-overview-discogs-dump-py-and-scoring-process.md` — périmètre plus
-étroit et plus technique que le doc Lot 1 ci-dessus : uniquement
-`radar_web/radar/discogs_dump.py` (téléchargement/parsing du dump mensuel,
-bascule atomique, schéma SQLite, `search_local`/`resolve_name`/
-`label_style_counts`/`artist_ids_for_labels`) et `radar_web/radar/scoring.py`
-(classe `Ctx`, pipeline complet dump → `wmap`/`ascore`/`reco_rows`/
-`album_score`) — `store.py`, `catalog_labelgraph.py` et les jobs appelants
-traités comme externes (mentionnés seulement comme sources/appelants).
-Généré en session cloud le 2026-09-11 à partir du code lu directement — même
-mise en garde que ci-dessus, à relire si ces deux fichiers évoluent.
+étroit/technique que le doc Lot 1 : uniquement `radar_web/radar/discogs_dump.py`
+(téléchargement/parsing dump mensuel, bascule atomique, schéma SQLite,
+`search_local`/`resolve_name`/`label_style_counts`/`artist_ids_for_labels`) et
+`radar_web/radar/scoring.py` (classe `Ctx`, pipeline complet dump →
+`wmap`/`ascore`/`reco_rows`/`album_score`) — `store.py`, `catalog_labelgraph.py`
+et jobs appelants traités comme externes (mentionnés comme sources/appelants
+seulement). Généré en session cloud le 2026-09-11 depuis le code lu directement
+— même mise en garde, à relire si ces deux fichiers évoluent.
 
 **Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé, point 37) et
 Lot 2 (graphe labels global, point 38) faits. **PR #132 mergée sur `main` le
-11/09** (ordre inversé sur décision utilisateur : merger d'abord, vérifier
-sur le VPS après déploiement — pas de vrai merge indépendant possible sur le
-VPS lui-même, il ne fait que suivre `main`). **Étape 0 (import TEST, point 40)
-faite et concluante sur le VPS le 11/09** (détail → point 40) : Lot 2 et le
-référentiel élargi tous formats (point 39) fonctionnent à petite échelle.
-**Reste à faire avant de considérer 38/39 pleinement clos** : réimport complet
-en réel sur le VPS (TODO ci-dessous) — pas encore fait, l'échelle réelle
-(19M+ sorties, temps d'exécution, proportion de labels avec parent, pertinence
-de `MAX_LABELS_PER_ARTIST=40`) reste à confirmer. **Lot 3 —
-DAG scoring** est la suite : casser les dépendances circulaires de `Ctx`. Puis
-Lot 4 (précalcul asynchrone `track_scores`, nouveau module `scorestore.py`,
-séparé de `discogs_dump.py`), Lot 5 (UI lit les tables précalculées).
-Livraison lot par lot avec point de contrôle utilisateur après chacun (déjà
-arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans validation
-entre-temps.
+11/09** (ordre inversé, décision utilisateur : merger d'abord, vérifier sur le
+VPS après déploiement — pas de merge indépendant possible sur le VPS, il suit
+`main`). **Étape 0 (import TEST, point 40) faite et concluante sur le VPS le
+11/09** (détail → point 40) : Lot 2 et référentiel élargi tous formats
+(point 39) fonctionnent à petite échelle. **Reste avant de considérer 38/39
+clos** : réimport complet en réel sur le VPS (TODO ci-dessous), pas encore
+fait — échelle réelle à confirmer (19M+ sorties, temps d'exécution, proportion
+labels avec parent, pertinence `MAX_LABELS_PER_ARTIST=40`). **Lot 3 — DAG
+scoring** ensuite : casser dépendances circulaires de `Ctx`. Puis Lot 4
+(précalcul asynchrone `track_scores`, nouveau module `scorestore.py`, séparé
+de `discogs_dump.py`), Lot 5 (UI lit tables précalculées). Livraison lot par
+lot, point de contrôle utilisateur après chacun (arbitré, cf. point 37) — ne
+pas enchaîner plusieurs lots sans validation entre-temps.
 
-**Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent avant de lire.
+**Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent.
 
 **Mode caveman par défaut** : invoquer skill `caveman` (`.claude/skills/caveman/SKILL.md`, niveau `full`) en début de session, sauf demande contraire. S'applique aux réponses conversationnelles ; code, commits, doc, tickets restent en prose normale (cf. Boundaries du skill).
 
@@ -58,7 +55,7 @@ entre-temps.
 1. **Structure** : `radar_web/` (FastAPI + HTMX, port 8600, interface) ; `crate_jobs.py` (tâches longues, lancées par `radar_web/worker.py`) ; `archive/` (ancienne appli Streamlit, retirée 2026-09-01, **ne pas y toucher**). Nav : Mes sources · Chercher un disque · Nouveautés · Mes labels & artistes · Reco Radar · Réglages.
 2. **Déploiement** : `git push` → GitHub (`alixclaudel-hue/radar`) → merge sur `main` → `.github/workflows/deploy.yml` (VPS OVH : `git pull` + rebuild Docker + health-check, rollback si KO — rollback impossible si échec avant `reset --hard`, ex. disque VPS saturé, cf. piège backup point 12). Manuel (dépannage) : **toujours `git fetch` avant `reset --hard origin/main`** ; `--force-recreate` si conteneur reste "Running" après changement d'env. Coordonnées VPS : Secrets Actions + note perso non versionnée.
 3. **Données** : `/data` sur VPS (JSON — labels, corpus, graphe, profils, config avec token Discogs). Rien dans git. Local : `export CRATE_DATA_DIR=$PWD/data`.
-4. **Session cloud (celle-ci)** : dépôt cloné frais, **sans** `/data`/`.env`/token Discogs, ni Playwright/yt-dlp, ni accès SSH VPS, ni mémoire perso Claude — ce fichier + `docs/` = source de vérité. Marche à suivre : éditer, `py_compile`, smoke test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour appel réel). Sans accès OVH Manager/identifiants VPS : dépannage VPS = guider l'utilisateur pas à pas, jamais demander ses identifiants.
+4. **Session cloud (celle-ci)** : dépôt cloné frais, **sans** `/data`/`.env`/token Discogs, ni Playwright/yt-dlp, ni accès SSH VPS, ni mémoire perso Claude — ce fichier + `docs/` = source de vérité. Marche à suivre : éditer, `py_compile`, smoke test des routes, ouvrir des PR. Réseau **Trusted** = registres de paquets + GitHub uniquement (passer en **Custom** + `api.discogs.com`/`bandcamp.com` pour appel réel). Sans accès OVH Manager/identifiants VPS : dépannage VPS = guider l'utilisateur pas à pas, jamais demander identifiants.
 5. **Boucle diag VPS — en pause depuis 2026-09-06** (jugée non fonctionnelle par l'utilisateur, latence de livraison jamais fiabilisée). Trigger `diag-vps` désactivé (`enabled: false`) : **ne pas réactiver, ne pas ouvrir d'issue `Diag <sha>`, ne pas appeler `fire_trigger` dessus**, sans demande explicite. Reprise possible plus tard. Contrats (gelés, gardés pour référence, **déplacés hors `.claude/skills/` donc non invocables** en l'état) : `docs/archive/skill-diag.md` + `docs/archive/skill-dev-loop.md`. Pour réactiver `/diag`/`/dev-loop`, les replacer dans `.claude/skills/<nom>/SKILL.md`. Session `session_01KbkY8jHGMbLLgkkQb8Kj6d` (« Radar — VPS (diagnostic) ») reste utilisable manuellement par l'utilisateur, hors boucle.
 6. **Conventions** : `py_compile` + smoke test local avant chaque push (double de la CI) ; **jamais `git add -A`** (ajouter fichiers nommément, relire `git status`) ; commits/commentaires **en français** ; pas de commentaires superflus (le *pourquoi*, pas le *quoi*).
 7. **Piège — Marketplace Discogs** : prix/annonces/décompte FR **inobtenables** (Cloudflare bloque). Abandonné — garder lien `🇫🇷 voir` + pastille API.
@@ -645,108 +642,114 @@ entre-temps.
 
 - **PR #132 mergée sur `main` le 11/09** (Lot 2 + référentiel tous formats +
   import TEST) — déployée sur le VPS. **Étape 0 (import TEST, point 40) faite
-  et concluante le 11/09** (résultats détaillés → points 38/39/40) : Lot 2 et
+  et concluante le 11/09** (résultats → points 38/39/40) : Lot 2 et
   l'élargissement tous formats fonctionnent à petite échelle (`limit=5000`).
-  Reste seul point bloquant avant de clore ce chantier : le réimport complet
+  Seul point bloquant restant avant de clore ce chantier : réimport complet
   en réel ci-dessous, jamais fait à l'échelle du catalogue complet.
 - **Réimport complet à pleine échelle (points 38/39)** : sur le VPS, relancer
-  `import_discogs_dump` en entier (pas un `force` sur un dump déjà à jour, il
-  faut un VRAI réimport pour peupler `is_vinyl` et récupérer les formats
-  non-vinyle — le référentiel réel de ce VPS date encore du 2026-09-03, avant
-  ce lot) et confirmer : taille finale de `discogs_dump.sqlite3` et temps
-  d'import (comparer au ~3G/~1h45 connus pour le vinyle seul — attention
-  disque, cf. point 12), le message de fin donne un `n_total` très supérieur
-  à l'ancien total vinyle (19 417 067) avec un `n_vinyl` cohérent en
-  sous-compte. Vérifier ensuite qu'une recherche ciblée (`/search`) ou
-  `job_scan_recos` ne se retrouve pas noyé de doublons CD/digital d'un même
-  disque au point de dégrader l'usage réel (sinon, ajouter un filtre
-  `is_vinyl=1` là où c'est gênant plutôt que de revenir en arrière sur
+  `import_discogs_dump` en entier (pas un `force` sur dump déjà à jour — il
+  faut un VRAI réimport pour peupler `is_vinyl` et récupérer formats
+  non-vinyle ; référentiel réel de ce VPS date encore du 2026-09-03, avant ce
+  lot) et confirmer : taille finale de `discogs_dump.sqlite3`, temps d'import
+  (comparer au ~3G/~1h45 connus pour vinyle seul — attention disque, cf.
+  point 12), message de fin donnant un `n_total` très supérieur à l'ancien
+  total vinyle (19 417 067) avec `n_vinyl` cohérent en sous-compte. Vérifier
+  ensuite qu'une recherche ciblée (`/search`) ou `job_scan_recos` ne soit pas
+  noyée de doublons CD/digital d'un même disque au point de dégrader l'usage
+  réel (sinon ajouter filtre `is_vinyl=1` là où gênant plutôt que revenir sur
   l'élargissement).
 - **Vérifier le Lot 2 refonte scoring à pleine échelle (graphe labels global,
-  point 38)** sur le VPS, après le réimport complet ci-dessus (le test à
-  petite échelle du 11/09 est déjà concluant, cf. point 38) : activer
-  `RADAR_CATALOG_LABELGRAPH=1` sur
-  le service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
-  (référentiel Discogs déjà importé requis), et confirmer au journal : temps
-  d'exécution raisonnable sur le vrai volume de `release_artists`, nombre de
-  labels/liens obtenus plausible pour CHAQUE type d'arête (« X par artiste
-  partagé », « Y par hiérarchie label parent/enfant » dans le message de fin),
-  nombre d'artistes écartés par `MAX_LABELS_PER_ARTIST=40` pas disproportionné
-  (sinon le plafond est à ajuster). Confirmer aussi qu'un second lancement sans nouveau dump répond
-  bien « déjà à jour » sans rien reconstruire.
-- **Vérifier le Lot 1 refonte scoring (labels Cœur/Aimé, point 37)** sur le VPS
-  après déploiement : confirmer que la migration ne perd aucun label (comparer le
-  total Cœur+Aimé à l'ancien total base+watchlist dédoublonné), que l'ajout/retrait/
-  changement de catégorie fonctionne dans `/univers`, et surtout que
-  `job_scan_veille` couvre bien maintenant TOUS les labels suivis (Cœur ET Aimé)
-  pour les nouveautés — pas seulement l'ancien watchlist.
-- **Vérifier les 2 curseurs RECOS RADAR** (point 36) sur le VPS après déploiement :
-  régler « Recherches YouTube par alimentation » et « Capacité de la playlist » dans
-  `/settings`, enregistrer, puis confirmer sur `/reco-radar` que le plafond affiché
-  (« X/Y ») et le comportement réel de « ▶ Alimenter la playlist » suivent bien les
-  nouvelles valeurs (pas les anciennes constantes 5/5).
+  point 38)** sur le VPS, après réimport complet ci-dessus (test à petite
+  échelle du 11/09 déjà concluant, cf. point 38) : activer
+  `RADAR_CATALOG_LABELGRAPH=1` sur le service `radar-worker`, lancer
+  `build_catalog_labelgraph` une fois à la main (référentiel Discogs déjà
+  importé requis), et confirmer au journal : temps d'exécution raisonnable sur
+  le vrai volume de `release_artists`, nombre de labels/liens plausible pour
+  CHAQUE type d'arête (« X par artiste partagé », « Y par hiérarchie label
+  parent/enfant » dans le message de fin), nombre d'artistes écartés par
+  `MAX_LABELS_PER_ARTIST=40` pas disproportionné (sinon ajuster le plafond).
+  Confirmer aussi qu'un second lancement sans nouveau dump répond bien « déjà
+  à jour » sans rien reconstruire.
+- **Vérifier le Lot 1 refonte scoring (labels Cœur/Aimé, point 37)** sur le
+  VPS après déploiement : confirmer que la migration ne perd aucun label
+  (comparer total Cœur+Aimé à l'ancien total base+watchlist dédoublonné), que
+  l'ajout/retrait/changement de catégorie fonctionne dans `/univers`, et
+  surtout que `job_scan_veille` couvre bien maintenant TOUS les labels suivis
+  (Cœur ET Aimé) pour les nouveautés — pas seulement l'ancien watchlist.
+- **Vérifier les 2 curseurs RECOS RADAR** (point 36) sur le VPS après
+  déploiement : régler « Recherches YouTube par alimentation » et « Capacité
+  de la playlist » dans `/settings`, enregistrer, puis confirmer sur
+  `/reco-radar` que le plafond affiché (« X/Y ») et le comportement réel de
+  « ▶ Alimenter la playlist » suivent les nouvelles valeurs (pas les anciennes
+  constantes 5/5).
 
-- **Vérifier le correctif du point 35** (scan toujours daté de l'année en cours) sur
-  le VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) », confirmer au
-  journal des sorties d'ANNÉES variées (pas uniquement l'année en cours), et que les
-  labels à fort volume ne monopolisent plus la file au détriment des autres labels
-  suivis.
+- **Vérifier le correctif du point 35** (scan toujours daté de l'année en
+  cours) sur le VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout
+  rescanner) », confirmer au journal des sorties d'ANNÉES variées (pas
+  uniquement l'année en cours), et que les labels à fort volume ne
+  monopolisent plus la file au détriment des autres labels suivis.
 
-- **Vérifier le correctif du point 34** (tentatives qui ne recherchaient jamais
-  rien) sur le VPS après déploiement : relancer « ▶ Alimenter la playlist » sur
-  les pistes actuellement à 2/3 tentatives (ex. Noir/Haze — Around, Candi Staton —
-  Hallelujah Anyway, Flashmob — Need In Me, Shakedown — At Night) et confirmer au
-  journal une VRAIE recherche (raison différente de « aucun match, en cache », ou
-  une vidéo enfin ajoutée). Pour récupérer Kings Of Tomorrow/Julie McKnight —
-  Finally (déjà abandonnée avant ce correctif) : cliquer « 🗑️🔄 Forcer (tout
-  rescanner) » pour qu'elle redevienne un candidat neuf.
-- **Vérifier le correctif du point 33** (candidat détruit au 1er échec YouTube)
-  sur le VPS après déploiement : lancer « ▶ Alimenter la playlist » plusieurs
-  fois de suite sur une file encombrée d'échecs et confirmer au journal qu'un
-  candidat retenté finit par être ajouté (ou abandonné après 3 tentatives avec
-  message explicite), au lieu de disparaître sans trace dès le 1er échec — et
-  surtout, confirmer qu'au moins une vidéo est désormais ajoutée à la playlist
-  (le symptôme central signalé le 10/09).
+- **Vérifier le correctif du point 34** (tentatives qui ne recherchaient
+  jamais rien) sur le VPS après déploiement : relancer « ▶ Alimenter la
+  playlist » sur les pistes actuellement à 2/3 tentatives (ex. Noir/Haze —
+  Around, Candi Staton — Hallelujah Anyway, Flashmob — Need In Me, Shakedown
+  — At Night) et confirmer au journal une VRAIE recherche (raison différente
+  de « aucun match, en cache », ou vidéo enfin ajoutée). Pour récupérer Kings
+  Of Tomorrow/Julie McKnight — Finally (déjà abandonnée avant ce correctif) :
+  cliquer « 🗑️🔄 Forcer (tout rescanner) » pour qu'elle redevienne candidat
+  neuf.
+- **Vérifier le correctif du point 33** (candidat détruit au 1er échec
+  YouTube) sur le VPS après déploiement : lancer « ▶ Alimenter la playlist »
+  plusieurs fois de suite sur une file encombrée d'échecs et confirmer au
+  journal qu'un candidat retenté finit par être ajouté (ou abandonné après 3
+  tentatives avec message explicite), au lieu de disparaître sans trace dès
+  le 1er échec — et surtout confirmer qu'au moins une vidéo est désormais
+  ajoutée à la playlist (symptôme central signalé le 10/09).
 
-- **Vérifier le correctif du point 32** (message « file pleine » sans raison) sur
-  le VPS après déploiement : provoquer une file pleine (quota épuisé ou file > 45)
-  et confirmer que le message de `scan_recos` affiche bien « Dernière publication :
-  ... » avec la vraie raison de blocage, pas juste « scan sauté ».
-- **Vérifier le correctif du point 31** (bouton "Scanner maintenant" forçait un
-  rescan complet) sur le VPS après déploiement : cliquer « 🔄 Scanner maintenant »
-  deux fois de suite sur `/reco-radar` et confirmer au journal que le 2ᵉ scan
-  traite des sorties DIFFÉRENTES du 1er (ou dit "aucune nouveauté" si tout est
-  déjà vu), au lieu de relister exactement les mêmes 20 sorties.
+- **Vérifier le correctif du point 32** (message « file pleine » sans
+  raison) sur le VPS après déploiement : provoquer une file pleine (quota
+  épuisé ou file > 45) et confirmer que le message de `scan_recos` affiche
+  bien « Dernière publication : ... » avec la vraie raison du blocage, pas
+  juste « scan sauté ».
+- **Vérifier le correctif du point 31** (bouton "Scanner maintenant" forçait
+  un rescan complet) sur le VPS après déploiement : cliquer « 🔄 Scanner
+  maintenant » deux fois de suite sur `/reco-radar` et confirmer au journal
+  que le 2ᵉ scan traite des sorties DIFFÉRENTES du 1er (ou dit "aucune
+  nouveauté" si tout est déjà vu), au lieu de relister exactement les mêmes
+  20 sorties.
 - **Vérifier le correctif du point 30** (budget de recherche calé sur les
   recherches, pas les ajouts) sur le VPS après déploiement : lancer « ▶ Alimenter
   la playlist » avec une file encombrée de candidats voués à l'échec et confirmer
   au journal que le job s'arrête bien après 5 recherches (`RECOS_SEARCHES_PER_RUN`)
   plutôt que de vider toute la file.
-- **Vérifier l'effet du correctif PR #112** (artiste "Various", point 27) sur le
-  VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) » sur
-  `/reco-radar`, relancer « ▶ Alimenter la playlist », confirmer que les pistes de
-  compilation (ex. Aquasonic Vol. 1, Defected Classics) trouvent enfin une vidéo au
-  lieu de "aucune vidéo trouvée".
-- **Vérifier le journal `publish_recos` après le prochain déploiement** (points 28-29) :
-  relancer « ▶ Alimenter la playlist » et lire la raison désormais affichée à côté de
-  « aucune vidéo trouvée ». Si c'est « Quota YouTube (recherche) épuisé », attendre la
-  remise à zéro du quota (minuit heure Pacifique) et relancer — la file est maintenant
-  conservée. Si c'est « meilleur score X < 0.5 : <titre> » sur des pistes évidentes
-  (Kerri Chandler — Coro, Midland — Final Credits), le seuil `MIN_MATCH_SCORE` ou le
-  cumul des pénalités de `_best_match` est trop strict : c'est alors la piste à
-  travailler, pas le quota.
-- **Ingestion réelle non testée depuis la factorisation** (PR #111, mergée sur `main`
-  le 10/09) : `job_ingest_youtube`/`spotify`/`bandcamp` (`crate_jobs.py`) partagent
-  maintenant `_ingest_lookup_loop` (dédoublonnage corpus, boucle `discogs_lookup`,
-  flush tous les 15, `corpus_merge`, `finish`) — 43 lignes en moins ; `review.html`/
-  `learn.html` réutilisent aussi la classe CSS `.tbl` (`app.css`) au lieu de styles
-  inline dupliqués. Vérifié depuis cette session cloud (pas de token Discogs/
+- **Vérifier l'effet du correctif PR #112** (artiste "Various", point 27) sur
+  le VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) » sur
+  `/reco-radar`, relancer « ▶ Alimenter la playlist », confirmer que les
+  pistes de compilation (ex. Aquasonic Vol. 1, Defected Classics) trouvent
+  enfin une vidéo au lieu de "aucune vidéo trouvée".
+- **Vérifier le journal `publish_recos` après le prochain déploiement**
+  (points 28-29) : relancer « ▶ Alimenter la playlist » et lire la raison
+  désormais affichée à côté de « aucune vidéo trouvée ». Si c'est « Quota
+  YouTube (recherche) épuisé », attendre la remise à zéro du quota (minuit
+  heure Pacifique) et relancer — la file est désormais conservée. Si c'est
+  « meilleur score X < 0.5 : <titre> » sur des pistes évidentes (Kerri
+  Chandler — Coro, Midland — Final Credits), le seuil `MIN_MATCH_SCORE` ou le
+  cumul des pénalités de `_best_match` est trop strict : c'est alors la piste
+  à travailler, pas le quota.
+- **Ingestion réelle non testée depuis la factorisation** (PR #111, mergée
+  sur `main` le 10/09) : `job_ingest_youtube`/`spotify`/`bandcamp`
+  (`crate_jobs.py`) partagent maintenant `_ingest_lookup_loop`
+  (dédoublonnage corpus, boucle `discogs_lookup`, flush tous les 15,
+  `corpus_merge`, `finish`) — 43 lignes en moins ; `review.html`/`learn.html`
+  réutilisent aussi la classe CSS `.tbl` (`app.css`) au lieu de styles inline
+  dupliqués. Vérifié depuis cette session cloud (pas de token Discogs/
   YouTube/Spotify ici) : `py_compile` OK, smoke tests (chemins d'erreur sans
-  identifiants, boucle testée avec `discogs_lookup` simulé — dédoublonnage et skip
-  du lookup si label déjà connu confirmés), rendu Jinja des 2 templates. **Reste à
-  faire** : tester une vraie ingestion (YouTube au moins) contre l'API réelle avant
-  de considérer le skill `factorize` définitivement clos sur `crate_jobs.py` —
-  depuis une session avec accès réseau + tokens (VPS ou réseau Custom + secrets).
-  Reste aussi du point 22 (TODO code identifié) : multi-selects genre/style,
-  `<label for>` non reliés, libellés FR Réglages, liens `/disco` reco/recherche, UI
-  revue artistes « approx », suppression track/DJ dans Mes sets.
+  identifiants, boucle testée avec `discogs_lookup` simulé — dédoublonnage et
+  skip du lookup si label déjà connu confirmés), rendu Jinja des 2 templates.
+  **Reste à faire** : tester une vraie ingestion (YouTube au moins) contre
+  l'API réelle avant de considérer le skill `factorize` définitivement clos
+  sur `crate_jobs.py` — depuis une session avec accès réseau + tokens (VPS ou
+  réseau Custom + secrets). Reste aussi du point 22 (TODO code identifié) :
+  multi-selects genre/style, `<label for>` non reliés, libellés FR Réglages,
+  liens `/disco` reco/recherche, UI revue artistes « approx », suppression
+  track/DJ dans Mes sets.

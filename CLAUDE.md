@@ -48,8 +48,9 @@ code actuel (incohérence signalée à l'utilisateur, objectif reformulé en
 #136 mergée sur `main` le 11/09** (accord utilisateur donné, CI verte).
 **Lot 4 fait** (précalcul asynchrone release+piste, nouveau module
 `scorestore.py`, point 42) — codé et testé hors-ligne en session cloud le
-11/09, **pas encore poussé/mergé** à la rédaction de ce point (détail →
-point 42). **Prochain point de contrôle à demander avant de démarrer le
+11/09. **PR #139 mergée sur `main` le 11/09** (CI verte, resynchronisée avec
+`main` au passage — `Update deploy.yml #138` mergé entre-temps). **Prochain
+point de contrôle à demander avant de démarrer le
 Lot 5** (UI lit les tables précalculées, pas encore commencé) : livraison
 lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
 37) — ne pas enchaîner plusieurs lots sans validation entre-temps.
@@ -783,9 +784,9 @@ lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
 
 ## TODO — prochaine session
 
-- **Lot 4 (précalcul scorestore, point 42) codé et testé hors-ligne le
-  11/09, pas encore poussé/mergé.** Une fois mergé et déployé sur le VPS :
-  activer `RADAR_SCORESTORE=1` sur `radar-worker`, lancer `scorestore_releases`
+- **PR #139 (Lot 4, précalcul scorestore, point 42) mergée sur `main` le
+  11/09.** Une fois déployé sur le VPS : activer `RADAR_SCORESTORE=1` sur
+  `radar-worker`, lancer `scorestore_releases`
   une fois à la main (référentiel Discogs + au moins un label suivi requis),
   confirmer au journal un nombre de sorties notées plausible et que
   `scorestore_tracks` s'enchaîne bien ensuite (récupération de tracklist si

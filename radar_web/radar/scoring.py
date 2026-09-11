@@ -176,6 +176,15 @@ class Ctx:
                 m[self.canon_artist_key(n)] = cid
         return m
 
+    def label_tier_map(self):
+        """{label_key: '1'|'2'} — Cœur/Aimé, même modèle que artist_tier_map()
+        (remplace les 2 anciennes listes à plat labels/watchlist)."""
+        m = {}
+        for cid, names in self.cfg.get("label_categories", {}).items():
+            for n in names:
+                m[normalize_label(n)] = cid
+        return m
+
     def seed_category_weight(self):
         """{clé canonique: poids} pour pondérer une graine du graphe selon sa
         provenance (2026-09-04) : Cœur/Aimés (poids scoring.graph.tier_w,
@@ -266,8 +275,7 @@ class Ctx:
             if cat1:
                 why.insert(0, f"⭐ {cat1}× avec un artiste Cœur")
             arts[ck] = {"name": e["name"], "id": e.get("id"), "score": score, "why": why}
-        watch = {normalize_label(x) for x in self.cfg.get("watchlist", [])}
-        basek = {normalize_label(x) for x in self.cfg.get("labels", [])}
+        label_tiers = self.label_tier_map()
         labs = {}
         for lk, le in g.get("label_edges", {}).items():
             co = le.get("co", {})
@@ -280,7 +288,7 @@ class Ctx:
                         "score": round(b * (1 + lbr * (n_seeds - 1)) + (c1b if c1s else 0), 2),
                         "n_seeds": n_seeds, "cat1_seeds": c1s,
                         "seeds": [seeds.get(sk, sk) for sk in list(co)[:6]],
-                        "in_watchlist": lk in watch, "in_base": lk in basek}
+                        "tier": label_tiers.get(lk)}
         return {
             "artists": dict(sorted(arts.items(), key=lambda kv: -kv[1]["score"])),
             "labels": dict(sorted(labs.items(), key=lambda kv: -kv[1]["score"])),
@@ -357,8 +365,11 @@ class Ctx:
                      if v.get("discogs_id") and v.get("status") in ("exact", "approx", "confirmed"))
         not_found = (sum(1 for v in self.resolved.values() if v.get("status") == "not_found")
                      + sum(1 for v in self.artists_res.values() if v.get("status") == "not_found"))
+        lc = self.cfg.get("label_categories", {})
         return {
-            "labels": len(self.cfg.get("labels", [])),
+            "labels": sum(len(v) for v in lc.values()),
+            "labels_coeur": len(lc.get("1", [])),
+            "labels_aimes": len(lc.get("2", [])),
             "labels_profiled": len(self.profile),
             "coeur": len(ac.get("1", [])),
             "aimes": len(ac.get("2", [])),
@@ -368,7 +379,7 @@ class Ctx:
             "graph_edges": len((self.graph or {}).get("edges", {})),
             "tracks": len(self.corpus),
             "tracks_by_source": self.corpus_by_source(),
-            "watchlist": len(self.cfg.get("watchlist", [])),
+            "veille_rules_active": len([r for r in self.cfg.get("veille_rules", []) if r.get("active", True)]),
             "sellers": len(self.cfg.get("sellers", [])),
         }
 
@@ -463,8 +474,7 @@ class Ctx:
 
     def _compute_artist_label_signal(self):
         from . import discogs_dump as dd
-        liked_keys = ({normalize_label(x) for x in self.cfg.get("labels", [])}
-                      | {normalize_label(x) for x in self.cfg.get("watchlist", [])})
+        liked_keys = set(self.label_tier_map())
         if not liked_keys:
             return {}
         hits = dd.artist_ids_for_labels(liked_keys)
@@ -515,8 +525,7 @@ class Ctx:
         max_corp = max(cs.values(), default=1.0) or 1.0
         max_art = max((v[0] for v in las.values()), default=1.0) or 1.0
         floor = float(self.scoring["label_affinity_floor"] or 0)
-        watch = {normalize_label(x) for x in self.cfg.get("watchlist", [])}
-        base = {normalize_label(x) for x in self.cfg.get("labels", [])}
+        label_tiers = self.label_tier_map()
         # `db` (artiste Cœur/Aimés au catalogue + graphe de co-crédits, référentiel local)
         # élargit l'univers classé au-delà de ce que collection/corpus/las connaissent déjà —
         # un label jamais possédé ni écouté mais où un artiste aimé a un disque doit pouvoir
@@ -549,7 +558,7 @@ class Ctx:
             rows.append({"key": k, "name": info.get("name") or db_names.get(k) or k, "score": score,
                          "owned": lc.get(k, 0), "want": wc.get(k, 0),
                          "corpus": round(cs.get(k, 0), 1), "aff": aff, "coverage": coverage,
-                         "artists": art_n, "watched": k in watch, "in_base": k in base, "feat": feat})
+                         "artists": art_n, "tier": label_tiers.get(k), "feat": feat})
         rows.sort(key=lambda r: r["score"], reverse=True)
         return rows
 

@@ -352,9 +352,54 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     bien ces valeurs plutôt que les constantes 5/5, `settings_save` enregistre les 2
     nouveaux champs). Non testé en conditions réelles (pas de token Discogs/YouTube
     depuis cette session cloud).
+37. **Refonte scoring — Lot 1 : labels Cœur(T1)/Aimé(T2)** (11/09, chantier de fond issu
+    d'un diagnostic Opus + arbitrages utilisateur, lot 1/5) : les 2 listes à plat
+    `cfg["labels"]` (base) et `cfg["watchlist"]` (veille nouveautés) remplacées par
+    `cfg["label_categories"] = {"1": [...], "2": [...]}`, même modèle que
+    `artist_categories`. Migration automatique au chargement (`store.load_config`) :
+    ancienne base -> Cœur (signal fort déjà curé), ancien watchlist non déjà en base ->
+    Aimé, dédoublonné. `scoring.py` : nouveau `Ctx.label_tier_map()` (miroir de
+    `artist_tier_map()`) remplace tous les accès directs à `cfg["labels"]`/`["watchlist"]`
+    (`artist_label_signal`, `reco_rows`, `graph_rescore`, `stats`). **Changement de
+    comportement assumé** (simplification demandée) : `job_scan_veille` scannait
+    avant SEULEMENT `watchlist` pour la règle implicite « labels suivis » — un label
+    en base sans être aussi en watchlist n'était pas surveillé pour ses nouveautés.
+    Depuis ce lot, TOUT label suivi (Cœur ou Aimé) l'est automatiquement, il n'y a
+    plus de distinction base/veille séparée (`job_scan_veille`, `job_scan_recos`
+    utilisent désormais l'union Cœur+Aimé). UI : `/univers` (tab labels) a maintenant
+    un sélecteur Cœur/Aimé à l'ajout + une colonne « Catégorie » dans le tableau
+    (`<select>`, `POST /univers/label/set`, exactement le même composant que la
+    table d'artistes) ; `/reco/label` prend un paramètre `tier` (1/2) au lieu de
+    `dest` (base/veille/both) ; import CSV labels (`/patte/import-csv?kind=labels`)
+    prend désormais un sélecteur de catégorie comme l'import artistes ; export CSV
+    (`/univers/labels/export`) inclut une colonne `categorie` (miroir de l'export
+    artistes). Route `/univers/labels/import` (Réglages) supprimée : dupliquait
+    `/patte/import-csv?kind=labels` et n'était plus liée nulle part depuis le
+    nettoyage du point 19 — code mort. Labels nouvellement détectés automatiquement
+    (`job_fetch_collection`, `job_merge_corpus`) atterrissent en Aimé par défaut
+    (comme un import CSV sans réglage explicite), l'utilisateur les promeut en
+    Cœur ensuite depuis le tableau s'il le souhaite. Vérifié par smoke tests
+    hors-ligne (migration ancien format -> label_categories, dédoublonnage,
+    `label_tier_map`/`stats`, les routes d'ajout/retrait/changement de tier, rendu
+    Jinja de `/univers`, `/univers/labels/table`, `/univers/reco/labels`, `/patte`,
+    `/veille` sans erreur). Non testé en conditions réelles (pas de token Discogs
+    depuis cette session cloud) — en particulier l'effet du changement de
+    comportement `job_scan_veille` sur un vrai jeu de labels. Lots suivants (2 à 5,
+    graphe labels global / DAG scoring / précalcul track_scores via nouveau module
+    `scorestore.py` / UI sur tables précalculées) pas commencés — arbitrages déjà
+    actés : précalcul release d'abord puis piste par piste pour le top scoré
+    (comme RECOS), `scorestore.py` séparé de `discogs_dump.py` (référentiel partagé
+    remplacé en bloc, incompatible avec des données par utilisateur), livraison
+    lot par lot avec point de contrôle après chacun.
 
 ## TODO — prochaine session
 
+- **Vérifier le Lot 1 refonte scoring (labels Cœur/Aimé, point 37)** sur le VPS
+  après déploiement : confirmer que la migration ne perd aucun label (comparer le
+  total Cœur+Aimé à l'ancien total base+watchlist dédoublonné), que l'ajout/retrait/
+  changement de catégorie fonctionne dans `/univers`, et surtout que
+  `job_scan_veille` couvre bien maintenant TOUS les labels suivis (Cœur ET Aimé)
+  pour les nouveautés — pas seulement l'ancien watchlist.
 - **Vérifier les 2 curseurs RECOS RADAR** (point 36) sur le VPS après déploiement :
   régler « Recherches YouTube par alimentation » et « Capacité de la playlist » dans
   `/settings`, enregistrer, puis confirmer sur `/reco-radar` que le plafond affiché

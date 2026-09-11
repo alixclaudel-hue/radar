@@ -202,7 +202,9 @@
       <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
         <label>Labels
         <input type="file" name="file" accept=".csv" required></label>
-        <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer</label>
+        <label class="small">Catégorie
+        <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimé</option></select></label>
+        <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer (ce tier)</label>
         <button type="submit" class="small">Importer</button>
       </form>
       <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
@@ -227,7 +229,7 @@
   <div class="stat" title="artistes croisés dans ta collection, ton écoute ou tes DJ sets, classés ou non"><b>{{ st.artists_identified }}</b><span>artistes croisés dans ton écoute</span></div>
   <div class="stat" title="connexions entre artistes détectées via leurs sorties communes"><b>{{ st.graph_edges }}</b><span>liens entre artistes</span></div>
   <div class="stat" title="titres (YouTube, Spotify, Bandcamp, DJ sets...) déjà analysés pour affiner tes recommandations"><b>{{ st.tracks }}</b><span>titres analysés</span></div>
-  <div class="stat" title="règles de nouveautés actives / vendeurs suivis"><b>{{ st.watchlist }} / {{ st.sellers }}</b><span>nouveautés / vendeurs</span></div>
+  <div class="stat" title="règles de nouveautés actives / vendeurs suivis"><b>{{ st.veille_rules_active }} / {{ st.sellers }}</b><span>nouveautés / vendeurs</span></div>
   {% if st.not_found %}
   <div class="stat" title="labels ou artistes jamais retrouvés sur Discogs — vérifie l'orthographe ou retire-les"><b><a href="/univers">{{ st.not_found }}</a></b><span>jamais identifiés sur Discogs</span></div>
   {% endif %}

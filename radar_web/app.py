@@ -372,17 +372,21 @@ def _csv_first_column(raw):
             for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
 
 
-def _add_labels(c, names, replace=False):
-    """Ajoute des labels à la base (dédoublonnés par nom canonique).
-    Modifie `c` sans l'enregistrer — l'appelant décide quand sauver."""
+def _add_labels(c, names, tier="2", replace=False):
+    """Ajoute des labels à la catégorie Cœur(1)/Aimé(2) `tier` (dédoublonnés par nom
+    canonique, tous tiers confondus — même modèle que artist_categories). `replace`
+    ne vide que le tier ciblé. Modifie `c` sans l'enregistrer — l'appelant décide
+    quand sauver."""
+    lc = c.setdefault("label_categories", {"1": [], "2": []})
+    tier = tier if tier in ("1", "2") else "2"
     if replace:
-        c["labels"] = []
-    have = {normalize_label(x) for x in c["labels"]}
+        lc[tier] = []
+    have = {normalize_label(x) for cid in ("1", "2") for x in lc.get(cid, [])}
     added = 0
     for n in names:
         if normalize_label(n) not in have:
             have.add(normalize_label(n))
-            c["labels"].append(n)
+            lc.setdefault(tier, []).append(n)
             added += 1
     return added
 
@@ -612,9 +616,11 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
         _queue_enrich("artists", names)
         store.save_config(c)
         return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
-    added = _add_labels(c, names, replace=bool(replace))
+    t = tier if tier in ("1", "2") else "2"
+    added = _add_labels(c, names, tier=t, replace=bool(replace))
     store.save_config(c)
-    return HTMLResponse(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
+    total = sum(len(v) for v in c.get("label_categories", {}).values())
+    return HTMLResponse(f"✓ {added} label(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} » (base : {total}).")
 
 
 # ============================================================ 🔍 Chercher un disque
@@ -716,23 +722,25 @@ def search_replay(request: Request, sid: str):
 
 
 def _base_labels_ranked(c):
-    """Labels de la base -> nom canonique + affinité. Tri : affinité de style
-    décroissante, départagée par le score de reco (collection + corpus + artistes),
-    puis alpha. Dédoublonné par nom canonique."""
+    """Labels Cœur/Aimés (label_categories) -> nom canonique + affinité + tier. Tri :
+    affinité de style décroissante, départagée par le score de reco (collection +
+    corpus + artistes), puis alpha. Dédoublonné par nom canonique."""
     ridx = c.reco_index
-    lc = c.collection.get("label_counts", {})
+    lc_counts = c.collection.get("label_counts", {})
     lids = c.collection.get("label_ids", {})
-    keys = [store.normalize_label(name) for name in c.cfg.get("labels", [])]
+    lcats = c.cfg.get("label_categories", {})
+    names = [(n, cid) for cid in ("1", "2") for n in lcats.get(cid, [])]
+    keys = [store.normalize_label(n) for n, _ in names]
     affinities = c.label_affinities(keys)
     rows, seen = [], set()
-    for name, key in zip(c.cfg.get("labels", []), keys):
+    for (name, cid), key in zip(names, keys):
         res = c.resolved.get(key) or {}
         disp = res.get("discogs_name") or res.get("original") or name
         aff, coverage = affinities[key]["aff"], affinities[key]["coverage"]
         did = res.get("discogs_id") or lids.get(key, {}).get("id")
-        rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key,
+        rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key, "tier": cid,
                      "aff": aff, "coverage": coverage, "_reco": ridx.get(key, 0),
-                     "owned": lc.get(key, 0), "id": did})
+                     "owned": lc_counts.get(key, 0), "id": did})
     rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
     uniq = []
     for r in rows:
@@ -1538,8 +1546,9 @@ def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
 @app.get("/veille", response_class=HTMLResponse)
 def veille_page(request: Request, saved: int = 0):
     c = _cfg()
+    followed_labels = [n for cid in ("1", "2") for n in c.get("label_categories", {}).get(cid, [])]
     return render(request, "pages/veille.html", active="veille", saved=saved,
-                  rules=c.get("veille_rules", []), watchlist=c.get("watchlist", []),
+                  rules=c.get("veille_rules", []), watchlist=followed_labels,
                   sellers=c.get("sellers", []), year=CURRENT_YEAR,
                   v_last=max((v.get("last_scan", "") for v in load(_pu().veille_seen, {}).values()), default=""),
                   s_last=max((v.get("last_scan", "") for v in load(_pu().sellers_seen, {}).values()), default=""))
@@ -1598,17 +1607,16 @@ def sellers_remove(name: str = Form("")):
 
 
 @app.post("/reco/label", response_class=HTMLResponse)
-def reco_label(name: str = Form(""), dest: str = Form("base")):
+def reco_label(name: str = Form(""), tier: str = Form("2")):
     c = _cfg()
     name = name.strip()
-    if name:
+    if name and tier in ("1", "2"):
+        lc = c.setdefault("label_categories", {"1": [], "2": []})
         nk = normalize_label(name)
-        if dest in ("base", "both") and nk not in {normalize_label(x) for x in c["labels"]}:
-            c["labels"].append(name)
-        if dest in ("veille", "both") and nk not in {normalize_label(x) for x in c.get("watchlist", [])}:
-            c.setdefault("watchlist", []).append(name)
-        _queue_enrich("labels", [name])
-        store.save_config(c)
+        if nk not in {normalize_label(x) for cid in ("1", "2") for x in lc.get(cid, [])}:
+            lc.setdefault(tier, []).append(name)
+            _queue_enrich("labels", [name])
+            store.save_config(c)
     return HTMLResponse("<span class='small muted'>✓ ajouté</span>")
 
 
@@ -1630,7 +1638,7 @@ def reco_artist(name: str = Form(""), tier: str = Form("2")):
 @app.get("/univers/reco/labels", response_class=HTMLResponse)
 def reco_labels_frag(request: Request):
     c = Ctx()
-    base = {normalize_label(x) for x in c.cfg.get("labels", [])}
+    base = set(c.label_tier_map())
     rows = []
     for r in c.reco_rows():
         if r["key"] not in base:
@@ -1712,7 +1720,8 @@ def univers_page(request: Request, tab: str = "labels"):
     artist_graphs = load(_pu().artist_graphs, [])
     review = _review_ctx(c)
     return render(request, "pages/univers.html", active="univers", tab=tab, cfg=c.cfg,
-                  n_labels=len(c.cfg.get("labels", [])), n_profiled=len(c.profile),
+                  n_labels=sum(len(v) for v in c.cfg.get("label_categories", {}).values()),
+                  n_profiled=len(c.profile),
                   n_artists=sum(len(v) for v in ac.values()),
                   n_sets=len([r for r in c.corpus if r.get("source") == "djset"]),
                   n_cart=len(load(_pu().cart, [])),
@@ -1751,11 +1760,16 @@ def _sort_rows(rows, field, reverse):
     return rows
 
 
+_LABEL_CAT_NAME = {"1": "Cœur", "2": "Aimé"}
+
+
 @app.get("/univers/labels/table", response_class=HTMLResponse)
 def univers_labels_table(request: Request, flt: str = "", page: int = 1,
                           sort: str = "", dir: str = "desc"):
     c = Ctx()
     rows = _base_labels_ranked(c)
+    for r in rows:
+        r["cat"] = _LABEL_CAT_NAME.get(r["tier"], "—")
     if flt:
         f = flt.lower()
         rows = [r for r in rows if f in r["disp"].lower()]
@@ -1771,18 +1785,20 @@ def univers_labels_table(request: Request, flt: str = "", page: int = 1,
 
 
 @app.post("/univers/labels/add", response_class=HTMLResponse)
-def univers_labels_add(request: Request, name: str = Form("")):
+def univers_labels_add(request: Request, name: str = Form(""), tier: str = Form("2")):
     c = _cfg()
     name = name.strip()
+    t = tier if tier in ("1", "2") else "2"
     ok, msg = False, "Identifiant vide."
     if name:
-        if normalize_label(name) in {normalize_label(x) for x in c["labels"]}:
+        lc = c.setdefault("label_categories", {"1": [], "2": []})
+        if normalize_label(name) in {normalize_label(x) for cid in ("1", "2") for x in lc.get(cid, [])}:
             msg = f"« {name} » est déjà dans ta base."
         else:
-            c["labels"].append(name)
+            lc.setdefault(t, []).append(name)
             _queue_enrich("labels", [name])
             store.save_config(c)
-            ok, msg = True, f"✓ « {name} » ajouté."
+            ok, msg = True, f"✓ « {name} » ajouté en « {_LABEL_CAT_NAME[t]} »."
     return HTMLResponse(f"<span class='small {'ok' if ok else 'notice warn'}'>{html.escape(msg)}</span>")
 
 
@@ -1790,9 +1806,26 @@ def univers_labels_add(request: Request, name: str = Form("")):
 def univers_labels_remove(request: Request, name: str = Form(""), flt: str = Form(""),
                           page: int = Form(1), sort: str = Form(""), dir: str = Form("desc")):
     c = _cfg()
-    c["labels"] = [l for l in c["labels"] if l != name]
+    lc = c.setdefault("label_categories", {"1": [], "2": []})
+    for cid in ("1", "2"):
+        lc[cid] = [l for l in lc.get(cid, []) if l != name]
     store.save_config(c)
     return univers_labels_table(request, flt=flt, page=page, sort=sort, dir=dir)
+
+
+@app.post("/univers/label/set", response_class=HTMLResponse)
+def univers_label_set(name: str = Form(""), cat: str = Form("")):
+    c = _cfg()
+    lc = c.setdefault("label_categories", {"1": [], "2": []})
+    nk = normalize_label(name)
+    for cid in ("1", "2"):
+        lc[cid] = [x for x in lc.get(cid, []) if normalize_label(x) != nk]
+    tgt = {v: k for k, v in _LABEL_CAT_NAME.items()}.get(cat)
+    if tgt:
+        lc.setdefault(tgt, []).append(name)
+        _queue_enrich("labels", [name])
+    store.save_config(c)
+    return _ok("✓")
 
 
 def _graph_link_facts(deg, weight, unit):
@@ -2038,15 +2071,6 @@ def univers_sets_delete_track(rid: str = Form("")):
     return HTMLResponse("")
 
 
-@app.post("/univers/labels/import", response_class=HTMLResponse)
-async def univers_labels_import(request: Request, file: UploadFile, replace: str = Form("")):
-    raw = (await file.read()).decode("utf-8", "ignore")
-    c = _cfg()
-    added = _add_labels(c, _csv_first_column(raw), replace=bool(replace))
-    store.save_config(c)
-    return _ok(f"✓ {added} label(s) ajouté(s) (base : {len(c['labels'])}).")
-
-
 def _csv_cell(s):
     s = str(s).replace('"', '""')
     return f'"{s}"'
@@ -2054,8 +2078,12 @@ def _csv_cell(s):
 
 @app.get("/univers/labels/export")
 def univers_labels_export():
-    lines = ["name"] + [_csv_cell(l) for l in _cfg().get("labels", [])]
-    return Response("\n".join(lines) + "\n", media_type="text/csv",
+    lc = _cfg().get("label_categories", {})
+    rows = ["name,categorie"]
+    for cid, cat in (("1", "Coeur"), ("2", "Aime")):
+        for n in lc.get(cid, []):
+            rows.append(f"{_csv_cell(n)},{cat}")
+    return Response("\n".join(rows) + "\n", media_type="text/csv",
                     headers={"Content-Disposition": "attachment; filename=radar_labels.csv"})
 
 

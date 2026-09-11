@@ -142,12 +142,31 @@ _ENV_SECRETS = (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY
 def load_config(uid=None):
     data = load(paths.user_paths(uid or current_uid()).config, {}) or {}
     data.setdefault("token", "")
-    data.setdefault("labels", [])
-    data.setdefault("watchlist", [])
     data.setdefault("sellers", [])
     data.setdefault("veille_rules", [])
     data.setdefault("taste_categories", {k: list(v) for k, v in DEFAULT_TASTE_CATEGORIES.items()})
     data.setdefault("artist_categories", {"1": [], "2": []})
+    # migration labels/watchlist (2 listes à plat) -> label_categories (Cœur T1 / Aimé T2,
+    # même modèle que artist_categories) : "labels" (base) devient Cœur (signal fort, déjà
+    # curé), "watchlist" (surveillance nouveautés) devient Aimé (signal plus faible) pour
+    # les entrées pas déjà en base. Simplifie aussi job_scan_veille (plus de distinction
+    # base/veille : TOUT label suivi, Cœur ou Aimé, est désormais scanné pour ses nouveautés).
+    if "labels" in data or "watchlist" in data:
+        lc = data.setdefault("label_categories", {"1": [], "2": []})
+        seen = {normalize_label(x) for cid in ("1", "2") for x in lc.get(cid, [])}
+        for n in data.get("labels") or []:
+            if normalize_label(n) not in seen:
+                seen.add(normalize_label(n))
+                lc.setdefault("1", []).append(n)
+        for n in data.get("watchlist") or []:
+            if normalize_label(n) not in seen:
+                seen.add(normalize_label(n))
+                lc.setdefault("2", []).append(n)
+        data.pop("labels", None)
+        data.pop("watchlist", None)
+    lc = data.setdefault("label_categories", {"1": [], "2": []})
+    for k in ("1", "2"):
+        lc.setdefault(k, [])
     # migration poids éparses -> scoring
     if "scoring" not in data:
         sc = deep_merge(DEFAULT_SCORING, {})

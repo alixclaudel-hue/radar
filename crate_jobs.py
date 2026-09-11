@@ -2784,6 +2784,185 @@ def job_build_catalog_labelgraph(job, params):
                f"{stats['n_parent_edges']} par hiérarchie label parent/enfant.")
 
 
+SCORESTORE_PER_LABEL_LIMIT = 500  # même limite/même raison que RECOS_PER_LABEL_LIMIT (diagnostic D6)
+SCORESTORE_FETCHES_PER_RUN = 20   # repli si scoring.scorestore.fetches_per_run absent
+
+
+def _chain_scorestore_tracks():
+    """Enfile scorestore_tracks après scorestore_releases, que le scan release
+    ait bougé quelque chose ou non — même principe que _chain_publish_recos :
+    une passe piste par piste laissée en plan par un précédent quota API
+    épuisé doit continuer à progresser aux scans suivants."""
+    from radar_web.radar import jobs as job_queue
+    if not any(j["name"] == "scorestore_tracks" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
+        job_queue.launch("scorestore_tracks", {}, uid=RADAR_UID)
+
+
+def job_scorestore_releases(job, params):
+    """Lot 4 de la refonte scoring (cf. CLAUDE.md point 37) : précalcule le
+    score de chaque sortie des labels suivis (Cœur + Aimé) dans
+    radar/scorestore.py (fichier SQLite par utilisateur, séparé du
+    référentiel Discogs partagé — cf. docstring du module : ces données sont
+    par utilisateur, pas remplacées en bloc comme le dump mensuel). Même
+    formule que la Recherche/RECOS RADAR (Ctx.album_score, pas une nouvelle
+    règle), mais ici SANS filtre de seuil ni limite de nouveautés : toutes
+    les sorties des labels suivis sont notées, pas seulement les mieux
+    placées ni seulement les jamais-vues — objectif d'infrastructure (Lot 5
+    lira ces tables), pas une file de candidats à consommer une fois.
+
+    Calcul purement local (aucun appel réseau) : contrairement à RECOS,
+    chaque lancement REFAIT le score de toutes les sorties suivies plutôt que
+    de sauter celles déjà vues, pour rester automatiquement à jour après un
+    changement de goût sans bookkeeping de fraîcheur séparé — le volume
+    (sorties des labels suivis, plafonné par label comme RECOS) reste assez
+    petit pour que ce soit bon marché.
+
+    Chaîne toujours job_scorestore_tracks en fin de course (comme
+    job_scan_recos chaîne job_publish_recos) : la passe piste par piste
+    (coûteuse — appel API pour la tracklist réelle) tourne dans un job
+    séparé, avec son propre budget."""
+    from radar_web.radar import discogs_dump as dd
+    from radar_web.radar import scorestore
+    from radar_web.radar.scoring import Ctx
+
+    cfg = cfg_load()
+    if not dd.available():
+        return job.finish(error="Référentiel Discogs local indisponible (dump pas encore importé).")
+
+    lcats = cfg.get("label_categories", {})
+    names = [n for cid in ("1", "2") for n in lcats.get(cid, [])]
+    label_keys = sorted({normalize_label(n) for n in names if n and n.strip()})
+
+    con = scorestore.open_db(RADAR_UID)
+    try:
+        scorestore.prune_labels(con, label_keys)
+        if not label_keys:
+            _chain_scorestore_tracks()
+            return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à noter.")
+
+        rows, row_ids = [], set()
+        for lk in label_keys:
+            for row in dd.search_local(label_keys=[lk], limit=SCORESTORE_PER_LABEL_LIMIT):
+                if row["id"] not in row_ids:
+                    row_ids.add(row["id"])
+                    rows.append(row)
+
+        ctx = Ctx(uid=RADAR_UID)
+        job.st["total"] = len(rows)
+        n_scored = 0
+        for i, row in enumerate(rows, 1):
+            if job.stopped():
+                break
+            title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
+            styles = row["styles"].split(", ") if row.get("styles") else []
+            score, detail = ctx.album_score({
+                "label": [row["label"]] if row.get("label") else [], "title": title, "style": styles})
+            scorestore.upsert_release_score(con, {
+                "release_id": row["id"], "label_key": normalize_label(row.get("label") or ""),
+                "label": row.get("label"), "artist": row.get("artist"), "title": row.get("title"),
+                "year": row.get("year"), "styles": row.get("styles"), "score": score, "detail": detail})
+            if score is not None:
+                n_scored += 1
+            job.tick(f"{row.get('artist')} — {row.get('title')} : {score if score is not None else '—'}")
+            if i % 200 == 0:
+                con.commit()
+        con.commit()
+        stats = scorestore.stats(con)
+    finally:
+        con.close()
+    _chain_scorestore_tracks()
+    job.finish(f"{n_scored} sortie(s) notée(s) sur {len(rows)} scannée(s), "
+               f"{len(label_keys)} label(s) suivi(s) — {stats['n_releases']} au total en base.")
+
+
+def job_scorestore_tracks(job, params):
+    """Passe piste par piste de radar/scorestore.py (Lot 4, suite de
+    job_scorestore_releases) : deux étapes indépendantes dans le même job —
+
+    (a) rafraîchit GRATUITEMENT (recalcul local, sans appel réseau) le score
+    de toute piste déjà connue, pour rester à jour après un changement de
+    goût sans jamais redemander sa tracklist à l'API — une sortie tombée
+    sous le seuil depuis garde ses pistes déjà récupérées à jour (cf.
+    scorestore.releases_with_tracks) ;
+
+    (b) récupère la tracklist réelle (API Discogs — le dump local n'en
+    contient pas, cf. discogs_dump.py) des sorties les mieux notées qui
+    n'ont ENCORE aucune piste connue, plafonné à
+    scoring.scorestore.fetches_per_run appels par lancement (même principe
+    de budget que RECOS_SEARCHES_PER_RUN — coût réseau/rate-limit Discogs,
+    pas juste de la CPU)."""
+    from radar_web.radar import scorestore
+    from radar_web.radar.scoring import Ctx, real_tracks
+
+    if not scorestore.available(RADAR_UID):
+        return job.finish("Rien à noter (lance d'abord scorestore_releases).")
+
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    sc = cfg.get("scoring", {}).get("scorestore", {})
+    min_score = float(params.get("min_score", sc.get("min_score", 60)))
+    fetches_per_run = int(params.get("fetches_per_run", sc.get("fetches_per_run", SCORESTORE_FETCHES_PER_RUN)))
+
+    con = scorestore.open_db(RADAR_UID)
+    try:
+        ctx = Ctx(uid=RADAR_UID)
+
+        # (a) rafraîchissement gratuit des pistes déjà connues, quel que soit
+        # leur score courant (cf. docstring de releases_with_tracks).
+        n_rescored = 0
+        for r in scorestore.releases_with_tracks(con):
+            styles = r["styles"].split(", ") if r.get("styles") else []
+            tracks = scorestore.tracks_for_release(con, r["release_id"])
+            updated = []
+            for t in tracks:
+                title = f"{t['artist']} - {t['title']}" if t.get("artist") else (t.get("title") or "")
+                score, _ = ctx.album_score({"label": [r["label"]] if r.get("label") else [],
+                                             "title": title, "style": styles})
+                updated.append({**t, "score": score})
+            scorestore.upsert_track_scores(con, r["release_id"], updated)
+            n_rescored += len(updated)
+        con.commit()
+
+        if not token:
+            job.finish(f"{n_rescored} piste(s) rafraîchie(s) — pas de token Discogs, "
+                       "récupération de nouvelles tracklists sautée.")
+            return
+
+        # (b) tracklist des sorties top-scorées pas encore couvertes.
+        targets = scorestore.top_releases(
+            con, min_score=min_score, without_tracks_only=True, limit=fetches_per_run)
+        job.st["total"] = len(targets)
+        n_new_releases, n_new_tracks = 0, 0
+        for row in targets:
+            if job.stopped():
+                break
+            d = discogs_get(token, f"/releases/{row['release_id']}")
+            tracks = real_tracks(d.get("tracklist", [])) if d else []
+            styles = row["styles"].split(", ") if row.get("styles") else []
+            scored_tracks = []
+            for i, t in enumerate(tracks):
+                ttl = (t.get("title") or "").strip()
+                if not ttl:
+                    continue
+                art = _track_credit_artist(t, row.get("artist") or "")
+                title = f"{art} - {ttl}" if art else ttl
+                score, _ = ctx.album_score({"label": [row["label"]] if row.get("label") else [],
+                                             "title": title, "style": styles})
+                scored_tracks.append({"track_no": i, "artist": art, "title": ttl, "score": score})
+            if scored_tracks:
+                scorestore.upsert_track_scores(con, row["release_id"], scored_tracks)
+                n_new_releases += 1
+                n_new_tracks += len(scored_tracks)
+            job.tick(f"{row.get('artist')} — {row.get('title')} : +{len(scored_tracks)} piste(s)"
+                     if d else f"{row.get('artist')} — {row.get('title')} : sortie indisponible (API)")
+            con.commit()
+            time.sleep(1.1)
+    finally:
+        con.close()
+    job.finish(f"{n_rescored} piste(s) rafraîchie(s) — "
+               f"+{n_new_tracks} nouvelle(s) piste(s) sur {n_new_releases} sortie(s).")
+
+
 JOBS = {
     "scan_catalog": job_scan_catalog,
     "import_discogs_dump": job_import_discogs_dump,
@@ -2804,6 +2983,8 @@ JOBS = {
     "scan_veille": job_scan_veille,
     "scan_recos": job_scan_recos,
     "publish_recos": job_publish_recos,
+    "scorestore_releases": job_scorestore_releases,
+    "scorestore_tracks": job_scorestore_tracks,
 }
 
 

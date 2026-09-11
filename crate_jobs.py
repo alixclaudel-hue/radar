@@ -85,7 +85,7 @@ RECOS_SEEN_PATH = os.path.join(USER_DIR, "recos_seen.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
-RECOS_MAX_TRACKS = 5  # limite de test (10/09, retour utilisateur) — remonter une fois validé
+RECOS_MAX_TRACKS = 5  # repli si scoring.recos.max_tracks absent (curseur /settings, 10/09)
 RECOS_DAILY_SEARCH_BUDGET = 45
 # marge sous le quota gratuit YouTube Data API (10 000 unités/jour) : évite que
 # scan_recos empile plus de candidats que publish_recos ne peut en chercher sur
@@ -94,7 +94,7 @@ RECOS_DAILY_SEARCH_BUDGET = 45
 # qui ne trouve rien en coûte 202 (recherche avec label, puis sans, plus /videos) :
 # la file entière brûlait le quota du jour et les candidats suivants tombaient en
 # « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
-RECOS_SEARCHES_PER_RUN = 5
+RECOS_SEARCHES_PER_RUN = 5  # repli si scoring.recos.searches_per_run absent
 RECOS_MAX_ATTEMPTS = 3
 RECOS_PER_LABEL_LIMIT = 500
 # search_local(label_keys=<tous les labels suivis>, limit=5000) faisait une seule
@@ -2205,14 +2205,15 @@ def job_publish_recos(job, params):
     vidéos via l'API IFrame Player. Seul appel réseau ici : la recherche vidéo (lecture
     seule) via ytcache (cache partagé + cascade de clés, Option A étape 5a).
 
-    Plafonnée à RECOS_MAX_TRACKS pistes : au-delà, la plus ancienne est retirée avant
-    d'ajouter la nouvelle (FIFO) — pas de détection d'écoute réelle (l'ancien lot 3,
-    scraping Playwright de l'historique YouTube, a été abandonné, cf. CLAUDE.md).
+    Plafonnée à scoring.recos.max_tracks pistes (curseur /settings, repli
+    RECOS_MAX_TRACKS) : au-delà, la plus ancienne est retirée avant d'ajouter la
+    nouvelle (FIFO) — pas de détection d'écoute réelle (l'ancien lot 3, scraping
+    Playwright de l'historique YouTube, a été abandonné, cf. CLAUDE.md).
 
-    Au plus RECOS_SEARCHES_PER_RUN recherches YouTube par lancement — sur le nombre de
-    RECHERCHES tentées, pas seulement les ajouts réussis, pour que la conso quota reste
-    bornée même si la plupart des candidats échouent à matcher (cf. commentaire de la
-    constante)."""
+    Au plus scoring.recos.searches_per_run recherches YouTube par lancement
+    (curseur /settings, repli RECOS_SEARCHES_PER_RUN) — sur le nombre de
+    RECHERCHES tentées, pas seulement les ajouts réussis, pour que la conso quota
+    reste bornée même si la plupart des candidats échouent à matcher."""
     candidates = load_json(RECOS_CANDIDATES_PATH, [])
     if not candidates:
         return job.finish("Aucun candidat en attente.")
@@ -2220,6 +2221,9 @@ def job_publish_recos(job, params):
     playlist = load_json(RECOS_PLAYLIST_PATH, [])
     cfg = cfg_load()
     keys = ytcache.youtube_keys(cfg)
+    rc = cfg.get("scoring", {}).get("recos", {})
+    searches_per_run = int(rc.get("searches_per_run", RECOS_SEARCHES_PER_RUN))
+    max_tracks = int(rc.get("max_tracks", RECOS_MAX_TRACKS))
     # historique permanent (jamais purgé) : {video_id: entrée} + identité de piste
     # (artiste/titre) déjà publiée par le passé, même si elle n'est plus dans la
     # playlist (FIFO ou suppression manuelle) — retour utilisateur 2026-09-10.
@@ -2229,7 +2233,7 @@ def job_publish_recos(job, params):
     remaining, added, searched, quota_hit = [], 0, 0, False
     now = datetime.now().isoformat(timespec="seconds")
     for c in candidates:
-        if job.stopped() or quota_hit or searched >= RECOS_SEARCHES_PER_RUN:
+        if job.stopped() or quota_hit or searched >= searches_per_run:
             remaining.append(c)
             continue
         ck = (style_key(c.get("artist")), style_key(c.get("title")))
@@ -2284,18 +2288,18 @@ def job_publish_recos(job, params):
         history_keys.add(ck)
         added += 1
         job.tick(f"{c['artist']} — {c['title']} : ajoutée")
-        if len(playlist) > RECOS_MAX_TRACKS:
+        if len(playlist) > max_tracks:
             dropped = playlist.pop(0)
             job.tick(f"{dropped.get('artist')} — {dropped.get('title')} : retirée "
-                     f"(plafond {RECOS_MAX_TRACKS})")
+                     f"(plafond {max_tracks})")
         save_json(RECOS_HISTORY_PATH, list(history.values()))
         save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_HISTORY_PATH, list(history.values()))
     save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_CANDIDATES_PATH, remaining)
-    note = (f" — limite de recherche ({RECOS_SEARCHES_PER_RUN}) atteinte."
-            if searched >= RECOS_SEARCHES_PER_RUN else "")
-    job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{RECOS_MAX_TRACKS}, "
+    note = (f" — limite de recherche ({searches_per_run}) atteinte."
+            if searched >= searches_per_run else "")
+    job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{max_tracks}, "
                f"{len(remaining)} en attente.{note}")
 
 

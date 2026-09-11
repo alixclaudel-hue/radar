@@ -101,7 +101,9 @@
 
   <h3>🎯 RECOS RADAR
     {{ reset_btn([['recos__min_score', sc.recos.min_score],
-                  ['recos__max_new_releases', sc.recos.max_new_releases]]) }}
+                  ['recos__max_new_releases', sc.recos.max_new_releases],
+                  ['recos__searches_per_run', sc.recos.searches_per_run],
+                  ['recos__max_tracks', sc.recos.max_tracks]]) }}
   </h3>
   <p class="muted small">Seuil et volume du scan quotidien des labels suivis pour la playlist YouTube
     « RECOS RADAR » (Mes sources → RECOS RADAR).</p>
@@ -110,6 +112,20 @@
       <input name="recos__min_score" type="number" step="1" value="{{ sc.recos.min_score }}"></label></div>
     <div class="field"><label>Sorties max par scan
       <input name="recos__max_new_releases" type="number" step="1" value="{{ sc.recos.max_new_releases }}"></label></div>
+  </div>
+  <div class="row wgroup__fields">
+    <div class="field">
+      <label>Recherches YouTube par alimentation <b id="recos-searches-out">{{ sc.recos.searches_per_run|int }}</b>
+        <span class="muted">· pistes cherchées à chaque clic « ▶ Alimenter la playlist »</span></label>
+      <input type="range" id="recos-searches" name="recos__searches_per_run" min="1" max="45" step="1"
+             value="{{ sc.recos.searches_per_run|int }}">
+    </div>
+    <div class="field">
+      <label>Capacité de la playlist <b id="recos-maxtracks-out">{{ sc.recos.max_tracks|int }}</b>
+        <span class="muted">· au-delà, la piste la plus ancienne est retirée (FIFO)</span></label>
+      <input type="range" id="recos-maxtracks" name="recos__max_tracks" min="1" max="100" step="1"
+             value="{{ sc.recos.max_tracks|int }}">
+    </div>
   </div>
 
   <hr>
@@ -129,6 +145,12 @@
         input.dispatchEvent(new Event('change', { bubbles: true }));
       });
     });
+  });
+})();
+(function () {
+  [['recos-searches', 'recos-searches-out'], ['recos-maxtracks', 'recos-maxtracks-out']].forEach(function (pair) {
+    var inp = document.getElementById(pair[0]), out = document.getElementById(pair[1]);
+    if (inp && out) inp.addEventListener('input', function () { out.textContent = inp.value; });
   });
 })();
 </script>

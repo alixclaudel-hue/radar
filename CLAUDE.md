@@ -335,8 +335,31 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
     sorties 2012 mieux scorées) : label B atteint désormais le scoring malgré le
     volume de label A. Non testé contre le vrai référentiel Discogs (pas d'accès
     réseau depuis cette session cloud).
+36. **RECOS RADAR — 2 curseurs Réglages** (10/09, demande utilisateur) : plafond
+    `RECOS_MAX_TRACKS`/`RECOS_SEARCHES_PER_RUN` de `crate_jobs.py` (jusqu'ici
+    constantes figées, dupliquées dans `radar_web/app.py` pour l'affichage, cf.
+    ancien point 19 "à resynchroniser si modifié") passés dans la config, réglables
+    via `/settings` : `scoring.recos.searches_per_run` (recherches YouTube par
+    clic « ▶ Alimenter la playlist », curseur 1-45 — plafonné au budget quotidien
+    `RECOS_DAILY_SEARCH_BUDGET`) et `scoring.recos.max_tracks` (capacité FIFO de la
+    playlist, curseur 1-100). Les 2 constantes du module restent en repli si la clé
+    est absente d'une config jamais réglée (nouvel utilisateur). `job_publish_recos`
+    lit `cfg["scoring"]["recos"]` (déjà chargé) plutôt que les constantes ; `/reco-radar`
+    (affichage) lit la même clé via `_cfg()` au lieu de l'ancienne constante
+    `app.RECOS_MAX_TRACKS` dupliquée — plus besoin de resynchroniser les deux fichiers
+    à la main. Vérifié par smoke test hors-ligne (rendu Jinja des 2 curseurs, config
+    par défaut, `job_publish_recos` avec `max_tracks=2`/`searches_per_run=3` respecte
+    bien ces valeurs plutôt que les constantes 5/5, `settings_save` enregistre les 2
+    nouveaux champs). Non testé en conditions réelles (pas de token Discogs/YouTube
+    depuis cette session cloud).
 
 ## TODO — prochaine session
+
+- **Vérifier les 2 curseurs RECOS RADAR** (point 36) sur le VPS après déploiement :
+  régler « Recherches YouTube par alimentation » et « Capacité de la playlist » dans
+  `/settings`, enregistrer, puis confirmer sur `/reco-radar` que le plafond affiché
+  (« X/Y ») et le comportement réel de « ▶ Alimenter la playlist » suivent bien les
+  nouvelles valeurs (pas les anciennes constantes 5/5).
 
 - **Vérifier le correctif du point 35** (scan toujours daté de l'année en cours) sur
   le VPS après déploiement : cliquer « 🗑️🔄 Forcer (tout rescanner) », confirmer au

@@ -7,5 +7,8 @@
   },
   "app-overview:discogs-dump-py-and-scoring-process": {
     "commit": "5d8610be566cac1f80dd6b6188209e3f411af847"
+  },
+  "app-overview:scoring-system-from-dump-discogs-to-sqli": {
+    "commit": "0f509ce9a45c16144b605353be5c0e4bcac7af56"
   }
 }

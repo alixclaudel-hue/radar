@@ -19,6 +19,18 @@ Diagramme associé : `docs/app-diagram-brief-scoring-lot1.md` (instructions de
 dessin) + `docs/app-overview-scoring-lot1.excalidraw` (rendu, 3 groupes/14
 boîtes/22 flèches — à ouvrir sur excalidraw.com ou l'extension VS Code).
 
+**Doc technique — référentiel Discogs local + scoring** :
+`docs/app-overview-discogs-dump-py-and-scoring-process.md` — périmètre plus
+étroit et plus technique que le doc Lot 1 ci-dessus : uniquement
+`radar_web/radar/discogs_dump.py` (téléchargement/parsing du dump mensuel,
+bascule atomique, schéma SQLite, `search_local`/`resolve_name`/
+`label_style_counts`/`artist_ids_for_labels`) et `radar_web/radar/scoring.py`
+(classe `Ctx`, pipeline complet dump → `wmap`/`ascore`/`reco_rows`/
+`album_score`) — `store.py`, `catalog_labelgraph.py` et les jobs appelants
+traités comme externes (mentionnés seulement comme sources/appelants).
+Généré en session cloud le 2026-09-11 à partir du code lu directement — même
+mise en garde que ci-dessus, à relire si ces deux fichiers évoluent.
+
 **Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé, point 37) et
 Lot 2 (graphe labels global, point 38) faits — **Lot 2 pas encore mergé**, cf.
 TODO ci-dessous pour la vérification VPS attendue avant de merger. **Lot 3 —

@@ -35,6 +35,10 @@ from .store import load, save
 
 DB_PATH = os.path.join(paths.SHARED_DIR, "catalog_labelgraph.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "catalog_labelgraph_meta.json")
+# Sortie d'une construction TEST (sur discogs_dump.TEST_DB_PATH) : fichier séparé,
+# jamais DB_PATH — cf. discogs_dump.TEST_DB_PATH pour le contexte (demande
+# utilisateur du 11/09, valider ce lot sans attendre le réimport complet).
+TEST_DB_PATH = os.path.join(paths.SHARED_DIR, "catalog_labelgraph_test.sqlite3")
 
 # Un artiste crédité sur un nombre déraisonnable de labels distincts (ex.
 # alias générique mal résolu, ou carrière de session-man sur des décennies)
@@ -93,9 +97,10 @@ def _create_indexes(con):
     con.execute("CREATE INDEX IF NOT EXISTS idx_label_pairs_b ON label_pairs(b)")
 
 
-def _open_new_db():
+def _open_new_db(out_path=None):
+    path = out_path or DB_PATH
     os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    new_path = DB_PATH + ".new"
+    new_path = path + ".new"
     for p in (new_path, new_path + "-wal", new_path + "-shm"):
         try:
             os.remove(p)
@@ -110,19 +115,20 @@ def _open_new_db():
     return con
 
 
-def _finalize_new_db(con):
+def _finalize_new_db(con, out_path=None):
+    path = out_path or DB_PATH
     _create_indexes(con)
     con.execute("ANALYZE")
     con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     con.execute("PRAGMA journal_mode=DELETE")
     con.close()
-    new_path = DB_PATH + ".new"
+    new_path = path + ".new"
     for suffix in ("-wal", "-shm"):
         try:
             os.remove(new_path + suffix)
         except OSError:
             pass
-    os.replace(new_path, DB_PATH)
+    os.replace(new_path, path)
 
 
 def _flush(con, counter):
@@ -209,7 +215,8 @@ def _build_parent_edges(dump_con, out_con):
 
 
 def build(dump_con=None, progress_cb=None, stop_cb=None,
-          max_labels_per_artist=MAX_LABELS_PER_ARTIST, flush_every=FLUSH_EVERY):
+          max_labels_per_artist=MAX_LABELS_PER_ARTIST, flush_every=FLUSH_EVERY,
+          out_path=None):
     """Reconstruit entièrement `label_pairs` (arêtes "artist" puis "parent",
     cf. docstring du module) à partir du référentiel Discogs partagé (déjà
     importé, cf. `discogs_dump.py`).
@@ -217,6 +224,10 @@ def build(dump_con=None, progress_cb=None, stop_cb=None,
     `dump_con` : connexion déjà ouverte sur discogs_dump.sqlite3 (repli :
     `discogs_dump.connect_readonly()`) - permet aux tests de passer une base
     en mémoire minimale sans dépendre d'un vrai dump importé.
+
+    `out_path` : cible de la bascule finale (défaut `DB_PATH`) — une
+    construction TEST (cf. `TEST_DB_PATH`) passe `TEST_DB_PATH` ici pour ne
+    jamais toucher au graphe réel déjà servi.
 
     Retourne {"n_labels", "n_edges", "n_artist_edges", "n_parent_edges",
     "n_artists_used", "n_artists_skipped_prolific"}. Lève RuntimeError si
@@ -231,7 +242,8 @@ def build(dump_con=None, progress_cb=None, stop_cb=None,
         if dump_con is None:
             raise RuntimeError("référentiel Discogs local absent")
 
-    out_con = _open_new_db()
+    path = out_path or DB_PATH
+    out_con = _open_new_db(out_path=path)
     try:
         n_artists_used, n_artists_skipped = _build_artist_edges(
             dump_con, out_con, progress_cb, stop_cb, max_labels_per_artist, flush_every)
@@ -242,7 +254,7 @@ def build(dump_con=None, progress_cb=None, stop_cb=None,
         n_labels = out_con.execute(
             "SELECT COUNT(DISTINCT lbl) FROM (SELECT a AS lbl FROM label_pairs UNION SELECT b FROM label_pairs)"
         ).fetchone()[0]
-        _finalize_new_db(out_con)
+        _finalize_new_db(out_con, out_path=path)
         out_con = None  # déjà fermée par _finalize_new_db
         return {"n_labels": n_labels, "n_edges": n_edges,
                 "n_artist_edges": n_artist_edges, "n_parent_edges": n_parent_edges,
@@ -251,7 +263,7 @@ def build(dump_con=None, progress_cb=None, stop_cb=None,
         if out_con is not None:
             out_con.close()
             try:
-                os.remove(DB_PATH + ".new")
+                os.remove(path + ".new")
             except OSError:
                 pass
         if owns_con:

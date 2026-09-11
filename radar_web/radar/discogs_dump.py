@@ -37,6 +37,11 @@ from .store import load, normalize_label, save
 DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_meta.json")
 RAW_DIR = os.path.join(paths.SHARED_DIR, "discogs_dump_raw")
+# Sortie d'un import TEST (job_import_discogs_dump avec le paramètre `limit`) :
+# fichier séparé, jamais DB_PATH — sert à valider un changement de pipeline sur un
+# sous-ensemble en quelques minutes avant de payer le ~1h45 d'un import complet
+# (demande utilisateur du 11/09, cf. CLAUDE.md points 38/39).
+TEST_DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_test.sqlite3")
 # Checkpoint de reprise (releases_done/vinyl + étape atteinte) : un import complet dure
 # ~1h45, largement plus long qu'un cycle de déploiement — sans ça, un redéploiement en
 # plein milieu (rebuild Docker sur CHAQUE merge, pas seulement ceux qui touchent au dump)
@@ -441,13 +446,13 @@ def _detect_needs_wrap(gz_path, root_tag=b"<releases"):
     return needs_wrap, skip
 
 
-def open_new_db(resume=False):
-    """Ouvre le fichier de reconstruction `DB_PATH + ".new"` : PRAGMAs d'import
-    puis schéma créé (sans index — cf. `_create_indexes`). Un cycle d'import
-    enchaîne `import_releases`/`import_labels`/`import_artists` sur la MÊME
-    connexion (les trois dumps du mois vont dans la même base), puis
+def open_new_db(resume=False, db_path=None):
+    """Ouvre le fichier de reconstruction `db_path + ".new"` (défaut `DB_PATH`) :
+    PRAGMAs d'import puis schéma créé (sans index — cf. `_create_indexes`). Un
+    cycle d'import enchaîne `import_releases`/`import_labels`/`import_artists`
+    sur la MÊME connexion (les trois dumps du mois vont dans la même base), puis
     `finalize_new_db()` une fois tout importé : index + bascule atomique
-    unique. Reconstruire à part, jamais dans `DB_PATH` lui-même, ferme la
+    unique. Reconstruire à part, jamais dans `db_path` lui-même, ferme la
     fenêtre où `available()` mentirait pendant les ~1h45 que dure un import
     (cf. diagnostic D1) — l'appli lit l'ancienne base valide jusqu'à la
     dernière seconde, et un import interrompu ne détruit jamais l'existant.
@@ -455,9 +460,14 @@ def open_new_db(resume=False):
     `resume=True` : reprise d'un import interrompu (cf.
     `discogs_dump_import.state.json`, même `dump_date`) — rouvre le `.new`
     existant tel quel, sans le vider ni recréer le schéma (les tables
-    contiennent déjà les lignes committées avant l'interruption)."""
+    contiennent déjà les lignes committées avant l'interruption).
+
+    `db_path` : cible de la bascule finale (défaut `DB_PATH`) — un import TEST
+    (cf. `TEST_DB_PATH`) passe `TEST_DB_PATH` ici pour ne jamais toucher au
+    référentiel réel pendant qu'il sert des lectures."""
+    path = db_path or DB_PATH
     os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    new_path = DB_PATH + ".new"
+    new_path = path + ".new"
     if resume and os.path.exists(new_path):
         con = sqlite3.connect(new_path)
         con.execute("PRAGMA journal_mode=WAL")
@@ -500,10 +510,12 @@ def _materialize_label_styles(con):
     con.execute("CREATE INDEX idx_ls_label ON label_styles(label_key)")
 
 
-def finalize_new_db(con):
+def finalize_new_db(con, db_path=None):
     """Index + profil de style par label + ANALYZE puis bascule atomique de
-    `.new` vers `DB_PATH`. À appeler une fois tous les dumps du cycle
-    importés sur `con` (`open_new_db()`) — ferme la connexion."""
+    `.new` vers `db_path` (défaut `DB_PATH` — doit être le MÊME chemin que
+    celui passé à `open_new_db()`). À appeler une fois tous les dumps du
+    cycle importés sur `con` (`open_new_db()`) — ferme la connexion."""
+    path = db_path or DB_PATH
     _create_indexes(con)
     _materialize_label_styles(con)
     con.execute("ANALYZE")
@@ -517,17 +529,17 @@ def finalize_new_db(con):
     # + synchronous=OFF pendant la CONSTRUCTION (cf. open_new_db) reste un vrai gain.
     con.execute("PRAGMA journal_mode=DELETE")
     con.close()
-    new_path = DB_PATH + ".new"
+    new_path = path + ".new"
     for suffix in ("-wal", "-shm"):               # compagnons WAL du fichier temporaire
         try:
             os.remove(new_path + suffix)
         except OSError:
             pass
-    os.replace(new_path, DB_PATH)
+    os.replace(new_path, path)
 
 
 def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
-                     resume_from=0, resume_vinyl=0, checkpoint_cb=None):
+                     resume_from=0, resume_vinyl=0, checkpoint_cb=None, limit=None):
     """Parse en flux le dump releases.xml.gz, garde TOUTES les sorties (tous
     formats, cf. module docstring), insère en base par lots dans
     `releases`/`release_styles`/`release_artists`, sur une connexion déjà
@@ -545,7 +557,13 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
     comme base du compteur retourné. `checkpoint_cb(seen, n_vinyl)` : appelé
     juste après chaque commit (`flush`) — seen/n_vinyl à ce moment-là
     correspondent toujours à des lignes déjà committées, jamais à un état
-    intermédiaire (sûr à persister comme point de reprise)."""
+    intermédiaire (sûr à persister comme point de reprise).
+
+    `limit` : coupe le flux après ce nombre de `<release>` VUS (pas
+    forcément tous retenus) — pour un import TEST rapide sur un
+    sous-ensemble (cf. `discogs_dump.TEST_DB_PATH`), jamais utilisé sur un
+    import réel, donc incompatible avec `resume_from` (les deux ne sont
+    jamais passés ensemble)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<releases")
@@ -600,13 +618,15 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
                     flush()
             if progress_cb and seen % 20000 == 0:
                 progress_cb(seen)
+            if limit and seen >= limit:      # mode test : arrêt propre, `with` referme le flux normalement
+                break
     flush()
     if progress_cb:
         progress_cb(seen)
     return seen, n_vinyl
 
 
-def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
+def import_labels(con, gz_path, progress_cb=None, batch_size=5000, limit=None):
     """Parse en flux discogs_{date}_labels.xml.gz -> table `labels`, sur une
     connexion déjà ouverte par `open_new_db()`. Retourne n_total.
 
@@ -622,7 +642,12 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
     balise que l'enregistrement racine. Un compteur de profondeur distingue
     les deux : ne traiter comme enregistrement que le `<label>` qui revient à
     profondeur 0 (referme un enregistrement racine, pas une référence
-    imbriquée)."""
+    imbriquée).
+
+    `limit` : coupe le flux après ce nombre d'enregistrements racine vus
+    (mode test, cf. `import_releases`) — la résolution parent/parent_id ne
+    porte alors que sur les labels réellement vus, un lien vers un parent
+    situé après la coupure reste juste non résolu (`parent_id IS NULL`)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<labels")
@@ -667,6 +692,8 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
                 flush()
             if progress_cb and n_total % 20000 == 0:
                 progress_cb(n_total)
+            if limit and n_total >= limit:
+                break
     flush()
     if parent_of:
         con.executemany(
@@ -678,7 +705,7 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
     return n_total
 
 
-def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
+def import_artists(con, gz_path, progress_cb=None, batch_size=5000, limit=None):
     """Parse en flux discogs_{date}_artists.xml.gz -> tables `artists` +
     `artist_aliases`, sur une connexion déjà ouverte par `open_new_db()`.
     Retourne n_total. `artist_aliases` ne couvre que les `namevariations`
@@ -686,7 +713,10 @@ def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
     `_create_schema` pour pourquoi les `<aliases>` n'ont pas besoin d'un lien
     de plus ici. Compteur de profondeur par précaution (cf. `import_labels`) :
     si `<groups>`/`<members>` venait à imbriquer une balise `artist`, elle ne
-    serait pas comptée comme un enregistrement racine."""
+    serait pas comptée comme un enregistrement racine.
+
+    `limit` : coupe le flux après ce nombre d'enregistrements racine vus
+    (mode test, cf. `import_releases`)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<artists")
@@ -732,6 +762,8 @@ def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
                 flush()
             if progress_cb and n_total % 20000 == 0:
                 progress_cb(n_total)
+            if limit and n_total >= limit:
+                break
     flush()
     if progress_cb:
         progress_cb(n_total)

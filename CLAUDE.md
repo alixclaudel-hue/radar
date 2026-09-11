@@ -575,24 +575,80 @@ entre-temps.
     réelle de la base résultante et le temps d'import restent à confirmer sur
     le VPS avant de merger — cf. TODO ci-dessous. **Pas encore mergé** (branche
     `claude/hello-e87dpo`), comme les points 38 et ci-dessus.
+40. **Import TEST à durée limitée** (11/09, demande utilisateur : valider les
+    points 38/39 sans payer le ~1h45 d'un réimport complet) : nouveau
+    paramètre `params["limit"]` sur le job `import_discogs_dump`
+    (`crate_jobs.py`, `_job_import_discogs_dump_test`) — mêmes fichiers dump
+    réels (téléchargement + vérification checksum inchangés, c'est le
+    parsing/insertion des ~18-20M lignes qui coûte le ~1h45, pas le
+    téléchargement), mais le parsing de chaque flux (releases/labels/artists)
+    est coupé après `limit` éléments VUS (`discogs_dump.import_releases`/
+    `import_labels`/`import_artists`, nouveau paramètre `limit`), et le
+    résultat va dans un fichier SÉPARÉ (`discogs_dump.TEST_DB_PATH` =
+    `discogs_dump_test.sqlite3`) — jamais `discogs_dump.sqlite3`,
+    `discogs_dump_meta.json` ni `discogs_dump_import.state.json` réels, qui
+    restent totalement inchangés pendant et après un run test (pas de
+    résume non plus : un test interrompu se relance simplement en entier vu
+    sa taille). `open_new_db()`/`finalize_new_db()` prennent un `db_path`
+    optionnel (défaut `DB_PATH`) pour permettre cette bascule vers un chemin
+    différent. Les `.gz` téléchargés sont volontairement CONSERVÉS après un
+    run test (pas supprimés comme après un import réel) : le prochain
+    réimport complet les réutilise au lieu de retélécharger plusieurs Go.
+    `job_build_catalog_labelgraph` reçoit symétriquement un `params["test"]`
+    (bool) : construit à partir de `discogs_dump.TEST_DB_PATH` au lieu du
+    référentiel réel, écrit dans `catalog_labelgraph.TEST_DB_PATH` (nouveau,
+    `catalog_labelgraph_test.sqlite3`) au lieu de `catalog_labelgraph.sqlite3`
+    — `catalog_labelgraph.build()`/`_open_new_db()`/`_finalize_new_db()` ont
+    un `out_path` optionnel pour ça — et ignore les garde-fous
+    `available()`/`needs_rebuild()` (pas de dump/meta réel en jeu). Aucun des
+    deux jobs n'est exposé dans l'UI (`VALID_JOBS` de `app.py` inchangé) :
+    lancement en CLI seulement sur le VPS, ex.
+    `python crate_jobs.py import_discogs_dump '{"limit": 5000}'` puis
+    `python crate_jobs.py build_catalog_labelgraph '{"test": true}'` — ce
+    n'est pas une fonctionnalité utilisateur, juste un outil de validation
+    jetable pour ce chantier. Vérifié par smoke test hors-ligne (flux XML
+    synthétiques : 3 releases/3 labels dont 1 parent-enfant/3 artists,
+    `limit=2` sur chaque flux — exactement 2 éléments retenus par flux, le
+    lien parent/enfant entre les 2 labels retenus correctement résolu,
+    fichiers réels `discogs_dump.sqlite3`/`catalog_labelgraph.sqlite3`
+    jamais créés/touchés à aucun moment). **Non testé contre un vrai dump
+    Discogs** (pas d'accès réseau depuis cette session cloud) : le temps réel
+    d'un run avec un `limit` de quelques milliers d'éléments (download inclus)
+    reste à mesurer sur le VPS — c'est justement l'outil que la TODO
+    ci-dessous demande d'utiliser en premier, avant le réimport complet.
 
 ## TODO — prochaine session
 
+- **Étape 0 — import TEST limité avant tout réimport complet (point 40,
+  demande utilisateur du 11/09)** : sur le VPS, lancer d'abord
+  `python crate_jobs.py import_discogs_dump '{"limit": 5000}'` (ajuster
+  `limit` selon le temps observé — pas de valeur mesurée en réel, à
+  calibrer : commencer petit, ex. 2000-5000, et remonter si le job est très
+  rapide) puis `python crate_jobs.py build_catalog_labelgraph '{"test": true}'`
+  — écrit dans `discogs_dump_test.sqlite3`/`catalog_labelgraph_test.sqlite3`,
+  jamais dans les fichiers réels. Sert à vérifier le Lot 2 (point 38) et le
+  schéma élargi tous formats (point 39) en quelques minutes. Boucler sur ce
+  cycle test pour chaque lot à valider (3, 4, 5) AVANT de lancer le réimport
+  complet ci-dessous une seule fois à la fin, quand tout est prêt à merger —
+  pas un réimport par lot.
 - **Vérifier l'élargissement du référentiel à tous les formats (point 39)**
-  sur le VPS — pas encore mergé, à traiter avant de merger : relancer
-  `import_discogs_dump` en entier (pas un `force` sur un dump déjà à jour,
-  il faut un VRAI réimport pour peupler `is_vinyl` et récupérer les formats
-  non-vinyle) et confirmer : taille finale de `discogs_dump.sqlite3` et temps
-  d'import (comparer au ~3G/~1h45 connus pour le vinyle seul — attention
-  disque, cf. point 12), le message de fin donne un `n_total` très supérieur
-  à l'ancien total vinyle avec un `n_vinyl` cohérent en sous-compte. Vérifier
-  ensuite qu'une recherche ciblée (`/search`) ou `job_scan_recos` ne se
-  retrouve pas noyé de doublons CD/digital d'un même disque au point de
-  dégrader l'usage réel (sinon, ajouter un filtre `is_vinyl=1` là où c'est
-  gênant plutôt que de revenir en arrière sur l'élargissement).
-- **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** sur le
-  VPS après déploiement — ce lot n'est pas encore mergé, à traiter avant de
-  merger (comme le Lot 1) : activer `RADAR_CATALOG_LABELGRAPH=1` sur le
+  sur le VPS — pas encore mergé, à traiter avant de merger : une fois
+  l'étape 0 concluante, relancer `import_discogs_dump` en entier (pas un
+  `force` sur un dump déjà à jour, il faut un VRAI réimport pour peupler
+  `is_vinyl` et récupérer les formats non-vinyle) et confirmer : taille
+  finale de `discogs_dump.sqlite3` et temps d'import (comparer au ~3G/~1h45
+  connus pour le vinyle seul — attention disque, cf. point 12), le message
+  de fin donne un `n_total` très supérieur à l'ancien total vinyle avec un
+  `n_vinyl` cohérent en sous-compte. Vérifier ensuite qu'une recherche
+  ciblée (`/search`) ou `job_scan_recos` ne se retrouve pas noyé de doublons
+  CD/digital d'un même disque au point de dégrader l'usage réel (sinon,
+  ajouter un filtre `is_vinyl=1` là où c'est gênant plutôt que de revenir en
+  arrière sur l'élargissement).
+- **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** —
+  d'abord via l'étape 0 (import TEST, point 40) pour un premier passage
+  rapide (schéma, 2 types d'arête, pas de crash), PUIS sur le VPS en réel
+  après le réimport complet — ce lot n'est pas encore mergé, à traiter avant
+  de merger (comme le Lot 1) : activer `RADAR_CATALOG_LABELGRAPH=1` sur le
   service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
   (référentiel Discogs déjà importé requis), et confirmer au journal : temps
   d'exécution raisonnable sur le vrai volume de `release_artists`, nombre de

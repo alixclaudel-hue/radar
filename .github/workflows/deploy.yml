@@ -18,7 +18,10 @@ jobs:
           mkdir -p ~/.ssh
           echo "$VPS_SSH_KEY_B64" | base64 -d > ~/.ssh/id
           chmod 600 ~/.ssh/id
-          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/id \
+          
+          # Ligne SSH modifiée avec les options anti-déconnexion (ServerAliveInterval)
+          ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=20 \
+              -o StrictHostKeyChecking=accept-new -i ~/.ssh/id \
             "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" 'bash -s' <<'REMOTE'
           set -e
           cd ~/radar

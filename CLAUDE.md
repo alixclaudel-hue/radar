@@ -45,10 +45,9 @@ code actuel (incohérence signalée à l'utilisateur, objectif reformulé en
 "rendre le DAG explicite" plutôt que "casser un cycle") — `NODE_DEPS` +
 `topological_order()` (vérifié à l'import) + vérification à l'exécution dans
 `Ctx._memo()`, aucun changement de comportement (détail → point 41). **PR
-#136 ouverte le 11/09** (point de contrôle utilisateur obtenu — accord donné
-pour merger sur `main`), merge en cours (CI `check` à confirmer avant le
-merge effectif, cf. TODO ci-dessous pour l'état exact au moment de la
-reprise). Puis Lot 4 (précalcul asynchrone `track_scores`, nouveau module
+#136 mergée sur `main` le 11/09** (accord utilisateur donné, CI verte).
+**Prochain point de contrôle à demander avant de démarrer le Lot 4** (pas
+encore commencé) : précalcul asynchrone `track_scores`, nouveau module
 `scorestore.py`, séparé de `discogs_dump.py`), Lot 5 (UI lit tables
 précalculées). Livraison lot par lot, point de contrôle utilisateur après
 chacun (arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans
@@ -685,27 +684,22 @@ validation entre-temps.
     stash) sur le même jeu synthétique — strictement identiques. Non testé à
     l'échelle réelle (pas de token Discogs ni de vraies données utilisateur
     depuis cette session cloud), mais aucun changement de formule ne le
-    justifie ici — refactor de structure pur. **PR #136 ouverte le 11/09**
-    (`claude/hello-e87dpo` → `main`), accord utilisateur donné pour merger —
-    merge lancé, bloqué une première fois par la règle de statut requis
-    ("check" en cours), branche remise à jour avec `main` (commit
-    `.dockerignore` #135 entre-temps) puis repoussée ; merge à confirmer une
-    fois le CI repassé au vert sur ce nouveau commit (cf. TODO).
+    justifie ici — refactor de structure pur. **PR #136 mergée sur `main`
+    le 11/09** (accord utilisateur, CI verte) — premier essai de merge
+    refusé par la règle de statut requis ("check" pas encore terminé),
+    branche resynchronisée avec `main` (PR #135 `.dockerignore` mergée
+    entre-temps) puis repoussée, merge confirmé au 2e essai.
 
 ## TODO — prochaine session
 
-- **PR #136 (Lot 3, graphe DAG explicite, point 41) : merge en cours, à
-  confirmer.** Ouverte sur `claude/hello-e87dpo` → `main`, accord utilisateur
-  obtenu. Premier essai de merge refusé par la règle de statut requis
-  ("check" pas encore terminé) ; branche resynchronisée avec `main` entre
-  temps (elle avait pris du retard, PR #135 mergée pendant l'attente) et
-  repoussée. Vérifier que le check CI est vert sur le dernier commit de la
-  branche et que la PR est bien mergée sur `main` — sinon relancer le merge
-  (`merge_pull_request`, PR #136) une fois le check passé. Pur refactor de
-  structure (pas de nouvelle route/UI à tester manuellement) une fois mergé.
-  Accord donné pour MERGER ce lot ; démarrer le Lot 4 (`scorestore.py`)
-  reste un nouveau point de contrôle à demander explicitement (cf. point 37,
-  "ne pas enchaîner plusieurs lots sans validation entre-temps").
+- **PR #136 (Lot 3, graphe DAG explicite, point 41) mergée sur `main` le
+  11/09.** Pur refactor de structure (`NODE_DEPS`/`topological_order()`/
+  vérification `Ctx._memo()`, aucun changement de comportement) — pas de
+  nouvelle route/UI à vérifier sur le VPS pour ce lot. Accord donné pour
+  MERGER ce lot uniquement ; démarrer le Lot 4 (`scorestore.py`, précalcul
+  asynchrone `track_scores`) reste un nouveau point de contrôle à demander
+  explicitement avant de coder (cf. point 37, "ne pas enchaîner plusieurs
+  lots sans validation entre-temps").
 - **PR #132 mergée sur `main` le 11/09** (Lot 2 + référentiel tous formats +
   import TEST) — déployée sur le VPS. **Étape 0 (import TEST, point 40) faite
   et concluante le 11/09** (résultats → points 38/39/40) : Lot 2 et

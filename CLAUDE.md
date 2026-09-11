@@ -32,8 +32,15 @@ Généré en session cloud le 2026-09-11 à partir du code lu directement — m�
 mise en garde que ci-dessus, à relire si ces deux fichiers évoluent.
 
 **Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé, point 37) et
-Lot 2 (graphe labels global, point 38) faits — **Lot 2 pas encore mergé**, cf.
-TODO ci-dessous pour la vérification VPS attendue avant de merger. **Lot 3 —
+Lot 2 (graphe labels global, point 38) faits. **Ordre merge/vérification VPS
+inversé le 11/09** (décision utilisateur) : PR #132 ouverte pour Lot 2 +
+référentiel tous formats (point 39) + import TEST (point 40) — merger d'abord
+sur `main` (déploiement auto VPS avec health-check/rollback), PUIS lancer les
+vérifications VPS de la TODO ci-dessous sur le code déployé. Ancienne règle
+« attendre vérification VPS avant de merger » abandonnée : pas de vrai merge
+indépendant possible sur le VPS lui-même (il ne fait que suivre `main`), et le
+filet health-check/rollback du déploiement couvre déjà un code cassé au
+démarrage. **Lot 3 —
 DAG scoring** est la suite : casser les dépendances circulaires de `Ctx`. Puis
 Lot 4 (précalcul asynchrone `track_scores`, nouveau module `scorestore.py`,
 séparé de `discogs_dump.py`), Lot 5 (UI lit les tables précalculées).
@@ -522,9 +529,9 @@ entre-temps.
     réel de `release_artists`/`labels` sur le catalogue vinyle complet, le
     temps d'exécution du job, la proportion réelle de labels avec un parent
     déclaré, et la pertinence du plafond `MAX_LABELS_PER_ARTIST=40` restent à
-    confirmer sur le VPS — cf. TODO ci-dessous. **Pas encore mergé** (branche
-    `claude/hello-e87dpo`) : attendre la vérification VPS avant de merger,
-    comme pour le Lot 1.
+    confirmer sur le VPS — cf. TODO ci-dessous. **PR #132 ouverte** (branche
+    `claude/hello-e87dpo` → `main`) : ordre inversé le 11/09 (cf. ci-dessus),
+    merger d'abord, vérifier sur le VPS après déploiement.
 39. **Référentiel Discogs élargi à TOUS les formats** (11/09, décision utilisateur
     après discussion des tradeoffs, suite du point 38) : `discogs_dump.py`
     filtrait jusqu'ici les sorties au vinyle 12"/LP uniquement dès l'import
@@ -573,8 +580,8 @@ entre-temps.
     ce qui aurait été invisible avant ce changement). **Non testé à l'échelle
     réelle** (pas de vrai dump Discogs depuis cette session cloud) : la taille
     réelle de la base résultante et le temps d'import restent à confirmer sur
-    le VPS avant de merger — cf. TODO ci-dessous. **Pas encore mergé** (branche
-    `claude/hello-e87dpo`), comme les points 38 et ci-dessus.
+    le VPS après déploiement — cf. TODO ci-dessous. **PR #132 ouverte**
+    (branche `claude/hello-e87dpo` → `main`), même PR que le point 38.
 40. **Import TEST à durée limitée** (11/09, demande utilisateur : valider les
     points 38/39 sans payer le ~1h45 d'un réimport complet) : nouveau
     paramètre `params["limit"]` sur le job `import_discogs_dump`
@@ -619,37 +626,40 @@ entre-temps.
 
 ## TODO — prochaine session
 
+- **PR #132 ouverte** (`claude/hello-e87dpo` → `main`, Lot 2 + référentiel tous
+  formats + import TEST) : **ordre inversé le 11/09** (décision utilisateur,
+  cf. « Prochaine session » ci-dessus) — merger d'abord sur `main`
+  (déploiement auto VPS, health-check/rollback), PUIS enchaîner les
+  vérifications ci-dessous sur le code déployé. Ne pas relancer un réimport
+  complet à l'aveugle juste après le merge : commencer par l'étape 0 (import
+  TEST, point 40) sur le code déployé pour un premier passage rapide.
 - **Étape 0 — import TEST limité avant tout réimport complet (point 40,
-  demande utilisateur du 11/09)** : sur le VPS, lancer d'abord
-  `python crate_jobs.py import_discogs_dump '{"limit": 5000}'` (ajuster
-  `limit` selon le temps observé — pas de valeur mesurée en réel, à
+  demande utilisateur du 11/09)** : une fois la PR mergée et déployée, sur le
+  VPS lancer d'abord `python crate_jobs.py import_discogs_dump '{"limit": 5000}'`
+  (ajuster `limit` selon le temps observé — pas de valeur mesurée en réel, à
   calibrer : commencer petit, ex. 2000-5000, et remonter si le job est très
   rapide) puis `python crate_jobs.py build_catalog_labelgraph '{"test": true}'`
   — écrit dans `discogs_dump_test.sqlite3`/`catalog_labelgraph_test.sqlite3`,
   jamais dans les fichiers réels. Sert à vérifier le Lot 2 (point 38) et le
-  schéma élargi tous formats (point 39) en quelques minutes. Boucler sur ce
-  cycle test pour chaque lot à valider (3, 4, 5) AVANT de lancer le réimport
-  complet ci-dessous une seule fois à la fin, quand tout est prêt à merger —
-  pas un réimport par lot.
+  schéma élargi tous formats (point 39) en quelques minutes avant de risquer
+  le réimport complet.
 - **Vérifier l'élargissement du référentiel à tous les formats (point 39)**
-  sur le VPS — pas encore mergé, à traiter avant de merger : une fois
-  l'étape 0 concluante, relancer `import_discogs_dump` en entier (pas un
-  `force` sur un dump déjà à jour, il faut un VRAI réimport pour peupler
-  `is_vinyl` et récupérer les formats non-vinyle) et confirmer : taille
-  finale de `discogs_dump.sqlite3` et temps d'import (comparer au ~3G/~1h45
-  connus pour le vinyle seul — attention disque, cf. point 12), le message
-  de fin donne un `n_total` très supérieur à l'ancien total vinyle avec un
-  `n_vinyl` cohérent en sous-compte. Vérifier ensuite qu'une recherche
-  ciblée (`/search`) ou `job_scan_recos` ne se retrouve pas noyé de doublons
-  CD/digital d'un même disque au point de dégrader l'usage réel (sinon,
-  ajouter un filtre `is_vinyl=1` là où c'est gênant plutôt que de revenir en
-  arrière sur l'élargissement).
-- **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** —
-  d'abord via l'étape 0 (import TEST, point 40) pour un premier passage
-  rapide (schéma, 2 types d'arête, pas de crash), PUIS sur le VPS en réel
-  après le réimport complet — ce lot n'est pas encore mergé, à traiter avant
-  de merger (comme le Lot 1) : activer `RADAR_CATALOG_LABELGRAPH=1` sur le
-  service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
+  sur le VPS après déploiement : une fois l'étape 0 concluante, relancer
+  `import_discogs_dump` en entier (pas un `force` sur un dump déjà à jour, il
+  faut un VRAI réimport pour peupler `is_vinyl` et récupérer les formats
+  non-vinyle) et confirmer : taille finale de `discogs_dump.sqlite3` et temps
+  d'import (comparer au ~3G/~1h45 connus pour le vinyle seul — attention
+  disque, cf. point 12), le message de fin donne un `n_total` très supérieur
+  à l'ancien total vinyle avec un `n_vinyl` cohérent en sous-compte. Vérifier
+  ensuite qu'une recherche ciblée (`/search`) ou `job_scan_recos` ne se
+  retrouve pas noyé de doublons CD/digital d'un même disque au point de
+  dégrader l'usage réel (sinon, ajouter un filtre `is_vinyl=1` là où c'est
+  gênant plutôt que de revenir en arrière sur l'élargissement).
+- **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** sur
+  le VPS après déploiement — d'abord via l'étape 0 (import TEST, point 40)
+  pour un premier passage rapide (schéma, 2 types d'arête, pas de crash), PUIS
+  en réel après le réimport complet : activer `RADAR_CATALOG_LABELGRAPH=1` sur
+  le service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
   (référentiel Discogs déjà importé requis), et confirmer au journal : temps
   d'exécution raisonnable sur le vrai volume de `release_artists`, nombre de
   labels/liens obtenus plausible pour CHAQUE type d'arête (« X par artiste

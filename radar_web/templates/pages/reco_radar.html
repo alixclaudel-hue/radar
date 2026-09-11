@@ -20,11 +20,11 @@
     <button type="submit" class="small" title="Vide la file d'attente sans relancer de scan">🗑️ Vider la file d'attente</button>
   </form>
 </div>
-<p class="small muted">« Scanner » cherche de nouvelles sorties chez tes labels suivis. « Forcer » vide la file
-  d'attente et rescanne TOUTES les sorties de tes labels suivis avec le scoring actuel (utile en phase de test
-  après un changement de pondération). « Alimenter » reprend juste les
-  {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente, sans rescanner. « Vider la file
-  d'attente » retire ces candidats sans rescanner ni forcer les sorties déjà vues à revenir.</p>
+<p class="small muted">« Scanner » ajoute les nouvelles pistes déjà notées de tes labels suivis (pas
+  d'appel réseau : les scores sont précalculés en fond, cf. Réglages). « Forcer » vide la file d'attente et la
+  reconstruit depuis les scores actuels (utile en phase de test après un changement de pondération). « Alimenter »
+  reprend juste les {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente pour chercher leur
+  vidéo YouTube. « Vider la file d'attente » retire ces candidats sans rien reconstruire.</p>
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">
@@ -33,8 +33,8 @@
 </p>
 
 {% if not playlist %}
-<p class="muted small" style="margin-top:16px">Playlist vide — lance un scan ci-dessus (nécessite un token Discogs et
-  au moins un label suivi, cf. <a href="/patte">Mes sources</a>).</p>
+<p class="muted small" style="margin-top:16px">Playlist vide — lance un scan ci-dessus (nécessite au moins un
+  label suivi noté, cf. <a href="/patte">Mes sources</a>).</p>
 {% else %}
 <div class="yt-player-wrap"><div id="yt-player"></div></div>
 

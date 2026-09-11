@@ -493,10 +493,10 @@ def reco_radar_delete_track(video_id: str = Form("")):
 @app.post("/reco-radar/clear-candidates")
 def reco_radar_clear_candidates():
     """Vide UNIQUEMENT la file d'attente des candidats prêts à être recherchés sur
-    YouTube (recos_candidates.json) — sans toucher recos_seen.json (donc sans forcer
-    un rescan des sorties déjà vues), ni la playlist publiée, ni l'historique.
-    Distinct de « Forcer (tout rescanner) » qui vide aussi recos_seen.json et relance
-    un scan complet."""
+    YouTube (recos_candidates.json) — ni la playlist publiée, ni l'historique, sans
+    relancer de scan. Distinct de « Forcer (tout rescanner) » qui vide aussi cette
+    file mais relance ensuite job_scan_recos pour la reconstruire depuis
+    radar/scorestore.py (Lot 5, cf. CLAUDE.md point 43)."""
     save(_pu().recos_candidates, [])
     return RedirectResponse("/reco-radar", status_code=303)
 

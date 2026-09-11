@@ -26,8 +26,9 @@ Deux tables :
   gratuite, refaite à chaque passage pour rester à jour après un changement
   de goût sans jamais re-fetcher une tracklist déjà connue).
 
-Lot 4 : infrastructure + jobs seulement — rien ne lit encore ces tables côté
-UI (prévu au Lot 5, cf. CLAUDE.md point 37)."""
+Lot 4 : infrastructure + jobs seulement. Lot 5 (cf. CLAUDE.md point 43) :
+`job_scan_recos` (crate_jobs.py) lit `track_scores` pour alimenter la
+playlist RECOS RADAR — premier consommateur de ces tables."""
 import json
 import os
 import sqlite3
@@ -68,6 +69,7 @@ def _create_schema(con):
             artist TEXT,
             title TEXT,
             score INTEGER,
+            detail_json TEXT,
             computed_at TEXT,
             PRIMARY KEY (release_id, track_no)
         )
@@ -75,18 +77,41 @@ def _create_schema(con):
     con.execute("CREATE INDEX IF NOT EXISTS idx_track_scores_score ON track_scores(score)")
 
 
+def _migrate_schema(con):
+    """`CREATE TABLE IF NOT EXISTS` ne fait rien sur une base déjà créée avec
+    un schéma plus ancien (contrairement à `discogs_dump.py`/
+    `catalog_labelgraph.py`, cette base n'est jamais reconstruite en bloc,
+    cf. docstring du module) — ajoute ici les colonnes apparues après le
+    premier déploiement, sans jamais toucher aux données déjà présentes.
+    `detail_json` sur `track_scores` (Lot 5, cf. CLAUDE.md point 43) : ajouté
+    après coup, une base déployée avant ce lot ne l'a pas encore."""
+    cols = {row[1] for row in con.execute("PRAGMA table_info(track_scores)")}
+    if "detail_json" not in cols:
+        con.execute("ALTER TABLE track_scores ADD COLUMN detail_json TEXT")
+        con.commit()
+
+
 def open_db(uid):
     """Connexion en écriture, schéma créé si absent (`user_paths` a déjà créé
-    le dossier de l'utilisateur). WAL : un futur lecteur (Lot 5) ne bloque
-    jamais sur un job en train d'écrire."""
+    le dossier de l'utilisateur). WAL : un lecteur concurrent (`job_scan_recos`,
+    Lot 5) ne bloque jamais sur un job en train d'écrire."""
     con = sqlite3.connect(db_path(uid))
     con.execute("PRAGMA journal_mode=WAL")
     _create_schema(con)
+    _migrate_schema(con)
     return con
 
 
 def connect_readonly(uid):
-    return sqlite3.connect(db_path(uid)) if available(uid) else None
+    """Connexion en lecture. Applique aussi `_migrate_schema` (idempotente,
+    coût négligeable) : un job de lecture pure (`job_scan_recos`, Lot 5) peut
+    tomber sur une base écrite par une version antérieure du schéma sans
+    jamais passer par `open_db()` entre-temps."""
+    if not available(uid):
+        return None
+    con = sqlite3.connect(db_path(uid))
+    _migrate_schema(con)
+    return con
 
 
 def prune_labels(con, keep_label_keys):
@@ -154,23 +179,31 @@ def releases_with_tracks(con):
 
 
 def upsert_track_scores(con, release_id, tracks):
-    """`tracks` : [{track_no, artist, title, score}, ...] — remplace toutes
-    les pistes listées de cette sortie (upsert par `(release_id, track_no)`,
-    jamais un remplacement en bloc de la sortie entière : une piste absente
-    de `tracks` mais déjà connue reste inchangée)."""
+    """`tracks` : [{track_no, artist, title, score, detail}, ...] — remplace
+    toutes les pistes listées de cette sortie (upsert par
+    `(release_id, track_no)`, jamais un remplacement en bloc de la sortie
+    entière : une piste absente de `tracks` mais déjà connue reste
+    inchangée). `detail` (facultatif, {label, artist, style} de
+    `Ctx.album_score`) : sert au feedback/apprentissage (RECOS RADAR, Lot 5),
+    calculé PAR PISTE (artiste réel de la piste, pas celui de la sortie)."""
     now = datetime.now().isoformat(timespec="seconds")
     con.executemany(
-        "INSERT OR REPLACE INTO track_scores (release_id, track_no, artist, title, score, computed_at) "
-        "VALUES (?,?,?,?,?,?)",
-        [(release_id, t["track_no"], t["artist"], t["title"], t.get("score"), now) for t in tracks])
+        "INSERT OR REPLACE INTO track_scores "
+        "(release_id, track_no, artist, title, score, detail_json, computed_at) "
+        "VALUES (?,?,?,?,?,?,?)",
+        [(release_id, t["track_no"], t["artist"], t["title"], t.get("score"),
+          json.dumps(t.get("detail") or {}), now) for t in tracks])
 
 
 def tracks_for_release(con, release_id):
     rows = con.execute(
-        "SELECT track_no, artist, title, score FROM track_scores "
+        "SELECT track_no, artist, title, score, detail_json FROM track_scores "
         "WHERE release_id = ? ORDER BY track_no", (release_id,)).fetchall()
-    keys = ("track_no", "artist", "title", "score")
-    return [dict(zip(keys, r)) for r in rows]
+    out = []
+    for track_no, artist, title, score, detail_json in rows:
+        out.append({"track_no": track_no, "artist": artist, "title": title, "score": score,
+                     "detail": json.loads(detail_json) if detail_json else {}})
+    return out
 
 
 def stats(con):

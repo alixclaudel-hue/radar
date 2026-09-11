@@ -19,17 +19,34 @@ Diagramme associé : `docs/app-diagram-brief-scoring-lot1.md` (instructions de
 dessin) + `docs/app-overview-scoring-lot1.excalidraw` (rendu, 3 groupes/14
 boîtes/22 flèches — à ouvrir sur excalidraw.com ou l'extension VS Code).
 
-**Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé) fait et mergé
-(PR #130, détail point 37 ci-dessous). **Lot 2 — graphe labels global** est la
-suite : job mensuel déclenché après `import_discogs_dump`, cartographie complète
-des labels sur le référentiel partagé (nouveau fichier `labelgraph.py`), mis à
-jour seulement si le dump a changé (`crate_jobs.py` nouveau job + `worker.py`
-déclencheur). Puis Lot 3 (DAG scoring, casser les dépendances circulaires de
-`Ctx`), Lot 4 (précalcul asynchrone `track_scores`, nouveau module
-`scorestore.py`, séparé de `discogs_dump.py`), Lot 5 (UI lit les tables
-précalculées). Livraison lot par lot avec point de contrôle utilisateur après
-chacun (déjà arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans
-validation entre-temps.
+**Doc technique — référentiel Discogs local + scoring** :
+`docs/app-overview-discogs-dump-py-and-scoring-process.md` — périmètre plus
+étroit et plus technique que le doc Lot 1 ci-dessus : uniquement
+`radar_web/radar/discogs_dump.py` (téléchargement/parsing du dump mensuel,
+bascule atomique, schéma SQLite, `search_local`/`resolve_name`/
+`label_style_counts`/`artist_ids_for_labels`) et `radar_web/radar/scoring.py`
+(classe `Ctx`, pipeline complet dump → `wmap`/`ascore`/`reco_rows`/
+`album_score`) — `store.py`, `catalog_labelgraph.py` et les jobs appelants
+traités comme externes (mentionnés seulement comme sources/appelants).
+Généré en session cloud le 2026-09-11 à partir du code lu directement — même
+mise en garde que ci-dessus, à relire si ces deux fichiers évoluent.
+
+**Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé, point 37) et
+Lot 2 (graphe labels global, point 38) faits. **Ordre merge/vérification VPS
+inversé le 11/09** (décision utilisateur) : PR #132 ouverte pour Lot 2 +
+référentiel tous formats (point 39) + import TEST (point 40) — merger d'abord
+sur `main` (déploiement auto VPS avec health-check/rollback), PUIS lancer les
+vérifications VPS de la TODO ci-dessous sur le code déployé. Ancienne règle
+« attendre vérification VPS avant de merger » abandonnée : pas de vrai merge
+indépendant possible sur le VPS lui-même (il ne fait que suivre `main`), et le
+filet health-check/rollback du déploiement couvre déjà un code cassé au
+démarrage. **Lot 3 —
+DAG scoring** est la suite : casser les dépendances circulaires de `Ctx`. Puis
+Lot 4 (précalcul asynchrone `track_scores`, nouveau module `scorestore.py`,
+séparé de `discogs_dump.py`), Lot 5 (UI lit les tables précalculées).
+Livraison lot par lot avec point de contrôle utilisateur après chacun (déjà
+arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans validation
+entre-temps.
 
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent avant de lire.
 
@@ -409,16 +426,247 @@ validation entre-temps.
     Jinja de `/univers`, `/univers/labels/table`, `/univers/reco/labels`, `/patte`,
     `/veille` sans erreur). Non testé en conditions réelles (pas de token Discogs
     depuis cette session cloud) — en particulier l'effet du changement de
-    comportement `job_scan_veille` sur un vrai jeu de labels. Lots suivants (2 à 5,
-    graphe labels global / DAG scoring / précalcul track_scores via nouveau module
-    `scorestore.py` / UI sur tables précalculées) pas commencés — arbitrages déjà
-    actés : précalcul release d'abord puis piste par piste pour le top scoré
-    (comme RECOS), `scorestore.py` séparé de `discogs_dump.py` (référentiel partagé
-    remplacé en bloc, incompatible avec des données par utilisateur), livraison
-    lot par lot avec point de contrôle après chacun.
+    comportement `job_scan_veille` sur un vrai jeu de labels. Lot 2 fait (point 38
+    ci-dessous) ; lots 3 à 5 (DAG scoring / précalcul track_scores via nouveau
+    module `scorestore.py` / UI sur tables précalculées) pas commencés —
+    arbitrages déjà actés : précalcul release d'abord puis piste par piste pour
+    le top scoré (comme RECOS), `scorestore.py` séparé de `discogs_dump.py`
+    (référentiel partagé remplacé en bloc, incompatible avec des données par
+    utilisateur), livraison lot par lot avec point de contrôle après chacun.
+38. **Refonte scoring — Lot 2 : graphe labels global** (11/09, suite du point 37,
+    lot 2/5) : nouveau module `radar_web/radar/catalog_labelgraph.py` —
+    cartographie label<->label sur le référentiel Discogs PARTAGÉ
+    (`discogs_dump.sqlite3`, tout le catalogue importé, indépendant du goût ou
+    du corpus d'un utilisateur quelconque), à ne pas confondre avec
+    `radar_web/radar/labelgraph.py` déjà existant (sous-graphe visuel PAR
+    UTILISATEUR dérivé de `producer_graph.json`/`job_build_graph`, consommé par
+    `/univers/labels/graph/build`) — **incohérence détectée dans le plan
+    d'origine** (qui proposait de réutiliser le nom `labelgraph.py` pour ce
+    nouveau module) et tranchée avec l'utilisateur avant d'écrire le code :
+    nom distinct `catalog_labelgraph.py`, choisi pour cohérence avec
+    `discogs_dump.py` qui documente déjà ce référentiel comme « le catalogue ».
+    **Deux origines de lien, distinguées par une colonne `kind` (jamais
+    mélangées dans le même total)** — ajout du 11/09 après retour
+    utilisateur pré-merge (cf. plus bas, incohérence "genre" détectée à
+    cette occasion) :
+    - `"artist"` (lien non dirigé) : deux labels partagent au moins un
+      artiste crédité (toutes sorties confondues) ; requête SQL triée par
+      `artist_id` sur `release_artists JOIN releases`, groupée en flux (pas
+      de matérialisation de tout le catalogue en mémoire), comptage par
+      paire accumulé dans un `Counter` vidé périodiquement (`FLUSH_EVERY =
+      20 000` artistes) via un UPSERT SQLite (`ON CONFLICT DO UPDATE SET
+      weight = weight + …`) — seul le lot de paires en attente de flush est
+      en mémoire à un instant donné, jamais le graphe entier. Garde-fou
+      anti-explosion combinatoire : un artiste crédité sur plus de
+      `MAX_LABELS_PER_ARTIST` (40) labels distincts est écarté entièrement
+      plutôt que tronqué au hasard (même logique que
+      `scoring.DEFAULT_SCORING["graph"]["max_credits"]`/`node_cap` côté
+      graphe par-utilisateur) — le nombre d'artistes écartés est journalisé
+      dans le message de fin de job, pas juste silencieusement omis.
+    - `"parent"` (lien DIRIGÉ, `a`=enfant/`b`=parent, `weight`=1 toujours) :
+      hiérarchie label enfant/parent déclarée explicitement par Discogs
+      (`<sublabels>` de `labels.xml`, déjà parsée par `import_labels` mais
+      jusqu'ici jamais exploitée au-delà de l'affichage). A nécessité
+      d'ajouter `labels.parent_id` (id Discogs, fiable) à côté de
+      `labels.parent` (nom, affichage seul, fragile pour une jointure —
+      collision possible après désambiguïsation "(2)"/"(3)", cf. diagnostic
+      R3 de `resolve_name`) dans `discogs_dump.py`, résolu par le même passage
+      `UPDATE` que `parent` (index `idx_labels_parent_id` ajouté). `catalog_labelgraph.neighbors()`
+      restitue le sens via un champ `role` ("child"/"parent"/`None` pour
+      `"artist"`, non dirigé).
+    - **Incohérence détectée et tranchée avec l'utilisateur avant de coder**
+      (deux questions) : (1) "genre" demandé par l'utilisateur comme donnée à
+      extraire de `labels.xml` — **ce champ n'existe pas** dans le schéma
+      réel du dump Discogs (confirmé par grep du code d'import existant :
+      `import_labels` ne parse que id/name/sublabels, jamais un genre ;
+      genre/style n'existe qu'au niveau `release`, cf. `_parse_release_elem`).
+      L'équivalent (profil de styles d'un label, exhaustif, dérivé de ses
+      sorties) existe déjà via `label_styles` (`_materialize_label_styles`,
+      alimente `Ctx.label_affinities`) — décision utilisateur : rien de plus
+      à faire, ce document existant couvre déjà le besoin. (2) "labels
+      associés" (parent/sous-labels) confirmé réel et déjà parsé, mais
+      jamais exploité — décision utilisateur : les intégrer comme 2e type
+      d'arête dans `catalog_labelgraph.py` plutôt qu'une table séparée (un
+      seul graphe label<->label, deux origines distinguées par `kind`).
+    Stocké dans son propre fichier SQLite (`catalog_labelgraph.sqlite3` +
+    `catalog_labelgraph_meta.json` sous `SHARED_DIR`, pas dans
+    `discogs_dump.sqlite3` lui-même) avec la MÊME bascule atomique que
+    `discogs_dump.py` (écriture dans `.new`, index + `os.replace` seulement à
+    la fin) : une reconstruction interrompue ne casse jamais le graphe déjà
+    servi, et ce module ne touche jamais au référentiel Discogs pendant qu'il
+    sert des lectures.
+    Nouveau job `build_catalog_labelgraph` (`crate_jobs.py`) : erreur propre si
+    `discogs_dump` pas encore importé, no-op (« déjà à jour ») si le graphe a
+    déjà été construit pour le `dump_date` courant (sauf `force=1`), sinon
+    reconstruit et écrit `catalog_labelgraph_meta.json` avec le `dump_date`
+    utilisé. Déclencheur dans `radar_web/worker.py`
+    (`_maybe_catalog_labelgraph_build`, opt-in `RADAR_CATALOG_LABELGRAPH=1`,
+    vérifié toutes les heures comme l'entretien de fond) : purement
+    événementiel (compare `catalog_labelgraph.needs_rebuild(discogs_dump.get_meta())`),
+    pas de cadence fixe à part cette vérification — la vraie cadence est celle
+    du dump mensuel lui-même, exactement la formulation attendue (« job mensuel
+    déclenché après `import_discogs_dump` »). Volontairement PAS chaîné en
+    dur à la fin de `job_import_discogs_dump` (contrairement à
+    canonicalize/profile_labels) : le déclencheur événementiel de `worker.py`
+    suffit et se répare tout seul après un déploiement interrompu, sans
+    dupliquer la logique « faut-il reconstruire » à deux endroits.
+    Lot 2 = infrastructure pure : rien ne consomme encore ce graphe (prévu aux
+    lots suivants, cf. point 37) — pas de changement de route ni de template
+    dans ce lot.
+    Vérifié par smoke tests hors-ligne (petite base SQLite en mémoire imitant
+    le schéma `discogs_dump`, table `labels` avec hiérarchie parent/enfant
+    incluse : comptage de paires "artist" correct, artiste prolifique bien
+    écarté, arêtes "parent" correctement dirigées dans les deux sens
+    (`neighbors()` sur le label enfant ET sur le parent), filtre par `kinds`,
+    bascule atomique, `needs_rebuild()` ; `import_labels` peuple bien
+    `parent`+`parent_id` depuis un vrai flux XML gzippé de test ; le job
+    `build_catalog_labelgraph` de bout en bout contre un `discogs_dump.sqlite3`
+    construit via le pipeline réel (`open_new_db`/`finalize_new_db`), message
+    de fin détaillant les 2 types d'arêtes ; le déclencheur `worker.py` sur
+    ses 5 cas — opt-in absent, dump absent, nouveau dump détecté, déjà en
+    file, graphe déjà à jour). **Non testé à l'échelle réelle** (pas de vrai
+    dump Discogs ni d'accès réseau depuis cette session cloud) : le volume
+    réel de `release_artists`/`labels` sur le catalogue vinyle complet, le
+    temps d'exécution du job, la proportion réelle de labels avec un parent
+    déclaré, et la pertinence du plafond `MAX_LABELS_PER_ARTIST=40` restent à
+    confirmer sur le VPS — cf. TODO ci-dessous. **PR #132 ouverte** (branche
+    `claude/hello-e87dpo` → `main`) : ordre inversé le 11/09 (cf. ci-dessus),
+    merger d'abord, vérifier sur le VPS après déploiement.
+39. **Référentiel Discogs élargi à TOUS les formats** (11/09, décision utilisateur
+    après discussion des tradeoffs, suite du point 38) : `discogs_dump.py`
+    filtrait jusqu'ici les sorties au vinyle 12"/LP uniquement dès l'import
+    (`_is_vinyl`, `_parse_release_elem` renvoyait `None` sinon) — désormais
+    TOUTE sortie est gardée (vinyle, CD, fichier audio, cassette, etc.),
+    nouvelle colonne `releases.is_vinyl` (calculée une fois au parsing,
+    jamais reparsée ensuite) pour qu'un consommateur qui voudrait rester
+    vinyle seul puisse filtrer sans rouvrir la chaîne `format` (index
+    `idx_releases_is_vinyl` ajouté, mais AUCUN filtre appliqué par défaut nulle part).
+    Décision explicitement validée avec ses conséquences : `search_local`
+    (recherche ciblée + `job_scan_recos`), `label_style_counts`/
+    `_materialize_label_styles` (`Ctx.label_affinities`, donc l'affinité de
+    style qui alimente `album_score`/`reco_rows` partout) et
+    `catalog_labelgraph` (Lot 2, point 38) portent maintenant tous sur le
+    catalogue complet, pas seulement le vinyle — améliore la cartographie
+    label/artiste et le profil de style d'un label (discographie entière,
+    pas seulement sa sortie vinyle) mais peut aussi faire remonter des
+    éléments non-vinyle dans une recherche ciblée ou du profilage. Alternative
+    écartée : élargir seulement pour `catalog_labelgraph` (deux vues du dump,
+    plus complexe, impact confiné) — l'utilisateur a choisi l'élargissement
+    complet en connaissance de cause.
+    Le comptage `n_vinyl` (déjà suivi séparément de `n_total` avant ce
+    changement — `n_total` comptait déjà TOUTES les sorties vues dans le flux
+    XML, `n_vinyl` celles retenues) change de sens : avant, `n_vinyl` ==
+    nombre de lignes réellement insérées ; maintenant `n_total` lignes sont
+    TOUTES insérées, `n_vinyl` n'est plus que le sous-compte de celles
+    marquées `is_vinyl=1` — `job_import_discogs_dump` (message de fin) et
+    `discogs_dump_meta.json` reflètent ce nouveau sens.
+    **Effet de bord non traité, à surveiller** : `job_scan_recos` (RECOS
+    RADAR) va désormais voir aussi les rééditions CD/digital d'un même
+    disque comme des lignes `releases` distinctes (déjà vrai avant pour
+    plusieurs pressages vinyle du même disque, mais le volume de doublons
+    potentiels augmente avec tous les formats) — pas de déduplication par
+    disque/piste au-delà de ce qui existait déjà ; à revisiter seulement
+    si ça se traduit par des candidats RECOS dupliqués en pratique.
+    **Coût opérationnel** : la base SQLite résultante sera nettement plus
+    grosse (le flux XML était déjà entièrement lu pour trier vinyle/non-vinyle,
+    donc le temps de téléchargement/parsing ne change presque pas, mais le
+    nombre de lignes insérées et la taille du fichier final augmentent) — à
+    surveiller côté disque VPS (cf. point 12, incident de saturation déjà
+    vécu avec le seul vinyle à ~3G).
+    Vérifié par smoke tests hors-ligne (flux XML de test avec 4 sorties de
+    formats différents — vinyle 12", CD, digital, vinyle 7" non éligible —
+    toutes importées, `is_vinyl` correct pour chacune ; `catalog_labelgraph.build()`
+    capte bien un lien label<->label qui n'existe QUE via une sortie non-vinyle,
+    ce qui aurait été invisible avant ce changement). **Non testé à l'échelle
+    réelle** (pas de vrai dump Discogs depuis cette session cloud) : la taille
+    réelle de la base résultante et le temps d'import restent à confirmer sur
+    le VPS après déploiement — cf. TODO ci-dessous. **PR #132 ouverte**
+    (branche `claude/hello-e87dpo` → `main`), même PR que le point 38.
+40. **Import TEST à durée limitée** (11/09, demande utilisateur : valider les
+    points 38/39 sans payer le ~1h45 d'un réimport complet) : nouveau
+    paramètre `params["limit"]` sur le job `import_discogs_dump`
+    (`crate_jobs.py`, `_job_import_discogs_dump_test`) — mêmes fichiers dump
+    réels (téléchargement + vérification checksum inchangés, c'est le
+    parsing/insertion des ~18-20M lignes qui coûte le ~1h45, pas le
+    téléchargement), mais le parsing de chaque flux (releases/labels/artists)
+    est coupé après `limit` éléments VUS (`discogs_dump.import_releases`/
+    `import_labels`/`import_artists`, nouveau paramètre `limit`), et le
+    résultat va dans un fichier SÉPARÉ (`discogs_dump.TEST_DB_PATH` =
+    `discogs_dump_test.sqlite3`) — jamais `discogs_dump.sqlite3`,
+    `discogs_dump_meta.json` ni `discogs_dump_import.state.json` réels, qui
+    restent totalement inchangés pendant et après un run test (pas de
+    résume non plus : un test interrompu se relance simplement en entier vu
+    sa taille). `open_new_db()`/`finalize_new_db()` prennent un `db_path`
+    optionnel (défaut `DB_PATH`) pour permettre cette bascule vers un chemin
+    différent. Les `.gz` téléchargés sont volontairement CONSERVÉS après un
+    run test (pas supprimés comme après un import réel) : le prochain
+    réimport complet les réutilise au lieu de retélécharger plusieurs Go.
+    `job_build_catalog_labelgraph` reçoit symétriquement un `params["test"]`
+    (bool) : construit à partir de `discogs_dump.TEST_DB_PATH` au lieu du
+    référentiel réel, écrit dans `catalog_labelgraph.TEST_DB_PATH` (nouveau,
+    `catalog_labelgraph_test.sqlite3`) au lieu de `catalog_labelgraph.sqlite3`
+    — `catalog_labelgraph.build()`/`_open_new_db()`/`_finalize_new_db()` ont
+    un `out_path` optionnel pour ça — et ignore les garde-fous
+    `available()`/`needs_rebuild()` (pas de dump/meta réel en jeu). Aucun des
+    deux jobs n'est exposé dans l'UI (`VALID_JOBS` de `app.py` inchangé) :
+    lancement en CLI seulement sur le VPS, ex.
+    `python crate_jobs.py import_discogs_dump '{"limit": 5000}'` puis
+    `python crate_jobs.py build_catalog_labelgraph '{"test": true}'` — ce
+    n'est pas une fonctionnalité utilisateur, juste un outil de validation
+    jetable pour ce chantier. Vérifié par smoke test hors-ligne (flux XML
+    synthétiques : 3 releases/3 labels dont 1 parent-enfant/3 artists,
+    `limit=2` sur chaque flux — exactement 2 éléments retenus par flux, le
+    lien parent/enfant entre les 2 labels retenus correctement résolu,
+    fichiers réels `discogs_dump.sqlite3`/`catalog_labelgraph.sqlite3`
+    jamais créés/touchés à aucun moment). **Non testé contre un vrai dump
+    Discogs** (pas d'accès réseau depuis cette session cloud) : le temps réel
+    d'un run avec un `limit` de quelques milliers d'éléments (download inclus)
+    reste à mesurer sur le VPS — c'est justement l'outil que la TODO
+    ci-dessous demande d'utiliser en premier, avant le réimport complet.
 
 ## TODO — prochaine session
 
+- **PR #132 ouverte** (`claude/hello-e87dpo` → `main`, Lot 2 + référentiel tous
+  formats + import TEST) : **ordre inversé le 11/09** (décision utilisateur,
+  cf. « Prochaine session » ci-dessus) — merger d'abord sur `main`
+  (déploiement auto VPS, health-check/rollback), PUIS enchaîner les
+  vérifications ci-dessous sur le code déployé. Ne pas relancer un réimport
+  complet à l'aveugle juste après le merge : commencer par l'étape 0 (import
+  TEST, point 40) sur le code déployé pour un premier passage rapide.
+- **Étape 0 — import TEST limité avant tout réimport complet (point 40,
+  demande utilisateur du 11/09)** : une fois la PR mergée et déployée, sur le
+  VPS lancer d'abord `python crate_jobs.py import_discogs_dump '{"limit": 5000}'`
+  (ajuster `limit` selon le temps observé — pas de valeur mesurée en réel, à
+  calibrer : commencer petit, ex. 2000-5000, et remonter si le job est très
+  rapide) puis `python crate_jobs.py build_catalog_labelgraph '{"test": true}'`
+  — écrit dans `discogs_dump_test.sqlite3`/`catalog_labelgraph_test.sqlite3`,
+  jamais dans les fichiers réels. Sert à vérifier le Lot 2 (point 38) et le
+  schéma élargi tous formats (point 39) en quelques minutes avant de risquer
+  le réimport complet.
+- **Vérifier l'élargissement du référentiel à tous les formats (point 39)**
+  sur le VPS après déploiement : une fois l'étape 0 concluante, relancer
+  `import_discogs_dump` en entier (pas un `force` sur un dump déjà à jour, il
+  faut un VRAI réimport pour peupler `is_vinyl` et récupérer les formats
+  non-vinyle) et confirmer : taille finale de `discogs_dump.sqlite3` et temps
+  d'import (comparer au ~3G/~1h45 connus pour le vinyle seul — attention
+  disque, cf. point 12), le message de fin donne un `n_total` très supérieur
+  à l'ancien total vinyle avec un `n_vinyl` cohérent en sous-compte. Vérifier
+  ensuite qu'une recherche ciblée (`/search`) ou `job_scan_recos` ne se
+  retrouve pas noyé de doublons CD/digital d'un même disque au point de
+  dégrader l'usage réel (sinon, ajouter un filtre `is_vinyl=1` là où c'est
+  gênant plutôt que de revenir en arrière sur l'élargissement).
+- **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** sur
+  le VPS après déploiement — d'abord via l'étape 0 (import TEST, point 40)
+  pour un premier passage rapide (schéma, 2 types d'arête, pas de crash), PUIS
+  en réel après le réimport complet : activer `RADAR_CATALOG_LABELGRAPH=1` sur
+  le service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
+  (référentiel Discogs déjà importé requis), et confirmer au journal : temps
+  d'exécution raisonnable sur le vrai volume de `release_artists`, nombre de
+  labels/liens obtenus plausible pour CHAQUE type d'arête (« X par artiste
+  partagé », « Y par hiérarchie label parent/enfant » dans le message de fin),
+  nombre d'artistes écartés par `MAX_LABELS_PER_ARTIST=40` pas disproportionné
+  (sinon le plafond est à ajuster). Confirmer aussi qu'un second lancement sans nouveau dump répond
+  bien « déjà à jour » sans rien reconstruire.
 - **Vérifier le Lot 1 refonte scoring (labels Cœur/Aimé, point 37)** sur le VPS
   après déploiement : confirmer que la migration ne perd aucun label (comparer le
   total Cœur+Aimé à l'ancien total base+watchlist dédoublonné), que l'ajout/retrait/

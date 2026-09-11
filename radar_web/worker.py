@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime
 
-from .radar import discogs_dump, jobs, paths, sellers, store
+from .radar import catalog_labelgraph, discogs_dump, jobs, paths, sellers, store
 
 POLL = 2.0
 JOB_TIMEOUT = 6 * 3600
@@ -96,6 +96,38 @@ def _maybe_monthly_dump_sync():
                   file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] monthly dump check : {e}", file=sys.stderr, flush=True)
+
+
+CATALOG_LABELGRAPH_CHECK_EVERY = 3600
+_last_catalog_labelgraph_check = 0.0
+
+
+def _maybe_catalog_labelgraph_build():
+    """Enfile build_catalog_labelgraph (owner) si le référentiel Discogs
+    partagé a changé de dump depuis la dernière construction du graphe
+    labels global — opt-in via RADAR_CATALOG_LABELGRAPH=1. Purement
+    événementiel (compare discogs_dump.get_meta() au meta.json propre du
+    graphe) : pas de cadence fixe à part cette simple vérification, la vraie
+    cadence est celle du dump mensuel lui-même (cf. CLAUDE.md point 37,
+    Lot 2)."""
+    global _last_catalog_labelgraph_check
+    if os.environ.get("RADAR_CATALOG_LABELGRAPH") != "1":
+        return
+    if time.time() - _last_catalog_labelgraph_check < CATALOG_LABELGRAPH_CHECK_EVERY:
+        return
+    _last_catalog_labelgraph_check = time.time()
+    try:
+        if not discogs_dump.available():
+            return
+        q = jobs.load_queue()
+        if any(j["name"] == "build_catalog_labelgraph" for j in q):
+            return
+        if catalog_labelgraph.needs_rebuild(discogs_dump.get_meta()):
+            jobs.launch("build_catalog_labelgraph", {}, uid=paths.DEFAULT_UID)
+            print("[worker] build_catalog_labelgraph enfilé (nouveau dump détecté)",
+                  file=sys.stderr, flush=True)
+    except Exception as e:                       # noqa: BLE001
+        print(f"[worker] catalog labelgraph check : {e}", file=sys.stderr, flush=True)
 
 
 def _last_successful_run(name):
@@ -204,6 +236,7 @@ def main():
         if not job:
             _maybe_weekly_scan()
             _maybe_monthly_dump_sync()
+            _maybe_catalog_labelgraph_build()
             _maybe_auto_maintenance()
             _maybe_recos_scan()
             time.sleep(POLL)

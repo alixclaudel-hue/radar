@@ -4,10 +4,19 @@ marketplace (vendeurs/prix/inventaire, qui reste toujours en API live, cf.
 `sellers.py`/`crate_jobs.job_scan_catalog`).
 
 Le dump complet fait plusieurs dizaines de Go décompressés pour ~18-20M de
-sorties tous formats — on ne garde que le vinyle et un sous-ensemble de
-champs (id, titre, artiste, label, catno, année, pays, formats, genres,
-styles, master_id) dans un fichier SQLite unique sous SHARED_DIR (pas de
-serveur, un fichier comme les autres dans /data).
+sorties TOUS FORMATS confondus (vinyle, CD, fichier audio, cassette, etc.) —
+élargi le 11/09 (demande utilisateur : une base exhaustive donne une
+cartographie label/artiste plus complète que le vinyle seul, cf.
+CLAUDE.md point 38) après avoir longtemps ne garder QUE le vinyle 12"/LP.
+On garde toutes les sorties, un sous-ensemble de champs (id, titre, artiste,
+label, catno, année, pays, formats, genres, styles, master_id) + un indicateur
+`is_vinyl` (calculé une fois au parsing, cf. `_is_vinyl`) pour qu'un
+consommateur qui veut filtrer au vinyle seul (ex. une recherche "quel disque
+acheter") puisse le faire sans reparser la chaîne `format`. Le tout dans un
+fichier SQLite unique sous SHARED_DIR (pas de serveur, un fichier comme les
+autres dans /data) — nettement plus volumineux qu'avant cet élargissement,
+à surveiller côté disque VPS (cf. CLAUDE.md point 12, déjà eu un incident de
+saturation).
 
 Rempli par le job `import_discogs_dump` (crate_jobs.py), rafraîchi par la
 veille mensuelle du worker (RADAR_DISCOGS_DUMP_SYNC=1). Un dump mensuel est
@@ -28,6 +37,11 @@ from .store import load, normalize_label, save
 DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_meta.json")
 RAW_DIR = os.path.join(paths.SHARED_DIR, "discogs_dump_raw")
+# Sortie d'un import TEST (job_import_discogs_dump avec le paramètre `limit`) :
+# fichier séparé, jamais DB_PATH — sert à valider un changement de pipeline sur un
+# sous-ensemble en quelques minutes avant de payer le ~1h45 d'un import complet
+# (demande utilisateur du 11/09, cf. CLAUDE.md points 38/39).
+TEST_DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_test.sqlite3")
 # Checkpoint de reprise (releases_done/vinyl + étape atteinte) : un import complet dure
 # ~1h45, largement plus long qu'un cycle de déploiement — sans ça, un redéploiement en
 # plein milieu (rebuild Docker sur CHAQUE merge, pas seulement ceux qui touchent au dump)
@@ -81,7 +95,8 @@ def _create_schema(con):
             format TEXT,
             genres TEXT,
             styles TEXT,
-            master_id INTEGER
+            master_id INTEGER,
+            is_vinyl INTEGER
         )
     """)
     # table à part (pas de LIKE '%…%' possible sur la colonne styles jointe par
@@ -92,7 +107,13 @@ def _create_schema(con):
     # id Discogs canonique d'un nom, sans appel API. C'est ce qui alimente
     # resolve_name() et, plus tard, un vrai graphe de co-crédits par jointure
     # SQL plutôt que par appel /artists/{id}/releases un par un.
-    con.execute("CREATE TABLE labels (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, parent TEXT)")
+    # `parent` (nom, affichage) ET `parent_id` (id Discogs du label parent,
+    # cf. import_labels) : le nom seul est fragile pour une jointure/un graphe
+    # (collision possible sur name_key après désambiguïsation "(2)"/"(3)",
+    # cf. diagnostic R3 de resolve_name) — parent_id est la clé fiable,
+    # exploitée par catalog_labelgraph.py pour les arêtes de hiérarchie.
+    con.execute("CREATE TABLE labels (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, "
+                "parent TEXT, parent_id INTEGER)")
     con.execute("CREATE TABLE artists (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, real_name TEXT)")
     # variantes de graphie d'un MÊME artiste (namevariations du dump) -> son id.
     # Les <aliases> (autres identités, chacune avec sa propre entrée <artist>
@@ -115,9 +136,16 @@ def _create_indexes(con):
     con.execute("CREATE INDEX IF NOT EXISTS idx_releases_label_key ON releases(label_key)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_releases_artist_key ON releases(artist_key)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_releases_year ON releases(year)")
+    # référentiel élargi à tous formats (11/09, cf. module docstring) : un consommateur
+    # qui veut rester vinyle seul (recherche "quel disque acheter") filtre ici sans
+    # reparser `format` — coût nul pour ceux qui n'en ont pas besoin (ex. catalog_labelgraph).
+    con.execute("CREATE INDEX IF NOT EXISTS idx_releases_is_vinyl ON releases(is_vinyl)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_rs_style ON release_styles(style)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_rs_release ON release_styles(release_id)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_labels_name_key ON labels(name_key)")
+    # requêtes "enfants de X" (catalog_labelgraph.py, hiérarchie parent/sous-label) —
+    # le sens inverse (enfant -> parent) n'en a pas besoin, `id` est déjà la clé primaire.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_labels_parent_id ON labels(parent_id)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_artists_name_key ON artists(name_key)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_alias_key ON artist_aliases(name_key)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_ra_artist ON release_artists(artist_id)")
@@ -418,13 +446,13 @@ def _detect_needs_wrap(gz_path, root_tag=b"<releases"):
     return needs_wrap, skip
 
 
-def open_new_db(resume=False):
-    """Ouvre le fichier de reconstruction `DB_PATH + ".new"` : PRAGMAs d'import
-    puis schéma créé (sans index — cf. `_create_indexes`). Un cycle d'import
-    enchaîne `import_releases`/`import_labels`/`import_artists` sur la MÊME
-    connexion (les trois dumps du mois vont dans la même base), puis
+def open_new_db(resume=False, db_path=None):
+    """Ouvre le fichier de reconstruction `db_path + ".new"` (défaut `DB_PATH`) :
+    PRAGMAs d'import puis schéma créé (sans index — cf. `_create_indexes`). Un
+    cycle d'import enchaîne `import_releases`/`import_labels`/`import_artists`
+    sur la MÊME connexion (les trois dumps du mois vont dans la même base), puis
     `finalize_new_db()` une fois tout importé : index + bascule atomique
-    unique. Reconstruire à part, jamais dans `DB_PATH` lui-même, ferme la
+    unique. Reconstruire à part, jamais dans `db_path` lui-même, ferme la
     fenêtre où `available()` mentirait pendant les ~1h45 que dure un import
     (cf. diagnostic D1) — l'appli lit l'ancienne base valide jusqu'à la
     dernière seconde, et un import interrompu ne détruit jamais l'existant.
@@ -432,9 +460,14 @@ def open_new_db(resume=False):
     `resume=True` : reprise d'un import interrompu (cf.
     `discogs_dump_import.state.json`, même `dump_date`) — rouvre le `.new`
     existant tel quel, sans le vider ni recréer le schéma (les tables
-    contiennent déjà les lignes committées avant l'interruption)."""
+    contiennent déjà les lignes committées avant l'interruption).
+
+    `db_path` : cible de la bascule finale (défaut `DB_PATH`) — un import TEST
+    (cf. `TEST_DB_PATH`) passe `TEST_DB_PATH` ici pour ne jamais toucher au
+    référentiel réel pendant qu'il sert des lectures."""
+    path = db_path or DB_PATH
     os.makedirs(paths.SHARED_DIR, exist_ok=True)
-    new_path = DB_PATH + ".new"
+    new_path = path + ".new"
     if resume and os.path.exists(new_path):
         con = sqlite3.connect(new_path)
         con.execute("PRAGMA journal_mode=WAL")
@@ -457,12 +490,14 @@ def open_new_db(resume=False):
 
 
 def _materialize_label_styles(con):
-    """Profil de style par label, exhaustif sur tout le catalogue vinyle
-    importé (pas un échantillon des 100 sorties les plus "want" via l'API,
-    biaisé vers les pièces rares — cf. diagnostic D5). Une ligne par
-    (label_key, style) : la table remplace labels_profile.json (calculé par
-    job_profile_labels, encore utilisé en repli pour les labels absents du
-    dump — cf. scoring.Ctx.label_affinities)."""
+    """Profil de style par label, exhaustif sur tout le catalogue importé —
+    tous formats depuis l'élargissement du 11/09 (vinyle, CD, fichier audio,
+    etc., cf. module docstring), plus large qu'avant cette date où seul le
+    vinyle alimentait ce profil (pas un échantillon des 100 sorties les plus
+    "want" via l'API, biaisé vers les pièces rares — cf. diagnostic D5). Une
+    ligne par (label_key, style) : la table remplace labels_profile.json
+    (calculé par job_profile_labels, encore utilisé en repli pour les
+    labels absents du dump — cf. scoring.Ctx.label_affinities)."""
     con.execute("DROP TABLE IF EXISTS label_styles")
     con.execute("""
         CREATE TABLE label_styles AS
@@ -475,10 +510,12 @@ def _materialize_label_styles(con):
     con.execute("CREATE INDEX idx_ls_label ON label_styles(label_key)")
 
 
-def finalize_new_db(con):
+def finalize_new_db(con, db_path=None):
     """Index + profil de style par label + ANALYZE puis bascule atomique de
-    `.new` vers `DB_PATH`. À appeler une fois tous les dumps du cycle
-    importés sur `con` (`open_new_db()`) — ferme la connexion."""
+    `.new` vers `db_path` (défaut `DB_PATH` — doit être le MÊME chemin que
+    celui passé à `open_new_db()`). À appeler une fois tous les dumps du
+    cycle importés sur `con` (`open_new_db()`) — ferme la connexion."""
+    path = db_path or DB_PATH
     _create_indexes(con)
     _materialize_label_styles(con)
     con.execute("ANALYZE")
@@ -492,22 +529,25 @@ def finalize_new_db(con):
     # + synchronous=OFF pendant la CONSTRUCTION (cf. open_new_db) reste un vrai gain.
     con.execute("PRAGMA journal_mode=DELETE")
     con.close()
-    new_path = DB_PATH + ".new"
+    new_path = path + ".new"
     for suffix in ("-wal", "-shm"):               # compagnons WAL du fichier temporaire
         try:
             os.remove(new_path + suffix)
         except OSError:
             pass
-    os.replace(new_path, DB_PATH)
+    os.replace(new_path, path)
 
 
 def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
-                     resume_from=0, resume_vinyl=0, checkpoint_cb=None):
-    """Parse en flux le dump releases.xml.gz, ne garde que le vinyle, insère
-    en base par lots dans `releases`/`release_styles`/`release_artists`, sur
-    une connexion déjà ouverte par `open_new_db()` (ne gère pas le cycle de
-    vie du fichier — cf. `open_new_db()`/`finalize_new_db()`). Retourne
-    (n_total_vu, n_vinyle).
+                     resume_from=0, resume_vinyl=0, checkpoint_cb=None, limit=None):
+    """Parse en flux le dump releases.xml.gz, garde TOUTES les sorties (tous
+    formats, cf. module docstring), insère en base par lots dans
+    `releases`/`release_styles`/`release_artists`, sur une connexion déjà
+    ouverte par `open_new_db()` (ne gère pas le cycle de vie du fichier —
+    cf. `open_new_db()`/`finalize_new_db()`). Retourne (n_total_vu,
+    n_vinyle) — n_vinyle est maintenant purement informatif (sous-ensemble
+    de n_total_vu marqué `is_vinyl=1`), plus le nombre de lignes réellement
+    conservées comme avant cet élargissement (toutes le sont désormais).
 
     `resume_from`/`resume_vinyl` : reprise après une interruption (cf.
     `discogs_dump_import.state.json`) — les `resume_from` premiers éléments
@@ -517,7 +557,13 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
     comme base du compteur retourné. `checkpoint_cb(seen, n_vinyl)` : appelé
     juste après chaque commit (`flush`) — seen/n_vinyl à ce moment-là
     correspondent toujours à des lignes déjà committées, jamais à un état
-    intermédiaire (sûr à persister comme point de reprise)."""
+    intermédiaire (sûr à persister comme point de reprise).
+
+    `limit` : coupe le flux après ce nombre de `<release>` VUS (pas
+    forcément tous retenus) — pour un import TEST rapide sur un
+    sous-ensemble (cf. `discogs_dump.TEST_DB_PATH`), jamais utilisé sur un
+    import réel, donc incompatible avec `resume_from` (les deux ne sont
+    jamais passés ensemble)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<releases")
@@ -527,8 +573,8 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
         if batch:
             con.executemany(
                 "INSERT OR REPLACE INTO releases "
-                "(id, title, artist, artist_key, label, label_key, catno, year, country, format, genres, styles, master_id) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+                "(id, title, artist, artist_key, label, label_key, catno, year, country, format, genres, styles, master_id, is_vinyl) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
             batch.clear()
         if style_rows:
             con.executemany(
@@ -562,8 +608,9 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
                                           # une référence sur chaque enfant traité (fuite mémoire
                                           # sur 18-20M sorties sans ce clear-là aussi)
             if parsed is not None:
-                row, styles_list, credits = parsed
-                n_vinyl += 1
+                row, styles_list, credits, is_vinyl_flag = parsed
+                if is_vinyl_flag:
+                    n_vinyl += 1
                 batch.append(row)
                 style_rows.extend((row[0], s) for s in styles_list)
                 credit_rows.extend((row[0], aid, role) for aid, role in credits)
@@ -571,13 +618,15 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
                     flush()
             if progress_cb and seen % 20000 == 0:
                 progress_cb(seen)
+            if limit and seen >= limit:      # mode test : arrêt propre, `with` referme le flux normalement
+                break
     flush()
     if progress_cb:
         progress_cb(seen)
     return seen, n_vinyl
 
 
-def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
+def import_labels(con, gz_path, progress_cb=None, batch_size=5000, limit=None):
     """Parse en flux discogs_{date}_labels.xml.gz -> table `labels`, sur une
     connexion déjà ouverte par `open_new_db()`. Retourne n_total.
 
@@ -585,14 +634,20 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
     (`<sublabels><label id="X">` posé sur l'entrée du label PARENT) : on
     accumule id->nom et enfant->id_parent en mémoire pendant le flux (quelques
     centaines de milliers de labels, négligeable face aux ~7 M sorties) et on
-    résout `parent` en un seul passage UPDATE à la fin, indépendant de l'ordre
-    d'apparition des labels dans le dump.
+    résout `parent` (nom, affichage) ET `parent_id` (id Discogs, clé fiable —
+    cf. `catalog_labelgraph.py`) en un seul passage UPDATE à la fin,
+    indépendant de l'ordre d'apparition des labels dans le dump.
 
     `<sublabels>` porte lui-même des `<label id="X">Nom</label>` — même nom de
     balise que l'enregistrement racine. Un compteur de profondeur distingue
     les deux : ne traiter comme enregistrement que le `<label>` qui revient à
     profondeur 0 (referme un enregistrement racine, pas une référence
-    imbriquée)."""
+    imbriquée).
+
+    `limit` : coupe le flux après ce nombre d'enregistrements racine vus
+    (mode test, cf. `import_releases`) — la résolution parent/parent_id ne
+    porte alors que sur les labels réellement vus, un lien vers un parent
+    situé après la coupure reste juste non résolu (`parent_id IS NULL`)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<labels")
@@ -603,7 +658,7 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
         if not batch:
             return
         con.executemany(
-            "INSERT OR REPLACE INTO labels (id, name, name_key, parent) VALUES (?,?,?,NULL)", batch)
+            "INSERT OR REPLACE INTO labels (id, name, name_key, parent, parent_id) VALUES (?,?,?,NULL,NULL)", batch)
         batch.clear()
         con.commit()
 
@@ -637,18 +692,20 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
                 flush()
             if progress_cb and n_total % 20000 == 0:
                 progress_cb(n_total)
+            if limit and n_total >= limit:
+                break
     flush()
     if parent_of:
         con.executemany(
-            "UPDATE labels SET parent = ? WHERE id = ?",
-            [(id_to_name[pid], cid) for cid, pid in parent_of.items() if pid in id_to_name])
+            "UPDATE labels SET parent = ?, parent_id = ? WHERE id = ?",
+            [(id_to_name[pid], pid, cid) for cid, pid in parent_of.items() if pid in id_to_name])
         con.commit()
     if progress_cb:
         progress_cb(n_total)
     return n_total
 
 
-def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
+def import_artists(con, gz_path, progress_cb=None, batch_size=5000, limit=None):
     """Parse en flux discogs_{date}_artists.xml.gz -> tables `artists` +
     `artist_aliases`, sur une connexion déjà ouverte par `open_new_db()`.
     Retourne n_total. `artist_aliases` ne couvre que les `namevariations`
@@ -656,7 +713,10 @@ def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
     `_create_schema` pour pourquoi les `<aliases>` n'ont pas besoin d'un lien
     de plus ici. Compteur de profondeur par précaution (cf. `import_labels`) :
     si `<groups>`/`<members>` venait à imbriquer une balise `artist`, elle ne
-    serait pas comptée comme un enregistrement racine."""
+    serait pas comptée comme un enregistrement racine.
+
+    `limit` : coupe le flux après ce nombre d'enregistrements racine vus
+    (mode test, cf. `import_releases`)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<artists")
@@ -702,6 +762,8 @@ def import_artists(con, gz_path, progress_cb=None, batch_size=5000):
                 flush()
             if progress_cb and n_total % 20000 == 0:
                 progress_cb(n_total)
+            if limit and n_total >= limit:
+                break
     flush()
     if progress_cb:
         progress_cb(n_total)
@@ -738,9 +800,13 @@ def _normalize_extra_roles(raw):
 
 
 def _parse_release_elem(elem):
-    """(row_releases, styles_list, credits) ou None si pas vinyle. À
-    valider/ajuster contre un vrai fichier — écrit d'après la structure
-    documentée des dumps Discogs (artists/artist, labels/label,
+    """(row_releases, styles_list, credits, is_vinyl) ou None si structurellement
+    inexploitable (id manquant). Ne filtre plus par format depuis
+    l'élargissement du 11/09 (cf. module docstring) — TOUTE sortie est gardée,
+    `is_vinyl` (calculé une fois ici, jamais reparsé ensuite) dit seulement si
+    CELLE-CI est au format vinyle 12"/LP, pour un filtrage optionnel côté
+    consommateur. À valider/ajuster contre un vrai fichier — écrit d'après la
+    structure documentée des dumps Discogs (artists/artist, labels/label,
     formats/format/descriptions/description, genres/genre, styles/style,
     master_id) ; utilise findtext/attrib défensivement pour ne pas planter
     tout l'import sur une variation ponctuelle. `styles_list` : liste brute
@@ -766,8 +832,7 @@ def _parse_release_elem(elem):
         if text_attr:
             fmt_desc_parts.append(text_attr)
     fmt_descriptions = ", ".join(p for p in fmt_desc_parts if p)
-    if not _is_vinyl(fmt_names, fmt_descriptions):
-        return None
+    is_vinyl = _is_vinyl(fmt_names, fmt_descriptions)
 
     artists, credits = [], []
     for a in elem.findall("./artists/artist"):
@@ -818,8 +883,9 @@ def _parse_release_elem(elem):
         int(rid), title, artist, normalize_label(artist) if artist else None,
         label, normalize_label(label) if label else None, catno, year,
         elem.findtext("country"), fmt_descriptions, genres, styles, master_id,
+        int(is_vinyl),
     )
-    return row, styles_list, credits
+    return row, styles_list, credits, is_vinyl
 
 
 # --------------------------------------------------------------- lookup (lecture, utilisé par l'appli)
@@ -919,8 +985,8 @@ def lookup_release(release_id, con=None):
 def label_style_counts(label_keys, con=None):
     """{label_key: {style: n, ...}} depuis la table `label_styles` matérialisée
     à l'import (cf. `_materialize_label_styles`) — exhaustif sur tout le
-    catalogue vinyle importé, pour les clés demandées uniquement (pas de
-    chargement de la table entière). {} si le dump n'est pas disponible,
+    catalogue importé (tous formats depuis le 11/09), pour les clés demandées
+    uniquement (pas de chargement de la table entière). {} si le dump n'est pas disponible,
     ou si `label_styles` n'existe pas encore (base construite avant D5,
     en attente du prochain import mensuel) : repli à la charge de l'appelant."""
     keys = [k for k in dict.fromkeys(label_keys) if k]
@@ -1038,10 +1104,12 @@ def artist_ids_for_labels(label_keys, con=None):
 
 def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
     """[{id, title, artist, label, catno, year, genres, styles}] — recherche
-    ciblée en local, triée par année décroissante (cf. diagnostic D6). Un
-    dump mensuel est un instantané complet du catalogue vinyle 12"/LP
-    (cf. `_is_vinyl`) : pas de filtre "vinyle uniquement" à part, toute la
-    table l'est déjà. Ne filtre pas le genre (colonne `releases.genres`
+    ciblée en local, triée par année décroissante (cf. diagnostic D6). Depuis
+    l'élargissement du 11/09 (cf. module docstring de `discogs_dump.py`), la
+    table couvre TOUS les formats, plus seulement le vinyle 12"/LP : pas de
+    filtre format ici (colonne `releases.is_vinyl` disponible pour l'appelant
+    qui voudrait se restreindre au vinyle, ex. `WHERE r.is_vinyl = 1`, non
+    appliqué par défaut). Ne filtre pas le genre (colonne `releases.genres`
     jointe par virgule, non normalisée) — à filtrer par l'appelant sur ce
     sous-ensemble déjà borné par `limit`. Pas de vignette : le dump ne
     contient aucune URL d'image, contrairement à l'API (repli nécessaire

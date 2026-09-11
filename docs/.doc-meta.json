@@ -4,5 +4,8 @@
   },
   "app-overview:scoring-lot1": {
     "commit": "4e7fe2d49905315fad411ac955c361df73b34e65"
+  },
+  "app-overview:discogs-dump-py-and-scoring-process": {
+    "commit": "5d8610be566cac1f80dd6b6188209e3f411af847"
   }
 }

@@ -134,11 +134,13 @@ class Ctx:
     def label_affinities(self, label_keys):
         """{label_key: {'aff': 0-100 ou None, 'coverage': 0-100}} — priorité
         au profil matérialisé depuis le dump Discogs (table label_styles,
-        exhaustif sur tout le catalogue vinyle importé), repli sur
-        labels_profile.json (échantillon API biaisé par le tri "want", cf.
-        diagnostic D5) pour les labels absents du dump. aff=None et
-        coverage=0 si aucune des deux sources n'a de données (jamais
-        profilé) — à distinguer d'un aff bas mais réel."""
+        exhaustif sur tout le catalogue importé — tous formats depuis
+        l'élargissement du 11/09, plus seulement le vinyle, cf. module
+        docstring de discogs_dump.py), repli sur labels_profile.json
+        (échantillon API biaisé par le tri "want", cf. diagnostic D5) pour
+        les labels absents du dump. aff=None et coverage=0 si aucune des
+        deux sources n'a de données (jamais profilé) — à distinguer d'un
+        aff bas mais réel."""
         from . import discogs_dump as dd
         keys = list(label_keys)
         dump_styles = dd.label_style_counts(keys)

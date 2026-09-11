@@ -7,6 +7,7 @@ import hashlib
 import math
 import os
 import re
+import threading
 
 from . import paths, store
 from .store import normalize_label, style_key
@@ -66,6 +67,71 @@ def _files_sig(*paths_):
     return tuple(out)
 
 
+# Lot 3 (refonte scoring) : graphe explicite des nœuds de calcul de Ctx, chacun
+# listant les AUTRES nœuds dont il dépend. Avant ce lot, ces dépendances n'existaient
+# que sous forme d'appels `self.xxx()` enchevêtrés dans le corps des méthodes — vrai
+# tant qu'aucun nouvel appel n'introduisait par erreur un cycle (qui aurait crashé en
+# `RecursionError` plutôt que d'être détecté). Ici, la déclaration est vérifiée deux
+# fois : `topological_order()` lève à l'IMPORT du module si `NODE_DEPS` contient un
+# cycle, et `Ctx._memo()` lève à l'EXÉCUTION si un nœud accède à un autre nœud absent
+# de sa liste déclarée (dérive entre le graphe documenté et le code réel). Sert aussi
+# de base au précalcul asynchrone du Lot 4 (`scorestore.py`) : l'ordre topologique dit
+# dans quel ordre les nœuds peuvent être calculés hors d'une requête HTTP.
+NODE_DEPS = {
+    "artist_tier_map": (),
+    "label_tier_map": (),
+    "wmap": (),
+    "seed_category_weight": ("artist_tier_map",),
+    "graph_rescore": ("artist_tier_map", "seed_category_weight", "label_tier_map"),
+    "artist_label_signal": ("label_tier_map", "wmap"),
+    "ascore": ("artist_tier_map", "graph_rescore", "artist_label_signal"),
+    "label_artist_signal": ("ascore",),
+    "label_db_signal": ("artist_tier_map", "graph_rescore"),
+    "reco_rows": ("label_artist_signal", "label_db_signal", "label_tier_map", "wmap"),
+    "reco_index": ("reco_rows",),
+}
+
+
+def topological_order(deps=NODE_DEPS):
+    """Ordre de calcul valide (chaque nœud après toutes ses dépendances).
+    Lève `ValueError` si `deps` contient un cycle."""
+    order, visiting, visited = [], set(), set()
+
+    def visit(n):
+        if n in visited:
+            return
+        if n in visiting:
+            raise ValueError(f"NODE_DEPS : cycle de dépendances détecté sur le nœud {n!r}")
+        visiting.add(n)
+        for dep in deps.get(n, ()):
+            visit(dep)
+        visiting.discard(n)
+        visited.add(n)
+        order.append(n)
+
+    for name in deps:
+        visit(name)
+    return order
+
+
+# Calculé à l'import : un cycle introduit dans NODE_DEPS casse le chargement du
+# module immédiatement (py_compile/premier import), pas une requête au hasard.
+NODE_ORDER = topological_order()
+
+# Pile (par thread — un serveur WSGI/ASGI peut traiter des requêtes concurrentes dans
+# des threads distincts) du nœud en cours de calcul, pour vérifier à l'exécution que
+# chaque nœud n'accède qu'à ses dépendances déclarées dans NODE_DEPS.
+_node_stack_local = threading.local()
+
+
+def _node_stack():
+    try:
+        return _node_stack_local.names
+    except AttributeError:
+        _node_stack_local.names = []
+        return _node_stack_local.names
+
+
 class Ctx:
     """Instantané des données. Recréer à chaque requête (peu coûteux, fichiers < 3 Mo)."""
 
@@ -87,6 +153,19 @@ class Ctx:
             self.P.corpus, self.P.collection, self.P.profile, dd.DB_PATH))
 
     def _memo(self, name, compute):
+        stack = _node_stack()
+        if stack:
+            parent = stack[-1]
+            allowed = NODE_DEPS.get(parent)
+            # allowed is None : `parent` n'est pas un nœud du DAG (ex. album_score,
+            # appelé directement par une route/job, jamais imbriqué dans un autre
+            # nœud) — rien à vérifier dans ce cas.
+            if allowed is not None and name not in allowed:
+                raise RuntimeError(
+                    f"scoring.NODE_DEPS : {parent!r} accède à {name!r} sans l'avoir "
+                    f"déclaré comme dépendance — ajouter {name!r} à "
+                    f"NODE_DEPS[{parent!r}] (scoring.py) au lieu de laisser "
+                    f"l'appel implicite.")
         slot = _DERIVED.get(self._key)
         if slot is None:
             if len(_DERIVED) >= _DERIVED_MAX:
@@ -94,7 +173,11 @@ class Ctx:
                                           # recalculée au prochain appel
             slot = _DERIVED[self._key] = {}
         if name not in slot:
-            slot[name] = compute()
+            stack.append(name)
+            try:
+                slot[name] = compute()
+            finally:
+                stack.pop()
         return slot[name]
 
     # -------------------------------------------------------------- goût / styles
@@ -248,7 +331,7 @@ class Ctx:
     def graph_rescore(self):
         """{'artists': {ck: {name,id,score,why}}, 'labels': {lk: {...}}} — proximité
         recalculée à partir des arêtes brutes + rangs courants (porté de crate_radar)."""
-        return self._memo("graph_rs", self._compute_graph_rescore)
+        return self._memo("graph_rescore", self._compute_graph_rescore)
 
     def _compute_graph_rescore(self):
         g = self.graph or {}
@@ -414,7 +497,15 @@ class Ctx:
         signal comportemental, étroit mais fiable. `db_link` couvre tout le catalogue
         Discogs (même jamais écouté) — signal structurel, large mais indirect. Les deux
         se chevauchent quand un titre écouté est aussi au catalogue (cas courant),
-        volontairement : ni redondant ni bug (retour nt_9af67eaeb8)."""
+        volontairement : ni redondant ni bug (retour nt_9af67eaeb8).
+
+        Mémoïsé (Lot 3) : nœud du DAG explicite (`NODE_DEPS["label_artist_signal"]`),
+        pas seulement pour la performance — sans ce nœud, l'accès à `self.ascore`
+        ci-dessous serait imputé à `reco_rows` (l'appelant) dans la vérification de
+        `_memo`, qui ne le déclare pas comme dépendance directe."""
+        return self._memo("label_artist_signal", self._compute_label_artist_signal)
+
+    def _compute_label_artist_signal(self):
         asc = self.ascore
         out = {}
         for r in self.corpus:

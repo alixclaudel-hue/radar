@@ -39,12 +39,20 @@ VPS après déploiement — pas de merge indépendant possible sur le VPS, il su
 (point 39) fonctionnent à petite échelle. **Reste avant de considérer 38/39
 clos** : réimport complet en réel sur le VPS (TODO ci-dessous), pas encore
 fait — échelle réelle à confirmer (19M+ sorties, temps d'exécution, proportion
-labels avec parent, pertinence `MAX_LABELS_PER_ARTIST=40`). **Lot 3 — DAG
-scoring** ensuite : casser dépendances circulaires de `Ctx`. Puis Lot 4
-(précalcul asynchrone `track_scores`, nouveau module `scorestore.py`, séparé
-de `discogs_dump.py`), Lot 5 (UI lit tables précalculées). Livraison lot par
-lot, point de contrôle utilisateur après chacun (arbitré, cf. point 37) — ne
-pas enchaîner plusieurs lots sans validation entre-temps.
+labels avec parent, pertinence `MAX_LABELS_PER_ARTIST=40`). **Lot 3 fait**
+(graphe DAG explicite de `Ctx`, point 41) : pas de vrai cycle trouvé dans le
+code actuel (incohérence signalée à l'utilisateur, objectif reformulé en
+"rendre le DAG explicite" plutôt que "casser un cycle") — `NODE_DEPS` +
+`topological_order()` (vérifié à l'import) + vérification à l'exécution dans
+`Ctx._memo()`, aucun changement de comportement (détail → point 41). **PR
+#136 ouverte le 11/09** (point de contrôle utilisateur obtenu — accord donné
+pour merger sur `main`), merge en cours (CI `check` à confirmer avant le
+merge effectif, cf. TODO ci-dessous pour l'état exact au moment de la
+reprise). Puis Lot 4 (précalcul asynchrone `track_scores`, nouveau module
+`scorestore.py`, séparé de `discogs_dump.py`), Lot 5 (UI lit tables
+précalculées). Livraison lot par lot, point de contrôle utilisateur après
+chacun (arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans
+validation entre-temps.
 
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent.
 
@@ -637,9 +645,67 @@ pas enchaîner plusieurs lots sans validation entre-temps.
     ce VPS date toujours de l'import du 2026-09-03 (avant le point 39,
     vinyle seul — 4 923 701 sorties vinyle retenues sur 19 417 067 au total),
     inchangé après ce run test.
+41. **Refonte scoring — Lot 3 : graphe DAG explicite de `Ctx`** (11/09, suite
+    du point 37, lot 3/5) : à la reprise de session, `CLAUDE.md` demandait de
+    "casser les dépendances circulaires de `Ctx`" (diagnostic Opus antérieur,
+    pas dans le repo) — analyse du code actuel (`scoring.py`) n'a trouvé
+    AUCUN vrai cycle d'appel : l'ordre de calcul est déjà un DAG implicite
+    (`wmap`/`artist_tier_map`/`label_tier_map` → `seed_category_weight` →
+    `graph_rescore` → `artist_label_signal`/`ascore` → `label_artist_signal`/
+    `label_db_signal` → `reco_rows`/`reco_index` → `album_score`), sans
+    retour en arrière. Incohérence signalée à l'utilisateur avant de coder
+    (cf. consigne « poser des questions si incohérence détectée ») — objectif
+    réel confirmé : rendre ce DAG EXPLICITE (pas corriger un bug de cycle
+    inexistant), pour préparer le précalcul asynchrone du Lot 4
+    (`scorestore.py`, qui doit calculer les mêmes nœuds hors d'une requête
+    HTTP, dans le bon ordre). Livré : nouveau dict `NODE_DEPS` (module
+    `scoring.py`) listant, pour chaque nœud mémoïsé, les autres nœuds dont il
+    dépend ; `topological_order()` calculé à l'IMPORT du module (échec
+    immédiat, pas au hasard d'une requête, si `NODE_DEPS` devient
+    incohérent) ; `Ctx._memo()` vérifie maintenant à l'EXÉCUTION (pile par
+    thread, `threading.local`) qu'un nœud n'accède qu'à ses dépendances
+    déclarées — lève une erreur explicite nommant le nœud fautif en cas de
+    dérive entre le graphe documenté et un futur appel non déclaré, au lieu
+    d'un `RecursionError` muet si quelqu'un introduisait un vrai cycle par
+    erreur. Effet de bord découvert en construisant `NODE_DEPS` :
+    `label_artist_signal` (label → artistes écoutés du corpus) n'était pas
+    mémoïsé — recalculé à chaque appel, son seul appelant étant `reco_rows`
+    — promu en nœud mémoïsé à part entière, sinon la vérification ci-dessus
+    aurait imputé à tort son accès à `self.ascore` à `reco_rows` (l'appelant
+    direct) plutôt qu'à lui-même. Clé de mémoïsation interne renommée
+    `"graph_rs"` → `"graph_rescore"` (cohérence avec le nom du nœud dans
+    `NODE_DEPS` ; aucun appelant externe ne référence cette chaîne). **Aucun
+    changement de comportement** : mêmes formules, mêmes poids, mêmes
+    signatures publiques (`app.py`/`crate_jobs.py` inchangés). Vérifié par
+    smoke test (config/corpus/collection synthétiques, `CRATE_DATA_DIR`
+    temporaire) : `topological_order()` détecte bien un cycle artificiel
+    injecté à la main ; parcours complet de `Ctx` (wmap → reco_index via
+    `album_score`) sans lever la nouvelle erreur de dépendance non déclarée ;
+    scores (`ascore`, `reco_rows`, `album_score`) comparés AVANT/APRÈS (git
+    stash) sur le même jeu synthétique — strictement identiques. Non testé à
+    l'échelle réelle (pas de token Discogs ni de vraies données utilisateur
+    depuis cette session cloud), mais aucun changement de formule ne le
+    justifie ici — refactor de structure pur. **PR #136 ouverte le 11/09**
+    (`claude/hello-e87dpo` → `main`), accord utilisateur donné pour merger —
+    merge lancé, bloqué une première fois par la règle de statut requis
+    ("check" en cours), branche remise à jour avec `main` (commit
+    `.dockerignore` #135 entre-temps) puis repoussée ; merge à confirmer une
+    fois le CI repassé au vert sur ce nouveau commit (cf. TODO).
 
 ## TODO — prochaine session
 
+- **PR #136 (Lot 3, graphe DAG explicite, point 41) : merge en cours, à
+  confirmer.** Ouverte sur `claude/hello-e87dpo` → `main`, accord utilisateur
+  obtenu. Premier essai de merge refusé par la règle de statut requis
+  ("check" pas encore terminé) ; branche resynchronisée avec `main` entre
+  temps (elle avait pris du retard, PR #135 mergée pendant l'attente) et
+  repoussée. Vérifier que le check CI est vert sur le dernier commit de la
+  branche et que la PR est bien mergée sur `main` — sinon relancer le merge
+  (`merge_pull_request`, PR #136) une fois le check passé. Pur refactor de
+  structure (pas de nouvelle route/UI à tester manuellement) une fois mergé.
+  Accord donné pour MERGER ce lot ; démarrer le Lot 4 (`scorestore.py`)
+  reste un nouveau point de contrôle à demander explicitement (cf. point 37,
+  "ne pas enchaîner plusieurs lots sans validation entre-temps").
 - **PR #132 mergée sur `main` le 11/09** (Lot 2 + référentiel tous formats +
   import TEST) — déployée sur le VPS. **Étape 0 (import TEST, point 40) faite
   et concluante le 11/09** (résultats → points 38/39/40) : Lot 2 et

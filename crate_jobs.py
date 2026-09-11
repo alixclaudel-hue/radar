@@ -650,10 +650,10 @@ def job_fetch_collection(job, params):
     # merge labels into base + seed resolved
     if params.get("merge_base", True):
         cfg = cfg_load()
-        base = cfg.get("labels", [])
-        exist = {normalize_label(x) for x in base}
+        lcats = cfg.setdefault("label_categories", {"1": [], "2": []})
+        exist = {normalize_label(x) for cid in ("1", "2") for x in lcats.get(cid, [])}
         newn = [v["name"] for k, v in lids.items() if k not in exist]
-        cfg["labels"] = base + newn
+        lcats.setdefault("2", []).extend(newn)   # nouveaux labels détectés -> Aimé par défaut
         save_json(CONFIG_PATH, cfg)
         res = load_json(RESOLVED_PATH, {})
         for k, v in lids.items():
@@ -673,8 +673,8 @@ def job_merge_corpus(job, params):
     cfg = cfg_load()
     corpus = load_json(CORPUS_PATH, [])
     resolved = load_json(RESOLVED_PATH, {})
-    base = cfg.get("labels", [])
-    base_keys = {normalize_label(x) for x in base}
+    lcats = cfg.setdefault("label_categories", {"1": [], "2": []})
+    base_keys = {normalize_label(x) for cid in ("1", "2") for x in lcats.get(cid, [])}
 
     junk_sub = ["(bmi)", "(ascap)", "(sesac)", "(prs)", "(gema)", "(sacem)", "distrokid",
                 "cd baby", "cdbaby", "tunecore", "the orchard", "believe digital", "ingrooves",
@@ -710,7 +710,8 @@ def job_merge_corpus(job, params):
     new = sorted(disp[k] for k in good if k not in base_keys)
     job.st["total"] = len(new)
 
-    cfg["labels"] = base + new
+    n_before = len(base_keys)
+    lcats.setdefault("2", []).extend(new)   # nouveaux labels détectés -> Aimé par défaut
     save_json(CONFIG_PATH, cfg)
     seeded = 0
     for k in good:
@@ -723,7 +724,7 @@ def job_merge_corpus(job, params):
         seeded += 1
     save_json(RESOLVED_PATH, resolved)
     job.st["done"] = len(new)
-    job.finish(f"+{len(new)} labels ajoutés (base {len(base)} → {len(cfg['labels'])}), "
+    job.finish(f"+{len(new)} labels ajoutés (base {n_before} → {n_before + len(new)}), "
                f"{seeded} résolus, {len(set(dropped))} écartés.")
 
 
@@ -757,7 +758,8 @@ def job_profile_labels(job, params):
     ordered = [k for k, _ in score.most_common()]
     seen = set(ordered)
     # 2) puis tout le reste de la base de labels (non couvert par le signal ci-dessus)
-    for name in cfg.get("labels", []):
+    lcats = cfg.get("label_categories", {})
+    for name in [n for cid in ("1", "2") for n in lcats.get(cid, [])]:
         k = normalize_label(name)
         if k and k not in seen:
             seen.add(k)
@@ -1760,8 +1762,9 @@ def job_enrich(job, params):
                                       "candidates": cands if status in ("approx", "not_found") else [],
                                       "reviewed_by": "auto"}
         if canon != name:
-            cfg_changed |= _rename_in_list(cfg.setdefault("labels", []), name, canon)
-            cfg_changed |= _rename_in_list(cfg.setdefault("watchlist", []), name, canon)
+            lcats = cfg.setdefault("label_categories", {"1": [], "2": []})
+            for cid in ("1", "2"):
+                cfg_changed |= _rename_in_list(lcats.setdefault(cid, []), name, canon)
             res[normalize_label(canon)] = res[normalize_label(name)]
         pk = normalize_label(canon)
         if pk not in prof:
@@ -1818,15 +1821,16 @@ def job_canonicalize(job, params):
 
     res = load_json(RESOLVED_PATH, {})
     ares = load_json(ARTISTS_RESOLVED_PATH, {})
-    base = list(cfg.get("labels", []))
+    lcats = cfg.setdefault("label_categories", {"1": [], "2": []})
+    label_names = [n for cid in ("1", "2") for n in lcats.get(cid, [])]
     cats = cfg.setdefault("artist_categories", {})
     art_names = [n for cid in ("1", "2", "3") for n in cats.get(cid, [])]
     corpus = load_json(CORPUS_PATH, []) if scope == "corpus" else []
     corpus_todo = [r for r in corpus if r.get("release_id")]
-    job.st["total"] = len(base) + len(art_names) + len(corpus_todo)
+    job.st["total"] = len(label_names) + len(art_names) + len(corpus_todo)
 
     changed, n_since_save = 0, 0
-    for name in base:
+    for name in label_names:
         if job.stopped():
             break
         k = normalize_label(name)
@@ -1841,17 +1845,18 @@ def job_canonicalize(job, params):
                       "status": status, "candidates": cands if status in ("approx", "not_found") else [],
                       "reviewed_by": "auto"}
             canon = dn if (dn and status == "exact") else name
-        if _rename_in_list(base, name, canon):
+        renamed = False
+        for cid in ("1", "2"):
+            renamed = _rename_in_list(lcats.setdefault(cid, []), name, canon) or renamed
+        if renamed:
             changed += 1
             res[normalize_label(canon)] = res.get(k, {})
         n_since_save += 1
         if n_since_save >= 200:                   # sauvegarde périodique : survit à une interruption
-            cfg["labels"] = base                   # sans repayer la résolution déjà faite (pas d'appel
-            save_json(CONFIG_PATH, cfg)             # API pour un nom déjà en 'exact'/'confirmed')
+            save_json(CONFIG_PATH, cfg)             # (pas d'appel API pour un nom déjà en 'exact'/'confirmed')
             save_json(RESOLVED_PATH, res)
             n_since_save = 0
         job.tick(f"label {name} → {canon}")
-    cfg["labels"] = base
     save_json(CONFIG_PATH, cfg)
     save_json(RESOLVED_PATH, res)
 
@@ -1971,7 +1976,8 @@ def job_scan_veille(job, params):
     if not token:
         return job.finish(error="Pas de token Discogs.")
     rules = [dict(r) for r in cfg.get("veille_rules", []) if r.get("active", True)]
-    wl = [w for w in cfg.get("watchlist", []) if w and w.strip()]
+    lcats = cfg.get("label_categories", {})
+    wl = [w for cid in ("1", "2") for w in lcats.get(cid, []) if w and w.strip()]
     wl_cap = int(params.get("watchlist_cap", 150))
     if wl:
         rules.insert(0, {"id": "__watchlist__",
@@ -2054,7 +2060,7 @@ def _strip_discogs_suffix(name):
 def job_scan_recos(job, params):
     """Candidats pour la playlist RECOS RADAR (Fonctionnalité 1, lot 1) : liste les
     sorties du référentiel Discogs local (radar/discogs_dump.py) sur les labels suivis
-    (base + veille implicite), les note avec Ctx.album_score (même système que la
+    (Cœur + Aimé, cf. label_categories), les note avec Ctx.album_score (même système que la
     Recherche — pas une nouvelle formule), garde celles au-dessus du seuil configuré
     (scoring.recos.min_score) triées par score décroissant, et récupère leur tracklist
     réelle (API Discogs à la demande — le dump n'en contient pas, cf. discogs_dump.py)
@@ -2087,10 +2093,11 @@ def job_scan_recos(job, params):
     max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
     force = bool(params.get("force"))
 
-    names = list(cfg.get("labels", [])) + [w for w in cfg.get("watchlist", []) if w and w.strip()]
+    lcats = cfg.get("label_categories", {})
+    names = [n for cid in ("1", "2") for n in lcats.get(cid, [])]
     label_keys = sorted({normalize_label(n) for n in names if n and n.strip()})
     if not label_keys:
-        return job.finish("Aucun label suivi (base ou veille) — rien à scanner.")
+        return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à scanner.")
 
     seen = set() if force else set(load_json(RECOS_SEEN_PATH, []))
     # Requête par label plutôt qu'une requête globale (cf. RECOS_PER_LABEL_LIMIT) :

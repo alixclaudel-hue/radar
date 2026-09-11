@@ -30,6 +30,7 @@
       {{ sort_th("aff", "Affinité", "desc", "", "width:90px") }}
       {{ sort_th("reco", "Reco", "desc", "num", "width:60px") }}
       {{ sort_th("owned", "Possédés", "desc", "num", "width:70px") }}
+      <th style="width:140px">Catégorie</th>
       <th></th></tr></thead>
     <tbody>
       {% for r in rows %}
@@ -46,6 +47,15 @@
         </td>
         <td class="num small muted">{{ r._reco }}</td>
         <td class="num small muted">{{ r.owned or '—' }}</td>
+        <td>
+          <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"
+                  hx-post="/univers/label/set" hx-vals='{"name": {{ r.disp|tojson }} }'
+                  hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
+            <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Cœur</option>
+            <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
+          </select>
+          <span class="m small"></span>
+        </td>
         <td>
           <button class="small" title="retirer de la base"
                   hx-post="/univers/labels/remove" hx-confirm="Retirer « {{ r.disp }} » de ta base ?"

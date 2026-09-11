@@ -60,13 +60,13 @@ notées) puis `scorestore_tracks` chaîné automatiquement (+112 pistes sur
 donc clos, en plus d'être mergé. **Lot 5 fait** (RECOS RADAR lit
 `track_scores`, point 43, dernier lot du chantier 37-43) — cadré par
 question explicite (« utiliser les scores des tracks pour alimenter la
-playlist reco radar »), codé et testé hors-ligne en session cloud le 11/09,
-**pas encore poussé/mergé** à la rédaction de ce point. `job_scan_recos`
-lit désormais directement `scorestore.track_scores` (score PAR PISTE, plus
-un score de release appliqué à toutes ses pistes) au lieu de rescanner
-Discogs lui-même — plus aucun appel réseau dans ce job. Chantier de refonte
-scoring (points 37-43) considéré terminé une fois ce lot mergé et vérifié
-sur le VPS (détail → point 43).
+playlist reco radar »), codé et testé hors-ligne le 11/09. **PR #143 mergée
+sur `main` le 11/09** (CI verte). `job_scan_recos` lit désormais
+directement `scorestore.track_scores` (score PAR PISTE, plus un score de
+release appliqué à toutes ses pistes) au lieu de rescanner Discogs
+lui-même — plus aucun appel réseau dans ce job. Chantier de refonte scoring
+(points 37-43) mergé dans son intégralité ; **reste à vérifier sur le VPS**
+(détail → point 43 et TODO) avant de le considérer définitivement clos.
 
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent.
 
@@ -893,10 +893,10 @@ sur le VPS (détail → point 43).
 
 ## TODO — prochaine session
 
-- **Lot 5 (RECOS RADAR lit `track_scores`, point 43) codé et testé
-  hors-ligne le 11/09, pas encore poussé/mergé.** Une fois mergé et déployé
-  sur le VPS (référentiel scorestore déjà peuplé, migration de schéma
-  automatique) : cliquer « 🔄 Scanner maintenant » sur `/reco-radar` et
+- **PR #143 (Lot 5, RECOS RADAR lit `track_scores`, point 43) mergée sur
+  `main` le 11/09 — dernier lot du chantier de refonte scoring.** Une fois
+  déployé sur le VPS (référentiel scorestore déjà peuplé, migration de
+  schéma automatique) : cliquer « 🔄 Scanner maintenant » sur `/reco-radar` et
   confirmer au journal que le scan ne fait plus aucun appel réseau
   (immédiat, pas de délai réseau) et remonte des candidats avec des scores
   différenciés par piste sur une même sortie (pas tous identiques comme

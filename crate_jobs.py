@@ -2615,14 +2615,17 @@ def job_import_discogs_dump(job, params):
 
 def job_build_catalog_labelgraph(job, params):
     """Reconstruit le graphe label<->label GLOBAL (radar/catalog_labelgraph.py)
-    à partir du référentiel Discogs partagé (discogs_dump.sqlite3) : deux
-    labels sont liés s'ils partagent des artistes crédités, sur tout le
-    catalogue importé, indépendamment du goût ou du corpus d'un utilisateur
-    quelconque — un seul graphe, partagé par tout le monde. Ne pas confondre
-    avec `job_build_graph` (mode "taste"), qui construit un graphe PAR
-    UTILISATEUR à partir de ses graines Cœur/Aimés + corpus écouté.
+    à partir du référentiel Discogs partagé (discogs_dump.sqlite3), sur tout
+    le catalogue importé, indépendamment du goût ou du corpus d'un
+    utilisateur quelconque — un seul graphe, partagé par tout le monde. Deux
+    origines de lien (jamais mélangées, cf. docstring du module) : labels
+    partageant un artiste crédité ("artist"), et hiérarchie label
+    enfant/parent déclarée par Discogs lui-même ("parent", labels.xml). Ne
+    pas confondre avec `job_build_graph` (mode "taste"), qui construit un
+    graphe PAR UTILISATEUR à partir de ses graines Cœur/Aimés + corpus
+    écouté.
 
-    Lot 2 de la refonte scoring (cf. CLAUDE.md point 37) : infrastructure
+    Lot 2 de la refonte scoring (cf. CLAUDE.md point 38) : infrastructure
     pure, rien n'en consomme encore le résultat pour l'instant (prévu aux
     lots suivants). Déclenché par `radar_web/worker.py`
     (`_maybe_catalog_labelgraph_build`) quand le dump partagé a changé depuis
@@ -2656,9 +2659,11 @@ def job_build_catalog_labelgraph(job, params):
     clg.save_meta({"dump_date": dump_meta.get("dump_date"),
                    "built_at": datetime.now().isoformat(timespec="seconds"), **stats})
     job.finish(f"Graphe labels global reconstruit ({dump_meta.get('dump_date')}) : "
-               f"{stats['n_labels']} label(s), {stats['n_edges']} lien(s) "
+               f"{stats['n_labels']} label(s), {stats['n_edges']} lien(s) — "
+               f"{stats['n_artist_edges']} par artiste partagé "
                f"({stats['n_artists_used']} artiste(s) utilisé(s), "
-               f"{stats['n_artists_skipped_prolific']} écarté(s) — trop de labels distincts).")
+               f"{stats['n_artists_skipped_prolific']} écarté(s) — trop de labels distincts), "
+               f"{stats['n_parent_edges']} par hiérarchie label parent/enfant.")
 
 
 JOBS = {

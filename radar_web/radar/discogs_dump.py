@@ -92,7 +92,13 @@ def _create_schema(con):
     # id Discogs canonique d'un nom, sans appel API. C'est ce qui alimente
     # resolve_name() et, plus tard, un vrai graphe de co-crédits par jointure
     # SQL plutôt que par appel /artists/{id}/releases un par un.
-    con.execute("CREATE TABLE labels (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, parent TEXT)")
+    # `parent` (nom, affichage) ET `parent_id` (id Discogs du label parent,
+    # cf. import_labels) : le nom seul est fragile pour une jointure/un graphe
+    # (collision possible sur name_key après désambiguïsation "(2)"/"(3)",
+    # cf. diagnostic R3 de resolve_name) — parent_id est la clé fiable,
+    # exploitée par catalog_labelgraph.py pour les arêtes de hiérarchie.
+    con.execute("CREATE TABLE labels (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, "
+                "parent TEXT, parent_id INTEGER)")
     con.execute("CREATE TABLE artists (id INTEGER PRIMARY KEY, name TEXT, name_key TEXT, real_name TEXT)")
     # variantes de graphie d'un MÊME artiste (namevariations du dump) -> son id.
     # Les <aliases> (autres identités, chacune avec sa propre entrée <artist>
@@ -118,6 +124,9 @@ def _create_indexes(con):
     con.execute("CREATE INDEX IF NOT EXISTS idx_rs_style ON release_styles(style)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_rs_release ON release_styles(release_id)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_labels_name_key ON labels(name_key)")
+    # requêtes "enfants de X" (catalog_labelgraph.py, hiérarchie parent/sous-label) —
+    # le sens inverse (enfant -> parent) n'en a pas besoin, `id` est déjà la clé primaire.
+    con.execute("CREATE INDEX IF NOT EXISTS idx_labels_parent_id ON labels(parent_id)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_artists_name_key ON artists(name_key)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_alias_key ON artist_aliases(name_key)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_ra_artist ON release_artists(artist_id)")
@@ -585,8 +594,9 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
     (`<sublabels><label id="X">` posé sur l'entrée du label PARENT) : on
     accumule id->nom et enfant->id_parent en mémoire pendant le flux (quelques
     centaines de milliers de labels, négligeable face aux ~7 M sorties) et on
-    résout `parent` en un seul passage UPDATE à la fin, indépendant de l'ordre
-    d'apparition des labels dans le dump.
+    résout `parent` (nom, affichage) ET `parent_id` (id Discogs, clé fiable —
+    cf. `catalog_labelgraph.py`) en un seul passage UPDATE à la fin,
+    indépendant de l'ordre d'apparition des labels dans le dump.
 
     `<sublabels>` porte lui-même des `<label id="X">Nom</label>` — même nom de
     balise que l'enregistrement racine. Un compteur de profondeur distingue
@@ -603,7 +613,7 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
         if not batch:
             return
         con.executemany(
-            "INSERT OR REPLACE INTO labels (id, name, name_key, parent) VALUES (?,?,?,NULL)", batch)
+            "INSERT OR REPLACE INTO labels (id, name, name_key, parent, parent_id) VALUES (?,?,?,NULL,NULL)", batch)
         batch.clear()
         con.commit()
 
@@ -640,8 +650,8 @@ def import_labels(con, gz_path, progress_cb=None, batch_size=5000):
     flush()
     if parent_of:
         con.executemany(
-            "UPDATE labels SET parent = ? WHERE id = ?",
-            [(id_to_name[pid], cid) for cid, pid in parent_of.items() if pid in id_to_name])
+            "UPDATE labels SET parent = ?, parent_id = ? WHERE id = ?",
+            [(id_to_name[pid], pid, cid) for cid, pid in parent_of.items() if pid in id_to_name])
         con.commit()
     if progress_cb:
         progress_cb(n_total)

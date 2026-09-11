@@ -426,19 +426,49 @@ entre-temps.
     nouveau module) et tranchée avec l'utilisateur avant d'écrire le code :
     nom distinct `catalog_labelgraph.py`, choisi pour cohérence avec
     `discogs_dump.py` qui documente déjà ce référentiel comme « le catalogue ».
-    Deux labels sont liés s'ils partagent au moins un artiste crédité (toutes
-    sorties confondues) ; requête SQL triée par `artist_id` sur
-    `release_artists JOIN releases`, groupée en flux (pas de matérialisation
-    de tout le catalogue en mémoire), comptage par paire accumulé dans un
-    `Counter` vidé périodiquement (`FLUSH_EVERY = 20 000` artistes) via un
-    UPSERT SQLite (`ON CONFLICT DO UPDATE SET shared = shared + …`) —
-    seul le lot de paires en attente de flush est en mémoire à un instant
-    donné, jamais le graphe entier. Garde-fou anti-explosion combinatoire :
-    un artiste crédité sur plus de `MAX_LABELS_PER_ARTIST` (40) labels
-    distincts est écarté entièrement plutôt que tronqué au hasard (même
-    logique que `scoring.DEFAULT_SCORING["graph"]["max_credits"]`/`node_cap`
-    côté graphe par-utilisateur) — le nombre d'artistes écartés est
-    journalisé dans le message de fin de job, pas juste silencieusement omis.
+    **Deux origines de lien, distinguées par une colonne `kind` (jamais
+    mélangées dans le même total)** — ajout du 11/09 après retour
+    utilisateur pré-merge (cf. plus bas, incohérence "genre" détectée à
+    cette occasion) :
+    - `"artist"` (lien non dirigé) : deux labels partagent au moins un
+      artiste crédité (toutes sorties confondues) ; requête SQL triée par
+      `artist_id` sur `release_artists JOIN releases`, groupée en flux (pas
+      de matérialisation de tout le catalogue en mémoire), comptage par
+      paire accumulé dans un `Counter` vidé périodiquement (`FLUSH_EVERY =
+      20 000` artistes) via un UPSERT SQLite (`ON CONFLICT DO UPDATE SET
+      weight = weight + …`) — seul le lot de paires en attente de flush est
+      en mémoire à un instant donné, jamais le graphe entier. Garde-fou
+      anti-explosion combinatoire : un artiste crédité sur plus de
+      `MAX_LABELS_PER_ARTIST` (40) labels distincts est écarté entièrement
+      plutôt que tronqué au hasard (même logique que
+      `scoring.DEFAULT_SCORING["graph"]["max_credits"]`/`node_cap` côté
+      graphe par-utilisateur) — le nombre d'artistes écartés est journalisé
+      dans le message de fin de job, pas juste silencieusement omis.
+    - `"parent"` (lien DIRIGÉ, `a`=enfant/`b`=parent, `weight`=1 toujours) :
+      hiérarchie label enfant/parent déclarée explicitement par Discogs
+      (`<sublabels>` de `labels.xml`, déjà parsée par `import_labels` mais
+      jusqu'ici jamais exploitée au-delà de l'affichage). A nécessité
+      d'ajouter `labels.parent_id` (id Discogs, fiable) à côté de
+      `labels.parent` (nom, affichage seul, fragile pour une jointure —
+      collision possible après désambiguïsation "(2)"/"(3)", cf. diagnostic
+      R3 de `resolve_name`) dans `discogs_dump.py`, résolu par le même passage
+      `UPDATE` que `parent` (index `idx_labels_parent_id` ajouté). `catalog_labelgraph.neighbors()`
+      restitue le sens via un champ `role` ("child"/"parent"/`None` pour
+      `"artist"`, non dirigé).
+    - **Incohérence détectée et tranchée avec l'utilisateur avant de coder**
+      (deux questions) : (1) "genre" demandé par l'utilisateur comme donnée à
+      extraire de `labels.xml` — **ce champ n'existe pas** dans le schéma
+      réel du dump Discogs (confirmé par grep du code d'import existant :
+      `import_labels` ne parse que id/name/sublabels, jamais un genre ;
+      genre/style n'existe qu'au niveau `release`, cf. `_parse_release_elem`).
+      L'équivalent (profil de styles d'un label, exhaustif, dérivé de ses
+      sorties) existe déjà via `label_styles` (`_materialize_label_styles`,
+      alimente `Ctx.label_affinities`) — décision utilisateur : rien de plus
+      à faire, ce document existant couvre déjà le besoin. (2) "labels
+      associés" (parent/sous-labels) confirmé réel et déjà parsé, mais
+      jamais exploité — décision utilisateur : les intégrer comme 2e type
+      d'arête dans `catalog_labelgraph.py` plutôt qu'une table séparée (un
+      seul graphe label<->label, deux origines distinguées par `kind`).
     Stocké dans son propre fichier SQLite (`catalog_labelgraph.sqlite3` +
     `catalog_labelgraph_meta.json` sous `SHARED_DIR`, pas dans
     `discogs_dump.sqlite3` lui-même) avec la MÊME bascule atomique que
@@ -465,18 +495,24 @@ entre-temps.
     lots suivants, cf. point 37) — pas de changement de route ni de template
     dans ce lot.
     Vérifié par smoke tests hors-ligne (petite base SQLite en mémoire imitant
-    le schéma `discogs_dump` : comptage de paires correct, artiste prolifique
-    bien écarté, bascule atomique, `neighbors()`, `needs_rebuild()` ; le job
-    `build_catalog_labelgraph` sur ses 3 chemins — référentiel absent,
-    construction réussie, déjà à jour ; le déclencheur `worker.py` sur ses 5
-    cas — opt-in absent, dump absent, nouveau dump détecté, déjà en file,
-    graphe déjà à jour). **Non testé à l'échelle réelle** (pas de
-    `discogs_dump.sqlite3` ni d'accès réseau depuis cette session cloud) : le
-    volume réel de `release_artists` sur le catalogue vinyle complet, le temps
-    d'exécution du job, et la pertinence du plafond `MAX_LABELS_PER_ARTIST=40`
-    restent à confirmer sur le VPS — cf. TODO ci-dessous. **Pas encore mergé**
-    (branche `claude/hello-e87dpo`) : attendre la vérification VPS avant de
-    merger, comme pour le Lot 1.
+    le schéma `discogs_dump`, table `labels` avec hiérarchie parent/enfant
+    incluse : comptage de paires "artist" correct, artiste prolifique bien
+    écarté, arêtes "parent" correctement dirigées dans les deux sens
+    (`neighbors()` sur le label enfant ET sur le parent), filtre par `kinds`,
+    bascule atomique, `needs_rebuild()` ; `import_labels` peuple bien
+    `parent`+`parent_id` depuis un vrai flux XML gzippé de test ; le job
+    `build_catalog_labelgraph` de bout en bout contre un `discogs_dump.sqlite3`
+    construit via le pipeline réel (`open_new_db`/`finalize_new_db`), message
+    de fin détaillant les 2 types d'arêtes ; le déclencheur `worker.py` sur
+    ses 5 cas — opt-in absent, dump absent, nouveau dump détecté, déjà en
+    file, graphe déjà à jour). **Non testé à l'échelle réelle** (pas de vrai
+    dump Discogs ni d'accès réseau depuis cette session cloud) : le volume
+    réel de `release_artists`/`labels` sur le catalogue vinyle complet, le
+    temps d'exécution du job, la proportion réelle de labels avec un parent
+    déclaré, et la pertinence du plafond `MAX_LABELS_PER_ARTIST=40` restent à
+    confirmer sur le VPS — cf. TODO ci-dessous. **Pas encore mergé** (branche
+    `claude/hello-e87dpo`) : attendre la vérification VPS avant de merger,
+    comme pour le Lot 1.
 
 ## TODO — prochaine session
 
@@ -486,9 +522,10 @@ entre-temps.
   service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
   (référentiel Discogs déjà importé requis), et confirmer au journal : temps
   d'exécution raisonnable sur le vrai volume de `release_artists`, nombre de
-  labels/liens obtenus plausible, nombre d'artistes écartés par
-  `MAX_LABELS_PER_ARTIST=40` pas disproportionné (sinon le plafond est à
-  ajuster). Confirmer aussi qu'un second lancement sans nouveau dump répond
+  labels/liens obtenus plausible pour CHAQUE type d'arête (« X par artiste
+  partagé », « Y par hiérarchie label parent/enfant » dans le message de fin),
+  nombre d'artistes écartés par `MAX_LABELS_PER_ARTIST=40` pas disproportionné
+  (sinon le plafond est à ajuster). Confirmer aussi qu'un second lancement sans nouveau dump répond
   bien « déjà à jour » sans rien reconstruire.
 - **Vérifier le Lot 1 refonte scoring (labels Cœur/Aimé, point 37)** sur le VPS
   après déploiement : confirmer que la migration ne perd aucun label (comparer le

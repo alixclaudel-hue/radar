@@ -49,8 +49,13 @@ code actuel (incohérence signalée à l'utilisateur, objectif reformulé en
 **Lot 4 fait** (précalcul asynchrone release+piste, nouveau module
 `scorestore.py`, point 42) — codé et testé hors-ligne en session cloud le
 11/09. **PR #139 mergée sur `main` le 11/09** (CI verte, resynchronisée avec
-`main` au passage — `Update deploy.yml #138` mergé entre-temps). **Prochain
-point de contrôle à demander avant de démarrer le
+`main` au passage — `Update deploy.yml #138` mergé entre-temps), **PR #140**
+(doc) mergée dans la foulée. **Déploiement automatique confirmé réussi** (workflow
+GitHub Actions `deploy` — runs #137/#138, conclusion `success`, health-check
+VPS donc passé) : le code des deux lots tourne sur le VPS, mais
+`RADAR_SCORESTORE=1` n'a pas encore été activé sur le service `radar-worker`
+(TODO ci-dessous) — l'utilisateur s'en charge de son côté, retour à venir.
+**Prochain point de contrôle à demander avant de démarrer le
 Lot 5** (UI lit les tables précalculées, pas encore commencé) : livraison
 lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
 37) — ne pas enchaîner plusieurs lots sans validation entre-temps.

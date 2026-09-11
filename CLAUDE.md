@@ -52,9 +52,12 @@ code actuel (incohérence signalée à l'utilisateur, objectif reformulé en
 `main` au passage — `Update deploy.yml #138` mergé entre-temps), **PR #140**
 (doc) mergée dans la foulée. **Déploiement automatique confirmé réussi** (workflow
 GitHub Actions `deploy` — runs #137/#138, conclusion `success`, health-check
-VPS donc passé) : le code des deux lots tourne sur le VPS, mais
-`RADAR_SCORESTORE=1` n'a pas encore été activé sur le service `radar-worker`
-(TODO ci-dessous) — l'utilisateur s'en charge de son côté, retour à venir.
+VPS donc passé) : le code des deux lots tourne sur le VPS. **Lot 4 vérifié
+en conditions réelles le 11/09** (`RADAR_SCORESTORE=1` activé par
+l'utilisateur, détail → point 42) : `scorestore_releases` (378 208 sorties
+notées) puis `scorestore_tracks` chaîné automatiquement (+112 pistes sur
+20 sorties, 0 erreur) fonctionnent de bout en bout sur le VPS. Ce lot est
+donc clos, en plus d'être mergé.
 **Prochain point de contrôle à demander avant de démarrer le
 Lot 5** (UI lit les tables précalculées, pas encore commencé) : livraison
 lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
@@ -779,29 +782,35 @@ lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
     notée ; un changement de goût fait changer le score des pistes déjà
     connues SANS nouvel appel à `discogs_get` (monkeypatché pour lever une
     erreur si appelé, jamais déclenché) ; retirer le label suivi purge
-    entièrement `release_scores`/`track_scores`. **Non testé en conditions
-    réelles** (pas de token Discogs ni de vrai référentiel dump depuis cette
-    session cloud) : le volume réel de sorties par utilisateur, le temps
-    d'exécution des deux jobs et la pertinence de `fetches_per_run=20`
-    restent à confirmer sur le VPS — cf. TODO ci-dessous. Aucun changement
+    entièrement `release_scores`/`track_scores`. Aucun changement
     à `scoring.py`/`store.py` au-delà de l'ajout de la clé de config (mêmes
     formules, mêmes signatures publiques).
 
+    **Vérifié en conditions réelles sur le VPS le 11/09** (`RADAR_SCORESTORE=1`
+    activé, retour utilisateur) : `scorestore_releases` a noté 378 208 sorties
+    (toutes les sorties des labels Cœur+Aimé suivis, plafonnées par
+    `SCORESTORE_PER_LABEL_LIMIT`), `scorestore_tracks` s'est bien enchaîné
+    automatiquement et a récupéré la tracklist de 20 sorties (le plafond
+    `fetches_per_run` par défaut) pour +112 pistes notées, 0 erreur API. Le
+    pipeline complet (release -> piste, worker -> chaînage automatique)
+    fonctionne donc de bout en bout à l'échelle réelle. Reste à confirmer
+    dans un prochain passage (pas bloquant pour clore ce lot) : le
+    rafraîchissement gratuit des scores déjà connus après un changement de
+    goût (pas encore rejoué en réel, seulement en smoke test hors-ligne).
+
 ## TODO — prochaine session
 
-- **PR #139 (Lot 4, précalcul scorestore, point 42) mergée sur `main` le
-  11/09.** Une fois déployé sur le VPS : activer `RADAR_SCORESTORE=1` sur
-  `radar-worker`, lancer `scorestore_releases`
-  une fois à la main (référentiel Discogs + au moins un label suivi requis),
-  confirmer au journal un nombre de sorties notées plausible et que
-  `scorestore_tracks` s'enchaîne bien ensuite (récupération de tracklist si
-  un token Discogs est configuré). Puis modifier un réglage de goût
-  (`taste_categories`/`label_categories`) et relancer `scorestore_tracks`
-  seul : les scores des pistes déjà connues doivent changer SANS nouvel
-  appel API (pas de nouvelle entrée dans le journal de récupération de
-  tracklist). Démarrer le Lot 5 (UI lit les tables précalculées) reste un
-  nouveau point de contrôle à demander explicitement avant de coder (cf.
-  point 37).
+- **Lot 4 (précalcul scorestore, point 42) mergé (PR #139/#140/#141) ET
+  vérifié en conditions réelles sur le VPS le 11/09** (`RADAR_SCORESTORE=1`
+  activé, retour utilisateur) : `scorestore_releases` (378 208 sorties
+  notées) puis `scorestore_tracks` chaîné automatiquement (+112 pistes sur
+  20 sorties, 0 erreur) fonctionnent de bout en bout. Reste, non bloquant :
+  confirmer en réel (pas seulement en smoke test hors-ligne) que modifier un
+  réglage de goût (`taste_categories`/`label_categories`) puis relancer
+  `scorestore_tracks` seul fait changer les scores des pistes déjà connues
+  SANS nouvel appel API. Démarrer le Lot 5 (UI lit les tables précalculées)
+  reste un nouveau point de contrôle à demander explicitement avant de coder
+  (cf. point 37).
 - **PR #136 (Lot 3, graphe DAG explicite, point 41) mergée sur `main` le
   11/09.** Pur refactor de structure (`NODE_DEPS`/`topological_order()`/
   vérification `Ctx._memo()`, aucun changement de comportement) — pas de

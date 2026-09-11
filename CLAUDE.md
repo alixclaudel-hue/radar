@@ -19,17 +19,15 @@ Diagramme associé : `docs/app-diagram-brief-scoring-lot1.md` (instructions de
 dessin) + `docs/app-overview-scoring-lot1.excalidraw` (rendu, 3 groupes/14
 boîtes/22 flèches — à ouvrir sur excalidraw.com ou l'extension VS Code).
 
-**Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé) fait et mergé
-(PR #130, détail point 37 ci-dessous). **Lot 2 — graphe labels global** est la
-suite : job mensuel déclenché après `import_discogs_dump`, cartographie complète
-des labels sur le référentiel partagé (nouveau fichier `labelgraph.py`), mis à
-jour seulement si le dump a changé (`crate_jobs.py` nouveau job + `worker.py`
-déclencheur). Puis Lot 3 (DAG scoring, casser les dépendances circulaires de
-`Ctx`), Lot 4 (précalcul asynchrone `track_scores`, nouveau module
-`scorestore.py`, séparé de `discogs_dump.py`), Lot 5 (UI lit les tables
-précalculées). Livraison lot par lot avec point de contrôle utilisateur après
-chacun (déjà arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans
-validation entre-temps.
+**Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé, point 37) et
+Lot 2 (graphe labels global, point 38) faits — **Lot 2 pas encore mergé**, cf.
+TODO ci-dessous pour la vérification VPS attendue avant de merger. **Lot 3 —
+DAG scoring** est la suite : casser les dépendances circulaires de `Ctx`. Puis
+Lot 4 (précalcul asynchrone `track_scores`, nouveau module `scorestore.py`,
+séparé de `discogs_dump.py`), Lot 5 (UI lit les tables précalculées).
+Livraison lot par lot avec point de contrôle utilisateur après chacun (déjà
+arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans validation
+entre-temps.
 
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent avant de lire.
 
@@ -409,16 +407,89 @@ validation entre-temps.
     Jinja de `/univers`, `/univers/labels/table`, `/univers/reco/labels`, `/patte`,
     `/veille` sans erreur). Non testé en conditions réelles (pas de token Discogs
     depuis cette session cloud) — en particulier l'effet du changement de
-    comportement `job_scan_veille` sur un vrai jeu de labels. Lots suivants (2 à 5,
-    graphe labels global / DAG scoring / précalcul track_scores via nouveau module
-    `scorestore.py` / UI sur tables précalculées) pas commencés — arbitrages déjà
-    actés : précalcul release d'abord puis piste par piste pour le top scoré
-    (comme RECOS), `scorestore.py` séparé de `discogs_dump.py` (référentiel partagé
-    remplacé en bloc, incompatible avec des données par utilisateur), livraison
-    lot par lot avec point de contrôle après chacun.
+    comportement `job_scan_veille` sur un vrai jeu de labels. Lot 2 fait (point 38
+    ci-dessous) ; lots 3 à 5 (DAG scoring / précalcul track_scores via nouveau
+    module `scorestore.py` / UI sur tables précalculées) pas commencés —
+    arbitrages déjà actés : précalcul release d'abord puis piste par piste pour
+    le top scoré (comme RECOS), `scorestore.py` séparé de `discogs_dump.py`
+    (référentiel partagé remplacé en bloc, incompatible avec des données par
+    utilisateur), livraison lot par lot avec point de contrôle après chacun.
+38. **Refonte scoring — Lot 2 : graphe labels global** (11/09, suite du point 37,
+    lot 2/5) : nouveau module `radar_web/radar/catalog_labelgraph.py` —
+    cartographie label<->label sur le référentiel Discogs PARTAGÉ
+    (`discogs_dump.sqlite3`, tout le catalogue importé, indépendant du goût ou
+    du corpus d'un utilisateur quelconque), à ne pas confondre avec
+    `radar_web/radar/labelgraph.py` déjà existant (sous-graphe visuel PAR
+    UTILISATEUR dérivé de `producer_graph.json`/`job_build_graph`, consommé par
+    `/univers/labels/graph/build`) — **incohérence détectée dans le plan
+    d'origine** (qui proposait de réutiliser le nom `labelgraph.py` pour ce
+    nouveau module) et tranchée avec l'utilisateur avant d'écrire le code :
+    nom distinct `catalog_labelgraph.py`, choisi pour cohérence avec
+    `discogs_dump.py` qui documente déjà ce référentiel comme « le catalogue ».
+    Deux labels sont liés s'ils partagent au moins un artiste crédité (toutes
+    sorties confondues) ; requête SQL triée par `artist_id` sur
+    `release_artists JOIN releases`, groupée en flux (pas de matérialisation
+    de tout le catalogue en mémoire), comptage par paire accumulé dans un
+    `Counter` vidé périodiquement (`FLUSH_EVERY = 20 000` artistes) via un
+    UPSERT SQLite (`ON CONFLICT DO UPDATE SET shared = shared + …`) —
+    seul le lot de paires en attente de flush est en mémoire à un instant
+    donné, jamais le graphe entier. Garde-fou anti-explosion combinatoire :
+    un artiste crédité sur plus de `MAX_LABELS_PER_ARTIST` (40) labels
+    distincts est écarté entièrement plutôt que tronqué au hasard (même
+    logique que `scoring.DEFAULT_SCORING["graph"]["max_credits"]`/`node_cap`
+    côté graphe par-utilisateur) — le nombre d'artistes écartés est
+    journalisé dans le message de fin de job, pas juste silencieusement omis.
+    Stocké dans son propre fichier SQLite (`catalog_labelgraph.sqlite3` +
+    `catalog_labelgraph_meta.json` sous `SHARED_DIR`, pas dans
+    `discogs_dump.sqlite3` lui-même) avec la MÊME bascule atomique que
+    `discogs_dump.py` (écriture dans `.new`, index + `os.replace` seulement à
+    la fin) : une reconstruction interrompue ne casse jamais le graphe déjà
+    servi, et ce module ne touche jamais au référentiel Discogs pendant qu'il
+    sert des lectures.
+    Nouveau job `build_catalog_labelgraph` (`crate_jobs.py`) : erreur propre si
+    `discogs_dump` pas encore importé, no-op (« déjà à jour ») si le graphe a
+    déjà été construit pour le `dump_date` courant (sauf `force=1`), sinon
+    reconstruit et écrit `catalog_labelgraph_meta.json` avec le `dump_date`
+    utilisé. Déclencheur dans `radar_web/worker.py`
+    (`_maybe_catalog_labelgraph_build`, opt-in `RADAR_CATALOG_LABELGRAPH=1`,
+    vérifié toutes les heures comme l'entretien de fond) : purement
+    événementiel (compare `catalog_labelgraph.needs_rebuild(discogs_dump.get_meta())`),
+    pas de cadence fixe à part cette vérification — la vraie cadence est celle
+    du dump mensuel lui-même, exactement la formulation attendue (« job mensuel
+    déclenché après `import_discogs_dump` »). Volontairement PAS chaîné en
+    dur à la fin de `job_import_discogs_dump` (contrairement à
+    canonicalize/profile_labels) : le déclencheur événementiel de `worker.py`
+    suffit et se répare tout seul après un déploiement interrompu, sans
+    dupliquer la logique « faut-il reconstruire » à deux endroits.
+    Lot 2 = infrastructure pure : rien ne consomme encore ce graphe (prévu aux
+    lots suivants, cf. point 37) — pas de changement de route ni de template
+    dans ce lot.
+    Vérifié par smoke tests hors-ligne (petite base SQLite en mémoire imitant
+    le schéma `discogs_dump` : comptage de paires correct, artiste prolifique
+    bien écarté, bascule atomique, `neighbors()`, `needs_rebuild()` ; le job
+    `build_catalog_labelgraph` sur ses 3 chemins — référentiel absent,
+    construction réussie, déjà à jour ; le déclencheur `worker.py` sur ses 5
+    cas — opt-in absent, dump absent, nouveau dump détecté, déjà en file,
+    graphe déjà à jour). **Non testé à l'échelle réelle** (pas de
+    `discogs_dump.sqlite3` ni d'accès réseau depuis cette session cloud) : le
+    volume réel de `release_artists` sur le catalogue vinyle complet, le temps
+    d'exécution du job, et la pertinence du plafond `MAX_LABELS_PER_ARTIST=40`
+    restent à confirmer sur le VPS — cf. TODO ci-dessous. **Pas encore mergé**
+    (branche `claude/hello-e87dpo`) : attendre la vérification VPS avant de
+    merger, comme pour le Lot 1.
 
 ## TODO — prochaine session
 
+- **Vérifier le Lot 2 refonte scoring (graphe labels global, point 38)** sur le
+  VPS après déploiement — ce lot n'est pas encore mergé, à traiter avant de
+  merger (comme le Lot 1) : activer `RADAR_CATALOG_LABELGRAPH=1` sur le
+  service `radar-worker`, lancer `build_catalog_labelgraph` une fois à la main
+  (référentiel Discogs déjà importé requis), et confirmer au journal : temps
+  d'exécution raisonnable sur le vrai volume de `release_artists`, nombre de
+  labels/liens obtenus plausible, nombre d'artistes écartés par
+  `MAX_LABELS_PER_ARTIST=40` pas disproportionné (sinon le plafond est à
+  ajuster). Confirmer aussi qu'un second lancement sans nouveau dump répond
+  bien « déjà à jour » sans rien reconstruire.
 - **Vérifier le Lot 1 refonte scoring (labels Cœur/Aimé, point 37)** sur le VPS
   après déploiement : confirmer que la migration ne perd aucun label (comparer le
   total Cœur+Aimé à l'ancien total base+watchlist dédoublonné), que l'ajout/retrait/

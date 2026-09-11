@@ -2613,9 +2613,58 @@ def job_import_discogs_dump(job, params):
                f"{n_labels} label(s), {n_artists} artiste(s). Canonisation + profilage enfilés.")
 
 
+def job_build_catalog_labelgraph(job, params):
+    """Reconstruit le graphe label<->label GLOBAL (radar/catalog_labelgraph.py)
+    à partir du référentiel Discogs partagé (discogs_dump.sqlite3) : deux
+    labels sont liés s'ils partagent des artistes crédités, sur tout le
+    catalogue importé, indépendamment du goût ou du corpus d'un utilisateur
+    quelconque — un seul graphe, partagé par tout le monde. Ne pas confondre
+    avec `job_build_graph` (mode "taste"), qui construit un graphe PAR
+    UTILISATEUR à partir de ses graines Cœur/Aimés + corpus écouté.
+
+    Lot 2 de la refonte scoring (cf. CLAUDE.md point 37) : infrastructure
+    pure, rien n'en consomme encore le résultat pour l'instant (prévu aux
+    lots suivants). Déclenché par `radar_web/worker.py`
+    (`_maybe_catalog_labelgraph_build`) quand le dump partagé a changé depuis
+    la dernière construction — jamais rien d'autre, ce job ne tourne pas à
+    cadence fixe."""
+    from radar_web.radar import catalog_labelgraph as clg
+    from radar_web.radar import discogs_dump as dd
+
+    if not dd.available():
+        return job.finish(error="Référentiel Discogs local absent — lance d'abord import_discogs_dump.")
+
+    dump_meta = dd.get_meta()
+    force = bool(params.get("force"))
+    if not force and not clg.needs_rebuild(dump_meta):
+        return job.finish(f"Déjà à jour (dump du {dump_meta.get('dump_date')}).")
+
+    job.msg("Construction du graphe labels global (référentiel Discogs partagé)…")
+
+    def progress(done):
+        job.sub(done=done, total=max(done, 1), label="artistes traités")
+
+    try:
+        stats = clg.build(progress_cb=progress, stop_cb=job.stopped)
+    except InterruptedError:
+        return job.finish("Arrêté — graphe existant conservé, reprendra de zéro au prochain lancement.")
+    except RuntimeError as e:
+        return job.finish(error=str(e))
+    except Exception as e:                        # noqa: BLE001
+        return job.finish(error=f"Construction du graphe labels échouée : {e}")
+
+    clg.save_meta({"dump_date": dump_meta.get("dump_date"),
+                   "built_at": datetime.now().isoformat(timespec="seconds"), **stats})
+    job.finish(f"Graphe labels global reconstruit ({dump_meta.get('dump_date')}) : "
+               f"{stats['n_labels']} label(s), {stats['n_edges']} lien(s) "
+               f"({stats['n_artists_used']} artiste(s) utilisé(s), "
+               f"{stats['n_artists_skipped_prolific']} écarté(s) — trop de labels distincts).")
+
+
 JOBS = {
     "scan_catalog": job_scan_catalog,
     "import_discogs_dump": job_import_discogs_dump,
+    "build_catalog_labelgraph": job_build_catalog_labelgraph,
     "ingest_youtube": job_ingest_youtube,
     "ingest_spotify": job_ingest_spotify,
     "ingest_bandcamp": job_ingest_bandcamp,

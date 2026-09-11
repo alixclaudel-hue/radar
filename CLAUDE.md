@@ -46,12 +46,13 @@ code actuel (incohérence signalée à l'utilisateur, objectif reformulé en
 `topological_order()` (vérifié à l'import) + vérification à l'exécution dans
 `Ctx._memo()`, aucun changement de comportement (détail → point 41). **PR
 #136 mergée sur `main` le 11/09** (accord utilisateur donné, CI verte).
-**Prochain point de contrôle à demander avant de démarrer le Lot 4** (pas
-encore commencé) : précalcul asynchrone `track_scores`, nouveau module
-`scorestore.py`, séparé de `discogs_dump.py`), Lot 5 (UI lit tables
-précalculées). Livraison lot par lot, point de contrôle utilisateur après
-chacun (arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans
-validation entre-temps.
+**Lot 4 fait** (précalcul asynchrone release+piste, nouveau module
+`scorestore.py`, point 42) — codé et testé hors-ligne en session cloud le
+11/09, **pas encore poussé/mergé** à la rédaction de ce point (détail →
+point 42). **Prochain point de contrôle à demander avant de démarrer le
+Lot 5** (UI lit les tables précalculées, pas encore commencé) : livraison
+lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
+37) — ne pas enchaîner plusieurs lots sans validation entre-temps.
 
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent.
 
@@ -689,17 +690,117 @@ validation entre-temps.
     refusé par la règle de statut requis ("check" pas encore terminé),
     branche resynchronisée avec `main` (PR #135 `.dockerignore` mergée
     entre-temps) puis repoussée, merge confirmé au 2e essai.
+42. **Refonte scoring — Lot 4 : précalcul asynchrone release+piste**
+    (11/09, suite du point 37, lot 4/5, arbitrages demandés et actés avant de
+    coder — périmètre release+piste dans le même lot, stockage SQLite par
+    utilisateur, branché au worker en opt-in) : nouveau module
+    `radar_web/radar/scorestore.py` — précalcule et stocke, PAR UTILISATEUR
+    (fichier `scorestore.sqlite3` sous `users/<uid>/`, séparé de
+    `discogs_dump.py`/`catalog_labelgraph.py` : le référentiel Discogs est
+    PARTAGÉ et remplacé en bloc une fois par mois, alors que ces scores
+    dépendent du goût d'un utilisateur précis et changent à chaque réglage),
+    le résultat de `Ctx.album_score()` pour chaque sortie des labels suivis
+    (Cœur+Aimé) puis pour chaque piste des sorties les mieux notées — même
+    formule que la Recherche/RECOS RADAR, aucune nouvelle règle de scoring.
+    **Pas de bascule atomique `.new`/`os.replace`** contrairement à
+    `discogs_dump.py`/`catalog_labelgraph.py` : ces deux modules reconstruisent
+    TOUT en un seul bloc (d'où le risque d'un lecteur voyant un état à moitié
+    reconstruit, justifiant la bascule), alors que `scorestore.py` grossit par
+    petits upserts commités un par un (comme `recos_candidates.json`) — un
+    lecteur voit toujours un état déjà cohérent entre deux écritures, rien à
+    masquer donc rien à basculer.
+
+    Deux tables SQLite (WAL) : `release_scores` (score par sortie, colonnes
+    `label_key`/`label`/`artist`/`title`/`year`/`styles`/`score`/`detail_json`,
+    `score`/`detail_json` peuvent être `NULL` — sortie non notable, jamais
+    confondu avec un score bas, même principe que le diagnostic N4) et
+    `track_scores` (score par piste, clé `(release_id, track_no)`).
+
+    Deux jobs chaînés (`crate_jobs.py`, même principe que
+    `job_scan_recos`/`job_publish_recos`) :
+    - `job_scorestore_releases` : purge d'abord les sorties dont le label
+      n'est plus suivi (`scorestore.prune_labels`, sinon un label retiré de
+      `label_categories` laisserait ses scores grossir indéfiniment le
+      fichier), puis note TOUTES les sorties des labels suivis (`search_local`
+      par label, plafond `SCORESTORE_PER_LABEL_LIMIT=500`, même limite/même
+      raison que `RECOS_PER_LABEL_LIMIT`, diagnostic D6) — sans filtre de
+      seuil ni limite de nouveautés (objectif d'infrastructure exhaustive,
+      pas une file de candidats à consommer une fois comme RECOS). Calcul
+      purement local (aucun appel réseau) : contrairement à RECOS, CHAQUE
+      lancement refait le score de toutes les sorties suivies plutôt que de
+      sauter celles déjà vues, pour rester automatiquement à jour après un
+      changement de goût sans bookkeeping de fraîcheur séparé. Chaîne
+      toujours `job_scorestore_tracks` en fin de course.
+    - `job_scorestore_tracks` : deux passes indépendantes dans le même job —
+      (a) rafraîchit GRATUITEMENT (recalcul local, sans appel réseau) le
+      score de toute piste déjà connue (`scorestore.releases_with_tracks`),
+      pour rester à jour après un changement de goût sans jamais redemander
+      sa tracklist à l'API, même si la sortie est retombée sous le seuil
+      depuis ; (b) récupère la tracklist réelle (API Discogs — le dump local
+      n'en contient pas) des sorties les mieux notées qui n'ont ENCORE aucune
+      piste connue, plafonné à `scoring.scorestore.fetches_per_run`
+      (curseur config, repli `SCORESTORE_FETCHES_PER_RUN=20`) appels par
+      lancement — même principe de budget que `RECOS_SEARCHES_PER_RUN` (coût
+      réseau/rate-limit Discogs, pas juste de la CPU). Réutilise
+      `crate_jobs._track_credit_artist`/`real_tracks` (déjà en place pour
+      RECOS, cf. points 25/27) pour le crédit par piste (cas "Various").
+
+    Nouvelle clé de config `scoring.scorestore` (`store.DEFAULT_SCORING`,
+    fusionnée automatiquement comme les autres groupes de poids) :
+    `min_score` (défaut 60, seuil "top scoré" de la passe piste) et
+    `fetches_per_run` (défaut 20). `SCORESTORE_PER_LABEL_LIMIT`, lui, reste
+    une constante fixe de `crate_jobs.py` (garde-fou technique, pas un
+    curseur de goût — même statut que `RECOS_PER_LABEL_LIMIT`).
+
+    Worker (`radar_web/worker.py`, `_maybe_scorestore_build`) : opt-in via
+    `RADAR_SCORESTORE=1`, vérifié toutes les `SCORESTORE_CHECK_EVERY=6h` —
+    cadence FIXE plutôt qu'événementielle (contrairement à
+    `_maybe_catalog_labelgraph_build`, déclenché par un changement de dump
+    partagé) : ce précalcul dépend aussi de `label_categories`/`scoring`, que
+    l'utilisateur peut changer à tout moment sans prévenir le worker. Aucune
+    route/template touché, aucun job ajouté à `VALID_JOBS` (`app.py`) :
+    infrastructure pure, comme le Lot 2 — rien ne consomme encore ces tables
+    côté UI (prévu au Lot 5).
+
+    Vérifié par smoke test hors-ligne complet (référentiel discogs_dump
+    synthétique en mémoire — 2 sorties d'un label suivi, une dans le goût
+    courant, une hors-goût, plus 1 sortie d'un label non suivi ; config
+    synthétique dans un `CRATE_DATA_DIR` temporaire) : seules les 2 sorties du
+    label suivi sont notées, celle dans le goût score mieux que celle hors
+    goût ; `job_scorestore_tracks` sans token ne casse rien ; avec un token
+    factice et `discogs_get` monkeypatché (aucun accès réseau réel possible
+    depuis cette session cloud), la tracklist est récupérée et chaque piste
+    notée ; un changement de goût fait changer le score des pistes déjà
+    connues SANS nouvel appel à `discogs_get` (monkeypatché pour lever une
+    erreur si appelé, jamais déclenché) ; retirer le label suivi purge
+    entièrement `release_scores`/`track_scores`. **Non testé en conditions
+    réelles** (pas de token Discogs ni de vrai référentiel dump depuis cette
+    session cloud) : le volume réel de sorties par utilisateur, le temps
+    d'exécution des deux jobs et la pertinence de `fetches_per_run=20`
+    restent à confirmer sur le VPS — cf. TODO ci-dessous. Aucun changement
+    à `scoring.py`/`store.py` au-delà de l'ajout de la clé de config (mêmes
+    formules, mêmes signatures publiques).
 
 ## TODO — prochaine session
 
+- **Lot 4 (précalcul scorestore, point 42) codé et testé hors-ligne le
+  11/09, pas encore poussé/mergé.** Une fois mergé et déployé sur le VPS :
+  activer `RADAR_SCORESTORE=1` sur `radar-worker`, lancer `scorestore_releases`
+  une fois à la main (référentiel Discogs + au moins un label suivi requis),
+  confirmer au journal un nombre de sorties notées plausible et que
+  `scorestore_tracks` s'enchaîne bien ensuite (récupération de tracklist si
+  un token Discogs est configuré). Puis modifier un réglage de goût
+  (`taste_categories`/`label_categories`) et relancer `scorestore_tracks`
+  seul : les scores des pistes déjà connues doivent changer SANS nouvel
+  appel API (pas de nouvelle entrée dans le journal de récupération de
+  tracklist). Démarrer le Lot 5 (UI lit les tables précalculées) reste un
+  nouveau point de contrôle à demander explicitement avant de coder (cf.
+  point 37).
 - **PR #136 (Lot 3, graphe DAG explicite, point 41) mergée sur `main` le
   11/09.** Pur refactor de structure (`NODE_DEPS`/`topological_order()`/
   vérification `Ctx._memo()`, aucun changement de comportement) — pas de
   nouvelle route/UI à vérifier sur le VPS pour ce lot. Accord donné pour
-  MERGER ce lot uniquement ; démarrer le Lot 4 (`scorestore.py`, précalcul
-  asynchrone `track_scores`) reste un nouveau point de contrôle à demander
-  explicitement avant de coder (cf. point 37, "ne pas enchaîner plusieurs
-  lots sans validation entre-temps").
+  MERGER ce lot uniquement.
 - **PR #132 mergée sur `main` le 11/09** (Lot 2 + référentiel tous formats +
   import TEST) — déployée sur le VPS. **Étape 0 (import TEST, point 40) faite
   et concluante le 11/09** (résultats → points 38/39/40) : Lot 2 et

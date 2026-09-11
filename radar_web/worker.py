@@ -130,6 +130,38 @@ def _maybe_catalog_labelgraph_build():
         print(f"[worker] catalog labelgraph check : {e}", file=sys.stderr, flush=True)
 
 
+SCORESTORE_CHECK_EVERY = 6 * 3600
+_last_scorestore_check = 0.0
+
+
+def _maybe_scorestore_build():
+    """Enfile scorestore_releases (owner) toutes les SCORESTORE_CHECK_EVERY —
+    opt-in via RADAR_SCORESTORE=1 (Lot 4 de la refonte scoring, cf. CLAUDE.md
+    point 37). Contrairement à build_catalog_labelgraph (déclenché par un
+    changement de dump partagé), ce précalcul dépend aussi du goût de
+    l'utilisateur (label_categories/scoring), qui peut changer à tout moment
+    sans prévenir le worker — une simple cadence fixe est donc plus sûre
+    qu'un déclencheur événementiel ici. scorestore_releases rechaîne
+    lui-même scorestore_tracks en fin de course (cf.
+    crate_jobs._chain_scorestore_tracks)."""
+    global _last_scorestore_check
+    if os.environ.get("RADAR_SCORESTORE") != "1":
+        return
+    if time.time() - _last_scorestore_check < SCORESTORE_CHECK_EVERY:
+        return
+    _last_scorestore_check = time.time()
+    try:
+        if not discogs_dump.available():
+            return
+        q = jobs.load_queue()
+        if any(j["name"] in ("scorestore_releases", "scorestore_tracks") for j in q):
+            return
+        jobs.launch("scorestore_releases", {}, uid=paths.DEFAULT_UID)
+        print("[worker] scorestore_releases enfilé", file=sys.stderr, flush=True)
+    except Exception as e:                       # noqa: BLE001
+        print(f"[worker] scorestore check : {e}", file=sys.stderr, flush=True)
+
+
 def _last_successful_run(name):
     """Timestamp de la DERNIÈRE exécution qui est allée à son terme sans erreur
     (0.0 si jamais complétée) — lu depuis le statut persisté du job lui-même,
@@ -239,6 +271,7 @@ def main():
             _maybe_catalog_labelgraph_build()
             _maybe_auto_maintenance()
             _maybe_recos_scan()
+            _maybe_scorestore_build()
             time.sleep(POLL)
             continue
         job["state"] = "running"

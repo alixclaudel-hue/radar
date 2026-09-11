@@ -2459,7 +2459,8 @@ def _job_import_discogs_dump_test(job, dd, latest, gz_paths, kinds, limit):
         con.close()
         return job.finish(error=f"Import test échoué : {e}")
 
-    job.finish(f"[TEST] {n_total} sortie(s) (dont {n_vinyl} vinyle 12\"/LP), {n_labels} label(s), "
+    pct_vinyl = (n_vinyl / n_total * 100) if n_total else 0.0
+    job.finish(f"[TEST] {n_total} sortie(s) (dont {n_vinyl} vinyle 12\"/LP, {pct_vinyl:.1f} %), {n_labels} label(s), "
                f"{n_artists} artiste(s) importés dans {dd.TEST_DB_PATH} — "
                f"référentiel réel INCHANGÉ (discogs_dump.sqlite3 pas touché). "
                f"Lance ensuite build_catalog_labelgraph avec params[\"test\"]=true pour tester le Lot 2 dessus.")
@@ -2684,7 +2685,11 @@ def job_build_catalog_labelgraph(job, params):
     par `job_import_discogs_dump` avec `limit`, cf. sa docstring) et écrit
     dans clg.TEST_DB_PATH — jamais discogs_dump.sqlite3/catalog_labelgraph.sqlite3
     réels, aucune des deux garde-fous (`available`/`needs_rebuild`) ne
-    s'applique puisqu'il n'y a pas de dump/meta réel en jeu."""
+    s'applique puisqu'il n'y a pas de dump/meta réel en jeu. Message de fin
+    (branche test) : ratio "% labels avec lien parent/enfant" — SOUS-ESTIME la
+    vraie proportion, un lien n'est vu que si l'enfant ET le parent figurent
+    tous deux parmi les labels retenus par la limite de test ; minorant utile,
+    pas une mesure exacte à petite échelle."""
     from radar_web.radar import catalog_labelgraph as clg
     from radar_web.radar import discogs_dump as dd
 
@@ -2709,12 +2714,21 @@ def job_build_catalog_labelgraph(job, params):
             return job.finish(error=f"Construction test échouée : {e}")
         finally:
             dump_con.close()
+        n_labels = stats["n_labels"]
+        n_used = stats["n_artists_used"]
+        n_skipped = stats["n_artists_skipped_prolific"]
+        n_artists_total = n_used + n_skipped
+        pct_parent = (stats["n_parent_edges"] / n_labels * 100) if n_labels else 0.0
+        pct_skipped = (n_skipped / n_artists_total * 100) if n_artists_total else 0.0
         return job.finish(
-            f"[TEST] {stats['n_labels']} label(s), {stats['n_edges']} lien(s) — "
+            f"[TEST] {n_labels} label(s), {stats['n_edges']} lien(s) — "
             f"{stats['n_artist_edges']} par artiste partagé "
-            f"({stats['n_artists_used']} artiste(s) utilisé(s), "
-            f"{stats['n_artists_skipped_prolific']} écarté(s) — trop de labels distincts), "
-            f"{stats['n_parent_edges']} par hiérarchie label parent/enfant → {clg.TEST_DB_PATH} "
+            f"({n_used} artiste(s) utilisé(s), "
+            f"{n_skipped} écarté(s) — trop de labels distincts, {pct_skipped:.1f} % des artistes crédités), "
+            f"{stats['n_parent_edges']} par hiérarchie label parent/enfant "
+            f"({pct_parent:.1f} % des labels — minorant : un lien parent/enfant n'est vu que si "
+            f"l'enfant ET le parent figurent tous deux parmi les labels retenus par la limite de "
+            f"test, un parent situé plus loin dans le fichier source est manqué) → {clg.TEST_DB_PATH} "
             f"(graphe réel INCHANGÉ).")
 
     if not dd.available():

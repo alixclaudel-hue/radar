@@ -57,11 +57,16 @@ en conditions réelles le 11/09** (`RADAR_SCORESTORE=1` activé par
 l'utilisateur, détail → point 42) : `scorestore_releases` (378 208 sorties
 notées) puis `scorestore_tracks` chaîné automatiquement (+112 pistes sur
 20 sorties, 0 erreur) fonctionnent de bout en bout sur le VPS. Ce lot est
-donc clos, en plus d'être mergé.
-**Prochain point de contrôle à demander avant de démarrer le
-Lot 5** (UI lit les tables précalculées, pas encore commencé) : livraison
-lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
-37) — ne pas enchaîner plusieurs lots sans validation entre-temps.
+donc clos, en plus d'être mergé. **Lot 5 fait** (RECOS RADAR lit
+`track_scores`, point 43, dernier lot du chantier 37-43) — cadré par
+question explicite (« utiliser les scores des tracks pour alimenter la
+playlist reco radar »), codé et testé hors-ligne en session cloud le 11/09,
+**pas encore poussé/mergé** à la rédaction de ce point. `job_scan_recos`
+lit désormais directement `scorestore.track_scores` (score PAR PISTE, plus
+un score de release appliqué à toutes ses pistes) au lieu de rescanner
+Discogs lui-même — plus aucun appel réseau dans ce job. Chantier de refonte
+scoring (points 37-43) considéré terminé une fois ce lot mergé et vérifié
+sur le VPS (détail → point 43).
 
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent.
 
@@ -797,9 +802,111 @@ lot par lot, point de contrôle utilisateur après chacun (arbitré, cf. point
     dans un prochain passage (pas bloquant pour clore ce lot) : le
     rafraîchissement gratuit des scores déjà connus après un changement de
     goût (pas encore rejoué en réel, seulement en smoke test hors-ligne).
+43. **Refonte scoring — Lot 5 : RECOS RADAR lit `track_scores`** (11/09, suite
+    du point 37, lot 5/5, périmètre demandé explicitement par l'utilisateur
+    après question de cadrage : « utiliser les scores des tracks pour
+    alimenter la playlist reco radar » — pas la page Nouveautés ni une
+    nouvelle page « Meilleures pistes », les deux autres options proposées) :
+    `job_scan_recos` (`crate_jobs.py`) entièrement refondu pour lire
+    directement `radar/scorestore.py` (`track_scores` JOIN `release_scores`)
+    au lieu de rescanner le référentiel Discogs et de renoter les sorties
+    lui-même — ce travail est déjà fait en continu, en amont, par
+    `job_scorestore_releases`/`job_scorestore_tracks` (Lot 4). Ce job n'est
+    plus qu'une SÉLECTION dans ce qui est déjà calculé.
+
+    **Changement de fond** : chaque piste candidate porte désormais SON
+    PROPRE score (`Ctx.album_score` calculé par artiste+titre RÉEL de la
+    piste) — avant ce lot, TOUTES les pistes d'une même sortie héritaient du
+    même score de RELEASE (calculé une fois sur le titre de la sortie
+    entière), moins précis pour une compilation ou un featuring où les
+    pistes n'ont pas toutes le même artiste. Nécessite que `scorestore.py`
+    stocke aussi le détail `{label, artist, style}` par PISTE (pas
+    seulement par release comme avant) : nouvelle colonne
+    `track_scores.detail_json`, remplie par `job_scorestore_tracks` (les
+    deux passes, rafraîchissement ET récupération de tracklist) — sert au
+    feedback 👍/👎 de `/reco-radar` (`f_label`/`f_artist`/`f_style` du
+    module d'apprentissage), qui lisait jusqu'ici le détail de la RELEASE
+    appliqué à toutes ses pistes.
+
+    **Migration de schéma sur une base déjà déployée** (`scorestore.py`,
+    `_migrate_schema`) : contrairement à `discogs_dump.py`/
+    `catalog_labelgraph.py` (reconstruits en bloc, une bascule atomique
+    suffit à changer de schéma), `scorestore.sqlite3` grossit par upserts
+    incrémentaux et n'est JAMAIS entièrement reconstruit — `CREATE TABLE IF
+    NOT EXISTS` ne modifie donc pas une table déjà créée avec l'ancien
+    schéma (le cas réel sur le VPS de l'utilisateur, déjà peuplé de
+    378 208 sorties avant ce lot). `_migrate_schema` (`ALTER TABLE
+    track_scores ADD COLUMN detail_json` si absente, idempotent) est appelé
+    aussi bien par `open_db()` que par `connect_readonly()` — un job de
+    LECTURE pure (`job_scan_recos`, qui ne passe jamais par `open_db()`)
+    peut tomber sur une base écrite par une version antérieure sans jamais
+    repasser par un job d'écriture entre-temps.
+
+    **Conséquence directe** : `job_scan_recos` ne fait plus AUCUN appel
+    réseau (la tracklist est déjà récupérée par `job_scorestore_tracks`) —
+    ni token Discogs ni référentiel dump requis pour CE job précis, juste
+    que scorestore ait déjà tourné au moins une fois. `recos_seen.json`
+    n'est plus utilisé (fichier laissé tel quel sur disque, inoffensif) :
+    lire scorestore est local et bon marché, chaque scan peut relire tout
+    `track_scores` sans distinguer "sortie déjà vue" — le dédoublonnage par
+    IDENTITÉ DE PISTE (candidats + playlist + historique, INCHANGÉ, cf.
+    points 19/29) suffit à ne jamais ajouter deux fois la même piste.
+    `force` (bouton « 🗑️🔄 Forcer ») garde son sens : vide
+    `recos_candidates.json` avant de reconstruire la file depuis les scores
+    ACTUELS de `track_scores` (utile si des candidats en attente portent un
+    score devenu obsolète après un changement de pondération —
+    `track_scores` lui-même reste à jour tout seul via la passe de
+    rafraîchissement gratuite de `job_scorestore_tracks`, donc plus besoin
+    de forcer un vrai rescan réseau comme avant ce lot).
+
+    Aucun changement pour `job_publish_recos` ni les templates
+    (`recos_candidates.json`/`recos_playlist.json` gardent exactement la
+    même forme — mêmes clés `artist`/`title`/`release_id`/`release_title`/
+    `label`/`year`/`album_score`/`d_label`/`d_artist`/`d_style` — les seules
+    différences sont la PRÉCISION du score/détail par piste et l'absence
+    d'appel réseau côté scan). Petits ajustements de texte pour rester
+    honnête sur ce que fait chaque bouton : libellé Réglages « Sorties max
+    par scan » → « Pistes candidates max par scan » (même clé de config
+    `scoring.recos.max_new_releases`, pas de migration — son unité change de
+    sens, pas son rôle de plafond par lancement) ; texte d'aide de
+    `/reco-radar` et docstring de `reco_radar_clear_candidates` (`app.py`)
+    mis à jour pour ne plus référencer `recos_seen.json`/un rescan réseau
+    inexistants désormais. `RECOS_PER_LABEL_LIMIT` (constante devenue morte
+    avec l'ancienne implémentation) supprimée de `crate_jobs.py`.
+
+    Vérifié par smoke test hors-ligne complet (scorestore synthétique dans un
+    `CRATE_DATA_DIR` temporaire) : (a) une base "ancienne" simulée SANS
+    `detail_json` est migrée automatiquement au premier appel de
+    `job_scan_recos` (lecture pure, jamais `open_db()`) et produit un
+    candidat correct (détail absent -> `{}`, pas de crash) ; (b) une 2e piste
+    ajoutée ensuite AVEC détail par piste distinct de celui de sa release
+    est filtrée par seuil (`scoring.recos.min_score`) puis retrouvée avec SON
+    propre détail (`d_artist` de la piste, pas de la release) ; (c) `force`
+    vide la file et la reconstruit à l'identique depuis les scores actuels ;
+    (d) aucun scorestore du tout -> erreur propre, pas de crash. **Non testé
+    en conditions réelles** (pas de token Discogs/YouTube ni de vrai
+    `job_publish_recos` de bout en bout depuis cette session cloud) : le
+    nombre réel de candidats produits sur le VPS de l'utilisateur (déjà
+    378 208 sorties/quelques dizaines de pistes en `track_scores`) et l'effet
+    visible sur la qualité perçue de la playlist restent à confirmer — cf.
+    TODO ci-dessous.
 
 ## TODO — prochaine session
 
+- **Lot 5 (RECOS RADAR lit `track_scores`, point 43) codé et testé
+  hors-ligne le 11/09, pas encore poussé/mergé.** Une fois mergé et déployé
+  sur le VPS (référentiel scorestore déjà peuplé, migration de schéma
+  automatique) : cliquer « 🔄 Scanner maintenant » sur `/reco-radar` et
+  confirmer au journal que le scan ne fait plus aucun appel réseau
+  (immédiat, pas de délai réseau) et remonte des candidats avec des scores
+  différenciés par piste sur une même sortie (pas tous identiques comme
+  avant ce lot). Puis « ▶ Alimenter la playlist » pour vérifier que la
+  recherche YouTube et l'ajout à la playlist fonctionnent toujours à
+  l'identique (aucun changement côté `job_publish_recos`). Vérifier aussi le
+  feedback 👍/👎 sur une piste de compilation/featuring : les valeurs
+  `f_label`/`f_artist`/`f_style` envoyées doivent refléter CETTE piste, pas
+  la release entière. Une fois confirmé, le chantier de refonte scoring
+  (points 37-43) est terminé.
 - **Lot 4 (précalcul scorestore, point 42) mergé (PR #139/#140/#141) ET
   vérifié en conditions réelles sur le VPS le 11/09** (`RADAR_SCORESTORE=1`
   activé, retour utilisateur) : `scorestore_releases` (378 208 sorties

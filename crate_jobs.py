@@ -81,7 +81,6 @@ DJSET_INPUT_PATH = os.path.join(JOBS_USER_DIR, "djsets.input.json")
 DJSET_SEEN_PATH = os.path.join(USER_DIR, "djset_seen.json")
 SELLERS_SEEN_PATH = os.path.join(USER_DIR, "sellers_seen.json")
 SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
-RECOS_SEEN_PATH = os.path.join(USER_DIR, "recos_seen.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
@@ -96,14 +95,6 @@ RECOS_DAILY_SEARCH_BUDGET = 45
 # « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
 RECOS_SEARCHES_PER_RUN = 5  # repli si scoring.recos.searches_per_run absent
 RECOS_MAX_ATTEMPTS = 3
-RECOS_PER_LABEL_LIMIT = 500
-# search_local(label_keys=<tous les labels suivis>, limit=5000) faisait une seule
-# requête globale ORDER BY year DESC : les labels les plus prolifiques de l'année
-# en cours remplissaient à eux seuls les 5000 lignes, écrasant les autres labels
-# suivis (même mieux notés, même possédés) qui n'atteignaient jamais le scoring —
-# tous les candidats RECOS finissaient datés de la même année récente (retour
-# utilisateur 2026-09-10). Une requête PAR label (ce plafond) donne à chaque label
-# sa juste part, indépendamment du volume des autres.
 # plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
 # ajouts réussis (correctif 10/09, retour utilisateur) : un plafond sur les seuls
 # ajouts laissait la boucle chercher sur tous les candidats en échec (cf. points
@@ -2058,76 +2049,63 @@ def _strip_discogs_suffix(name):
 
 
 def job_scan_recos(job, params):
-    """Candidats pour la playlist RECOS RADAR (Fonctionnalité 1, lot 1) : liste les
-    sorties du référentiel Discogs local (radar/discogs_dump.py) sur les labels suivis
-    (Cœur + Aimé, cf. label_categories), les note avec Ctx.album_score (même système que la
-    Recherche — pas une nouvelle formule), garde celles au-dessus du seuil configuré
-    (scoring.recos.min_score) triées par score décroissant, et récupère leur tracklist
-    réelle (API Discogs à la demande — le dump n'en contient pas, cf. discogs_dump.py)
-    pour empiler des candidats PAR PISTE dans recos_candidates.json. Ne cherche rien sur
-    YouTube ici : la recherche vidéo (job séparé, lot 2, cf. job_publish_recos) consommera
-    cette file.
+    """Candidats pour la playlist RECOS RADAR — refondu au Lot 5 de la refonte
+    scoring (cf. CLAUDE.md point 43) : lit directement radar/scorestore.py
+    (`track_scores` JOIN `release_scores`) au lieu de rescanner le référentiel
+    Discogs et de renoter les sorties lui-même. Ce travail est déjà fait en
+    continu, en amont, par job_scorestore_releases/job_scorestore_tracks
+    (Lot 4) — ce job n'est plus qu'une SÉLECTION dans ce qui est déjà calculé.
 
-    recos_seen.json évite de retraiter une sortie déjà vue à chaque lancement : un
-    dump est un instantané mensuel, search_local() renverrait sinon indéfiniment
-    les mêmes releases tant que le mois ne change pas.
+    Changement de fond (demande utilisateur) : chaque piste candidate porte
+    désormais SON PROPRE score (`Ctx.album_score` calculé par artiste+titre
+    RÉEL de la piste, cf. job_scorestore_tracks) — avant ce lot, toutes les
+    pistes d'une même sortie héritaient du même score de RELEASE (calculé une
+    fois sur le titre de la sortie), moins précis pour une compilation ou un
+    featuring où les pistes n'ont pas toutes le même artiste. Conséquence :
+    plus aucun appel réseau ici (la tracklist est déjà récupérée par
+    job_scorestore_tracks) — ni token Discogs ni référentiel dump requis pour
+    CE job précis, juste que scorestore ait déjà tourné au moins une fois.
 
-    `force` (case "forcer (tout rescanner)", phase de test — retour utilisateur
-    2026-09-10) : ignore recos_seen.json ET vide recos_candidates.json avant de
-    scanner, pour reconstruire la file d'attente à neuf avec le scoring courant
-    (ex. après un changement de pondération) au lieu de ne repérer que les
-    sorties jamais vues. Ne touche ni recos_playlist.json (déjà publié) ni
+    `recos_seen.json` n'est plus utilisé (fichier laissé tel quel sur disque,
+    inoffensif) : lire scorestore est local et bon marché, chaque scan peut
+    donc relire tout `track_scores` sans distinguer "sortie déjà vue" — le
+    dédoublonnage par IDENTITÉ DE PISTE (candidats + playlist + historique,
+    inchangé, cf. `_recos_history_track_keys`) suffit à ne jamais ajouter deux
+    fois la même piste.
+
+    `force` : vide `recos_candidates.json` avant de reconstruire la file
+    depuis `track_scores`, utile si des candidats en attente portent un score
+    devenu obsolète après un changement de pondération (`track_scores`, lui,
+    reste à jour tout seul via la passe de rafraîchissement gratuite de
+    job_scorestore_tracks). Ne touche ni recos_playlist.json (déjà publié) ni
     recos_history.json (vidéos déjà proposées, jamais réajoutées)."""
-    from radar_web.radar import discogs_dump as dd
-    from radar_web.radar.scoring import Ctx, real_tracks
+    from radar_web.radar import scorestore
 
     cfg = cfg_load()
-    token = cfg.get("token", "")
-    if not token:
-        return job.finish(error="Pas de token Discogs.")
-    if not dd.available():
-        return job.finish(error="Référentiel Discogs local indisponible (dump pas encore importé).")
-
     rc = cfg.get("scoring", {}).get("recos", {})
     min_score = float(params.get("min_score", rc.get("min_score", 60)))
     max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
     force = bool(params.get("force"))
 
-    lcats = cfg.get("label_categories", {})
-    names = [n for cid in ("1", "2") for n in lcats.get(cid, [])]
-    label_keys = sorted({normalize_label(n) for n in names if n and n.strip()})
-    if not label_keys:
-        return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à scanner.")
+    if not scorestore.available(RADAR_UID):
+        return job.finish(error="Aucun score précalculé disponible — lance d'abord "
+                                 "scorestore_releases (ou active RADAR_SCORESTORE=1 sur le worker).")
 
-    seen = set() if force else set(load_json(RECOS_SEEN_PATH, []))
-    # Requête par label plutôt qu'une requête globale (cf. RECOS_PER_LABEL_LIMIT) :
-    # chaque label suivi garde sa part du scan, un label prolifique cette année ne
-    # peut plus faire disparaître les sorties des autres avant même le scoring.
-    rows, row_ids = [], set()
-    for lk in label_keys:
-        for row in dd.search_local(label_keys=[lk], limit=RECOS_PER_LABEL_LIMIT):
-            if row["id"] not in row_ids:
-                row_ids.add(row["id"])
-                rows.append(row)
-    ctx = Ctx(uid=RADAR_UID)
-    scored = []
-    for row in rows:
-        if row["id"] in seen:
-            continue
-        title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
-        r = {"label": [row["label"]] if row.get("label") else [],
-             "title": title, "style": row["styles"].split(", ") if row.get("styles") else []}
-        score, detail = ctx.album_score(r)
-        if score is not None and score >= min_score:
-            scored.append((score, row, detail))
-    scored.sort(key=lambda x: -x[0])
-    targets = scored[:max_new]
-    job.st["total"] = len(targets)
-    if not targets:
+    con = scorestore.connect_readonly(RADAR_UID)
+    try:
+        rows = con.execute(
+            "SELECT ts.artist, ts.title, ts.score, ts.detail_json, "
+            "ts.release_id, rs.title, rs.label, rs.year "
+            "FROM track_scores ts JOIN release_scores rs ON rs.release_id = ts.release_id "
+            "WHERE ts.score >= ? ORDER BY ts.score DESC", (min_score,)).fetchall()
+    finally:
+        con.close()
+    if not rows:
         _chain_publish_recos()
-        return job.finish(f"{len(rows)} sortie(s) sur tes labels, aucune au-dessus de {min_score:g}.")
+        return job.finish(f"Aucune piste précalculée au-dessus de {min_score:g} pour l'instant "
+                           f"— laisse scorestore_tracks récupérer la tracklist des sorties les "
+                           f"mieux notées (job séparé, cf. CLAUDE.md point 42).")
 
-    job.msg(f"{len(targets)} sortie(s) retenue(s) sur {len(rows)} scannée(s).")
     candidates = [] if force else load_json(RECOS_CANDIDATES_PATH, [])
     if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
         _chain_publish_recos()
@@ -2147,43 +2125,30 @@ def job_scan_recos(job, params):
                      for c in candidates + playlist}
                     | _recos_history_track_keys(_recos_history_load()))
     now = datetime.now().isoformat(timespec="seconds")
-    n_tracks = 0
-    cap_hit = False
-    for score, row, detail in targets:
-        if job.stopped():
+    job.st["total"] = min(len(rows), max_new)
+    n_added = 0
+    for artist, title, score, detail_json, release_id, release_title, label, year in rows:
+        if job.stopped() or n_added >= max_new or len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
             break
-        if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
-            cap_hit = True
-            break
-        seen.add(row["id"])
-        d = discogs_get(token, f"/releases/{row['id']}")
-        tracks = real_tracks(d.get("tracklist", [])) if d else []
-        art = row.get("artist") or ""
-        for t in tracks:
-            ttl = (t.get("title") or "").strip()
-            track_art = _track_credit_artist(t, art)
-            k = (style_key(track_art), style_key(ttl))
-            if not ttl or k in known_tracks:
-                continue
-            known_tracks.add(k)
-            candidates.append({
-                "artist": track_art, "title": ttl, "release_id": row["id"],
-                "release_title": row.get("title") or "", "label": row.get("label"),
-                "year": row.get("year"), "album_score": score, "added_at": now,
-                "d_label": detail.get("label"), "d_artist": detail.get("artist"),
-                "d_style": detail.get("style"),
-            })
-            n_tracks += 1
-        job.tick(f"{art} — {row.get('title')} ({score}) : +{len(tracks)} piste(s)"
-                 if d else f"{art} — {row.get('title')} : sortie indisponible (API)")
-        save_json(RECOS_SEEN_PATH, sorted(seen))
-        save_json(RECOS_CANDIDATES_PATH, candidates)
-        time.sleep(1.1)
-    save_json(RECOS_SEEN_PATH, sorted(seen))
+        title = (title or "").strip()
+        k = (style_key(artist), style_key(title))
+        if not title or k in known_tracks:
+            continue
+        known_tracks.add(k)
+        detail = json.loads(detail_json) if detail_json else {}
+        candidates.append({
+            "artist": artist, "title": title, "release_id": release_id,
+            "release_title": release_title or "", "label": label, "year": year,
+            "album_score": score, "added_at": now,
+            "d_label": detail.get("label"), "d_artist": detail.get("artist"),
+            "d_style": detail.get("style"),
+        })
+        n_added += 1
+        job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
     _chain_publish_recos()
-    note = " — limite journalière atteinte, reste des sorties retenues au prochain scan." if cap_hit else ""
-    job.finish(f"+{n_tracks} piste(s) candidate(s) sur {len(targets)} sortie(s) — file : {len(candidates)}.{note}")
+    job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
+               f"file : {len(candidates)}.")
 
 
 def _chain_publish_recos():
@@ -2784,7 +2749,9 @@ def job_build_catalog_labelgraph(job, params):
                f"{stats['n_parent_edges']} par hiérarchie label parent/enfant.")
 
 
-SCORESTORE_PER_LABEL_LIMIT = 500  # même limite/même raison que RECOS_PER_LABEL_LIMIT (diagnostic D6)
+SCORESTORE_PER_LABEL_LIMIT = 500  # requête par label plutôt que globale — même raison que
+# le D6 de job_scan_recos (avant sa refonte au Lot 5) : un label prolifique ne doit pas
+# écraser les autres avant même le scoring.
 SCORESTORE_FETCHES_PER_RUN = 20   # repli si scoring.scorestore.fetches_per_run absent
 
 
@@ -2890,7 +2857,11 @@ def job_scorestore_tracks(job, params):
     n'ont ENCORE aucune piste connue, plafonné à
     scoring.scorestore.fetches_per_run appels par lancement (même principe
     de budget que RECOS_SEARCHES_PER_RUN — coût réseau/rate-limit Discogs,
-    pas juste de la CPU)."""
+    pas juste de la CPU).
+
+    Stocke aussi le détail `{label, artist, style}` de `Ctx.album_score` par
+    PISTE (Lot 5, cf. CLAUDE.md point 43 — `job_scan_recos` en a besoin pour
+    le feedback RECOS RADAR), pas seulement le score."""
     from radar_web.radar import scorestore
     from radar_web.radar.scoring import Ctx, real_tracks
 
@@ -2916,9 +2887,9 @@ def job_scorestore_tracks(job, params):
             updated = []
             for t in tracks:
                 title = f"{t['artist']} - {t['title']}" if t.get("artist") else (t.get("title") or "")
-                score, _ = ctx.album_score({"label": [r["label"]] if r.get("label") else [],
-                                             "title": title, "style": styles})
-                updated.append({**t, "score": score})
+                score, detail = ctx.album_score({"label": [r["label"]] if r.get("label") else [],
+                                                  "title": title, "style": styles})
+                updated.append({**t, "score": score, "detail": detail})
             scorestore.upsert_track_scores(con, r["release_id"], updated)
             n_rescored += len(updated)
         con.commit()
@@ -2946,9 +2917,10 @@ def job_scorestore_tracks(job, params):
                     continue
                 art = _track_credit_artist(t, row.get("artist") or "")
                 title = f"{art} - {ttl}" if art else ttl
-                score, _ = ctx.album_score({"label": [row["label"]] if row.get("label") else [],
-                                             "title": title, "style": styles})
-                scored_tracks.append({"track_no": i, "artist": art, "title": ttl, "score": score})
+                score, detail = ctx.album_score({"label": [row["label"]] if row.get("label") else [],
+                                                  "title": title, "style": styles})
+                scored_tracks.append({"track_no": i, "artist": art, "title": ttl,
+                                       "score": score, "detail": detail})
             if scored_tracks:
                 scorestore.upsert_track_scores(con, row["release_id"], scored_tracks)
                 n_new_releases += 1

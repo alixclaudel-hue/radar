@@ -6,6 +6,31 @@ Outil perso crate-digging vinyle basé sur Discogs : ingère écoute (YouTube, S
 
 **Historique complet + détails techniques** : `claude_archive.md` (dump Discogs, graphe multi-niveaux, cerveau scoring, RECOS RADAR, etc.) et `docs/archive/` (anciens docs résumés ici : `etat-2026-09-08.md`, `skill-diag.md`, `skill-dev-loop.md`) — fichiers dans `.claudeignore` (non lus automatiquement) : lire explicitement (`Read <fichier>`) si détail précis manquant.
 
+**Doc technique — scoring (Lot 1)** : `docs/app-overview-scoring-lot1.md` — vue d'ensemble
+du moteur de notation (`radar_web/radar/scoring.py` classe `Ctx` : wmap/affinité,
+ascore, label_tier_map, reco_rows/reco_index, graph_rescore, album_score), de la
+migration config `labels`/`watchlist` (2 listes à plat) → `label_categories`
+(Cœur/Aimé, `radar_web/radar/store.py`) et des jobs qui en dépendent
+(`job_scan_recos`, `job_scan_veille`, `job_profile_labels`, `job_canonicalize`,
+`job_fetch_collection`, `job_merge_corpus`, `job_build_graph`). Généré en session
+cloud le 2026-09-11 à partir du code lu directement (pas de token/accès réseau) —
+à relire si le scoring évolue encore, ce fichier n'est pas mis à jour automatiquement.
+Diagramme associé : `docs/app-diagram-brief-scoring-lot1.md` (instructions de
+dessin) + `docs/app-overview-scoring-lot1.excalidraw` (rendu, 3 groupes/14
+boîtes/22 flèches — à ouvrir sur excalidraw.com ou l'extension VS Code).
+
+**Prochaine session — reprendre ici** : Lot 1 (labels Cœur/Aimé) fait et mergé
+(PR #130, détail point 37 ci-dessous). **Lot 2 — graphe labels global** est la
+suite : job mensuel déclenché après `import_discogs_dump`, cartographie complète
+des labels sur le référentiel partagé (nouveau fichier `labelgraph.py`), mis à
+jour seulement si le dump a changé (`crate_jobs.py` nouveau job + `worker.py`
+déclencheur). Puis Lot 3 (DAG scoring, casser les dépendances circulaires de
+`Ctx`), Lot 4 (précalcul asynchrone `track_scores`, nouveau module
+`scorestore.py`, séparé de `discogs_dump.py`), Lot 5 (UI lit les tables
+précalculées). Livraison lot par lot avec point de contrôle utilisateur après
+chacun (déjà arbitré, cf. point 37) — ne pas enchaîner plusieurs lots sans
+validation entre-temps.
+
 **Avant de lire un document non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent avant de lire.
 
 **Mode caveman par défaut** : invoquer skill `caveman` (`.claude/skills/caveman/SKILL.md`, niveau `full`) en début de session, sauf demande contraire. S'applique aux réponses conversationnelles ; code, commits, doc, tickets restent en prose normale (cf. Boundaries du skill).

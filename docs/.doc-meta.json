@@ -10,5 +10,8 @@
   },
   "app-overview:scoring-system-from-dump-discogs-to-sqli": {
     "commit": "0f509ce9a45c16144b605353be5c0e4bcac7af56"
+  },
+  "app-overview:de-tous-les-poids-avec-valeurs-par-d-fa": {
+    "commit": "711fe71162701e83b12bb9ba6d14581dd6b3d931"
   }
 }

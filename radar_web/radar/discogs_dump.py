@@ -37,11 +37,6 @@ from .store import load, normalize_label, save
 DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_meta.json")
 RAW_DIR = os.path.join(paths.SHARED_DIR, "discogs_dump_raw")
-# Sortie d'un import TEST (job_import_discogs_dump avec le paramètre `limit`) :
-# fichier séparé, jamais DB_PATH — sert à valider un changement de pipeline sur un
-# sous-ensemble en quelques minutes avant de payer le ~1h45 d'un import complet
-# (demande utilisateur du 11/09, cf. CLAUDE.md points 38/39).
-TEST_DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_test.sqlite3")
 # Checkpoint de reprise (releases_done/vinyl + étape atteinte) : un import complet dure
 # ~1h45, largement plus long qu'un cycle de déploiement — sans ça, un redéploiement en
 # plein milieu (rebuild Docker sur CHAQUE merge, pas seulement ceux qui touchent au dump)
@@ -462,9 +457,7 @@ def open_new_db(resume=False, db_path=None):
     existant tel quel, sans le vider ni recréer le schéma (les tables
     contiennent déjà les lignes committées avant l'interruption).
 
-    `db_path` : cible de la bascule finale (défaut `DB_PATH`) — un import TEST
-    (cf. `TEST_DB_PATH`) passe `TEST_DB_PATH` ici pour ne jamais toucher au
-    référentiel réel pendant qu'il sert des lectures."""
+    `db_path` : cible de la bascule finale (défaut `DB_PATH`)."""
     path = db_path or DB_PATH
     os.makedirs(paths.SHARED_DIR, exist_ok=True)
     new_path = path + ".new"
@@ -560,10 +553,8 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
     intermédiaire (sûr à persister comme point de reprise).
 
     `limit` : coupe le flux après ce nombre de `<release>` VUS (pas
-    forcément tous retenus) — pour un import TEST rapide sur un
-    sous-ensemble (cf. `discogs_dump.TEST_DB_PATH`), jamais utilisé sur un
-    import réel, donc incompatible avec `resume_from` (les deux ne sont
-    jamais passés ensemble)."""
+    forcément tous retenus) — incompatible avec `resume_from` (les deux ne
+    sont jamais passés ensemble)."""
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<releases")

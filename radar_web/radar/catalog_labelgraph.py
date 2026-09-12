@@ -35,10 +35,6 @@ from .store import load, save
 
 DB_PATH = os.path.join(paths.SHARED_DIR, "catalog_labelgraph.sqlite3")
 META_PATH = os.path.join(paths.SHARED_DIR, "catalog_labelgraph_meta.json")
-# Sortie d'une construction TEST (sur discogs_dump.TEST_DB_PATH) : fichier séparé,
-# jamais DB_PATH — cf. discogs_dump.TEST_DB_PATH pour le contexte (demande
-# utilisateur du 11/09, valider ce lot sans attendre le réimport complet).
-TEST_DB_PATH = os.path.join(paths.SHARED_DIR, "catalog_labelgraph_test.sqlite3")
 
 # Un artiste crédité sur un nombre déraisonnable de labels distincts (ex.
 # alias générique mal résolu, ou carrière de session-man sur des décennies)
@@ -225,9 +221,7 @@ def build(dump_con=None, progress_cb=None, stop_cb=None,
     `discogs_dump.connect_readonly()`) - permet aux tests de passer une base
     en mémoire minimale sans dépendre d'un vrai dump importé.
 
-    `out_path` : cible de la bascule finale (défaut `DB_PATH`) — une
-    construction TEST (cf. `TEST_DB_PATH`) passe `TEST_DB_PATH` ici pour ne
-    jamais toucher au graphe réel déjà servi.
+    `out_path` : cible de la bascule finale (défaut `DB_PATH`).
 
     Retourne {"n_labels", "n_edges", "n_artist_edges", "n_parent_edges",
     "n_artists_used", "n_artists_skipped_prolific"}. Lève RuntimeError si

@@ -2411,61 +2411,6 @@ def job_scan_catalog(job, params):
     job.finish(f"{job.st['done']}/{len(targets)} vendeur(s) scanné(s) · +{total_new} nouveauté(s) au total.{suffix}")
 
 
-def _job_import_discogs_dump_test(job, dd, latest, gz_paths, kinds, limit):
-    """Import TEST (cf. `job_import_discogs_dump`, params["limit"]) : mêmes
-    fichiers dump réels, mêmes téléchargement+checksum (pas de raccourci
-    dessus — c'est le parsing/insertion qui coûte le temps sur un dump
-    complet, pas le téléchargement), mais parsing coupé après `limit`
-    éléments par flux et écriture dans dd.TEST_DB_PATH — jamais dans
-    discogs_dump.sqlite3/discogs_dump_meta.json/discogs_dump_import.state.json.
-    Pas de reprise (un run test se relance en entier si interrompu, coût
-    négligeable vu sa taille). Les .gz téléchargés sont volontairement
-    CONSERVÉS (pas supprimés comme après un import réel) : un réimport complet
-    lancé ensuite les réutilise au lieu de retélécharger plusieurs Go."""
-    for kind in kinds:
-        job.msg(f"[TEST limit={limit}] Téléchargement du dump {kind} ({latest})…")
-
-        def dl_progress(done, total, kind=kind):
-            job.sub(done=done, total=total, label=f"téléchargement {kind}")
-            if job.stopped():
-                raise InterruptedError("stop demandé pendant le téléchargement")
-
-        try:
-            dd.download_dump(latest, gz_paths[kind], progress_cb=dl_progress, kind=kind)
-        except InterruptedError:
-            return job.finish("Arrêté pendant le téléchargement (mode test) — relance depuis zéro au prochain lancement.")
-        except Exception as e:                    # noqa: BLE001
-            return job.finish(error=f"Téléchargement du dump {kind} échoué : {e}")
-
-    for kind in kinds:
-        job.msg(f"[TEST] Vérification de l'intégrité du dump {kind}…")
-        ok = dd.verify_checksum(latest, gz_paths[kind])
-        if ok is False:
-            try:
-                os.remove(gz_paths[kind])
-            except OSError:
-                pass
-            return job.finish(error=f"Somme de contrôle invalide pour {kind} — fichier corrompu, relance le job.")
-
-    job.msg(f"[TEST] Import limité à {limit} élément(s) par flux dans {dd.TEST_DB_PATH}…")
-    con = dd.open_new_db(db_path=dd.TEST_DB_PATH)
-    try:
-        n_total, n_vinyl = dd.import_releases(con, gz_paths["releases"], limit=limit)
-        n_labels = dd.import_labels(con, gz_paths["labels"], limit=limit)
-        con.execute("DELETE FROM artist_aliases")   # cf. job réel : rejeu propre si run test précédent interrompu
-        n_artists = dd.import_artists(con, gz_paths["artists"], limit=limit)
-        dd.finalize_new_db(con, db_path=dd.TEST_DB_PATH)
-    except Exception as e:                        # noqa: BLE001
-        con.close()
-        return job.finish(error=f"Import test échoué : {e}")
-
-    pct_vinyl = (n_vinyl / n_total * 100) if n_total else 0.0
-    job.finish(f"[TEST] {n_total} sortie(s) (dont {n_vinyl} vinyle 12\"/LP, {pct_vinyl:.1f} %), {n_labels} label(s), "
-               f"{n_artists} artiste(s) importés dans {dd.TEST_DB_PATH} — "
-               f"référentiel réel INCHANGÉ (discogs_dump.sqlite3 pas touché). "
-               f"Lance ensuite build_catalog_labelgraph avec params[\"test\"]=true pour tester le Lot 2 dessus.")
-
-
 def job_import_discogs_dump(job, params):
     """Télécharge le dernier dump mensuel officiel Discogs (Releases, Labels,
     Artists) et reconstruit le référentiel local SQLite (radar/discogs_dump.py)
@@ -2496,31 +2441,8 @@ def job_import_discogs_dump(job, params):
     Releases (le gros morceau), le nombre de sorties déjà committées : au prochain
     lancement, l'import reprend à cet endroit plutôt que de repartir de zéro.
     Labels/Artists (quelques minutes chacun) repartent de zéro sur eux-mêmes si
-    interrompus, sans reperdre Releases.
-
-    `params["limit"]` (entier) : mode TEST — mêmes fichiers dump, mais parsing
-    coupé après `limit` éléments par flux et écriture dans un fichier SÉPARÉ
-    (dd.TEST_DB_PATH), jamais dans le référentiel réel ni son état de reprise
-    (cf. `_job_import_discogs_dump_test`). Sert à valider un changement de
-    pipeline (ex. Lot 2 catalog_labelgraph, élargissement tous formats) en
-    quelques minutes avant le vrai réimport complet (demande utilisateur du
-    11/09, cf. CLAUDE.md points 38/39)."""
+    interrompus, sans reperdre Releases."""
     from radar_web.radar import discogs_dump as dd
-
-    latest_kinds = ("releases", "labels", "artists")
-    limit = params.get("limit")
-    try:
-        limit = int(limit) if limit else None
-    except (TypeError, ValueError):
-        limit = None
-    if limit:
-        job.msg("Recherche du dernier dump Discogs disponible…")
-        try:
-            latest = dd.find_latest_dump_date()
-        except Exception as e:                    # noqa: BLE001
-            return job.finish(error=f"Impossible de lister les dumps Discogs : {e}")
-        gz_paths = {k: os.path.join(dd.RAW_DIR, f"discogs_{latest}_{k}.xml.gz") for k in latest_kinds}
-        return _job_import_discogs_dump_test(job, dd, latest, gz_paths, latest_kinds, limit)
 
     force = bool(params.get("force"))
     job.msg("Recherche du dernier dump Discogs disponible…")
@@ -2679,57 +2601,9 @@ def job_build_catalog_labelgraph(job, params):
     lots suivants). Déclenché par `radar_web/worker.py`
     (`_maybe_catalog_labelgraph_build`) quand le dump partagé a changé depuis
     la dernière construction — jamais rien d'autre, ce job ne tourne pas à
-    cadence fixe.
-
-    `params["test"]` (bool) : construit à partir de dd.TEST_DB_PATH (produit
-    par `job_import_discogs_dump` avec `limit`, cf. sa docstring) et écrit
-    dans clg.TEST_DB_PATH — jamais discogs_dump.sqlite3/catalog_labelgraph.sqlite3
-    réels, aucune des deux garde-fous (`available`/`needs_rebuild`) ne
-    s'applique puisqu'il n'y a pas de dump/meta réel en jeu. Message de fin
-    (branche test) : ratio "% labels avec lien parent/enfant" — SOUS-ESTIME la
-    vraie proportion, un lien n'est vu que si l'enfant ET le parent figurent
-    tous deux parmi les labels retenus par la limite de test ; minorant utile,
-    pas une mesure exacte à petite échelle."""
+    cadence fixe."""
     from radar_web.radar import catalog_labelgraph as clg
     from radar_web.radar import discogs_dump as dd
-
-    if params.get("test"):
-        if not os.path.exists(dd.TEST_DB_PATH):
-            return job.finish(error="Référentiel TEST absent — lance d'abord import_discogs_dump avec params[\"limit\"].")
-        import sqlite3
-        dump_con = sqlite3.connect(dd.TEST_DB_PATH)
-        job.msg(f"[TEST] Construction du graphe labels sur {dd.TEST_DB_PATH}…")
-
-        def progress(done):
-            job.sub(done=done, total=max(done, 1), label="artistes traités")
-
-        try:
-            stats = clg.build(dump_con=dump_con, progress_cb=progress, stop_cb=job.stopped,
-                               out_path=clg.TEST_DB_PATH)
-        except InterruptedError:
-            return job.finish("Arrêté (mode test).")
-        except RuntimeError as e:
-            return job.finish(error=str(e))
-        except Exception as e:                    # noqa: BLE001
-            return job.finish(error=f"Construction test échouée : {e}")
-        finally:
-            dump_con.close()
-        n_labels = stats["n_labels"]
-        n_used = stats["n_artists_used"]
-        n_skipped = stats["n_artists_skipped_prolific"]
-        n_artists_total = n_used + n_skipped
-        pct_parent = (stats["n_parent_edges"] / n_labels * 100) if n_labels else 0.0
-        pct_skipped = (n_skipped / n_artists_total * 100) if n_artists_total else 0.0
-        return job.finish(
-            f"[TEST] {n_labels} label(s), {stats['n_edges']} lien(s) — "
-            f"{stats['n_artist_edges']} par artiste partagé "
-            f"({n_used} artiste(s) utilisé(s), "
-            f"{n_skipped} écarté(s) — trop de labels distincts, {pct_skipped:.1f} % des artistes crédités), "
-            f"{stats['n_parent_edges']} par hiérarchie label parent/enfant "
-            f"({pct_parent:.1f} % des labels — minorant : un lien parent/enfant n'est vu que si "
-            f"l'enfant ET le parent figurent tous deux parmi les labels retenus par la limite de "
-            f"test, un parent situé plus loin dans le fichier source est manqué) → {clg.TEST_DB_PATH} "
-            f"(graphe réel INCHANGÉ).")
 
     if not dd.available():
         return job.finish(error="Référentiel Discogs local absent — lance d'abord import_discogs_dump.")

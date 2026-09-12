@@ -40,6 +40,10 @@ services:
     env_file: .env
     volumes:
       - ./data:/data
+    # ne sert pas HTTP : le HEALTHCHECK du Dockerfile (hérité de la même image
+    # que radar-web) le marquerait "unhealthy" en permanence sans ça
+    healthcheck:
+      disable: true
 
 volumes:
   caddy_data:

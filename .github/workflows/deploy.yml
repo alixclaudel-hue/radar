@@ -47,4 +47,8 @@ jobs:
             exit 1
           fi
           echo "deploy OK -> $target"
+
+          # purge les images/layers de build devenus inutiles (anciens déploiements) —
+          # sans ça le disque accumule au fil des déploiements (cf. incident backup pt 12)
+          sudo docker image prune -f
           REMOTE

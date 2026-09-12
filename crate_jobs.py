@@ -2645,7 +2645,7 @@ def job_build_catalog_labelgraph(job, params):
 SCORESTORE_PER_LABEL_LIMIT = 500  # requête par label plutôt que globale — même raison que
 # le D6 de job_scan_recos (avant sa refonte au Lot 5) : un label prolifique ne doit pas
 # écraser les autres avant même le scoring.
-SCORESTORE_FETCHES_PER_RUN = 20   # repli si scoring.scorestore.fetches_per_run absent
+SCORESTORE_FETCHES_PER_RUN = 1000  # repli si scoring.scorestore.fetches_per_run absent
 
 
 def _chain_scorestore_tracks():
@@ -2764,7 +2764,7 @@ def job_scorestore_tracks(job, params):
     cfg = cfg_load()
     token = cfg.get("token", "")
     sc = cfg.get("scoring", {}).get("scorestore", {})
-    min_score = float(params.get("min_score", sc.get("min_score", 60)))
+    min_score = float(params.get("min_score", sc.get("min_score", 10)))
     fetches_per_run = int(params.get("fetches_per_run", sc.get("fetches_per_run", SCORESTORE_FETCHES_PER_RUN)))
 
     con = scorestore.open_db(RADAR_UID)
@@ -2824,6 +2824,12 @@ def job_scorestore_tracks(job, params):
             time.sleep(1.1)
     finally:
         con.close()
+    # Lot plein : d'autres sorties sans tracklist attendent probablement encore —
+    # se rechaîne soi-même pour tourner en continu plutôt que d'attendre le
+    # prochain passage à cadence fixe de worker._maybe_scorestore_build (même
+    # principe que _chain_publish_recos).
+    if len(targets) >= fetches_per_run:
+        _chain_scorestore_tracks()
     job.finish(f"{n_rescored} piste(s) rafraîchie(s) — "
                f"+{n_new_tracks} nouvelle(s) piste(s) sur {n_new_releases} sortie(s).")
 

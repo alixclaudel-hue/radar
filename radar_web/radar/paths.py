@@ -97,6 +97,18 @@ def user_paths(uid=DEFAULT_UID):
     return SimpleNamespace(**ns)
 
 
+def all_uids():
+    """Uids enregistrés = sous-dossiers de users/ contenant une config
+    (`crate_radar_config.json`) — ordre alphabétique, utilisé par le worker
+    pour boucler l'entretien de fond (scorestore, etc.) sur CHAQUE utilisateur
+    plutôt que sur le seul DEFAULT_UID."""
+    if not os.path.isdir(USERS_DIR):
+        return []
+    return sorted(
+        d for d in os.listdir(USERS_DIR)
+        if os.path.isfile(os.path.join(USERS_DIR, d, _PER_USER["config"])))
+
+
 def migrate_layout(uid=DEFAULT_UID):
     """Déplace les fichiers historiques de <DATA>/*.json vers users/<uid>/ et
     shared/. Idempotent : ne fait rien si <DATA>/crate_radar_config.json est absent

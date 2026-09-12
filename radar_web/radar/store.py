@@ -107,7 +107,7 @@ DEFAULT_SCORING = {
                 "spotify": 0.5, "bandcamp": 0.9, "djset": 0.4},
     "recos": {"min_score": 60, "max_new_releases": 20,
               "searches_per_run": 5, "max_tracks": 5},
-    "scorestore": {"min_score": 60, "fetches_per_run": 20},
+    "scorestore": {"min_score": 10, "fetches_per_run": 1000},
     "label_affinity_floor": 0,
     "learn": {"l2": 2.0, "min_feedback": 12, "min_per_class": 3},
 }

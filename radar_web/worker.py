@@ -130,20 +130,24 @@ def _maybe_catalog_labelgraph_build():
         print(f"[worker] catalog labelgraph check : {e}", file=sys.stderr, flush=True)
 
 
-SCORESTORE_CHECK_EVERY = 6 * 3600
+SCORESTORE_CHECK_EVERY = 15 * 60
 _last_scorestore_check = 0.0
 
 
 def _maybe_scorestore_build():
-    """Enfile scorestore_releases (owner) toutes les SCORESTORE_CHECK_EVERY —
+    """Enfile scorestore_releases toutes les SCORESTORE_CHECK_EVERY, POUR
+    CHAQUE UTILISATEUR ENREGISTRÉ (paths.all_uids(), plus seulement owner) —
     opt-in via RADAR_SCORESTORE=1 (Lot 4 de la refonte scoring, cf. CLAUDE.md
     point 37). Contrairement à build_catalog_labelgraph (déclenché par un
     changement de dump partagé), ce précalcul dépend aussi du goût de
     l'utilisateur (label_categories/scoring), qui peut changer à tout moment
     sans prévenir le worker — une simple cadence fixe est donc plus sûre
     qu'un déclencheur événementiel ici. scorestore_releases rechaîne
-    lui-même scorestore_tracks en fin de course (cf.
-    crate_jobs._chain_scorestore_tracks)."""
+    lui-même scorestore_tracks en fin de course, qui se rechaîne à son tour
+    tant qu'il reste des sorties sans tracklist (cf.
+    crate_jobs._chain_scorestore_tracks) — cette cadence ne sert donc qu'à
+    redémarrer la chaîne si elle s'est complètement vidée ou si le worker
+    vient de repartir, pas à cadencer chaque lot."""
     global _last_scorestore_check
     if os.environ.get("RADAR_SCORESTORE") != "1":
         return
@@ -153,11 +157,12 @@ def _maybe_scorestore_build():
     try:
         if not discogs_dump.available():
             return
-        q = jobs.load_queue()
-        if any(j["name"] in ("scorestore_releases", "scorestore_tracks") for j in q):
-            return
-        jobs.launch("scorestore_releases", {}, uid=paths.DEFAULT_UID)
-        print("[worker] scorestore_releases enfilé", file=sys.stderr, flush=True)
+        queued = {(j["uid"], j["name"]) for j in jobs.load_queue()}
+        for uid in paths.all_uids():
+            if (uid, "scorestore_releases") in queued or (uid, "scorestore_tracks") in queued:
+                continue
+            jobs.launch("scorestore_releases", {}, uid=uid)
+            print(f"[worker] scorestore_releases enfilé ({uid})", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] scorestore check : {e}", file=sys.stderr, flush=True)
 

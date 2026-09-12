@@ -1,8 +1,9 @@
 # secrets & données (jamais dans git — elles vivent sur le volume du serveur)
 .env
 /data/
-# CRATE_DATA_DIR non défini => paths.DATA retombe sur la racine du dépôt et y écrit
-# users/<uid>/crate_radar_config.json, qui contient le token Discogs. Dépôt public.
+# garde-fou : défaut normalement /data/ (cf. pt 44 CLAUDE.md) mais si jamais
+# écrit ici (vieux CRATE_DATA_DIR exporté vers la racine, ancien comportement...)
+# ça contiendrait users/<uid>/crate_radar_config.json avec le token Discogs.
 /users/
 /shared/
 accounts.json

@@ -26,8 +26,13 @@ from radar_web.radar import store, ytcache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Répertoire des données : partagé avec radar_web via CRATE_DATA_DIR (volume
-# persistant en conteneur ; à côté du script en local).
-DATA = os.environ.get("CRATE_DATA_DIR") or HERE
+# persistant en conteneur). Défaut aligné sur radar_web/radar/paths.py (data/
+# à côté du script, jamais la racine du repo elle-même) — sans ça un lancement
+# manuel sans CRATE_DATA_DIR exporté écrit hors du volume monté par Docker
+# (incident du 12/09 : réimport dump écrit dans <repo>/shared au lieu de
+# <repo>/data/shared).
+DATA = os.environ.get("CRATE_DATA_DIR") or os.path.join(HERE, "data")
+print(f"[crate_jobs] DATA={DATA}", file=sys.stderr)
 # Multi-utilisateur (cf. docs/architecture.md étape 1) : chaque job tourne pour un
 # utilisateur (RADAR_UID, défaut "owner") — données sous users/<uid>/, caches
 # neutres sous shared/. Doit rester aligné avec radar_web/radar/paths.py.

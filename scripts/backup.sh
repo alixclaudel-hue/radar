@@ -24,8 +24,17 @@ out="$OUT_DIR/data-$ts.tgz.enc"
 # depuis le dump mensuel Discogs, cf. discogs_dump.py — pas une donnée utilisateur,
 # inutile de le réencrypter en entier chaque jour) -> tar -> chiffrement (flux,
 # rien en clair sur disque)
-sudo tar czf - --exclude="$OUT_DIR" --exclude="$DATA_DIR/shared/discogs_dump.sqlite3*" \
-  -C "$(dirname "$DATA_DIR")" "$(basename "$DATA_DIR")" \
+#
+# Piège : tar archive avec des chemins RELATIFS à -C ("data/...") — un --exclude
+# en chemin absolu ne matche jamais rien. Vécu le 12/09 : backups/ et
+# shared/discogs_dump_raw/ (~12G) inclus dans l'archive -> 13G corrompu
+# (tar lit le .tgz.enc en cours d'écriture -> "file changed as we read it").
+base="$(basename "$DATA_DIR")"
+sudo tar czf - \
+  --exclude="$base/backups" \
+  --exclude="$base/shared/discogs_dump.sqlite3*" \
+  --exclude="$base/shared/discogs_dump_raw" \
+  -C "$(dirname "$DATA_DIR")" "$base" \
   | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASS -out "$out"
 chown "$(id -u):$(id -g)" "$out" 2>/dev/null || true
 echo "$(date -u +%FT%TZ)  ok  $(basename "$out")  $(du -h "$out" | cut -f1)"

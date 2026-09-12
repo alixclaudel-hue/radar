@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 # racine du projet = dossier parent de radar_web/
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA = os.environ.get("CRATE_DATA_DIR") or _REPO
+DATA = os.environ.get("CRATE_DATA_DIR") or os.path.join(_REPO, "data")
 JOBS_SCRIPT = os.path.join(_REPO, "crate_jobs.py")
 
 DEFAULT_UID = "owner"

@@ -11,6 +11,10 @@ COPY . .
 
 ENV CRATE_DATA_DIR=/data PYTHONUNBUFFERED=1
 EXPOSE 8600
+# reflète l'état réel dans `docker compose ps` — le health-check qui pilote
+# le rollback (deploy.yml) reste externe et indépendant de celui-ci
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8600/health', timeout=3)" || exit 1
 # --forwarded-allow-ips : derrière Caddy (réseau Docker, jamais 127.0.0.1), sans ça
 # uvicorn ignore X-Forwarded-Proto et l'appli se croit en http alors que le navigateur
 # est en https -> request.base_url ne correspond plus à l'en-tête Origin, et _bad_origin

@@ -66,7 +66,7 @@
       else if (p[0] < CX - 6) anchor = 'end';
       ax.tName = svgEl('text', {
         x: p[0], y: p[1], 'text-anchor': anchor,
-        style: 'fill:var(--soft);font-size:10.5px;font-family:inherit'
+        style: 'fill:var(--soft);font-size:11px;font-family:inherit'
       });
       ax.tName.textContent = ax.label;
       // la valeur se pose vers l'extérieur, pour ne pas empiéter sur la toile

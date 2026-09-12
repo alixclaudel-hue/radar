@@ -63,3 +63,18 @@ jobs:
           check /settings         '200|303'
           kill $pid 2>/dev/null || true
           exit $fail
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # construit l'image réellement utilisée en prod (radar_web/Dockerfile) sans la
+      # publier — un Dockerfile cassé (dépendance manquante, COPY invalide...) est
+      # sinon découvert seulement au déploiement sur le VPS (deploy.yml)
+      - name: Build de l'image Docker (validation uniquement, pas de push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: radar_web/Dockerfile
+          push: false

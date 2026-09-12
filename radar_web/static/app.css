@@ -201,7 +201,7 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 }
 .cover-meta:empty{ display:none; }
 .cover-meta .cm{
-  font-size:10.5px; line-height:1; color:#fff; background:rgba(0,0,0,.6);
+  font-size:11px; line-height:1; color:#fff; background:rgba(0,0,0,.6);
   border-radius:999px; padding:3px 7px; font-weight:600; white-space:nowrap;
   text-decoration:none;
 }
@@ -279,7 +279,7 @@ a.chip:hover{ border-color:var(--pin); }
 }
 .tracklist .tk-play:hover{ background:var(--pin); color:var(--paper); border-color:var(--pin); }
 
-.notice{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+.notice{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
 .notice.warn{ border-color:var(--clay); }
 
 .progress{ height:8px; background:var(--line); border-radius:999px; overflow:hidden; }
@@ -308,6 +308,7 @@ a.chip:hover{ border-color:var(--pin); }
 @media (prefers-reduced-motion:reduce){ .spinner{ animation:none; } }
 
 .section-title{ display:flex; align-items:baseline; gap:10px; }
+.section-title h3{ font-size:15px; }
 
 /* accordéons */
 .acc{ border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); margin-bottom:10px; overflow:hidden; }
@@ -325,7 +326,7 @@ a.chip:hover{ border-color:var(--pin); }
 .logo{ width:18px; height:18px; flex:0 0 auto; vertical-align:middle; }
 
 .statgrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-top:8px; }
-.stat{ background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+.stat{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:12px 14px; }
 .stat b{ font-family:'Syne',sans-serif; font-weight:800; font-size:22px; display:block; }
 .stat span{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--soft); }
 .htmx-indicator{ opacity:0; }

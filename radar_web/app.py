@@ -12,6 +12,7 @@ import io
 import os
 import re
 import secrets
+import sys
 import threading
 import time
 from datetime import datetime
@@ -57,11 +58,12 @@ templates.env.filters["pl_id"] = _pl_id
 templates.env.filters["sp_id"] = _sp_id
 
 # migration douce : <DATA>/*.json -> users/owner/ + shared/  (idempotent, no-op si déjà fait)
+print(f"[radar] DATA={paths.DATA}", file=sys.stderr)
+
 _migrated = paths.migrate_layout()
 if _migrated:
-    import sys as _sys
     print(f"[radar] layout migré vers users/{paths.DEFAULT_UID}/ + shared/ : "
-          f"{len(_migrated)} fichier(s)", file=_sys.stderr)
+          f"{len(_migrated)} fichier(s)", file=sys.stderr)
 
 app = FastAPI(title="Radar")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")

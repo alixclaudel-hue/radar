@@ -2106,14 +2106,12 @@ def job_scan_recos(job, params):
     finally:
         con.close()
     if not rows:
-        _chain_publish_recos()
         return job.finish(f"Aucune piste précalculée au-dessus de {min_score:g} pour l'instant "
                            f"— laisse scorestore_tracks récupérer la tracklist des sorties les "
                            f"mieux notées (job séparé, cf. CLAUDE.md point 42).")
 
     candidates = [] if force else load_json(RECOS_CANDIDATES_PATH, [])
     if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
-        _chain_publish_recos()
         last = _publish_recos_last_message()
         cause = f" Dernière publication : {last}" if last else ""
         return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"
@@ -2151,18 +2149,8 @@ def job_scan_recos(job, params):
         n_added += 1
         job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
-    _chain_publish_recos()
     job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
                f"file : {len(candidates)}.")
-
-
-def _chain_publish_recos():
-    """Enfile publish_recos après scan_recos, que le scan ait trouvé du neuf ou non :
-    une file laissée en plan par un précédent quota YouTube épuisé doit continuer à se
-    vider aux scans suivants (cf. job_publish_recos)."""
-    from radar_web.radar import jobs as job_queue
-    if not any(j["name"] == "publish_recos" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
-        job_queue.launch("publish_recos", {}, uid=RADAR_UID)
 
 
 def _publish_recos_last_message():
@@ -2183,9 +2171,14 @@ def job_publish_recos(job, params):
     seule) via ytcache (cache partagé + cascade de clés, Option A étape 5a).
 
     Plafonnée à scoring.recos.max_tracks pistes (curseur /settings, repli
-    RECOS_MAX_TRACKS) : au-delà, la plus ancienne est retirée avant d'ajouter la
-    nouvelle (FIFO) — pas de détection d'écoute réelle (l'ancien lot 3, scraping
-    Playwright de l'historique YouTube, a été abandonné, cf. CLAUDE.md).
+    RECOS_MAX_TRACKS) : une fois pleine, plus aucun ajout tant qu'une piste n'a
+    pas été retirée — ni éviction automatique par ancienneté (FIFO, abandonnée
+    au retour utilisateur 2026-09-14), ni suppression liée à une détection
+    d'écoute réelle (l'ancien lot 3, scraping Playwright de l'historique
+    YouTube, avait déjà été abandonné, cf. CLAUDE.md). Le renouvellement passe
+    désormais par un clic explicite sur une piste (marquage "écoutée") purgé à
+    minuit heure de Paris par le worker (cf. app.py::reco_radar_mark_played,
+    worker.py::_maybe_recos_midnight_purge).
 
     Au plus scoring.recos.searches_per_run recherches YouTube par lancement
     (curseur /settings, repli RECOS_SEARCHES_PER_RUN) — sur le nombre de
@@ -2211,6 +2204,9 @@ def job_publish_recos(job, params):
     now = datetime.now().isoformat(timespec="seconds")
     for c in candidates:
         if job.stopped() or quota_hit or searched >= searches_per_run:
+            remaining.append(c)
+            continue
+        if len(playlist) >= max_tracks:
             remaining.append(c)
             continue
         ck = (style_key(c.get("artist")), style_key(c.get("title")))
@@ -2265,10 +2261,6 @@ def job_publish_recos(job, params):
         history_keys.add(ck)
         added += 1
         job.tick(f"{c['artist']} — {c['title']} : ajoutée")
-        if len(playlist) > max_tracks:
-            dropped = playlist.pop(0)
-            job.tick(f"{dropped.get('artist')} — {dropped.get('title')} : retirée "
-                     f"(plafond {max_tracks})")
         save_json(RECOS_HISTORY_PATH, list(history.values()))
         save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_HISTORY_PATH, list(history.values()))
@@ -2276,6 +2268,9 @@ def job_publish_recos(job, params):
     save_json(RECOS_CANDIDATES_PATH, remaining)
     note = (f" — limite de recherche ({searches_per_run}) atteinte."
             if searched >= searches_per_run else "")
+    if len(playlist) >= max_tracks and remaining:
+        note += (f" Playlist pleine ({max_tracks}) — plus d'ajout tant qu'aucune "
+                 f"piste n'est marquée écoutée (clic sur une ligne, purge à minuit).")
     job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{max_tracks}, "
                f"{len(remaining)} en attente.{note}")
 
@@ -2650,9 +2645,9 @@ SCORESTORE_FETCHES_PER_RUN = 1000  # repli si scoring.scorestore.fetches_per_run
 
 def _chain_scorestore_tracks():
     """Enfile scorestore_tracks après scorestore_releases, que le scan release
-    ait bougé quelque chose ou non — même principe que _chain_publish_recos :
-    une passe piste par piste laissée en plan par un précédent quota API
-    épuisé doit continuer à progresser aux scans suivants."""
+    ait bougé quelque chose ou non : une passe piste par piste laissée en plan
+    par un précédent quota API épuisé doit continuer à progresser aux scans
+    suivants."""
     from radar_web.radar import jobs as job_queue
     if not any(j["name"] == "scorestore_tracks" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
         job_queue.launch("scorestore_tracks", {}, uid=RADAR_UID)
@@ -2826,8 +2821,7 @@ def job_scorestore_tracks(job, params):
         con.close()
     # Lot plein : d'autres sorties sans tracklist attendent probablement encore —
     # se rechaîne soi-même pour tourner en continu plutôt que d'attendre le
-    # prochain passage à cadence fixe de worker._maybe_scorestore_build (même
-    # principe que _chain_publish_recos).
+    # prochain passage à cadence fixe de worker._maybe_scorestore_build.
     if len(targets) >= fetches_per_run:
         _chain_scorestore_tracks()
     job.finish(f"{n_rescored} piste(s) rafraîchie(s) — "

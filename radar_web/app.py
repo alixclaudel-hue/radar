@@ -492,6 +492,24 @@ def reco_radar_delete_track(video_id: str = Form("")):
     return RedirectResponse("/reco-radar", status_code=303)
 
 
+@app.post("/reco-radar/mark-played")
+def reco_radar_mark_played(video_id: str = Form("")):
+    """Marque une piste comme écoutée aujourd'hui (clic sur la ligne, cf. JS
+    reco_radar.html) — purgée à minuit heure de Paris par le worker
+    (_maybe_recos_midnight_purge), qui remplace l'éviction FIFO comme mécanisme
+    de renouvellement de la playlist (retour utilisateur 2026-09-14)."""
+    if video_id:
+        playlist = load(_pu().recos_playlist, [])
+        changed = False
+        for t in playlist:
+            if t.get("video_id") == video_id and not t.get("played"):
+                t["played"] = True
+                changed = True
+        if changed:
+            save(_pu().recos_playlist, playlist)
+    return Response(status_code=204)
+
+
 @app.post("/reco-radar/clear-candidates")
 def reco_radar_clear_candidates():
     """Vide UNIQUEMENT la file d'attente des candidats prêts à être recherchés sur

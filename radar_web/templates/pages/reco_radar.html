@@ -2,9 +2,10 @@
 {% block title %}Reco Radar · Radar{% endblock %}
 {% block content %}
 <h1>🎯 Reco Radar</h1>
-<p class="muted small">Playlist alimentée automatiquement à partir des sorties de tes labels suivis
-  (score album ≥ seuil réglable dans Réglages) — {{ n_playlist }}/{{ max_tracks }} piste{{ 's' if n_playlist > 1 }}.
-  Au-delà de {{ max_tracks }}, la plus ancienne est retirée pour laisser la place à la suivante.</p>
+<p class="muted small">Playlist alimentée à la demande (boutons ci-dessous) à partir des sorties de tes
+  labels suivis (score album ≥ seuil réglable dans Réglages) — {{ n_playlist }}/{{ max_tracks }} piste{{ 's' if n_playlist > 1 }}.
+  Une fois pleine, plus d'ajout tant qu'une piste n'a pas été retirée : clique sur une ligne pour la marquer
+  écoutée, elle est purgée de la playlist à minuit (heure de Paris).</p>
 
 <p class="small">
   <span class="tag">{{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} en attente{% if last_scan %} · dernier scan {{ last_scan }}{% endif %}{% if last_publish %} · dernière publication {{ last_publish }}{% endif %}</span>
@@ -118,7 +119,13 @@
 
   rows.forEach(r => r.addEventListener('click', (e) => {
     if (e.target.closest('button, a, form')) return;
-    if (player) player.playVideoAt(Number(r.dataset.index));
+    const idx = Number(r.dataset.index);
+    if (player) player.playVideoAt(idx);
+    fetch('/reco-radar/mark-played', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'video_id=' + encodeURIComponent(videoIds[idx]),
+    });
   }));
 
   window.onYouTubeIframeAPIReady = () => {

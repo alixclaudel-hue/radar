@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from .radar import catalog_labelgraph, discogs_dump, jobs, paths, sellers, store
 
@@ -49,6 +50,19 @@ _last_auto_maint_check = 0.0
 # personnelle (un seul owner en pratique) -> pas de round-robin par
 # utilisateur nécessaire, mêmes conventions que les scans ci-dessus.
 _last_recos_check = 0.0
+
+# Purge de minuit RECOS RADAR (retour utilisateur 2026-09-14) : remplace
+# l'éviction FIFO comme mécanisme de renouvellement de la playlist — une
+# piste marquée "écoutée" (clic sur une ligne, cf. app.py::reco_radar_mark_played)
+# est retirée à minuit heure de Paris, jamais tout de suite (laisser la
+# session d'écoute en cours intacte). Check à 10 min : plus fin que les
+# autres check horaires pour ne pas rater minuit de trop loin. Toujours actif
+# (pas d'opt-in RADAR_* : comportement de base de la playlist, pas une tâche
+# de fond facultative).
+MIDNIGHT_PURGE_CHECK_EVERY = 600
+_last_midnight_purge_check = 0.0
+_last_midnight_purge_date = None
+PARIS_TZ = ZoneInfo("Europe/Paris")
 
 
 def _maybe_weekly_scan():
@@ -209,8 +223,11 @@ def _maybe_auto_maintenance():
 def _maybe_recos_scan():
     """Toutes les heures (si RADAR_RECOS_SCAN=1) : publish_recos si des candidats
     attendent déjà dans recos_candidates.json (draine la file avant d'aller
-    chercher autre chose), sinon scan_recos pour en trouver de nouveaux (qui
-    rechaîne lui-même publish_recos à la fin, cf. crate_jobs._chain_publish_recos).
+    chercher autre chose), sinon scan_recos pour en trouver de nouveaux.
+    Chaînage scan_recos→publish_recos supprimé depuis (retour utilisateur
+    2026-09-14, cf. CLAUDE.md point 19) : si ce `return` était un jour retiré,
+    il faudrait aussi relancer explicitement publish_recos ici après
+    scan_recos.
 
     En pause depuis le 10/09 (retour utilisateur, phase de test, plafond de
     playlist réduit à 5 pistes, cf. crate_jobs.RECOS_MAX_TRACKS) : désactivé au
@@ -237,6 +254,32 @@ def _maybe_recos_scan():
             print("[worker] scan_recos enfilé (file d'attente vide)", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] recos check : {e}", file=sys.stderr, flush=True)
+
+
+def _maybe_recos_midnight_purge():
+    """Renouvelle la playlist RECOS RADAR : purge à minuit heure de Paris les pistes
+    cliquées ('played') dans la journée (retour utilisateur 2026-09-14, remplace
+    l'éviction FIFO par ancienneté). Ne touche pas recos_history.json : une piste
+    purgée n'est jamais réajoutée automatiquement (dédup permanente inchangée,
+    cf. CLAUDE.md pt 19)."""
+    global _last_midnight_purge_check, _last_midnight_purge_date
+    if time.time() - _last_midnight_purge_check < MIDNIGHT_PURGE_CHECK_EVERY:
+        return
+    _last_midnight_purge_check = time.time()
+    today = datetime.now(PARIS_TZ).date()
+    if _last_midnight_purge_date is None:
+        _last_midnight_purge_date = today   # référence initiale, pas de purge au démarrage
+        return
+    if today == _last_midnight_purge_date:
+        return
+    _last_midnight_purge_date = today
+    path = paths.user_paths(paths.DEFAULT_UID).recos_playlist
+    playlist = store.load(path, [])
+    kept = [t for t in playlist if not t.get("played")]
+    if len(kept) != len(playlist):
+        store.save(path, kept)
+        print(f"[worker] purge minuit RECOS : {len(playlist) - len(kept)} piste(s) écoutée(s) retirée(s)",
+              file=sys.stderr, flush=True)
 
 
 def _pick(q, last_uid):
@@ -276,6 +319,7 @@ def main():
             _maybe_catalog_labelgraph_build()
             _maybe_auto_maintenance()
             _maybe_recos_scan()
+            _maybe_recos_midnight_purge()
             _maybe_scorestore_build()
             time.sleep(POLL)
             continue

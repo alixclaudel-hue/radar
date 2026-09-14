@@ -67,8 +67,13 @@ def running(name, uid=None):
     return bool(s and (s.get("running") or s.get("queued")))
 
 
-def launch(name, params=None, uid=None):
-    """Empile le job. Refuse un doublon (déjà en file ou en cours pour cet uid)."""
+def launch(name, params=None, uid=None, priority=1):
+    """Empile le job. Refuse un doublon (déjà en file ou en cours pour cet uid).
+
+    `priority` : 1 = interactif (clic utilisateur, défaut), 0 = entretien de
+    fond déclenché par worker.py. Le worker sert toujours la file en série
+    (protection rate-limit Discogs, cf. worker.py), mais un job interactif
+    déjà en file passe devant les jobs de fond encore en attente."""
     uid = uid or store.current_uid()
     q = load_queue()
     if any(j["uid"] == uid and j["name"] == name and j["state"] in ("queued", "running")
@@ -78,7 +83,8 @@ def launch(name, params=None, uid=None):
     if s and s.get("running") and s.get("_age", 999) < 150:
         return False
     q.append({"id": secrets.token_hex(6), "uid": uid, "name": name,
-              "params": params or {}, "ts": time.time(), "state": "queued"})
+              "params": params or {}, "ts": time.time(), "state": "queued",
+              "priority": priority})
     save_queue(q)
     return True
 

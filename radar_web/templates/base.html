@@ -19,11 +19,13 @@
         <form method="post" action="/logout" style="display:inline">
           <button type="submit" class="linklike">déconnexion</button></form></span>
       {% else %}<span class="brand-sub">nouvelle interface</span>{% endif %}
-      <a class="chip cart-tab" href="/univers?tab=cart" title="Wantlist Discogs">{{ icons.cart("ic-lg") }}{% if n_cart %} {{ n_cart }}{% endif %}</a>
+      {% set cur = active|default('') %}
+      <div class="topbar-right">
+        <a href="/patte" class="chip profile-tab {{ 'active' if cur=='patte' }}" title="Mon profil">👤 Mon profil</a>
+        <a class="chip cart-tab" href="/univers?tab=cart" title="Wantlist Discogs">{{ icons.cart("ic-lg") }}{% if n_cart %} {{ n_cart }}{% endif %}</a>
+      </div>
     </div>
     <nav class="nav">
-      {% set cur = active|default('') %}
-      <a href="/patte"    class="{{ 'active' if cur=='patte' }}">👤 Mon profil</a>
       <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Chercher un disque</a>
       <a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Nouveautés</a>
       <a href="/univers"  class="{{ 'active' if cur=='univers' }}">🌐 Mes labels &amp; artistes</a>

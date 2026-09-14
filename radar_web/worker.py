@@ -83,7 +83,7 @@ def _maybe_weekly_scan():
         q = jobs.load_queue()
         running = any(j["name"] == "scan_catalog" for j in q)
         if stale and not running:
-            jobs.launch("scan_catalog", {}, uid=paths.DEFAULT_UID)
+            jobs.launch("scan_catalog", {}, uid=paths.DEFAULT_UID, priority=0)
             print("[worker] scan_catalog hebdo enfilé", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] weekly scan check : {e}", file=sys.stderr, flush=True)
@@ -105,7 +105,7 @@ def _maybe_monthly_dump_sync():
             return
         latest = discogs_dump.find_latest_dump_date()
         if latest != discogs_dump.get_meta().get("dump_date"):
-            jobs.launch("import_discogs_dump", {}, uid=paths.DEFAULT_UID)
+            jobs.launch("import_discogs_dump", {}, uid=paths.DEFAULT_UID, priority=0)
             print(f"[worker] import_discogs_dump enfilé (nouveau dump {latest})",
                   file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
@@ -137,7 +137,7 @@ def _maybe_catalog_labelgraph_build():
         if any(j["name"] == "build_catalog_labelgraph" for j in q):
             return
         if catalog_labelgraph.needs_rebuild(discogs_dump.get_meta()):
-            jobs.launch("build_catalog_labelgraph", {}, uid=paths.DEFAULT_UID)
+            jobs.launch("build_catalog_labelgraph", {}, uid=paths.DEFAULT_UID, priority=0)
             print("[worker] build_catalog_labelgraph enfilé (nouveau dump détecté)",
                   file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
@@ -175,7 +175,7 @@ def _maybe_scorestore_build():
         for uid in paths.all_uids():
             if (uid, "scorestore_releases") in queued or (uid, "scorestore_tracks") in queued:
                 continue
-            jobs.launch("scorestore_releases", {}, uid=uid)
+            jobs.launch("scorestore_releases", {}, uid=uid, priority=0)
             print(f"[worker] scorestore_releases enfilé ({uid})", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] scorestore check : {e}", file=sys.stderr, flush=True)
@@ -214,7 +214,7 @@ def _maybe_auto_maintenance():
                               ("build_graph", {"mode": "taste"})):
             if name in queued_names or now - _last_successful_run(name) < AUTO_MAINT_EVERY[name]:
                 continue
-            jobs.launch(name, params, uid=paths.DEFAULT_UID)
+            jobs.launch(name, params, uid=paths.DEFAULT_UID, priority=0)
             print(f"[worker] entretien de fond enfilé : {name}", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] auto maintenance check : {e}", file=sys.stderr, flush=True)
@@ -247,10 +247,10 @@ def _maybe_recos_scan():
             return
         pending = store.load(paths.user_paths(paths.DEFAULT_UID).recos_candidates, [])
         if pending:
-            jobs.launch("publish_recos", {}, uid=paths.DEFAULT_UID)
+            jobs.launch("publish_recos", {}, uid=paths.DEFAULT_UID, priority=0)
             print("[worker] publish_recos enfilé (file d'attente non vide)", file=sys.stderr, flush=True)
         else:
-            jobs.launch("scan_recos", {}, uid=paths.DEFAULT_UID)
+            jobs.launch("scan_recos", {}, uid=paths.DEFAULT_UID, priority=0)
             print("[worker] scan_recos enfilé (file d'attente vide)", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] recos check : {e}", file=sys.stderr, flush=True)
@@ -283,9 +283,16 @@ def _maybe_recos_midnight_purge():
 
 
 def _pick(q, last_uid):
+    """Choisit le prochain job. Priorité d'abord (1=interactif devant 0=fond,
+    retour utilisateur 2026-09-14 : un clic ne doit pas attendre derrière un
+    entretien de fond déjà en file), round-robin ensuite entre utilisateurs à
+    priorité égale. Ne préempte jamais un job déjà "running" — l'exécution
+    reste sérielle (protection rate-limit Discogs, cf. docstring module)."""
     pend = [j for j in q if j["state"] == "queued"]
     if not pend:
         return None
+    top = max(j.get("priority", 1) for j in pend)
+    pend = [j for j in pend if j.get("priority", 1) == top]
     for j in pend:                      # round-robin : préfère un autre utilisateur
         if j["uid"] != last_uid:
             return j

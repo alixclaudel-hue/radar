@@ -118,9 +118,9 @@
 {% elif tab == 'artists' %}
   {% if n_artists == 0 %}
   <p class="muted small">Base vide : c'est ici que se voient les artistes que tu classes Principaux/Secondaires —
-    ils pilotent le score artiste des recherches. Ajoute-les depuis Mes sources (listes Cœur/Aimés) : la résolution
+    ils pilotent le score artiste des recherches. Ajoute-les depuis Mon profil (listes Cœur/Aimés) : la résolution
     Discogs se fait automatiquement en fond.</p>
-  <p class="small"><a href="/patte">Aller à Mes sources</a></p>
+  <p class="small"><a href="/patte">Aller à Mon profil</a></p>
   {% else %}
   <p class="muted small">Principaux (références) / Secondaires — pilotent le score d'artiste. Règle la catégorie d'un clic.
     Résolution Discogs faite automatiquement en fond à chaque ajout.</p>
@@ -184,7 +184,7 @@
   <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
 
 {% elif tab == 'sets' %}
-  <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mes sources</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
+  <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mon profil</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
   <hr>
   <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
 

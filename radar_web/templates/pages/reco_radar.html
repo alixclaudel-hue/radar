@@ -35,7 +35,7 @@
 
 {% if not playlist %}
 <p class="muted small" style="margin-top:16px">Playlist vide — lance un scan ci-dessus (nécessite au moins un
-  label suivi noté, cf. <a href="/patte">Mes sources</a>).</p>
+  label suivi noté, cf. <a href="/patte">Mon profil</a>).</p>
 {% else %}
 <div class="yt-player-wrap"><div id="yt-player"></div></div>
 
@@ -93,8 +93,7 @@
         {% endif %}
       </td>
       <td>
-        <form method="post" action="/reco-radar/delete"
-              onsubmit="return confirm('Retirer cette piste de la playlist RECOS RADAR ?');">
+        <form method="post" action="/reco-radar/delete">
           <input type="hidden" name="video_id" value="{{ t.video_id }}">
           <button type="submit" class="small" title="Retirer cette piste de la playlist">🗑️</button>
         </form>

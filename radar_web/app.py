@@ -1,7 +1,7 @@
 """Radar — interface FastAPI + HTMX. Données PARTAGÉES avec l'appli Streamlit.
 Lancement :  uvicorn radar_web.app:app --reload --port 8600
 
-Nav : 🧠 Mes sources · 🔍 Chercher un disque · 📻 Nouveautés · 🌐 Mes labels & artistes ·
+Nav : 👤 Mon profil · 🔍 Chercher un disque · 📻 Nouveautés · 🌐 Mes labels & artistes ·
 🎯 Reco Radar · 🎛️ Réglages
 (URLs historiques inchangées : /patte, /search, /veille, /univers, /reco-radar, /settings)
 """
@@ -439,7 +439,7 @@ def home():
     return RedirectResponse("/patte", status_code=303)
 
 
-# ============================================================ 🧠 Mes sources
+# ============================================================ 👤 Mon profil
 def _last_import(job):
     s = jobs.status(job)
     fa = s.get("finished_at") if s else None
@@ -2133,7 +2133,7 @@ def job_launch(name: str, force: str = Form("")):
         srcs = [s.strip() for s in (_cfg().get("djset_sources") or "").splitlines() if s.strip()]
         if not srcs:
             return HTMLResponse("<div id='job-ingest_djsets' class='notice warn small'>"
-                                "Aucune source DJ — renseigne-les dans « Mes sources → DJ sets ».</div>")
+                                "Aucune source DJ — renseigne-les dans « Mon profil → DJ sets ».</div>")
         _write_djset_input(srcs)
     if name in VALID_JOBS:
         # le paramètre "force" (bouton "forcer" de scan_catalog/import_discogs_dump,

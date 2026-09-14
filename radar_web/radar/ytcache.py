@@ -135,7 +135,7 @@ def request(path, params, keys, timeout=15):
         raise RuntimeError(f"YouTube {r.status_code}: {r.text[:200]}")
     if last is not None and _is_quota_response(last):
         raise QuotaExhausted("Quota YouTube épuisé (toutes les clés). "
-                             "Réessaie demain ou ajoute ta clé perso dans « Mes sources ».")
+                             "Réessaie demain ou ajoute ta clé perso dans « Mon profil ».")
     raise RuntimeError("Aucune clé YouTube utilisable.")
 
 

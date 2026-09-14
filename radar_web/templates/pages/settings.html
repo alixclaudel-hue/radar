@@ -4,7 +4,7 @@
 {% block title %}Réglages · Radar{% endblock %}
 {% block content %}
 <h1>Réglages</h1>
-<p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes se règlent dans Mes sources.</p>
+<p class="muted small">Comment le cerveau pondère. Les <em>goûts</em> eux-mêmes se règlent dans Mon profil.</p>
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
 
 {# Réinitialise aux valeurs du DERNIER enregistrement (sc.*, ce qui est chargé dans les
@@ -106,7 +106,7 @@
                   ['recos__max_tracks', sc.recos.max_tracks]]) }}
   </h3>
   <p class="muted small">Seuil et volume du scan quotidien des labels suivis pour la playlist YouTube
-    « RECOS RADAR » (Mes sources → RECOS RADAR).</p>
+    « RECOS RADAR » (Mon profil → RECOS RADAR).</p>
   <div class="row wgroup__fields">
     <div class="field"><label>Score album minimum
       <input name="recos__min_score" type="number" step="1" value="{{ sc.recos.min_score }}"></label></div>
@@ -156,7 +156,7 @@
 </script>
 
 <hr>
-<h3>Base de labels — export CSV <span class="muted small">· import : Mes sources</span></h3>
+<h3>Base de labels — export CSV <span class="muted small">· import : Mon profil</span></h3>
 <div class="field" style="max-width:320px"><label>Exporter</label>
   <a class="small" href="/univers/labels/export">⬇ Exporter la base (CSV)</a></div>
 

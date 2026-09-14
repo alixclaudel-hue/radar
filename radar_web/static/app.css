@@ -242,7 +242,10 @@ a.tk-play .ic{ width:15px; height:15px; }
   text-decoration:underline; cursor:pointer; }
 .chip{ font-size:11px; padding:2px 9px; border-radius:999px; border:1px solid var(--line); color:var(--ink); text-decoration:none; display:inline-block; }
 a.chip:hover{ border-color:var(--pin); }
-.cart-tab{ margin-left:auto; font-size:13px; padding:6px 15px; font-weight:600; }
+.topbar-right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+.cart-tab{ font-size:13px; padding:6px 15px; font-weight:600; }
+.profile-tab{ font-size:13px; padding:6px 15px; font-weight:600; }
+.profile-tab.active{ background:var(--pin); border-color:var(--pin); color:var(--paper); }
 .catno{ font-size:11px; color:var(--soft); }
 
 .vote{ display:inline-flex; align-items:center; gap:4px; }

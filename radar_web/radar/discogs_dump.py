@@ -1097,10 +1097,13 @@ def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
     """[{id, title, artist, label, catno, year, genres, styles}] — recherche
     ciblée en local, triée par année décroissante (cf. diagnostic D6). Depuis
     l'élargissement du 11/09 (cf. module docstring de `discogs_dump.py`), la
-    table couvre TOUS les formats, plus seulement le vinyle 12"/LP : pas de
-    filtre format ici (colonne `releases.is_vinyl` disponible pour l'appelant
-    qui voudrait se restreindre au vinyle, ex. `WHERE r.is_vinyl = 1`, non
-    appliqué par défaut). Ne filtre pas le genre (colonne `releases.genres`
+    table couvre TOUS les formats — mais cette fonction reste réservée aux
+    usages "chercher du vinyle à acheter" (`/search`, `job_scorestore_releases`
+    donc RECOS RADAR et son bouton wantlist) : filtre `r.is_vinyl = 1`
+    toujours appliqué (retour utilisateur 2026-09-14, issue #62 — sans ce
+    filtre le référentiel élargi faisait remonter des sorties CD/digital,
+    y compris via le bouton "ajouter à la wantlist" de Reco Radar). Ne filtre
+    pas le genre (colonne `releases.genres`
     jointe par virgule, non normalisée) — à filtrer par l'appelant sur ce
     sous-ensemble déjà borné par `limit`. Pas de vignette : le dump ne
     contient aucune URL d'image, contrairement à l'API (repli nécessaire
@@ -1118,7 +1121,7 @@ def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
         return []
     con = sqlite3.connect(DB_PATH)
     try:
-        where, params = [], []
+        where, params = ["r.is_vinyl = 1"], []
         query = ("SELECT DISTINCT r.id, r.title, r.artist, r.label, r.catno, r.year, r.genres, r.styles "
                   "FROM releases r")
         if styles:

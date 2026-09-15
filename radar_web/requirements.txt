@@ -3,6 +3,9 @@ uvicorn[standard]>=0.30
 jinja2>=3.1
 python-multipart>=0.0.9
 requests>=2.28
+# fournit les données IANA à zoneinfo (worker.py: PARIS_TZ) quand l'image
+# n'a pas la base tz système (cas de mcr.microsoft.com/playwright/python)
+tzdata
 # pour les jobs lancés en sous-processus (crate_jobs.py)
 yt-dlp>=2024.10.22
 playwright==1.48.0

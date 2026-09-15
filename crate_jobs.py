@@ -2058,16 +2058,25 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
-_PLACEHOLDER_ARTISTS = {"various", "various artists", "unknown artist", "v/a"}
+_PLACEHOLDER_ARTISTS = {"various", "various artists", "va", "v/a", "unknown artist",
+                        "unknown", "no artist"}
 
 
 def _is_placeholder_artist(name):
-    """Un placeholder Discogs ("Various", "Unknown Artist"...) ne vaut pas
-    mieux qu'une absence de crédit — diagnostic VPS 2026-09-15 : 'Various'
-    (1712), 'Unknown Artist' (1616), 'Various Artists' (6) en base owner,
-    tous injectés à tort comme faux signal artiste dans le scoring/la
-    recherche YouTube RECOS."""
-    return (name or "").strip().casefold() in _PLACEHOLDER_ARTISTS
+    """Un placeholder Discogs ("Various", "Unknown Artist", "No Artist"...) ne
+    vaut pas mieux qu'une absence de crédit. Set DÉDIÉ, volontairement distinct
+    d'ARTIST_STOPWORDS (graphe labels/artistes) — un essai de fusion le 15/09
+    a été annulé après vérif VPS : ARTIST_STOPWORDS contient aussi "release"/
+    "progressive classics"/"traxsource", du bruit propre au graphe co-crédits,
+    pas des marqueurs "sans artiste" — un vrai artiste Discogs nommé "Release"
+    (release réelle, ex. "Release (22) — Walk Away") se serait retrouvé écarté
+    à tort des candidats RECOS. Suffixe de désambiguïsation Discogs '(N)'
+    retiré avant comparaison (`_strip_discogs_suffix`, existait déjà pour un
+    autre usage) : diagnostic VPS 2026-09-15, 137 pistes 'No Artist' (111),
+    'Various Artists (N)' (14), 'Unknown Artist (N)' (8), 'Unknown' (3)
+    passaient au travers de l'ancien set + suffixe jamais retiré."""
+    n = _strip_discogs_suffix((name or "").strip()).casefold()
+    return n in _PLACEHOLDER_ARTISTS
 
 
 _CONTINUOUS_MIX_PATTERNS = (

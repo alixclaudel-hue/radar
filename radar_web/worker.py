@@ -224,17 +224,16 @@ def _maybe_recos_scan():
     """Toutes les heures (si RADAR_RECOS_SCAN=1) : publish_recos si des candidats
     attendent déjà dans recos_candidates.json (draine la file avant d'aller
     chercher autre chose), sinon scan_recos pour en trouver de nouveaux.
-    Chaînage scan_recos→publish_recos supprimé depuis (retour utilisateur
-    2026-09-14, cf. CLAUDE.md point 19) : si ce `return` était un jour retiré,
-    il faudrait aussi relancer explicitement publish_recos ici après
-    scan_recos.
+    Chaînage scan_recos→publish_recos supprimé (retour utilisateur 2026-09-14,
+    cf. CLAUDE.md point 19) : la boucle horaire suffit à faire alterner les
+    deux au fil des ticks, sans relance immédiate dans le même tick.
 
-    En pause depuis le 10/09 (retour utilisateur, phase de test, plafond de
-    playlist réduit à 5 pistes, cf. crate_jobs.RECOS_MAX_TRACKS) : désactivé au
-    niveau code plutôt que côté variable d'environnement VPS (hors d'atteinte
-    depuis cette session cloud, cf. CLAUDE.md) — retirer ce `return` pour
-    réactiver, même principe que la pause de la boucle diag VPS."""
-    return
+    Réactivée le 15/09 (diagnostic VPS : RADAR_RECOS_SCAN=1 était déjà dans le
+    .env, ignoré par ce `return` depuis la pause du 10/09 — playlist bloquée à
+    0/240). Sûr désormais côté quota YouTube : RECOS_DAILY_SEARCH_BUDGET est un
+    vrai compteur journalier persistant appliqué DANS job_publish_recos (cf.
+    crate_jobs._recos_searches_used_today), pas seulement une limite de
+    longueur de file — 24 ticks/jour ne peuvent plus dépasser le budget."""
     global _last_recos_check
     if os.environ.get("RADAR_RECOS_SCAN") != "1":
         return

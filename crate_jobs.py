@@ -19,6 +19,7 @@ import sys
 import time
 from collections import Counter
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -89,6 +90,8 @@ SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
+RECOS_SEARCH_BUDGET_PATH = os.path.join(USER_DIR, "recos_search_budget.json")
+PARIS_TZ = ZoneInfo("Europe/Paris")  # même horloge que worker._maybe_recos_midnight_purge
 RECOS_MAX_TRACKS = 5  # repli si scoring.recos.max_tracks absent (curseur /settings, 10/09)
 RECOS_DAILY_SEARCH_BUDGET = 45
 # marge sous le quota gratuit YouTube Data API (10 000 unités/jour) : évite que
@@ -131,6 +134,30 @@ def _recos_history_track_keys(history):
     video_id seul laisserait passer."""
     return {(style_key(h["artist"]), style_key(h["title"]))
             for h in history.values() if h.get("artist") and h.get("title")}
+
+
+def _recos_searches_used_today():
+    """Recherches YouTube RECOS déjà consommées aujourd'hui (minuit heure de
+    Paris). Sans ce compteur PERSISTANT, RECOS_DAILY_SEARCH_BUDGET ne bornait
+    que la longueur de recos_candidates.json (job_scan_recos), jamais le
+    nombre réel de recherches/jour — la boucle horaire du worker
+    (RADAR_RECOS_SCAN=1) pouvait épuiser le quota YouTube dès la matinée
+    (diagnostic VPS 2026-09-15). Lu ici (job_publish_recos) plutôt que dans le
+    worker pour valoir aussi sur un lancement manuel (bouton ▶)."""
+    today = datetime.now(PARIS_TZ).date().isoformat()
+    d = load_json(RECOS_SEARCH_BUDGET_PATH, {})
+    return int(d.get("count", 0)) if d.get("date") == today else 0
+
+
+def _recos_searches_record(n):
+    """Ajoute `n` recherches au compteur du jour (reparti de 0 si le fichier
+    date d'un jour différent)."""
+    if not n:
+        return
+    today = datetime.now(PARIS_TZ).date().isoformat()
+    d = load_json(RECOS_SEARCH_BUDGET_PATH, {})
+    count = int(d.get("count", 0)) if d.get("date") == today else 0
+    save_json(RECOS_SEARCH_BUDGET_PATH, {"date": today, "count": count + n})
 
 
 DISCOGS_UA = "CrateRadar/1.0 +personal-use"
@@ -2031,16 +2058,56 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
+_PLACEHOLDER_ARTISTS = {"various", "various artists", "unknown artist", "v/a"}
+
+
+def _is_placeholder_artist(name):
+    """Un placeholder Discogs ("Various", "Unknown Artist"...) ne vaut pas
+    mieux qu'une absence de crédit — diagnostic VPS 2026-09-15 : 'Various'
+    (1712), 'Unknown Artist' (1616), 'Various Artists' (6) en base owner,
+    tous injectés à tort comme faux signal artiste dans le scoring/la
+    recherche YouTube RECOS."""
+    return (name or "").strip().casefold() in _PLACEHOLDER_ARTISTS
+
+
+_CONTINUOUS_MIX_PATTERNS = (
+    "continuous mix", "continuous dj mix", "continuous dj-mix",
+    "full continuous mix", "dj mix", "megamix",
+)
+
+
+def _is_continuous_mix(title):
+    """Megamix/DJ mix continu d'une sortie (une seule "piste" de 30-60min sans
+    artiste unique identifiable, ex. "(Continuous DJ Mix)", "(Full Continuous
+    Mix)", "Megamix" — 430+83 titres en base owner, diagnostic VPS 2026-09-15) :
+    n'a rien à faire comme candidat RECOS RADAR. Ne PAS réutiliser dans
+    scoring.real_tracks() : partagée avec la page sortie (app.py) où
+    l'utilisateur veut voir la piste megamix listée."""
+    t = (title or "").lower()
+    return any(p in t for p in _CONTINUOUS_MIX_PATTERNS)
+
+
 def _track_credit_artist(t, fallback):
     """Artiste réel d'une piste Discogs : `tracklist[].artists` (crédit par piste,
     rempli seulement quand il diffère de l'artiste de la sortie — cas des
     compilations « Various ») sinon `fallback` (artiste de la sortie). Corrige la
     recherche YouTube RECOS RADAR qui recevait "Various" comme artiste — pénalisé
     à tort par ytcache._best_match (mot absent des métadonnées vidéo), rejetant
-    quasi toutes les pistes de compilation (retour utilisateur 2026-09-10)."""
+    quasi toutes les pistes de compilation (retour utilisateur 2026-09-10).
+
+    Un placeholder ("Various"...) est traité comme une absence de crédit, que
+    ce soit CAS A (Discogs ne fournit aucun crédit par piste, ex. release
+    17828710 : le fallback release est alors lui-même "Various") ou CAS B (une
+    piste précise est littéralement créditée "Various" au sein d'une sortie
+    par ailleurs bien créditée, ex. release 16062985 piste 1 = megamix,
+    pistes 2-8 = vrais artistes) — diagnostic VPS 2026-09-15. Retourne ""
+    plutôt que le placeholder, à charge de l'appelant d'écarter une piste sans
+    artiste exploitable."""
     arts = [(a.get("anv") or a.get("name") or "").strip() for a in (t.get("artists") or [])]
-    arts = [a for a in arts if a]
-    return ", ".join(arts) if arts else fallback
+    arts = [a for a in arts if a and not _is_placeholder_artist(a)]
+    if arts:
+        return ", ".join(arts)
+    return "" if _is_placeholder_artist(fallback) else (fallback or "")
 
 
 def _strip_discogs_suffix(name):
@@ -2083,7 +2150,14 @@ def job_scan_recos(job, params):
     devenu obsolète après un changement de pondération (`track_scores`, lui,
     reste à jour tout seul via la passe de rafraîchissement gratuite de
     job_scorestore_tracks). Ne touche ni recos_playlist.json (déjà publié) ni
-    recos_history.json (vidéos déjà proposées, jamais réajoutées)."""
+    recos_history.json (vidéos déjà proposées, jamais réajoutées).
+
+    Écarte (diagnostic VPS 2026-09-15, décision utilisateur) les pistes sans
+    artiste exploitable (`TRIM(ts.artist) <> ''`, cf. `_track_credit_artist`) —
+    pas de recherche YouTube au titre seul, `_best_match` ne sait pas trancher
+    sans artiste — et les megamix/DJ mix continus (`_is_continuous_mix`), déjà
+    présents en base avant que job_scorestore_tracks ne les filtre à
+    l'écriture."""
     from radar_web.radar import scorestore
 
     cfg = cfg_load()
@@ -2102,7 +2176,8 @@ def job_scan_recos(job, params):
             "SELECT ts.artist, ts.title, ts.score, ts.detail_json, "
             "ts.release_id, rs.title, rs.label, rs.year "
             "FROM track_scores ts JOIN release_scores rs ON rs.release_id = ts.release_id "
-            "WHERE ts.score >= ? ORDER BY ts.score DESC", (min_score,)).fetchall()
+            "WHERE ts.score >= ? AND TRIM(ts.artist) <> '' "
+            "ORDER BY ts.score DESC", (min_score,)).fetchall()
     finally:
         con.close()
     if not rows:
@@ -2135,7 +2210,7 @@ def job_scan_recos(job, params):
             break
         title = (title or "").strip()
         k = (style_key(artist), style_key(title))
-        if not title or k in known_tracks:
+        if not title or k in known_tracks or _is_continuous_mix(title):
             continue
         known_tracks.add(k)
         detail = json.loads(detail_json) if detail_json else {}
@@ -2183,10 +2258,23 @@ def job_publish_recos(job, params):
     Au plus scoring.recos.searches_per_run recherches YouTube par lancement
     (curseur /settings, repli RECOS_SEARCHES_PER_RUN) — sur le nombre de
     RECHERCHES tentées, pas seulement les ajouts réussis, pour que la conso quota
-    reste bornée même si la plupart des candidats échouent à matcher."""
+    reste bornée même si la plupart des candidats échouent à matcher.
+
+    Plafond quotidien RECOS_DAILY_SEARCH_BUDGET appliqué ICI (pas dans le
+    worker) via `_recos_searches_used_today`/`_recos_searches_record` :
+    persistant, il vaut aussi bien pour la boucle horaire (RADAR_RECOS_SCAN=1,
+    réactivée le 15/09, cf. worker._maybe_recos_scan) que pour un lancement
+    manuel (bouton ▶) — sans lui, `searches_per_run` répété à chaque tick
+    horaire pouvait dépasser le quota YouTube en quelques heures (diagnostic
+    VPS 2026-09-15)."""
     candidates = load_json(RECOS_CANDIDATES_PATH, [])
     if not candidates:
         return job.finish("Aucun candidat en attente.")
+
+    budget_used = _recos_searches_used_today()
+    if budget_used >= RECOS_DAILY_SEARCH_BUDGET:
+        return job.finish(f"Budget quotidien de recherches YouTube atteint ({budget_used}/"
+                           f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra demain après minuit (Paris).")
 
     playlist = load_json(RECOS_PLAYLIST_PATH, [])
     cfg = cfg_load()
@@ -2201,9 +2289,13 @@ def job_publish_recos(job, params):
     history_keys = _recos_history_track_keys(history)
     job.st["total"] = len(candidates)
     remaining, added, searched, quota_hit = [], 0, 0, False
+    daily_hit = False
     now = datetime.now().isoformat(timespec="seconds")
     for c in candidates:
-        if job.stopped() or quota_hit or searched >= searches_per_run:
+        if (job.stopped() or quota_hit or searched >= searches_per_run
+                or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
+            if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
+                daily_hit = True
             remaining.append(c)
             continue
         if len(playlist) >= max_tracks:
@@ -2266,8 +2358,12 @@ def job_publish_recos(job, params):
     save_json(RECOS_HISTORY_PATH, list(history.values()))
     save_json(RECOS_PLAYLIST_PATH, playlist)
     save_json(RECOS_CANDIDATES_PATH, remaining)
+    _recos_searches_record(searched)
     note = (f" — limite de recherche ({searches_per_run}) atteinte."
             if searched >= searches_per_run else "")
+    if daily_hit:
+        note += (f" Budget quotidien atteint ({budget_used + searched}/"
+                 f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra demain après minuit (Paris).")
     if len(playlist) >= max_tracks and remaining:
         note += (f" Playlist pleine ({max_tracks}) — plus d'ajout tant qu'aucune "
                  f"piste n'est marquée écoutée (clic sur une ligne, purge à minuit).")
@@ -2434,6 +2530,12 @@ def job_import_discogs_dump(job, params):
     pas [déjà tout le flux était lu pour trier vinyle/non-vinyle], mais le
     nombre de lignes réellement insérées en base augmente).
 
+    Tracklists (diagnostic VPS 2026-09-15) : parsées dans la MÊME passe XML que
+    releases et écrites dans une base SÉPARÉE (`discogs_dump.TRACKS_DB_PATH`,
+    sa propre bascule atomique) — `job_scorestore_tracks` les lit en priorité,
+    zéro appel API, et ne retombe sur l'API que pour une sortie absente du
+    dump (ajoutée sur Discogs après ce dernier import mensuel).
+
     Reprenable : chaque déploiement redéploie le conteneur du worker (tout merge sur
     main, pas seulement ceux qui touchent au dump), ce qui tue ce job en plein milieu
     d'un import de ~1h45 s'il tombe pendant. `discogs_dump_import.state.json`
@@ -2501,6 +2603,11 @@ def job_import_discogs_dump(job, params):
 
     est_total = meta.get("n_total") or 20_000_000
     con = dd.open_new_db(resume=resuming)
+    # Tracklists (diagnostic VPS 2026-09-15, cf. docstring de TRACKS_DB_PATH) : base
+    # séparée, remplie dans la MÊME passe XML que releases — jamais un second parsing
+    # du flux. `resuming` couvre les deux bases ensemble (même dump_date, même notion
+    # de reprise) : un import interrompu reprend les deux .new en l'état.
+    tracks_con = dd.open_new_tracks_db(resume=resuming)
     try:
         if state["stage"] == "releases":
             job.msg(f"Import du dump {latest} — sorties…")
@@ -2517,7 +2624,7 @@ def job_import_discogs_dump(job, params):
             n_total, n_vinyl = dd.import_releases(
                 con, gz_paths["releases"], progress_cb=releases_progress,
                 resume_from=state["releases_done"], resume_vinyl=state["releases_vinyl"],
-                checkpoint_cb=releases_checkpoint)
+                checkpoint_cb=releases_checkpoint, tracks_con=tracks_con)
             state["stage"] = "labels"
             dd.save_import_state(state)
         else:
@@ -2557,8 +2664,10 @@ def job_import_discogs_dump(job, params):
 
         job.msg("Construction des index…")
         dd.finalize_new_db(con)
+        dd.finalize_new_tracks_db(tracks_con)
     except Exception as e:                        # noqa: BLE001
-        con.close()
+        con.close()                                # sans effet si finalize_new_db a déjà fermé con
+        tracks_con.close()                         # idem pour tracks_con et finalize_new_tracks_db
         return job.finish(error=f"Import échoué : {e}")
 
     dd.clear_import_state()
@@ -2572,6 +2681,12 @@ def job_import_discogs_dump(job, params):
     dd.save_meta({"dump_date": latest, "imported_at": datetime.now().isoformat(timespec="seconds"),
                   "n_total": n_total, "n_vinyl": n_vinyl, "n_labels": n_labels, "n_artists": n_artists})
 
+    n_tracks_con = sqlite3.connect(dd.TRACKS_DB_PATH)
+    try:
+        n_tracks = n_tracks_con.execute("SELECT COUNT(*) FROM tracks").fetchone()[0]
+    finally:
+        n_tracks_con.close()
+
     # Un nouveau dump doit rafraîchir toute la chaîne dérivée sans intervention :
     # la résolution canonique (bien meilleure avec les namevariations du nouveau
     # dump artistes) puis le profilage des labels.
@@ -2580,8 +2695,8 @@ def job_import_discogs_dump(job, params):
     job_queue.launch("profile_labels", {"limit": 150}, uid="owner")
 
     job.finish(f"Dump {latest} importé : {n_total} sortie(s) tous formats "
-               f"(dont {n_vinyl} vinyle 12\"/LP), {n_labels} label(s), {n_artists} artiste(s). "
-               f"Canonisation + profilage enfilés.")
+               f"(dont {n_vinyl} vinyle 12\"/LP), {n_labels} label(s), {n_artists} artiste(s), "
+               f"{n_tracks} piste(s) (tracklists locales). Canonisation + profilage enfilés.")
 
 
 def job_build_catalog_labelgraph(job, params):
@@ -2641,6 +2756,12 @@ SCORESTORE_PER_LABEL_LIMIT = 500  # requête par label plutôt que globale — m
 # le D6 de job_scan_recos (avant sa refonte au Lot 5) : un label prolifique ne doit pas
 # écraser les autres avant même le scoring.
 SCORESTORE_FETCHES_PER_RUN = 1000  # repli si scoring.scorestore.fetches_per_run absent
+# lot par lancement quand les tracklists sont couvertes par le dump local (gratuit,
+# zéro appel réseau, cf. discogs_dump.TRACKS_DB_PATH) — bien plus large que
+# SCORESTORE_FETCHES_PER_RUN (qui ne borne plus que les VRAIS appels API, le repli
+# pour une sortie absente du dump), tout en restant borné pour qu'un run garde une
+# durée raisonnable (le job se rechaîne lui-même si le lot était plein, cf. plus bas).
+SCORESTORE_LOCAL_BATCH_PER_RUN = 20000
 
 
 def _chain_scorestore_tracks():
@@ -2672,6 +2793,14 @@ def job_scorestore_releases(job, params):
     (sorties des labels suivis, plafonné par label comme RECOS) reste assez
     petit pour que ce soit bon marché.
 
+    Tous formats depuis le 15/09 (`search_local(vinyl_only=False)`, décision
+    utilisateur : « exhaustif à la découverte, vinyle à l'achat ») — le
+    correctif vinyle du 14/09 (issue #62) avait mis le filtre à la racine de
+    `search_local`, ce qui excluait à tort les sorties CD/digital de la
+    découverte RECOS elle-même. Le filtre vinyle se fait désormais seulement
+    à l'ajout wantlist (`app.py::cart_add`), jamais ici : `release_scores`/
+    `track_scores` grossissent en conséquence (~4x, cf. CLAUDE.md).
+
     Chaîne toujours job_scorestore_tracks en fin de course (comme
     job_scan_recos chaîne job_publish_recos) : la passe piste par piste
     (coûteuse — appel API pour la tracklist réelle) tourne dans un job
@@ -2697,7 +2826,10 @@ def job_scorestore_releases(job, params):
 
         rows, row_ids = [], set()
         for lk in label_keys:
-            for row in dd.search_local(label_keys=[lk], limit=SCORESTORE_PER_LABEL_LIMIT):
+            # découverte exhaustive tous formats (décision utilisateur 2026-09-15,
+            # cf. CLAUDE.md) : le filtre vinyle ne s'applique plus ici, seulement à
+            # l'ajout wantlist (app.py::cart_add) — voir docstring de search_local.
+            for row in dd.search_local(label_keys=[lk], limit=SCORESTORE_PER_LABEL_LIMIT, vinyl_only=False):
                 if row["id"] not in row_ids:
                     row_ids.add(row["id"])
                     rows.append(row)
@@ -2740,16 +2872,30 @@ def job_scorestore_tracks(job, params):
     sous le seuil depuis garde ses pistes déjà récupérées à jour (cf.
     scorestore.releases_with_tracks) ;
 
-    (b) récupère la tracklist réelle (API Discogs — le dump local n'en
-    contient pas, cf. discogs_dump.py) des sorties les mieux notées qui
-    n'ont ENCORE aucune piste connue, plafonné à
-    scoring.scorestore.fetches_per_run appels par lancement (même principe
-    de budget que RECOS_SEARCHES_PER_RUN — coût réseau/rate-limit Discogs,
-    pas juste de la CPU).
+    (b) récupère la tracklist des sorties les mieux notées qui n'ont ENCORE
+    aucune piste connue — depuis le 15/09 (diagnostic VPS, cf. CLAUDE.md), en
+    priorité via `discogs_dump.tracks_for_release()` : le dump local CONTIENT
+    bien les tracklists (seul le schéma d'origine ne les exploitait pas),
+    donc AUCUN appel réseau pour toute sortie présente dans le dernier import
+    mensuel — plafonné à `SCORESTORE_LOCAL_BATCH_PER_RUN` par lancement (pas
+    de coût réseau, juste CPU/écriture, un lot bien plus large que l'ancien
+    budget API). L'API Discogs ne sert plus que de repli pour une sortie
+    ABSENTE du dump (ajoutée sur Discogs depuis le dernier import), plafonné
+    à `scoring.scorestore.fetches_per_run` appels par lancement (même
+    principe de budget que RECOS_SEARCHES_PER_RUN — coût réseau/rate-limit
+    Discogs, pas juste de la CPU).
 
     Stocke aussi le détail `{label, artist, style}` de `Ctx.album_score` par
     PISTE (Lot 5, cf. CLAUDE.md point 43 — `job_scan_recos` en a besoin pour
-    le feedback RECOS RADAR), pas seulement le score."""
+    le feedback RECOS RADAR), pas seulement le score.
+
+    La passe (a) normalise aussi l'artiste des pistes déjà stockées
+    (`_is_placeholder_artist`) : les lignes polluées par "Various"/"Unknown
+    Artist" avant le correctif du 15/09 se nettoient donc seules, sans rappel
+    réseau — coût nul, cf. diagnostic VPS 2026-09-15. La passe (b) ne stocke
+    plus les megamix/DJ mix continus (`_is_continuous_mix`) : rien à faire
+    dans RECOS RADAR."""
+    from radar_web.radar import discogs_dump as dd
     from radar_web.radar import scorestore
     from radar_web.radar.scoring import Ctx, real_tracks
 
@@ -2774,58 +2920,83 @@ def job_scorestore_tracks(job, params):
             tracks = scorestore.tracks_for_release(con, r["release_id"])
             updated = []
             for t in tracks:
-                title = f"{t['artist']} - {t['title']}" if t.get("artist") else (t.get("title") or "")
+                art = "" if _is_placeholder_artist(t.get("artist")) else (t.get("artist") or "").strip()
+                title = f"{art} - {t['title']}" if art else (t.get("title") or "")
                 score, detail = ctx.album_score({"label": [r["label"]] if r.get("label") else [],
                                                   "title": title, "style": styles})
-                updated.append({**t, "score": score, "detail": detail})
+                updated.append({**t, "artist": art, "score": score, "detail": detail})
             scorestore.upsert_track_scores(con, r["release_id"], updated)
             n_rescored += len(updated)
         con.commit()
 
-        if not token:
-            job.finish(f"{n_rescored} piste(s) rafraîchie(s) — pas de token Discogs, "
-                       "récupération de nouvelles tracklists sautée.")
+        tracks_ready = dd.tracks_available()
+        if not token and not tracks_ready:
+            job.finish(f"{n_rescored} piste(s) rafraîchie(s) — pas de token Discogs ni de "
+                       "tracklists locales, récupération de nouvelles tracklists sautée.")
             return
 
-        # (b) tracklist des sorties top-scorées pas encore couvertes.
+        # (b) tracklist des sorties top-scorées pas encore couvertes — dump local
+        # d'abord (gratuit), API en repli seulement (cf. docstring).
+        batch_limit = SCORESTORE_LOCAL_BATCH_PER_RUN if tracks_ready else fetches_per_run
         targets = scorestore.top_releases(
-            con, min_score=min_score, without_tracks_only=True, limit=fetches_per_run)
+            con, min_score=min_score, without_tracks_only=True, limit=batch_limit)
         job.st["total"] = len(targets)
-        n_new_releases, n_new_tracks = 0, 0
-        for row in targets:
-            if job.stopped():
-                break
-            d = discogs_get(token, f"/releases/{row['release_id']}")
-            tracks = real_tracks(d.get("tracklist", [])) if d else []
-            styles = row["styles"].split(", ") if row.get("styles") else []
-            scored_tracks = []
-            for i, t in enumerate(tracks):
-                ttl = (t.get("title") or "").strip()
-                if not ttl:
+        n_new_releases, n_new_tracks, n_local, n_api = 0, 0, 0, 0
+        main_con = dd.connect_readonly() if tracks_ready else None
+        tracks_con = dd.connect_tracks_readonly() if tracks_ready else None
+        try:
+            for row in targets:
+                if job.stopped():
+                    break
+                dump_tracks = (dd.tracks_for_release(row["release_id"], con=tracks_con, main_con=main_con)
+                               if tracks_ready else None)
+                if dump_tracks is not None:
+                    tracks = real_tracks(dump_tracks)
+                    n_local += 1
+                elif token and n_api < fetches_per_run:
+                    d = discogs_get(token, f"/releases/{row['release_id']}")
+                    tracks = real_tracks(d.get("tracklist", [])) if d else []
+                    n_api += 1
+                    time.sleep(1.1)
+                else:
+                    # hors dump ET (pas de token OU budget API épuisé pour ce lancement) :
+                    # laissé de côté, retenté au prochain passage (jamais marqué "vu").
+                    job.tick(f"{row.get('artist')} — {row.get('title')} : hors dump local, "
+                             f"repli API {'indisponible (pas de token)' if not token else 'plafonné pour ce lancement'}.")
                     continue
-                art = _track_credit_artist(t, row.get("artist") or "")
-                title = f"{art} - {ttl}" if art else ttl
-                score, detail = ctx.album_score({"label": [row["label"]] if row.get("label") else [],
-                                                  "title": title, "style": styles})
-                scored_tracks.append({"track_no": i, "artist": art, "title": ttl,
-                                       "score": score, "detail": detail})
-            if scored_tracks:
-                scorestore.upsert_track_scores(con, row["release_id"], scored_tracks)
-                n_new_releases += 1
-                n_new_tracks += len(scored_tracks)
-            job.tick(f"{row.get('artist')} — {row.get('title')} : +{len(scored_tracks)} piste(s)"
-                     if d else f"{row.get('artist')} — {row.get('title')} : sortie indisponible (API)")
-            con.commit()
-            time.sleep(1.1)
+                styles = row["styles"].split(", ") if row.get("styles") else []
+                scored_tracks = []
+                for i, t in enumerate(tracks):
+                    ttl = (t.get("title") or "").strip()
+                    if not ttl or _is_continuous_mix(ttl):
+                        continue
+                    art = _track_credit_artist(t, row.get("artist") or "")
+                    title = f"{art} - {ttl}" if art else ttl
+                    score, detail = ctx.album_score({"label": [row["label"]] if row.get("label") else [],
+                                                      "title": title, "style": styles})
+                    scored_tracks.append({"track_no": i, "artist": art, "title": ttl,
+                                           "score": score, "detail": detail})
+                if scored_tracks:
+                    scorestore.upsert_track_scores(con, row["release_id"], scored_tracks)
+                    n_new_releases += 1
+                    n_new_tracks += len(scored_tracks)
+                job.tick(f"{row.get('artist')} — {row.get('title')} : +{len(scored_tracks)} piste(s)")
+                con.commit()
+        finally:
+            if main_con is not None:
+                main_con.close()
+            if tracks_con is not None:
+                tracks_con.close()
     finally:
         con.close()
-    # Lot plein : d'autres sorties sans tracklist attendent probablement encore —
-    # se rechaîne soi-même pour tourner en continu plutôt que d'attendre le
-    # prochain passage à cadence fixe de worker._maybe_scorestore_build.
-    if len(targets) >= fetches_per_run:
+    # Lot plein (dump local) ou budget API épuisé : d'autres sorties sans tracklist
+    # attendent probablement encore — se rechaîne soi-même pour tourner en continu
+    # plutôt que d'attendre le prochain passage à cadence fixe de
+    # worker._maybe_scorestore_build.
+    if len(targets) >= batch_limit or n_api >= fetches_per_run:
         _chain_scorestore_tracks()
-    job.finish(f"{n_rescored} piste(s) rafraîchie(s) — "
-               f"+{n_new_tracks} nouvelle(s) piste(s) sur {n_new_releases} sortie(s).")
+    job.finish(f"{n_rescored} piste(s) rafraîchie(s) — +{n_new_tracks} nouvelle(s) piste(s) sur "
+               f"{n_new_releases} sortie(s) ({n_local} via le dump local, {n_api} via l'API).")
 
 
 JOBS = {

@@ -531,8 +531,126 @@ def finalize_new_db(con, db_path=None):
     os.replace(new_path, path)
 
 
+# --------------------------------------------------------------- tracklists (base séparée)
+#
+# Diagnostic VPS 2026-09-15 : le XML brut du dump CONTIENT les crédits par piste
+# (`<tracklist><track><artists>`) — seul le schéma SQLite ne les exploitait pas,
+# forçant `job_scorestore_tracks` (crate_jobs.py) à un appel API par sortie pour
+# récupérer sa tracklist, plafonné à `fetches_per_run`. Base séparée de
+# `discogs_dump.sqlite3` (comme `catalog_labelgraph.sqlite3`) plutôt qu'une table
+# de plus dedans : un problème de parsing tracklist ne doit jamais bloquer la
+# bascule du catalogue principal (labels/artistes/graphe), et inversement un
+# import interrompu APRÈS la bascule principale mais AVANT celle des tracklists
+# laisse le catalogue à jour avec des tracklists en retard d'un cycle — jamais
+# l'inverse, jamais un référentiel principal à moitié à jour.
+TRACKS_DB_PATH = os.path.join(paths.SHARED_DIR, "discogs_dump_tracks.sqlite3")
+
+
+def _create_tracks_schema(con):
+    con.execute("""
+        CREATE TABLE tracks (
+            release_id INTEGER,
+            track_no INTEGER,
+            position TEXT,
+            title TEXT,
+            artist TEXT
+        )
+    """)
+
+
+def _create_tracks_indexes(con):
+    con.execute("CREATE INDEX IF NOT EXISTS idx_tracks_release ON tracks(release_id)")
+
+
+def open_new_tracks_db(resume=False):
+    """Pendant de `open_new_db()` pour `TRACKS_DB_PATH` — remplie EN PARALLÈLE de
+    la base principale par `import_releases(tracks_con=...)` (même passe XML,
+    jamais reconstruite seule). `resume=True` : même sémantique que
+    `open_new_db` (reprise du `.new` existant sans le vider)."""
+    new_path = TRACKS_DB_PATH + ".new"
+    if resume and os.path.exists(new_path):
+        con = sqlite3.connect(new_path)
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("PRAGMA synchronous=OFF")
+        return con
+    os.makedirs(paths.SHARED_DIR, exist_ok=True)
+    for p in (new_path, new_path + "-wal", new_path + "-shm"):
+        try:
+            os.remove(p)                          # reliquat d'un import précédent abandonné
+        except OSError:
+            pass
+    con = sqlite3.connect(new_path)
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=OFF")
+    _create_tracks_schema(con)
+    return con
+
+
+def finalize_new_tracks_db(con):
+    """Index + bascule atomique de `TRACKS_DB_PATH.new` vers `TRACKS_DB_PATH` —
+    même mécanique que `finalize_new_db`, indépendante de celle-ci (cf. note du
+    module ci-dessus)."""
+    _create_tracks_indexes(con)
+    con.execute("ANALYZE")
+    con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    con.execute("PRAGMA journal_mode=DELETE")
+    con.close()
+    new_path = TRACKS_DB_PATH + ".new"
+    for suffix in ("-wal", "-shm"):
+        try:
+            os.remove(new_path + suffix)
+        except OSError:
+            pass
+    os.replace(new_path, TRACKS_DB_PATH)
+
+
+def tracks_available():
+    return os.path.exists(TRACKS_DB_PATH)
+
+
+def connect_tracks_readonly():
+    return sqlite3.connect(TRACKS_DB_PATH) if tracks_available() else None
+
+
+def tracks_for_release(release_id, con=None, main_con=None):
+    """[{"position","type_","title","artists"}] — forme compatible avec
+    `real_tracks()`/`_track_credit_artist()` (crate_jobs.py), pour que
+    `job_scorestore_tracks` (pass b) puisse consommer le dump local exactement
+    comme une tracklist API, sans code spécifique. `None` si cette sortie n'est
+    PAS dans le référentiel courant (absente du dernier import mensuel — sortie
+    ajoutée sur Discogs depuis) : SEUL cas où l'appelant doit retomber sur
+    l'API. Une sortie connue mais sans piste exploitable renvoie `[]`, jamais
+    `None` (diagnostic VPS 2026-09-15 : ne pas confondre "pas encore importé"
+    et "importé, rien à en tirer" — même principe que `release_scores.score
+    IS NULL` dans `scorestore.py`).
+
+    `con`/`main_con` : connexions à réutiliser pour des lookups en série (`con`
+    vers `TRACKS_DB_PATH`, `main_con` vers `DB_PATH` pour la vérification de
+    présence) — sans ça, une connexion SQLite s'ouvrirait et se refermerait
+    pour CHAQUE sortie, coûteux sur les dizaines de milliers de sorties d'un
+    run `job_scorestore_tracks`."""
+    if lookup_release(release_id, con=main_con) is None:
+        return None
+    owns = con is None
+    if owns:
+        con = connect_tracks_readonly()
+        if con is None:
+            return None
+    try:
+        rows = con.execute(
+            "SELECT position, title, artist FROM tracks WHERE release_id = ? ORDER BY track_no",
+            (int(release_id),)).fetchall()
+    finally:
+        if owns:
+            con.close()
+    return [{"position": pos, "type_": "track", "title": title,
+             "artists": [{"name": artist}] if artist else []}
+            for pos, title, artist in rows]
+
+
 def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
-                     resume_from=0, resume_vinyl=0, checkpoint_cb=None, limit=None):
+                     resume_from=0, resume_vinyl=0, checkpoint_cb=None, limit=None,
+                     tracks_con=None):
     """Parse en flux le dump releases.xml.gz, garde TOUTES les sorties (tous
     formats, cf. module docstring), insère en base par lots dans
     `releases`/`release_styles`/`release_artists`, sur une connexion déjà
@@ -541,6 +659,13 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
     n_vinyle) — n_vinyle est maintenant purement informatif (sous-ensemble
     de n_total_vu marqué `is_vinyl=1`), plus le nombre de lignes réellement
     conservées comme avant cet élargissement (toutes le sont désormais).
+
+    `tracks_con` (cf. `open_new_tracks_db`, diagnostic VPS 2026-09-15) :
+    connexion optionnelle vers la base SÉPARÉE des tracklists — remplie dans
+    la MÊME passe XML (jamais un second parsing du flux releases, plusieurs
+    dizaines de Go compressés) et committée en lockstep avec `con` dans
+    `flush()`, pour que la reprise (`resume_from`) retombe sur un état
+    cohérent entre les deux bases.
 
     `resume_from`/`resume_vinyl` : reprise après une interruption (cf.
     `discogs_dump_import.state.json`) — les `resume_from` premiers éléments
@@ -558,7 +683,7 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
     import xml.etree.ElementTree as ET
 
     needs_wrap, skip_bytes = _detect_needs_wrap(gz_path, b"<releases")
-    seen, n_vinyl, batch, style_rows, credit_rows = 0, resume_vinyl, [], [], []
+    seen, n_vinyl, batch, style_rows, credit_rows, track_rows = 0, resume_vinyl, [], [], [], []
 
     def flush():
         if batch:
@@ -576,6 +701,13 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
                 "INSERT INTO release_artists (release_id, artist_id, role) VALUES (?,?,?)", credit_rows)
             credit_rows.clear()
         con.commit()
+        if tracks_con is not None:
+            if track_rows:
+                tracks_con.executemany(
+                    "INSERT INTO tracks (release_id, track_no, position, title, artist) "
+                    "VALUES (?,?,?,?,?)", track_rows)
+                track_rows.clear()
+            tracks_con.commit()
         if checkpoint_cb:
             checkpoint_cb(seen, n_vinyl)
 
@@ -599,12 +731,14 @@ def import_releases(con, gz_path, progress_cb=None, batch_size=5000,
                                           # une référence sur chaque enfant traité (fuite mémoire
                                           # sur 18-20M sorties sans ce clear-là aussi)
             if parsed is not None:
-                row, styles_list, credits, is_vinyl_flag = parsed
+                row, styles_list, credits, is_vinyl_flag, tracklist = parsed
                 if is_vinyl_flag:
                     n_vinyl += 1
                 batch.append(row)
                 style_rows.extend((row[0], s) for s in styles_list)
                 credit_rows.extend((row[0], aid, role) for aid, role in credits)
+                if tracks_con is not None:
+                    track_rows.extend((row[0], tno, pos, ttl, art) for tno, pos, ttl, art in tracklist)
                 if len(batch) >= batch_size:
                     flush()
             if progress_cb and seen % 20000 == 0:
@@ -791,8 +925,8 @@ def _normalize_extra_roles(raw):
 
 
 def _parse_release_elem(elem):
-    """(row_releases, styles_list, credits, is_vinyl) ou None si structurellement
-    inexploitable (id manquant). Ne filtre plus par format depuis
+    """(row_releases, styles_list, credits, is_vinyl, track_rows) ou None si
+    structurellement inexploitable (id manquant). Ne filtre plus par format depuis
     l'élargissement du 11/09 (cf. module docstring) — TOUTE sortie est gardée,
     `is_vinyl` (calculé une fois ici, jamais reparsé ensuite) dit seulement si
     CELLE-CI est au format vinyle 12"/LP, pour un filtrage optionnel côté
@@ -808,7 +942,9 @@ def _parse_release_elem(elem):
     les rôles utiles de `<extraartists>` sont normalisés vers leur forme
     canonique (`_normalize_extra_roles` : texte libre Discogs, listes et
     qualificatifs entre crochets, cf. diagnostic R4), le reste (Mixed By,
-    Design, Photography, …) est ignoré pour limiter le volume."""
+    Design, Photography, …) est ignoré pour limiter le volume. `track_rows` :
+    cf. `_parse_tracklist` — écrits dans la base SÉPARÉE des tracklists
+    (`TRACKS_DB_PATH`), jamais dans `releases`."""
     rid = elem.get("id")
     if not rid:
         return None
@@ -876,7 +1012,36 @@ def _parse_release_elem(elem):
         elem.findtext("country"), fmt_descriptions, genres, styles, master_id,
         int(is_vinyl),
     )
-    return row, styles_list, credits, is_vinyl
+    track_rows = _parse_tracklist(elem)
+    return row, styles_list, credits, is_vinyl, track_rows
+
+
+def _parse_tracklist(elem):
+    """[(track_no, position, title, artist)] depuis `<tracklist><track>` — le XML
+    brut CONTIENT bien les crédits par piste (`<artists><artist><name>`/`<anv>`),
+    contrairement à ce qu'affirmait `job_scorestore_tracks` avant le diagnostic VPS
+    du 2026-09-15 (« le dump local n'en contient pas ») : seuls `_parse_release_elem`
+    et le schéma SQLite ne les exploitaient pas. Mesuré sur un échantillon VPS :
+    100% des sorties ont une tracklist, 5,7 pistes/sortie en moyenne, 26,1% des
+    pistes ont un crédit par piste (les autres restent à `""`, PAS l'artiste de la
+    sortie — le repli sur l'artiste de la sortie, comme la normalisation des
+    placeholders "Various"/"Unknown Artist", reste la responsabilité de l'appelant,
+    cf. `_track_credit_artist` dans crate_jobs.py, jamais dupliquée ici).
+
+    `artist` : comma-joint si plusieurs artistes crédités sur une même piste, même
+    simplification que l'artiste de la SORTIE plus haut dans cette fonction (le
+    séparateur `<join>` du dump, ex. "&", est ignoré des deux côtés)."""
+    rows = []
+    for i, tr in enumerate(elem.findall("./tracklist/track")):
+        title = (tr.findtext("title") or "").strip()
+        if not title:
+            continue
+        position = (tr.findtext("position") or "").strip()
+        names = [(a.findtext("anv") or a.findtext("name") or "").strip()
+                 for a in tr.findall("./artists/artist")]
+        artist = ", ".join(n for n in names if n)
+        rows.append((i, position, title, artist))
+    return rows
 
 
 # --------------------------------------------------------------- lookup (lecture, utilisé par l'appli)
@@ -951,10 +1116,12 @@ def resolve_name(name, kind="label", con=None):
 
 
 def lookup_release(release_id, con=None):
-    """{genres, styles, label, artist, year, format} ou None — utilisé pour
-    enrichir gratuitement les items d'inventaire vendeur (qui portent déjà le
-    release_id) sans appel API supplémentaire. `con` : réutiliser une
-    connexion ouverte via `connect_readonly()` pour des lookups en série."""
+    """{genres, styles, label, artist, year, format, is_vinyl} ou None — utilisé
+    pour enrichir gratuitement les items d'inventaire vendeur (qui portent déjà
+    le release_id) sans appel API supplémentaire, ainsi que pour vérifier le
+    format d'une sortie avant ajout à la wantlist (`app.py::cart_add`, cf.
+    `search_local(vinyl_only=...)`). `con` : réutiliser une connexion ouverte
+    via `connect_readonly()` pour des lookups en série."""
     owns = con is None
     if owns:
         con = connect_readonly()
@@ -962,14 +1129,15 @@ def lookup_release(release_id, con=None):
             return None
     try:
         row = con.execute(
-            "SELECT title, artist, label, catno, year, country, format, genres, styles, master_id "
+            "SELECT title, artist, label, catno, year, country, format, genres, styles, master_id, is_vinyl "
             "FROM releases WHERE id = ?", (int(release_id),)).fetchone()
     finally:
         if owns:
             con.close()
     if not row:
         return None
-    keys = ("title", "artist", "label", "catno", "year", "country", "format", "genres", "styles", "master_id")
+    keys = ("title", "artist", "label", "catno", "year", "country", "format", "genres", "styles",
+            "master_id", "is_vinyl")
     return dict(zip(keys, row))
 
 
@@ -1093,17 +1261,26 @@ def artist_ids_for_labels(label_keys, con=None):
     return out
 
 
-def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
+def search_local(label_keys=None, styles=None, year_range=None, limit=5000, vinyl_only=True):
     """[{id, title, artist, label, catno, year, genres, styles}] — recherche
     ciblée en local, triée par année décroissante (cf. diagnostic D6). Depuis
     l'élargissement du 11/09 (cf. module docstring de `discogs_dump.py`), la
-    table couvre TOUS les formats — mais cette fonction reste réservée aux
-    usages "chercher du vinyle à acheter" (`/search`, `job_scorestore_releases`
-    donc RECOS RADAR et son bouton wantlist) : filtre `r.is_vinyl = 1`
-    toujours appliqué (retour utilisateur 2026-09-14, issue #62 — sans ce
-    filtre le référentiel élargi faisait remonter des sorties CD/digital,
-    y compris via le bouton "ajouter à la wantlist" de Reco Radar). Ne filtre
-    pas le genre (colonne `releases.genres`
+    table couvre TOUS les formats.
+
+    `vinyl_only` (`r.is_vinyl = 1`, défaut True) : réservé aux usages
+    "chercher du vinyle à acheter" (`/search`, cf. retour utilisateur
+    2026-09-14, issue #62 — sans ce filtre le référentiel élargi faisait
+    remonter des sorties CD/digital jusque dans la wantlist). Le correctif du
+    14/09 avait mis ce filtre à la racine, appliqué sans distinction à TOUS
+    les appelants — trop large : `job_scorestore_releases` (donc RECOS RADAR)
+    doit au contraire rester exhaustif tous formats à la DÉCOUVERTE (décision
+    utilisateur 2026-09-15 : « exhaustif à la découverte, vinyle à l'achat »)
+    et passe `vinyl_only=False` — le filtrage vinyle se fait alors plus tard,
+    au moment de l'ajout à la wantlist (`app.py::cart_add`), pas ici. `/search`
+    garde le défaut `vinyl_only=True` (confirmé par l'utilisateur : cet écran
+    reste "quel disque acheter").
+
+    Ne filtre pas le genre (colonne `releases.genres`
     jointe par virgule, non normalisée) — à filtrer par l'appelant sur ce
     sous-ensemble déjà borné par `limit`. Pas de vignette : le dump ne
     contient aucune URL d'image, contrairement à l'API (repli nécessaire
@@ -1121,7 +1298,7 @@ def search_local(label_keys=None, styles=None, year_range=None, limit=5000):
         return []
     con = sqlite3.connect(DB_PATH)
     try:
-        where, params = ["r.is_vinyl = 1"], []
+        where, params = (["r.is_vinyl = 1"] if vinyl_only else []), []
         query = ("SELECT DISTINCT r.id, r.title, r.artist, r.label, r.catno, r.year, r.genres, r.styles "
                   "FROM releases r")
         if styles:

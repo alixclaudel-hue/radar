@@ -29,10 +29,17 @@ out="$OUT_DIR/data-$ts.tgz.enc"
 # en chemin absolu ne matche jamais rien. Vécu le 12/09 : backups/ et
 # shared/discogs_dump_raw/ (~12G) inclus dans l'archive -> 13G corrompu
 # (tar lit le .tgz.enc en cours d'écriture -> "file changed as we read it").
+#
+# Piège récidive (diagnostic VPS 15/09) : l'exclusion ne visait QUE
+# discogs_dump.sqlite3* nommément — catalog_labelgraph.sqlite3 n'était déjà pas
+# couvert, et une nouvelle base (discogs_dump_tracks.sqlite3, tracklists locales)
+# ne l'aurait pas été non plus. Toute base *.sqlite3 sous shared/ est un index
+# reconstructible depuis le dump mensuel, jamais une donnée utilisateur -> un
+# seul glob générique plutôt qu'un nom par nom à mettre à jour à chaque ajout.
 base="$(basename "$DATA_DIR")"
 sudo tar czf - \
   --exclude="$base/backups" \
-  --exclude="$base/shared/discogs_dump.sqlite3*" \
+  --exclude="$base/shared/"'*.sqlite3*' \
   --exclude="$base/shared/discogs_dump_raw" \
   -C "$(dirname "$DATA_DIR")" "$base" \
   | openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -pass env:BACKUP_PASS -out "$out"

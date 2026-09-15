@@ -1103,6 +1103,19 @@ def _discogs_username(cfg, token):
     return user
 
 
+def _vinyl_matches(token, artist, title, limit=12):
+    """Pressages vinyle Discogs d'une piste (artiste+titre, recherche API filtrée
+    sur le format) — partagé par `/release_matches` (DJ sets) et `cart_add` (repli
+    quand la sortie proposée n'est pas au format vinyle, cf. CLAUDE.md : découverte
+    RECOS exhaustive tous formats, décision utilisateur 2026-09-15 : le filtre
+    vinyle se fait à l'achat, pas à la découverte)."""
+    res = discogs.search(token, artist=artist, track=title, per_page=25).get("results", [])
+    vinyl = [r for r in res if "vinyl" in " ".join(r.get("format") or []).lower()]
+    return [{"id": r.get("id"), "title": r.get("title"), "label": r.get("label") or [],
+             "year": r.get("year"), "format": r.get("format") or [],
+             "thumb": r.get("cover_image") or r.get("thumb")} for r in vinyl[:limit]]
+
+
 @app.get("/release_matches", response_class=HTMLResponse)
 def release_matches(request: Request, a: str = "", t: str = ""):
     """Vinyles Discogs contenant cette track (une track peut être sortie sur
@@ -1113,13 +1126,9 @@ def release_matches(request: Request, a: str = "", t: str = ""):
     if not token:
         return _err("Token Discogs manquant.", "p")
     try:
-        res = discogs.search(token, artist=a, track=t, per_page=25).get("results", [])
+        rows = _vinyl_matches(token, a, t)
     except discogs.DiscogsError as e:
         return _err(e, "p")
-    vinyl = [r for r in res if "vinyl" in " ".join(r.get("format") or []).lower()]
-    rows = [{"id": r.get("id"), "title": r.get("title"), "label": r.get("label") or [],
-             "year": r.get("year"), "format": r.get("format") or [],
-             "thumb": r.get("cover_image") or r.get("thumb")} for r in vinyl[:12]]
     return frag(request, "partials/release_matches.html", rows=rows, a=a, t=t, in_cart=_cart_ids())
 
 
@@ -1129,7 +1138,7 @@ def cart_frag(request: Request):
 
 
 @app.post("/cart/add", response_class=HTMLResponse)
-def cart_add(rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
+def cart_add(request: Request, rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
              thumb: str = Form(""), label: str = Form("")):
     rid = (rid or "").strip()
     if not rid:
@@ -1138,6 +1147,24 @@ def cart_add(rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
     token = cfg.get("token", "")
     if not token:
         return _err("Token Discogs manquant.")
+
+    # Découverte RECOS exhaustive tous formats (cf. CLAUDE.md, job_scorestore_releases)
+    # mais achat vinyle seul (décision utilisateur 2026-09-15 : « exhaustif à la
+    # découverte, vinyle à l'achat ») — une sortie non-vinyle n'est jamais ajoutée
+    # telle quelle à la wantlist Discogs : on propose à la place le(s) pressage(s)
+    # vinyle de la même piste (artiste+titre), même mécanisme que /release_matches
+    # (DJ sets) — y compris son message explicite si aucun n'existe.
+    from .radar import discogs_dump as dd
+    if dd.available():
+        info = dd.lookup_release(rid)
+        if info and not info.get("is_vinyl"):
+            try:
+                rows = _vinyl_matches(token, artist.strip(), title.strip())
+            except discogs.DiscogsError as e:
+                return _err(e)
+            return frag(request, "partials/release_matches.html", rows=rows,
+                        a=artist.strip(), t=title.strip(), in_cart=_cart_ids())
+
     try:
         user = _discogs_username(cfg, token)
         if not user:

@@ -2058,20 +2058,23 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
-_PLACEHOLDER_ARTISTS = ARTIST_STOPWORDS | {"v/a"}
+_PLACEHOLDER_ARTISTS = {"various", "various artists", "va", "v/a", "unknown artist",
+                        "unknown", "no artist"}
 
 
 def _is_placeholder_artist(name):
     """Un placeholder Discogs ("Various", "Unknown Artist", "No Artist"...) ne
-    vaut pas mieux qu'une absence de crédit. Réutilise ARTIST_STOPWORDS (déjà
-    le set le plus large du fichier, utilisé pour le même bruit dans le
-    graphe labels/artistes) plutôt qu'un set dédié plus étroit qui a fini par
-    en diverger : diagnostic VPS 2026-09-15 (1er passage) puis reformulé le
-    même jour — après nettoyage de 'Various'/'Various Artists'/'Unknown
-    Artist', 137 pistes 'No Artist' (111), 'Various Artists (N)' (14),
-    'Unknown Artist (N)' (8), 'Unknown' (3) restaient candidates RECOS car
-    absentes de l'ancien set + suffixe de désambiguïsation Discogs '(N)'
-    jamais retiré avant comparaison."""
+    vaut pas mieux qu'une absence de crédit. Set DÉDIÉ, volontairement distinct
+    d'ARTIST_STOPWORDS (graphe labels/artistes) — un essai de fusion le 15/09
+    a été annulé après vérif VPS : ARTIST_STOPWORDS contient aussi "release"/
+    "progressive classics"/"traxsource", du bruit propre au graphe co-crédits,
+    pas des marqueurs "sans artiste" — un vrai artiste Discogs nommé "Release"
+    (release réelle, ex. "Release (22) — Walk Away") se serait retrouvé écarté
+    à tort des candidats RECOS. Suffixe de désambiguïsation Discogs '(N)'
+    retiré avant comparaison (`_strip_discogs_suffix`, existait déjà pour un
+    autre usage) : diagnostic VPS 2026-09-15, 137 pistes 'No Artist' (111),
+    'Various Artists (N)' (14), 'Unknown Artist (N)' (8), 'Unknown' (3)
+    passaient au travers de l'ancien set + suffixe jamais retiré."""
     n = _strip_discogs_suffix((name or "").strip()).casefold()
     return n in _PLACEHOLDER_ARTISTS
 

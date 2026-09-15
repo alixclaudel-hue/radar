@@ -2058,16 +2058,22 @@ def job_scan_veille(job, params):
     job.finish(f"+{total_new} nouveauté(s) sur {len(rules)} règle(s) · file d'attente {len(queue)}.")
 
 
-_PLACEHOLDER_ARTISTS = {"various", "various artists", "unknown artist", "v/a"}
+_PLACEHOLDER_ARTISTS = ARTIST_STOPWORDS | {"v/a"}
 
 
 def _is_placeholder_artist(name):
-    """Un placeholder Discogs ("Various", "Unknown Artist"...) ne vaut pas
-    mieux qu'une absence de crédit — diagnostic VPS 2026-09-15 : 'Various'
-    (1712), 'Unknown Artist' (1616), 'Various Artists' (6) en base owner,
-    tous injectés à tort comme faux signal artiste dans le scoring/la
-    recherche YouTube RECOS."""
-    return (name or "").strip().casefold() in _PLACEHOLDER_ARTISTS
+    """Un placeholder Discogs ("Various", "Unknown Artist", "No Artist"...) ne
+    vaut pas mieux qu'une absence de crédit. Réutilise ARTIST_STOPWORDS (déjà
+    le set le plus large du fichier, utilisé pour le même bruit dans le
+    graphe labels/artistes) plutôt qu'un set dédié plus étroit qui a fini par
+    en diverger : diagnostic VPS 2026-09-15 (1er passage) puis reformulé le
+    même jour — après nettoyage de 'Various'/'Various Artists'/'Unknown
+    Artist', 137 pistes 'No Artist' (111), 'Various Artists (N)' (14),
+    'Unknown Artist (N)' (8), 'Unknown' (3) restaient candidates RECOS car
+    absentes de l'ancien set + suffixe de désambiguïsation Discogs '(N)'
+    jamais retiré avant comparaison."""
+    n = _strip_discogs_suffix((name or "").strip()).casefold()
+    return n in _PLACEHOLDER_ARTISTS
 
 
 _CONTINUOUS_MIX_PATTERNS = (

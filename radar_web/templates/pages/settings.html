@@ -116,8 +116,8 @@
   <div class="row wgroup__fields">
     <div class="field">
       <label>Recherches YouTube par alimentation <b id="recos-searches-out">{{ sc.recos.searches_per_run|int }}</b>
-        <span class="muted">· pistes cherchées à chaque clic « ▶ Alimenter la playlist »</span></label>
-      <input type="range" id="recos-searches" name="recos__searches_per_run" min="1" max="45" step="1"
+        <span class="muted">· pistes cherchées à chaque clic « ▶ Alimenter la playlist », dans la limite du budget quotidien (80)</span></label>
+      <input type="range" id="recos-searches" name="recos__searches_per_run" min="1" max="80" step="1"
              value="{{ sc.recos.searches_per_run|int }}">
     </div>
     <div class="field">

@@ -38,11 +38,17 @@ API = "https://www.googleapis.com/youtube/v3"
 # (PR suivante) — ne pas re-fusionner les deux familles sur un seul indice.
 _DAILY_QUOTA_REASONS = {"quotaexceeded", "dailylimitexceeded"}
 _RATE_LIMIT_REASONS = {"ratelimitexceeded", "userratelimitexceeded"}
-# Marqueurs de quota JOURNALIER dans le `message` d'une erreur par ailleurs
+# Marqueur de quota JOURNALIER dans le `message` d'une erreur par ailleurs
 # classée _RATE_LIMIT_REASONS (cf. commentaire ci-dessus) — pas dans `reason`,
 # qui ment précisément dans ce cas.
-_DAILY_QUOTA_MESSAGE_MARKERS = ("per day", "queries per day",
-                               "quota exceeded for quota metric")
+# UNIQUEMENT la fenêtre de la limite ("per day"), surtout pas le préfixe
+# "Quota exceeded for quota metric ...", commun à TOUTES les métriques : Google
+# l'emploie aussi pour les limites transitoires ("... and limit 'Queries per
+# minute per user' ..."), qu'il ferait alors passer à tort pour un quota
+# journalier — soit exactement le bug corrigé par la PR #158, réintroduit par
+# l'autre bout. Toute autre fenêtre (minute, 100 secondes) reste transitoire
+# par défaut, donc traitée en "rate".
+_DAILY_QUOTA_MESSAGE_MARKERS = ("per day",)
 # Backoff sur limite de débit transitoire, sur la MÊME clé, avant de basculer
 # sur la suivante ou d'abandonner.
 _RATE_LIMIT_RETRY_DELAYS = (1, 2, 4)
@@ -235,13 +241,21 @@ def request(path, params, keys, timeout=15):
             continue                      # retries épuisés sur cette clé -> suivante
         raise RuntimeError(f"YouTube {r.status_code}: {r.text[:200]}")
     if last is not None:
-        kind = _error_kind(last)
-        if kind == "daily":
+        # `any_rate` AVANT le quota journalier, et non la seule dernière réponse :
+        # la journée n'est perdue que si AUCUNE clé ne peut plus servir aujourd'hui.
+        # Une clé simplement limitée en débit redevient utilisable en quelques
+        # secondes ; conclure QuotaExhausted parce que la DERNIÈRE clé essayée est
+        # épuisée pour la journée abandonnerait tout le run (et renverrait
+        # l'utilisateur à la remise à zéro du quota) alors qu'une autre clé
+        # repasserait au prochain lancement. Sans effet tant qu'une seule clé est
+        # configurée ; compte dès qu'il y en a deux.
+        if any_rate:
+            raise RateLimited("Limite de débit YouTube atteinte sur toutes les clés "
+                              "encore utilisables aujourd'hui, après plusieurs "
+                              "tentatives -- réessaie dans quelques minutes.")
+        if _error_kind(last) == "daily":
             raise QuotaExhausted("Quota YouTube épuisé (toutes les clés). "
                                  "Réessaie demain ou ajoute ta clé perso dans « Mon profil ».")
-        if kind == "rate" or any_rate:
-            raise RateLimited("Limite de débit YouTube atteinte sur toutes les clés "
-                              "après plusieurs tentatives -- réessaie dans quelques minutes.")
     raise RuntimeError("Aucune clé YouTube utilisable.")
 
 

@@ -91,16 +91,24 @@ RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
 RECOS_SEARCH_BUDGET_PATH = os.path.join(USER_DIR, "recos_search_budget.json")
-PARIS_TZ = ZoneInfo("Europe/Paris")  # même horloge que worker._maybe_recos_midnight_purge
+# Le quota gratuit YouTube Data API se remet à zéro à MINUIT HEURE DU PACIFIQUE
+# (9h à Paris), pas à minuit à Paris : compter les recherches sur l'horloge de
+# Paris bloquait le budget pendant ~9h chaque jour alors que le vrai quota était
+# déjà reparti (constaté en prod le 16/09). Horloge distincte de celle de la
+# purge des pistes écoutées (worker.py), qui elle reste sur Paris.
+YT_QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 RECOS_MAX_TRACKS = 5  # repli si scoring.recos.max_tracks absent (curseur /settings, 10/09)
-RECOS_DAILY_SEARCH_BUDGET = 45
-# marge sous le quota gratuit YouTube Data API (10 000 unités/jour) : évite que
-# scan_recos empile plus de candidats que publish_recos ne peut en chercher sur
-# YouTube en une journée (retour utilisateur du 09/09 : file à 417 candidats, quota
-# épuisé dès la 1re publication). 90 supposait 100 unités par candidat, or une piste
-# qui ne trouve rien en coûte 202 (recherche avec label, puis sans, plus /videos) :
-# la file entière brûlait le quota du jour et les candidats suivants tombaient en
+RECOS_DAILY_SEARCH_BUDGET = 80
+# marge sous le quota gratuit YouTube Data API : évite que scan_recos empile plus
+# de candidats que publish_recos ne peut en chercher sur YouTube en une journée
+# (retour utilisateur du 09/09 : file à 417 candidats, quota épuisé dès la 1re
+# publication). 90 supposait 100 unités par candidat, or une piste qui ne trouve
+# rien en coûte 202 (recherche avec label, puis sans, plus /videos) : la file
+# entière brûlait le quota du jour et les candidats suivants tombaient en
 # « aucune vidéo trouvée » alors que le quota, pas la piste, était en cause.
+# 80 n'est atteignable en entier qu'avec plusieurs clés : au pire des cas (80
+# échecs à 202 unités) il faudrait ~16 160 unités, soit plus que les 10 000/jour
+# d'une clé unique — le plafond effectif reste alors le quota Google.
 RECOS_SEARCHES_PER_RUN = 5  # repli si scoring.recos.searches_per_run absent
 RECOS_MAX_ATTEMPTS = 3
 # plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
@@ -137,24 +145,25 @@ def _recos_history_track_keys(history):
 
 
 def _recos_searches_used_today():
-    """Recherches YouTube RECOS déjà consommées aujourd'hui (minuit heure de
-    Paris). Sans ce compteur PERSISTANT, RECOS_DAILY_SEARCH_BUDGET ne bornait
+    """Recherches YouTube RECOS déjà consommées aujourd'hui, sur l'horloge de
+    remise à zéro du quota Google (minuit heure du Pacifique, 9h à Paris —
+    cf. YT_QUOTA_TZ). Sans ce compteur PERSISTANT, RECOS_DAILY_SEARCH_BUDGET ne bornait
     que la longueur de recos_candidates.json (job_scan_recos), jamais le
     nombre réel de recherches/jour — la boucle horaire du worker
     (RADAR_RECOS_SCAN=1) pouvait épuiser le quota YouTube dès la matinée
     (diagnostic VPS 2026-09-15). Lu ici (job_publish_recos) plutôt que dans le
     worker pour valoir aussi sur un lancement manuel (bouton ▶)."""
-    today = datetime.now(PARIS_TZ).date().isoformat()
+    today = datetime.now(YT_QUOTA_TZ).date().isoformat()
     d = load_json(RECOS_SEARCH_BUDGET_PATH, {})
     return int(d.get("count", 0)) if d.get("date") == today else 0
 
 
 def _recos_searches_record(n):
     """Ajoute `n` recherches au compteur du jour (reparti de 0 si le fichier
-    date d'un jour différent)."""
+    date d'un jour différent, toujours en heure du Pacifique)."""
     if not n:
         return
-    today = datetime.now(PARIS_TZ).date().isoformat()
+    today = datetime.now(YT_QUOTA_TZ).date().isoformat()
     d = load_json(RECOS_SEARCH_BUDGET_PATH, {})
     count = int(d.get("count", 0)) if d.get("date") == today else 0
     save_json(RECOS_SEARCH_BUDGET_PATH, {"date": today, "count": count + n})
@@ -2283,7 +2292,7 @@ def job_publish_recos(job, params):
     budget_used = _recos_searches_used_today()
     if budget_used >= RECOS_DAILY_SEARCH_BUDGET:
         return job.finish(f"Budget quotidien de recherches YouTube atteint ({budget_used}/"
-                           f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra demain après minuit (Paris).")
+                           f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
 
     playlist = load_json(RECOS_PLAYLIST_PATH, [])
     cfg = cfg_load()
@@ -2372,7 +2381,7 @@ def job_publish_recos(job, params):
             if searched >= searches_per_run else "")
     if daily_hit:
         note += (f" Budget quotidien atteint ({budget_used + searched}/"
-                 f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra demain après minuit (Paris).")
+                 f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
     if len(playlist) >= max_tracks and remaining:
         note += (f" Playlist pleine ({max_tracks}) — plus d'ajout tant qu'aucune "
                  f"piste n'est marquée écoutée (clic sur une ligne, purge à minuit).")

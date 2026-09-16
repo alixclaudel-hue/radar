@@ -20,12 +20,29 @@ API = "https://www.googleapis.com/youtube/v3"
 # Deux familles d'erreurs bien distinctes, longtemps confondues sous un même
 # quota "épuisé" (diagnostic VPS 16/09) : quotaExceeded/dailyLimitExceeded sont
 # le quota des 10 000 unités/jour (persistant, ne se résout qu'au lendemain) ;
-# rateLimitExceeded/userRateLimitExceeded sont une limite de débit par seconde
-# (transitoire, se résorbe en quelques secondes). Preuve en réel : un appel
-# rejeté "quota" a réussi identiquement 20s plus tard avec la MÊME clé — le
-# vrai quota journalier n'était pas en cause.
+# rateLimitExceeded/userRateLimitExceeded sont NORMALEMENT une limite de débit
+# par seconde (transitoire, se résorbe en quelques secondes) — preuve en réel :
+# un appel rejeté "quota" a réussi identiquement 20s plus tard avec la MÊME clé.
+#
+# CONTRE-INTUITIF, 2e diagnostic VPS en 24h en sens inverse du 1er : Google
+# renvoie AUSSI reason="rateLimitExceeded" pour un quota JOURNALIER bien précis
+# ("Search Queries per day", distinct des 10 000 unités/jour globales — /videos
+# peut répondre 200 au même instant où /search est épuisé). Exemple réel :
+#   429 {"error": {"message": "Quota exceeded for quota metric 'Search
+#   Queries' and limit 'Search Queries per day' of service
+#   'youtube.googleapis.com' for consumer '...'",
+#   "errors": [{"reason": "rateLimitExceeded"}]}}
+# La `reason` ment ici ; seul le `message` tranche (cf. _error_kind). Les deux
+# cas sont donc réels et symétriques : rateLimitExceeded SANS mention "per day"
+# dans le message reste transitoire (PR #158) ; AVEC, c'est un quota journalier
+# (PR suivante) — ne pas re-fusionner les deux familles sur un seul indice.
 _DAILY_QUOTA_REASONS = {"quotaexceeded", "dailylimitexceeded"}
 _RATE_LIMIT_REASONS = {"ratelimitexceeded", "userratelimitexceeded"}
+# Marqueurs de quota JOURNALIER dans le `message` d'une erreur par ailleurs
+# classée _RATE_LIMIT_REASONS (cf. commentaire ci-dessus) — pas dans `reason`,
+# qui ment précisément dans ce cas.
+_DAILY_QUOTA_MESSAGE_MARKERS = ("per day", "queries per day",
+                               "quota exceeded for quota metric")
 # Backoff sur limite de débit transitoire, sur la MÊME clé, avant de basculer
 # sur la suivante ou d'abandonner.
 _RATE_LIMIT_RETRY_DELAYS = (1, 2, 4)
@@ -134,20 +151,40 @@ def _reason(resp):
         return set()
 
 
+def _error_message(resp):
+    """`error.message` de la réponse Google, en minuscules -- c'est lui, pas
+    `reason`, qui distingue un quota "Search Queries per day" d'une vraie
+    limite de débit (cf. _DAILY_QUOTA_MESSAGE_MARKERS)."""
+    try:
+        return (resp.json().get("error", {}).get("message") or "").lower()
+    except ValueError:
+        return resp.text.lower()
+
+
 def _error_kind(r):
     """"daily" (quota journalier, persistant), "rate" (limite de débit,
-    transitoire) ou None (pas une erreur de quota). Le repli sur le texte
-    "quota" (nouveau format 429 sans `reason` exploitable, cf. retour
-    utilisateur du 09/09, `Quota Queries per day`) ne s'applique QUE quand
-    Google ne renvoie aucune `reason` du tout -- resserré le 16/09 : il
-    rattrapait avant n'importe quel 403/429 dont le message contenait
-    incidemment ce mot, y compris une vraie limite de débit."""
+    transitoire) ou None (pas une erreur de quota).
+
+    Le repli sur le texte "quota" (nouveau format 429 sans `reason`
+    exploitable, cf. retour utilisateur du 09/09, `Quota Queries per day`) ne
+    s'applique QUE quand Google ne renvoie aucune `reason` du tout -- resserré
+    le 16/09 : il rattrapait avant n'importe quel 403/429 dont le message
+    contenait incidemment ce mot, y compris une vraie limite de débit.
+
+    Une `reason` dans _RATE_LIMIT_REASONS n'est PAS toujours transitoire pour
+    autant (2e diagnostic VPS, même jour) : Google l'utilise aussi pour un
+    quota journalier précis ("Search Queries per day"), où la `reason` ment --
+    seul le `message` le révèle. D'où la vérification `message` avant de
+    conclure "rate", cf. le commentaire de _DAILY_QUOTA_MESSAGE_MARKERS."""
     if r.status_code not in (403, 429):
         return None
     reasons = _reason(r)
     if reasons & _DAILY_QUOTA_REASONS:
         return "daily"
     if reasons & _RATE_LIMIT_REASONS:
+        message = _error_message(r)
+        if any(m in message for m in _DAILY_QUOTA_MESSAGE_MARKERS):
+            return "daily"
         return "rate"
     if not reasons and "quota" in r.text.lower():
         return "daily"

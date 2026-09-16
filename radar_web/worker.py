@@ -241,7 +241,12 @@ def _maybe_recos_scan():
         return
     _last_recos_check = time.time()
     try:
-        queued_names = {j["name"] for j in jobs.load_queue()}
+        # Bornée à DEFAULT_UID (pas juste le nom) : un job scan_recos/publish_recos
+        # d'un AUTRE utilisateur ne doit pas bloquer l'auto-scan de owner. Une
+        # entrée "running" reste dans load_queue() tout le temps de son exécution
+        # (worker.main() ne la retire qu'après _run(), cf. docstring plus haut) :
+        # ce test couvre donc bien aussi un job déjà en cours, pas seulement en file.
+        queued_names = {j["name"] for j in jobs.load_queue() if j["uid"] == paths.DEFAULT_UID}
         if "scan_recos" in queued_names or "publish_recos" in queued_names:
             return
         pending = store.load(paths.user_paths(paths.DEFAULT_UID).recos_candidates, [])

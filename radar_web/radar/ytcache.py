@@ -17,8 +17,24 @@ from .textmatch import overlap, toks
 
 CACHE_PATH = os.path.join(paths.SHARED_DIR, "youtube_cache.json")
 API = "https://www.googleapis.com/youtube/v3"
-_QUOTA_REASONS = {"quotaexceeded", "dailylimitexceeded", "ratelimitexceeded",
-                  "userratelimitexceeded"}
+# Deux familles d'erreurs bien distinctes, longtemps confondues sous un même
+# quota "épuisé" (diagnostic VPS 16/09) : quotaExceeded/dailyLimitExceeded sont
+# le quota des 10 000 unités/jour (persistant, ne se résout qu'au lendemain) ;
+# rateLimitExceeded/userRateLimitExceeded sont une limite de débit par seconde
+# (transitoire, se résorbe en quelques secondes). Preuve en réel : un appel
+# rejeté "quota" a réussi identiquement 20s plus tard avec la MÊME clé — le
+# vrai quota journalier n'était pas en cause.
+_DAILY_QUOTA_REASONS = {"quotaexceeded", "dailylimitexceeded"}
+_RATE_LIMIT_REASONS = {"ratelimitexceeded", "userratelimitexceeded"}
+# Backoff sur limite de débit transitoire, sur la MÊME clé, avant de basculer
+# sur la suivante ou d'abandonner.
+_RATE_LIMIT_RETRY_DELAYS = (1, 2, 4)
+# Espacement minimal entre deux appels HTTP à l'API (toutes clés confondues) :
+# aucun throttle n'existait avant, et les relances de candidats en échec
+# partent avec force=True (crate_jobs.job_publish_recos) donc en rafale —
+# exactement ce qui déclenche la limite de débit ci-dessus.
+_MIN_CALL_INTERVAL = 0.34  # ~3 req/s
+_last_call_ts = 0.0
 
 # Pertinence du résultat (retour utilisateur 2026-09-10 : plus de la moitié des
 # vidéos ajoutées à RECOS RADAR n'avaient aucun rapport avec la piste demandée —
@@ -68,6 +84,14 @@ class QuotaExhausted(RuntimeError):
     pass
 
 
+class RateLimited(RuntimeError):
+    """Limite de débit YouTube (par seconde/utilisateur) après épuisement des
+    retries -- distincte de QuotaExhausted : transitoire, pas le quota
+    journalier. L'appelant doit reprendre plus tard, pas abandonner tout le
+    run (cf. crate_jobs.job_publish_recos)."""
+    pass
+
+
 def youtube_keys(cfg):
     """Clés à essayer, dans l'ordre : perso (protège le pot commun) puis appli."""
     out = []
@@ -110,32 +134,77 @@ def _reason(resp):
         return set()
 
 
-def _is_quota_response(r):
-    """Quota épuisé, sous deux formats Google vus en réel : l'ancien (403,
-    `error.errors[].reason` dans _QUOTA_REASONS) et le nouveau (429, juste
-    `error.code`/`error.message`, repéré au texte "quota" du message — cf.
-    retour utilisateur du 09/09, `Quota Queries per day` en 429)."""
+def _error_kind(r):
+    """"daily" (quota journalier, persistant), "rate" (limite de débit,
+    transitoire) ou None (pas une erreur de quota). Le repli sur le texte
+    "quota" (nouveau format 429 sans `reason` exploitable, cf. retour
+    utilisateur du 09/09, `Quota Queries per day`) ne s'applique QUE quand
+    Google ne renvoie aucune `reason` du tout -- resserré le 16/09 : il
+    rattrapait avant n'importe quel 403/429 dont le message contenait
+    incidemment ce mot, y compris une vraie limite de débit."""
     if r.status_code not in (403, 429):
-        return False
-    if _reason(r) & _QUOTA_REASONS:
-        return True
-    return "quota" in r.text.lower()
+        return None
+    reasons = _reason(r)
+    if reasons & _DAILY_QUOTA_REASONS:
+        return "daily"
+    if reasons & _RATE_LIMIT_REASONS:
+        return "rate"
+    if not reasons and "quota" in r.text.lower():
+        return "daily"
+    return None
+
+
+def _throttle():
+    """Espace les appels HTTP d'au moins _MIN_CALL_INTERVAL, toutes clés/threads
+    confondus (worker sériel, cf. worker.py -- pas besoin de verrou)."""
+    global _last_call_ts
+    wait = _last_call_ts + _MIN_CALL_INTERVAL - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    _last_call_ts = time.time()
+
+
+def _get(path, params, key, timeout):
+    """GET sur une clé, avec retries + backoff sur limite de débit transitoire
+    (jusqu'à _RATE_LIMIT_RETRY_DELAYS tentatives sur la MÊME clé avant de la
+    considérer épuisée pour ce cycle)."""
+    _throttle()
+    r = requests.get(f"{API}{path}", params={**params, "key": key}, timeout=timeout)
+    for delay in _RATE_LIMIT_RETRY_DELAYS:
+        if r.ok or _error_kind(r) != "rate":
+            break
+        time.sleep(delay)
+        _throttle()
+        r = requests.get(f"{API}{path}", params={**params, "key": key}, timeout=timeout)
+    return r
 
 
 def request(path, params, keys, timeout=15):
-    """GET {API}{path} en essayant chaque clé. QuotaExhausted si toutes en quota."""
-    last = None
+    """GET {API}{path} en essayant chaque clé. QuotaExhausted si toutes en quota
+    journalier ; RateLimited si toutes sont seulement en limite de débit
+    (transitoire) après retries -- l'appelant doit réessayer plus tard, pas
+    considérer la journée perdue (cf. RateLimited)."""
+    last, any_rate = None, False
     for k in keys:
-        r = requests.get(f"{API}{path}", params={**params, "key": k}, timeout=timeout)
+        r = _get(path, params, k, timeout)
         if r.ok:
             return r.json()
         last = r
-        if _is_quota_response(r):
-            continue                      # clé épuisée -> suivante
+        kind = _error_kind(r)
+        if kind == "daily":
+            continue                      # clé épuisée pour la journée -> suivante
+        if kind == "rate":
+            any_rate = True
+            continue                      # retries épuisés sur cette clé -> suivante
         raise RuntimeError(f"YouTube {r.status_code}: {r.text[:200]}")
-    if last is not None and _is_quota_response(last):
-        raise QuotaExhausted("Quota YouTube épuisé (toutes les clés). "
-                             "Réessaie demain ou ajoute ta clé perso dans « Mon profil ».")
+    if last is not None:
+        kind = _error_kind(last)
+        if kind == "daily":
+            raise QuotaExhausted("Quota YouTube épuisé (toutes les clés). "
+                                 "Réessaie demain ou ajoute ta clé perso dans « Mon profil ».")
+        if kind == "rate" or any_rate:
+            raise RateLimited("Limite de débit YouTube atteinte sur toutes les clés "
+                              "après plusieurs tentatives -- réessaie dans quelques minutes.")
     raise RuntimeError("Aucune clé YouTube utilisable.")
 
 
@@ -217,7 +286,7 @@ def _best_match(ids, query, artist, title, label, keys):
     structured = bool((artist or "").strip() or (title or "").strip())
     try:
         d = request("/videos", {"part": "snippet,status", "id": ",".join(ids)}, keys)
-    except QuotaExhausted:
+    except (QuotaExhausted, RateLimited):
         raise
     except RuntimeError:
         return ("" if structured else ids[0]), "erreur API /videos"

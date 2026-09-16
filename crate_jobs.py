@@ -2326,7 +2326,6 @@ def job_publish_recos(job, params):
             continue
         art_q = _strip_discogs_suffix(c.get("artist"))
         label_q = _strip_discogs_suffix(c.get("label") or "")
-        searched += 1
         try:
             # force=True dès la 1re relance (attempts >= 1) : sinon la nouvelle
             # tentative ne fait que relire le même échec en cache (NEG_TTL 6h,
@@ -2338,10 +2337,23 @@ def job_publish_recos(job, params):
                 artist=art_q, title=c.get("title"), label=label_q,
                 force=bool(c.get("attempts")))
         except ytcache.QuotaExhausted:
+            searched += 1
             job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
             quota_hit = True
             remaining.append(c)
             continue
+        except ytcache.RateLimited:
+            # Transitoire (limite de débit par seconde, PAS le quota du jour,
+            # diagnostic VPS 16/09 : un appel direct a réussi 20s plus tard sur
+            # la même clé) : ne coûte pas d'unité de quota Google, donc ne
+            # décompte pas `searched` (cf. _recos_searches_record plus bas), et
+            # n'abandonne pas tout le run comme QuotaExhausted — le candidat
+            # repasse simplement au tour suivant.
+            job.tick(f"{c['artist']} — {c['title']} : YouTube limite le débit "
+                     f"— nouvelle tentative au prochain lancement.")
+            remaining.append(c)
+            continue
+        searched += 1
         if not vid:
             # BUG trouvé le 10/09 (retour utilisateur : "aucune vidéo trouvée"
             # systématique malgré le correctif scoring de 9f1eb04) : ce `continue`

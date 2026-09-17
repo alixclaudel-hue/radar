@@ -10,6 +10,14 @@ description: Boucle dev cloud ↔ diagnostic VPS. À lire par la session de dev 
 > déclenche rien de ce qui suit (pas de `fire_trigger`, pas d'issue `Diag
 > <sha>`) sans demande explicite de sa part. Ce fichier reste comme
 > référence pour une reprise éventuelle.
+>
+> **Mise à jour 17/09** : le contrat de la session diagnostic (référencé
+> ci-dessous comme `.claude/skills/diag/SKILL.md`) a été renommé et déplacé
+> vers `.claude/skills/vps-ops/SKILL.md` — périmètre élargi (jobs/Docker en
+> plus du diagnostic pur), et surtout rendu auto-découvrable par toute
+> session VPS quel que soit son nom, pas seulement « Radar — VPS
+> (diagnostic) ». Si cette boucle reprend un jour, remplacer les mentions
+> `.claude/skills/diag/SKILL.md` ci-dessous par `.claude/skills/vps-ops/SKILL.md`.
 
 Tu es la session de dev cloud. Tu codes, tu ouvres les PR, tu merges. Tu ne vois
 ni la base réelle, ni les conteneurs, ni les jobs : c'est la session de

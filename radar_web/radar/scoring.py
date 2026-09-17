@@ -4,6 +4,7 @@ Un objet Ctx charge toutes les données une fois ; les fonctions le prennent en 
 v0 : label + style complets ; terme « artiste » simplifié (liste manuelle + corpus +
 collection ; le graphe de producteurs viendra ensuite)."""
 import hashlib
+import json
 import math
 import os
 import re
@@ -65,6 +66,21 @@ def _files_sig(*paths_):
         except OSError:
             out.append(None)
     return tuple(out)
+
+
+def _config_scoring_sig(cfg):
+    """Empreinte du seul sous-arbre de config qui alimente les nœuds
+    mémoïsés de `Ctx` (`scoring`, `artist_categories`, `label_categories`,
+    `taste_categories` -- seuls `self.cfg`/`self.scoring` lus depuis
+    `wmap`/`artist_tier_map`/`label_tier_map`/`seed_category_weight`, cf.
+    `NODE_DEPS`), PAS la mtime du fichier `crate_radar_config.json` entier :
+    sinon enregistrer un réglage sans rapport (ex. une clé API YouTube dans
+    Mon profil) invalidait tout `_DERIVED`, y compris `graph_rescore` sur
+    le graphe complet (153 182 artistes mesurés, 132s à recalculer --
+    diagnostic VPS 17/09)."""
+    subset = {k: cfg.get(k) for k in
+              ("scoring", "artist_categories", "label_categories", "taste_categories")}
+    return hashlib.sha1(json.dumps(subset, sort_keys=True, default=str).encode()).hexdigest()
 
 
 # Lot 3 (refonte scoring) : graphe explicite des nœuds de calcul de Ctx, chacun
@@ -133,7 +149,15 @@ def _node_stack():
 
 
 class Ctx:
-    """Instantané des données. Recréer à chaque requête (peu coûteux, fichiers < 3 Mo)."""
+    """Instantané des données. Recréer à chaque requête -- attention,
+    PAS "peu coûteux" en général malgré l'ancienne docstring : les fichiers
+    lus ici peuvent dépasser 50 Mo (`producer_graph.json` mesuré à 69,3 Mo
+    en prod, diagnostic VPS 17/09), pas < 3 Mo comme annoncé avant. Les
+    calculs DÉRIVÉS de ces fichiers (graphe, scores) sont mémoïsés sous
+    `_key` (cf. `_memo`) -- eux restent quasi gratuits une fois en cache,
+    mais le premier accès après invalidation (nouveau process, fichier
+    modifié) ne l'est pas : ne jamais forcer un nœud coûteux (`ascore`,
+    `graph_rescore`) pour un simple comptage, cf. `stats()`."""
 
     def __init__(self, uid=None):
         self.uid = uid or store.current_uid()
@@ -148,8 +172,8 @@ class Ctx:
         self.artists_res = store.load_cached(self.P.artists_res, {})
         self.graph = store.load_cached(self.P.graph, {})
         from . import discogs_dump as dd
-        self._key = (self.uid, _files_sig(
-            self.P.config, self.P.graph, self.P.artists_res,
+        self._key = (self.uid, _config_scoring_sig(self.cfg), _files_sig(
+            self.P.graph, self.P.artists_res,
             self.P.corpus, self.P.collection, self.P.profile, dd.DB_PATH))
 
     def _memo(self, name, compute):
@@ -444,6 +468,31 @@ class Ctx:
             out[r.get("source", "?")] = out.get(r.get("source", "?"), 0) + 1
         return out
 
+    def _identified_artist_keys(self):
+        """Mêmes clés que `set(self.ascore)`, sans passer par `graph_rescore`/
+        `ascore` : `stats()` n'a besoin que du COMPTE (tuile "artistes croisés
+        dans ton écoute", `patte.html`), pas des scores. `_compute_ascore`
+        construit son dict sur `set(tiers) | set(corpus_c) | set(coll_c) |
+        set(graph) | set(djset_c) | set(label_link)`, où `graph` est
+        `graph_rescore()["artists"]` amputé des clés déjà dans `tiers` --
+        donc `set(tiers) | set(graph)` == `set(tiers) | set(edges du graphe
+        brut)`, sans qu'il soit nécessaire de calculer un score par artiste.
+        Évite le calcul complet (153 182 artistes, 623 747 co-occurrences
+        mesurés en prod -> 132s CPU pour n'en lire que `len()`, diagnostic
+        VPS 17/09)."""
+        tiers = self.artist_tier_map()
+        keys = set(tiers)
+        for r in self.corpus:
+            a = (r.get("artist") or "").strip()
+            if a and normalize_label(a) not in ARTIST_STOPWORDS:
+                keys.add(self.canon_artist_key(a))
+        for a in self.collection.get("artist_counts", {}):
+            if a and normalize_label(a) not in ARTIST_STOPWORDS:
+                keys.add(self.canon_artist_key(a))
+        keys.update((self.graph or {}).get("edges", {}))
+        keys.update(self.artist_label_signal())
+        return keys
+
     def stats(self):
         ac = self.cfg.get("artist_categories", {})
         res_ok = sum(1 for v in self.artists_res.values()
@@ -459,7 +508,7 @@ class Ctx:
             "coeur": len(ac.get("1", [])),
             "aimes": len(ac.get("2", [])),
             "artists_resolved": res_ok,
-            "artists_identified": len(self.ascore),
+            "artists_identified": len(self._identified_artist_keys()),
             "not_found": not_found,
             "graph_edges": len((self.graph or {}).get("edges", {})),
             "tracks": len(self.corpus),

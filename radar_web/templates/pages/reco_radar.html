@@ -43,8 +43,7 @@
 <table class="tbl">
   <thead><tr>
     <th style="width:34px">#</th>
-    <th>Artiste</th>
-    <th>Piste</th>
+    <th>Track</th>
     <th>Release</th>
     <th>Label</th>
     <th class="num" style="width:60px">Année</th>
@@ -58,8 +57,7 @@
     {% for t in playlist %}
     <tr data-index="{{ loop.index0 }}">
       <td class="small muted">{{ loop.index }}</td>
-      <td>{{ t.artist }}</td>
-      <td>{{ t.title }}</td>
+      <td>{{ t.artist }} - {{ t.title }}</td>
       <td>{{ t.release_title or '—' }}</td>
       <td>{% if t.label %}<a href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}</td>
       <td class="num small muted">{{ t.year or '—' }}</td>
@@ -87,6 +85,9 @@
           <input type="hidden" name="rid" value="{{ t.release_id }}">
           <input type="hidden" name="title" value="{{ t.release_title }}">
           <input type="hidden" name="artist" value="{{ t.artist }}">
+          <!-- titre de la PISTE : sert à retrouver les pressages vinyle quand la
+               sortie proposée n'est pas du vinyle (cf. app.py::cart_add) -->
+          <input type="hidden" name="track" value="{{ t.title }}">
           <input type="hidden" name="label" value="{{ t.label or '' }}">
           <button type="submit" class="ic-btn" title="Ajouter le release à la wantlist Discogs">{{ icons.cart() }}</button>
         </form>

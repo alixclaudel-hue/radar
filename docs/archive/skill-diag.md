@@ -26,19 +26,64 @@ l'accompagne dans ta conversation.
 
 - **Ne jamais modifier le code de l'appli.** `~/radar` est en lecture seule.
   `git pull` pour lire la version déployée : oui. Commit, push, checkout d'une
-  autre branche, édition d'un fichier : non.
+  autre branche, édition d'un fichier : non. **Inchangé le 17/09** — tout
+  changement de code continue de passer par la session cloud, via PR : c'est
+  ce qui évite que deux sessions éditent le même code en parallèle.
 - **Ne jamais écrire dans `/data`.** Ouvrir SQLite en lecture seule
   (`sqlite3.connect("file:...?mode=ro", uri=True)`), lire les JSON, jamais
-  écrire/déplacer/supprimer.
-- **Ne jamais toucher aux jobs ni aux conteneurs.** Lire `queue.json`,
-  `*.status.json`, `docker ps/logs/inspect` : oui — c'est même le cœur du
-  travail. Lancer ou arrêter un job, `docker compose up/down/restart/build` :
-  non. Un rebuild tue un job en cours.
-- **HTTP : GET uniquement.** Un POST peut lancer un job ou modifier la config.
+  écrire/déplacer/supprimer **à la main** (édition directe d'un fichier,
+  requête SQL en écriture). **Inchangé le 17/09** — un job que tu lances
+  légitimement (ci-dessous) peut écrire dans `/data` en tant qu'effet de son
+  fonctionnement normal ; toi, directement, jamais.
 - **Aucun secret dans un rapport.** Les rapports partent sur GitHub, de façon
   permanente. Jamais de token Discogs, de contenu de `.env`, de clé API, de mot
   de passe — même partiel. Écrire « token présent (non affiché) », jamais la
   valeur.
+
+## Jobs et conteneurs — élargi le 17/09 (demande explicite utilisateur)
+
+Avant le 17/09, cette section était un interdit total (lecture seule sur
+`queue.json`/`*.status.json`/`docker ps/logs/inspect`, jamais de lancement de
+job ni de `docker compose up/down/restart/build`). L'utilisateur a jugé ça trop
+limitant pour du diagnostic réel et a explicitement demandé d'élargir — voir
+`CLAUDE.md` pt 59 pour l'historique de cet arbitrage. Le principe qui reste
+non négociable : **le code passe par PR, l'opérationnel VPS ne passe plus par
+moi**. Ce que ça change concrètement :
+
+- **Lancer/relancer un job** (`crate_jobs.py <job> '{...}'`, en CLI ou via
+  `docker compose exec radar-web ...`) : autorisé, y compris un job en mode
+  simulation (ex. `prune_labels` sans `apply`) pour obtenir un résultat à
+  interpréter. **Avant de lancer** : vérifier `queue.json`/`*.status.json`
+  qu'aucun job du même utilisateur n'est déjà `running` sur la même ressource
+  (éviter un doublon, cf. piège pt 51 de `CLAUDE.md`) et que le job existe
+  bien dans `JOBS` (`crate_jobs.py`).
+- **Commandes Docker qui changent l'état** (`docker compose restart`,
+  `docker compose up -d --build`) : autorisé. **Avant de redémarrer/rebuild** :
+  vérifier qu'aucun job long n'est `running` (un rebuild le tue, raison
+  d'origine de l'ancien interdit — reste vraie, mais c'est maintenant à toi de
+  la respecter plutôt qu'à ne jamais toucher aux conteneurs) et qu'aucun
+  déploiement automatique (`.github/workflows/deploy.yml`, déclenché par un
+  merge sur `main` côté cloud) n'est probablement en cours — en cas de doute
+  (push récent sur `main` dans les dernières minutes), attendre plutôt que de
+  redémarrer en parallèle.
+- **Point d'attention spécifique RECOS** : plusieurs jobs (`scan_recos`,
+  `publish_recos`) sont soumis à un budget de recherches YouTube quotidien
+  fragile et déjà instrumenté (`recos_search_budget.json`, cf. `CLAUDE.md`
+  pts 47-53). Les relancer manuellement, surtout avec `force=1`, consomme ce
+  budget comme une exécution automatique — vérifier le budget restant avant de
+  lancer, ne pas le faire juste pour « voir si ça marche ».
+- **HTTP : GET par défaut.** Un POST reste interdit sur les routes qui
+  modifient la config ou les données applicatives (`/settings/save`,
+  `/cart/add`, édition de labels…) — ça reviendrait à écrire dans `/data` par
+  un autre chemin, cf. interdit ci-dessus. POST autorisé uniquement pour
+  lancer un job (`/jobs/<job>/launch`, `/patte/run/<job>`), dans les mêmes
+  conditions que le lancement en CLI ci-dessus.
+- **Simulations et requêtes ad hoc** : autorisé d'écrire et lancer tes propres
+  scripts de requête/simulation (dans `~/radar-diag/`, cf. section outillage)
+  pour produire un résultat à interpréter — tant qu'ils restent en lecture sur
+  `/data` et le code de l'appli, et qu'ils ne remplacent pas un job existant
+  par une réimplémentation ad hoc (relancer le vrai job, pas le reproduire à
+  la main).
 
 ## Ton outillage : `~/radar-diag/`
 
@@ -90,6 +135,9 @@ Structure exacte, dans cet ordre :
 ## Verdict : OK | À CORRIGER (n bloquant, n majeur, n mineur)
 
 sha déployé : <sha court> · run : <horodatage UTC>
+
+## Actions effectuées (si tu as changé un état — job lancé, conteneur redémarré/rebuild)
+<liste horodatée : quoi, pourquoi, résultat. Vide si run purement observationnel.>
 
 ### [B1] <titre court>          ← B = bloquant, M = majeur, m = mineur
 - **Où** : fichier:ligne, ou « runtime VPS » / « base /data »

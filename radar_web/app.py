@@ -25,8 +25,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import (accounts, artistgraph, bandcamp, discogs, jobs, labelgraph, learn,
-                    paths, sellers, store, vocab, volumo, ytcache)
+from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
+                    learn, paths, sellers, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 from .radar.textmatch import overlap, toks
@@ -44,21 +44,24 @@ RECOS_MAX_TRACKS = 5
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 
-# Fonctionnalité « Nouveautés » (/veille : règles de veille + nouveautés vendeurs)
-# en PAUSE depuis le 2026-09-17 (décision utilisateur : pas utilisée pour l'instant,
-# gardée pour plus tard). Un seul interrupteur : repasser à True rend la page, son
-# entrée de nav et ses deux jobs (scan_veille/scan_sellers). Rien n'est effacé — le
-# gabarit, les règles (cfg["veille_rules"]), la liste de vendeurs et les files déjà
-# scannées restent en place. Les deux jobs n'ont aucune boucle automatique côté
-# worker : les retirer de VALID_JOBS suffit à les mettre à l'arrêt.
-VEILLE_ENABLED = False
-templates.env.globals["veille_enabled"] = VEILLE_ENABLED
+# Fonctionnalités en pause : les drapeaux vivent dans radar/features.py (partagés
+# avec le worker, cf. docstring de ce module). Ici, ils coupent l'entrée de nav,
+# les routes et les jobs lançables.
+templates.env.globals["veille_enabled"] = features.VEILLE_ENABLED
+templates.env.globals["sellers_enabled"] = features.SELLERS_ENABLED
 
 
 def _veille_guard():
-    """404 tant que la fonctionnalité Nouveautés est en pause (cf. VEILLE_ENABLED)."""
-    if not VEILLE_ENABLED:
+    """404 tant que la fonctionnalité Nouveautés est en pause."""
+    if not features.VEILLE_ENABLED:
         raise HTTPException(status_code=404, detail="Nouveautés : fonctionnalité en pause.")
+
+
+def _sellers_guard():
+    """404 tant que la fonctionnalité Vendeurs (catalogue + regroupement wantlist)
+    est en pause."""
+    if not features.SELLERS_ENABLED:
+        raise HTTPException(status_code=404, detail="Vendeurs : fonctionnalité en pause.")
 
 
 def _pl_id(url):
@@ -1259,6 +1262,7 @@ def cart_sync(request: Request):
 
 @app.get("/cart/sellers", response_class=HTMLResponse)
 def cart_sellers_frag(request: Request):
+    _sellers_guard()
     cart = load(_pu().cart, [])
     titles = {str(x.get("id")): x for x in cart}
     cov = sellers.cart_coverage(titles.keys())
@@ -2184,11 +2188,16 @@ VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_ba
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
               "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog",
               "import_discogs_dump", "scan_recos", "publish_recos"}
-if not VEILLE_ENABLED:
+if not features.VEILLE_ENABLED:
     # Les deux jobs de la page Nouveautés ne sont lançables que depuis elle : les
     # retirer ici les arrête aussi bien pour /jobs/<nom>/launch que pour
     # /patte/run/<nom>, qui passe par la même validation.
     VALID_JOBS -= {"scan_veille", "scan_sellers"}
+if not features.SELLERS_ENABLED:
+    # scan_catalog : bouton de Réglages coupé ici, boucle hebdo coupée côté
+    # worker (_maybe_weekly_scan) — les deux sont nécessaires, le worker
+    # n'enfile pas via VALID_JOBS.
+    VALID_JOBS -= {"scan_catalog"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 
@@ -2335,6 +2344,7 @@ def discogs_dump_frag(request: Request):
 
 @app.get("/sellers/catalog", response_class=HTMLResponse)
 def sellers_catalog_frag(request: Request):
+    _sellers_guard()
     rows, cat = _catalog_rows()
     return frag(request, "partials/sellers_catalog.html", rows=rows,
                 n_active=sum(1 for r in rows if r.get("active")),
@@ -2344,6 +2354,7 @@ def sellers_catalog_frag(request: Request):
 
 @app.post("/sellers/catalog/toggle", response_class=HTMLResponse)
 def sellers_catalog_toggle(request: Request, u: str = Form("")):
+    _sellers_guard()
     cat = sellers.load_catalog()
     if u in cat:
         cat[u]["active"] = not cat[u].get("active")
@@ -2354,6 +2365,7 @@ def sellers_catalog_toggle(request: Request, u: str = Form("")):
 
 @app.post("/sellers/catalog/add", response_class=HTMLResponse)
 def sellers_catalog_add(request: Request, u: str = Form(""), name: str = Form("")):
+    _sellers_guard()
     u = u.strip().lstrip("@")
     cat = sellers.load_catalog()
     if u and u not in cat:

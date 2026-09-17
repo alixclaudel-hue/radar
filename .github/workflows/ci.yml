@@ -56,10 +56,14 @@ jobs:
           check /                 '200|303'
           check /patte            '200|303'
           check /search           '200|303'
-          check /veille           '200|303'
+          check /reco-radar       '200|303'
+          # /veille (Nouveautés) en pause depuis 2026-09-17 (CLAUDE.md pt 56) :
+          # 404 attendu tant que features.VEILLE_ENABLED est à False.
+          check /veille           '404'
           check /univers          '200|303'
           check '/univers?tab=artists' '200|303'
           check '/univers?tab=sets'    '200|303'
+          check '/univers?tab=cart'    '200|303'
           check /settings         '200|303'
           kill $pid 2>/dev/null || true
           exit $fail

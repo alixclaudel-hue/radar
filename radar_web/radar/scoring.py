@@ -468,32 +468,12 @@ class Ctx:
             out[r.get("source", "?")] = out.get(r.get("source", "?"), 0) + 1
         return out
 
-    def _identified_artist_keys(self):
-        """Mêmes clés que `set(self.ascore)`, sans passer par `graph_rescore`/
-        `ascore` : `stats()` n'a besoin que du COMPTE (tuile "artistes croisés
-        dans ton écoute", `patte.html`), pas des scores. `_compute_ascore`
-        construit son dict sur `set(tiers) | set(corpus_c) | set(coll_c) |
-        set(graph) | set(djset_c) | set(label_link)`, où `graph` est
-        `graph_rescore()["artists"]` amputé des clés déjà dans `tiers` --
-        donc `set(tiers) | set(graph)` == `set(tiers) | set(edges du graphe
-        brut)`, sans qu'il soit nécessaire de calculer un score par artiste.
-        Évite le calcul complet (153 182 artistes, 623 747 co-occurrences
-        mesurés en prod -> 132s CPU pour n'en lire que `len()`, diagnostic
-        VPS 17/09)."""
-        tiers = self.artist_tier_map()
-        keys = set(tiers)
-        for r in self.corpus:
-            a = (r.get("artist") or "").strip()
-            if a and normalize_label(a) not in ARTIST_STOPWORDS:
-                keys.add(self.canon_artist_key(a))
-        for a in self.collection.get("artist_counts", {}):
-            if a and normalize_label(a) not in ARTIST_STOPWORDS:
-                keys.add(self.canon_artist_key(a))
-        keys.update((self.graph or {}).get("edges", {}))
-        keys.update(self.artist_label_signal())
-        return keys
-
     def stats(self):
+        """Compteurs de la page Mon profil (`patte.html`) — AUCUN ne doit
+        dépendre d'un nœud coûteux du DAG. Les deux qui le faisaient
+        (`artists_identified` via `ascore`/`graph_rescore`, et `graph_edges`)
+        ont été retirés avec leurs tuiles le 17/09 (demande utilisateur) :
+        ne pas les réintroduire sans relire le pt 54 de CLAUDE.md."""
         ac = self.cfg.get("artist_categories", {})
         res_ok = sum(1 for v in self.artists_res.values()
                      if v.get("discogs_id") and v.get("status") in ("exact", "approx", "confirmed"))
@@ -508,9 +488,7 @@ class Ctx:
             "coeur": len(ac.get("1", [])),
             "aimes": len(ac.get("2", [])),
             "artists_resolved": res_ok,
-            "artists_identified": len(self._identified_artist_keys()),
             "not_found": not_found,
-            "graph_edges": len((self.graph or {}).get("edges", {})),
             "tracks": len(self.corpus),
             "tracks_by_source": self.corpus_by_source(),
             "veille_rules_active": len([r for r in self.cfg.get("veille_rules", []) if r.get("active", True)]),

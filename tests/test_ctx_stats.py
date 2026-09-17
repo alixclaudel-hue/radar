@@ -3,10 +3,13 @@
 `len(self.ascore)`, forçant tout `graph_rescore()` (153 182 artistes,
 623 747 co-occurrences mesurés en prod) pour n'en garder que la LONGUEUR.
 
-Corrigé : `Ctx._identified_artist_keys()` calcule le même ensemble de clés
-sans passer par le score/`why` de `graph_rescore` -- ce test vérifie
-l'ÉQUIVALENCE mathématique exacte avec `set(ascore)` (pas juste "ça
-tourne"), sur un graphe synthétique.
+Traité en deux temps : d'abord un calcul équivalent bon marché, puis (choix
+utilisateur du 17/09) suppression pure et simple des deux tuiles concernées
+(« artistes croisés dans ton écoute », « liens entre artistes ») et donc des
+deux compteurs. Le garde-fou qui reste est le bon : `stats()` ne doit
+JAMAIS déclencher un nœud coûteux du DAG -- vérifié ici en inspectant le
+cache `_DERIVED` après l'appel, pas en chronométrant (un temps mesuré serait
+instable en CI).
 
 Corrigé aussi : `Ctx._key` incluait la mtime du fichier de config ENTIER
 -- enregistrer un réglage sans rapport (ex. une clé API YouTube) jetait le
@@ -70,17 +73,26 @@ class CtxStatsTestCase(unittest.TestCase):
         store.save(self.P.artists_res, {})
         store.save(self.P.resolved, {})
 
-    def test_identified_artist_keys_equivaut_a_ascore(self):
+    def test_stats_ne_declenche_aucun_noeud_couteux(self):
+        """Le vrai garde-fou des 135s : après `stats()`, ni `graph_rescore`
+        ni `ascore` ne doivent avoir été calculés (cache `_DERIVED` vide de
+        ces nœuds). Réintroduire un compteur qui les touche casse ce test."""
+        scoring._DERIVED.clear()
+        self.addCleanup(scoring._DERIVED.clear)
         c = scoring.Ctx(self.uid)
-        exact = set(c.ascore)
-        cheap = c._identified_artist_keys()
-        self.assertEqual(exact, cheap)
-        self.assertGreater(len(exact), 0)
+        c.stats()
+        slot = scoring._DERIVED.get(c._key, {})
+        self.assertNotIn("graph_rescore", slot)
+        self.assertNotIn("ascore", slot)
 
-    def test_stats_utilise_le_calcul_bon_marche(self):
-        c = scoring.Ctx(self.uid)
-        st = c.stats()
-        self.assertEqual(st["artists_identified"], len(c._identified_artist_keys()))
+    def test_stats_ne_publie_plus_les_deux_compteurs_retires(self):
+        """Tuiles « artistes croisés dans ton écoute » / « liens entre
+        artistes » retirées de patte.html le 17/09 (demande utilisateur) :
+        leurs compteurs partent avec, ils n'ont plus de consommateur."""
+        st = scoring.Ctx(self.uid).stats()
+        self.assertNotIn("artists_identified", st)
+        self.assertNotIn("graph_edges", st)
+        self.assertIn("tracks", st)  # les autres compteurs restent
 
     def test_key_stable_sur_reglage_hors_scope(self):
         c1 = scoring.Ctx(self.uid)

@@ -3117,6 +3117,100 @@ def job_scorestore_tracks(job, params):
                f"{n_new_releases} sortie(s) ({n_local} via le dump local, {n_api} via l'API).")
 
 
+def job_prune_labels(job, params):
+    """Élague `label_categories` (Cœur+Aimé) des labels hors du goût courant
+    (`taste_categories`) — chantier C du pt 57 (CLAUDE.md), brief révisé par la
+    session VPS le 17/09. But : PERTINENCE du signal `artist_label_signal`/
+    `label_db_signal`, pas performance (l'élagage seul ne gagne que ~4% sur
+    `artist_ids_for_labels` — le vrai coût vient des catalogues géants, sujet
+    séparé, cf. CLAUDE.md pt 57).
+
+    Pour chaque label de label_categories (1 ou 2) :
+      st    = discogs_dump.label_style_counts([key]), repli Ctx.profile[key]
+      tot   = somme des valeurs de st (majorant : une sortie peut porter
+              plusieurs styles, cf. note ci-dessous)
+      known = somme des valeurs de st dont style_key(style) est dans Ctx.wmap
+      pct   = 100 * known / tot (0 si tot == 0)
+    Retiré si (known < max_known) OU (pct < min_pct), SAUF label possédé
+    (collection.label_counts > 0) ou écouté (corpus_label_scores > 0) —
+    ces deux garde-fous ne sont PAS désactivables par paramètre.
+
+    `known`/`tot` comptent des sorties par STYLE, une même sortie multi-style
+    peut donc être comptée plusieurs fois : majorant, pas un nombre exact de
+    disques — ne jamais l'afficher comme tel.
+
+    SIMULATION PAR DÉFAUT (apply=False) : calcule et journalise sans écrire.
+    `apply=True` retire les entrées de la config (suppression sèche, décision
+    utilisateur 17/09 — pas de catégorie "écarté" réversible) après avoir
+    copié crate_radar_config.json vers un .bak-<horodatage> et écrit un
+    rapport JSON listant les labels retirés (nom, tier, tot, known, pct) pour
+    permettre un retour en arrière manuel.
+
+    CLI seulement (pas de bouton web, cf. CLAUDE.md pt 57 volet C) :
+        python crate_jobs.py prune_labels '{"max_known": 5, "min_pct": 5}'
+        python crate_jobs.py prune_labels '{"max_known": 5, "min_pct": 5, "apply": 1}'
+    """
+    from radar_web.radar import discogs_dump as dd
+    from radar_web.radar.scoring import Ctx
+
+    max_known = int(params.get("max_known", 5))
+    min_pct = float(params.get("min_pct", 5.0))
+    apply_ = bool(params.get("apply"))
+
+    cfg = cfg_load()
+    lcats = cfg.get("label_categories", {"1": [], "2": []})
+    entries = [(cid, name) for cid in ("1", "2") for name in lcats.get(cid, []) if name and name.strip()]
+    if not entries:
+        return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à élaguer.")
+
+    ctx = Ctx(uid=RADAR_UID)
+    wmap = ctx.wmap
+    owned = ctx.collection.get("label_counts", {})
+    heard = ctx.corpus_label_scores()
+
+    keys = sorted({normalize_label(n) for _, n in entries})
+    style_counts = {}
+    for i in range(0, len(keys), 900):   # sous SQLITE_MAX_VARIABLE_NUMBER (label_style_counts non chunké)
+        style_counts.update(dd.label_style_counts(keys[i:i + 900]))
+
+    job.st["total"] = len(entries)
+    kept, removed = [], []
+    for cid, name in entries:
+        key = normalize_label(name)
+        st = style_counts.get(key) or (ctx.profile.get(key) or {}).get("style_counts") or {}
+        tot = sum(st.values())
+        known = sum(n for s, n in st.items() if store.style_key(s) in wmap)
+        pct = round(100 * known / tot, 1) if tot else 0.0
+        spared = owned.get(key, 0) > 0 or heard.get(key, 0) > 0
+        row = {"tier": cid, "name": name, "key": key, "tot": tot, "known": known, "pct": pct}
+        drop = not spared and (known < max_known or pct < min_pct)
+        (removed if drop else kept).append(row)
+        job.tick(f"{name} : tot={tot} known={known} pct={pct}%" + (" — écarté" if drop else ""))
+
+    if apply_:
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        bak_path = f"{CONFIG_PATH}.bak-{ts}"
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            raw = f.read()
+        with open(bak_path, "w", encoding="utf-8") as f:
+            f.write(raw)
+        removed_keys = {r["key"] for r in removed}
+        for cid in ("1", "2"):
+            lcats[cid] = [n for n in lcats.get(cid, []) if normalize_label(n) not in removed_keys]
+        cfg["label_categories"] = lcats
+        save_json(CONFIG_PATH, cfg)
+        report_path = os.path.join(USER_DIR, f"prune_labels_report_{ts}.json")
+        save_json(report_path, {
+            "params": {"max_known": max_known, "min_pct": min_pct},
+            "removed": removed, "kept_count": len(kept),
+            "config_backup": bak_path})
+        job.finish(f"APPLIQUÉ — {len(removed)} label(s) retiré(s), {len(kept)} gardé(s). "
+                   f"Sauvegarde : {bak_path} — rapport : {report_path}")
+    else:
+        job.finish(f"SIMULATION — {len(removed)} label(s) à retirer, {len(kept)} gardé(s). "
+                   f"Relancer avec apply=1 pour appliquer.")
+
+
 JOBS = {
     "scan_catalog": job_scan_catalog,
     "import_discogs_dump": job_import_discogs_dump,
@@ -3139,6 +3233,7 @@ JOBS = {
     "publish_recos": job_publish_recos,
     "scorestore_releases": job_scorestore_releases,
     "scorestore_tracks": job_scorestore_tracks,
+    "prune_labels": job_prune_labels,
 }
 
 

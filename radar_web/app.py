@@ -761,11 +761,17 @@ def search_replay(request: Request, sid: str):
                 n_matches=entry.get("n_matches"), page=1, total_pages=1)
 
 
-def _base_labels_ranked(c):
+def _base_labels_ranked(c, need_reco=True):
     """Labels Cœur/Aimés (label_categories) -> nom canonique + affinité + tier. Tri :
     affinité de style décroissante, départagée par le score de reco (collection +
-    corpus + artistes), puis alpha. Dédoublonné par nom canonique."""
-    ridx = c.reco_index
+    corpus + artistes) si `need_reco`, puis alpha. Dédoublonné par nom canonique.
+
+    `need_reco=False` évite `c.reco_index` (-> `ascore` -> `artist_label_signal` ->
+    `discogs_dump.artist_ids_for_labels`, deux GROUP BY sur tout le dump : 181s
+    mesurés en prod sur 10 187 labels, diagnostic VPS 17/09) quand l'appelant ne
+    trie/affiche pas réellement par reco — `_reco` vaut alors `None` dans les lignes
+    (pas 0 : ne pas confondre "pas calculé cette fois" et "reco nulle")."""
+    ridx = c.reco_index if need_reco else {}
     lc_counts = c.collection.get("label_counts", {})
     lids = c.collection.get("label_ids", {})
     lcats = c.cfg.get("label_categories", {})
@@ -779,9 +785,13 @@ def _base_labels_ranked(c):
         aff, coverage = affinities[key]["aff"], affinities[key]["coverage"]
         did = res.get("discogs_id") or lids.get(key, {}).get("id")
         rows.append({"disp": disp, "norm": store.normalize_label(disp), "key": key, "tier": cid,
-                     "aff": aff, "coverage": coverage, "_reco": ridx.get(key, 0),
+                     "aff": aff, "coverage": coverage,
+                     "_reco": ridx.get(key, 0) if need_reco else None,
                      "owned": lc_counts.get(key, 0), "id": did})
-    rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
+    if need_reco:
+        rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), -r["_reco"], r["disp"].lower()))
+    else:
+        rows.sort(key=lambda r: (r["aff"] is None, -(r["aff"] or 0), r["disp"].lower()))
     uniq = []
     for r in rows:
         if r["norm"] in seen:
@@ -805,7 +815,7 @@ def _pick_base_labels(c, metric, minv, topn):
         v = r.get(field)
         return -1.0 if v is None else float(v)
 
-    rows = _base_labels_ranked(c)
+    rows = _base_labels_ranked(c, need_reco=(field == "_reco"))
     if minv is not None:
         rows = [r for r in rows if val(r) >= minv]
     rows.sort(key=lambda r: -val(r))
@@ -816,7 +826,7 @@ def _pick_base_labels(c, metric, minv, topn):
 def search_labels(request: Request, label: str = "", q: str = ""):
     c = Ctx()
     term = store.normalize_label(label or q)
-    ranked = _base_labels_ranked(c)
+    ranked = _base_labels_ranked(c, need_reco=False)
     matched = [r for r in ranked if term and term in r["norm"]]
     no_match = bool(term) and not matched
     if matched:
@@ -1799,6 +1809,8 @@ def univers_review_action(request: Request, kind: str, action: str, key: str = F
 # ============================================================ 🌐 Mes labels & artistes
 @app.get("/univers", response_class=HTMLResponse)
 def univers_page(request: Request, tab: str = "labels"):
+    if tab == "cart":   # ancien 4e onglet cf. /wantlist -- redirection pour ne pas casser les signets
+        return RedirectResponse("/wantlist", status_code=303)
     c = Ctx()
     ac = c.cfg.get("artist_categories", {})
     label_graphs = load(_pu().label_graphs, [])
@@ -1819,8 +1831,21 @@ def univers_page(request: Request, tab: str = "labels"):
                   # ("jamais identifiés" -> /univers) menait à un panneau invisible (diag. Lot 5 C3).
                   n_review=(len(review["labels_approx"]) + len(review["artists_approx"])
                             + len(review["labels_not_found"]) + len(review["artists_not_found"])),
-                  top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)),
-                  top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)))
+                  # Raccourcis de graphe de labels : uniquement affichés/utilisés sur l'onglet
+                  # "labels" (cf. univers.html) — les calculer pour les autres onglets forçait
+                  # `reco_index` (chaîne coûteuse, cf. `_base_labels_ranked`) pour rien, ~185s
+                  # mesurés en prod sur l'onglet wantlist (diagnostic VPS 17/09).
+                  top_aff="\n".join(_pick_base_labels(c, "aff", None, 5)) if tab == "labels" else "",
+                  top_reco="\n".join(_pick_base_labels(c, "reco", None, 5)) if tab == "labels" else "")
+
+
+# ============================================================ 🛒 Wantlist
+@app.get("/wantlist", response_class=HTMLResponse)
+def wantlist_page(request: Request):
+    """Page dédiée (ex-4e onglet caché de /univers?tab=cart, cf. CLAUDE.md pt 45/57) --
+    pas de Ctx() : ne dépend que de cart.json (petit fichier), lu via `render()`
+    (n_cart) et le fragment /cart ci-dessous."""
+    return render(request, "pages/wantlist.html", active="wantlist")
 
 
 LABELS_PAGE_SIZE = 25
@@ -1852,13 +1877,13 @@ _LABEL_CAT_NAME = {"1": "Cœur", "2": "Aimé"}
 def univers_labels_table(request: Request, flt: str = "", page: int = 1,
                           sort: str = "", dir: str = "desc"):
     c = Ctx()
-    rows = _base_labels_ranked(c)
+    field = _LABELS_SORT_FIELDS.get(sort)
+    rows = _base_labels_ranked(c, need_reco=(field == "_reco"))
     for r in rows:
         r["cat"] = _LABEL_CAT_NAME.get(r["tier"], "—")
     if flt:
         f = flt.lower()
         rows = [r for r in rows if f in r["disp"].lower()]
-    field = _LABELS_SORT_FIELDS.get(sort)
     if field:
         rows = _sort_rows(rows, field, dir != "asc")
     shown, page, pages, total = _paginate(rows, page, LABELS_PAGE_SIZE)

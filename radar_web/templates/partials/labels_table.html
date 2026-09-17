@@ -45,7 +45,7 @@
           <span class="small muted" title="couverture : part du catalogue du label classée dans une de tes catégories de style">{{ icons.label() }} {{ r.aff }} <span style="opacity:.7">· couv. {{ r.coverage }}%</span></span>
           {% else %}<span class="small muted" title="pas encore profilé — n'est pas forcément une mauvaise affinité">— pas profilé</span>{% endif %}
         </td>
-        <td class="num small muted">{{ r._reco }}</td>
+        <td class="num small muted">{{ r._reco if r._reco is not none else '—' }}</td>
         <td class="num small muted">{{ r.owned or '—' }}</td>
         <td>
           <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"

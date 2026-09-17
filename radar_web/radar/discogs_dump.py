@@ -1261,6 +1261,38 @@ def artist_ids_for_labels(label_keys, con=None):
     return out
 
 
+def label_names_for(label_keys, con=None):
+    """{label_key (name_key) : nom d'affichage} depuis la table `labels` --
+    ajouté le 17/09 pour `Ctx.label_db_signal` (3e composante, voisinage
+    `catalog_labelgraph`) : un label qui remonte UNIQUEMENT via son voisinage
+    (jamais possédé/écouté/lié par co-crédit direct) n'a pas de nom dans
+    `collection.label_ids` ni dans le graphe par-utilisateur -- reco_rows a
+    besoin d'un nom à afficher plutôt que la clé technique brute. {} si le
+    dump n'est pas disponible. Un `name_key` partagé par plusieurs labels
+    Discogs distincts (suffixes de désambiguïsation "(2)"/"(3)" retirés) garde
+    le premier nom rencontré -- affichage seulement, pas une clé, une
+    approximation suffit ici (à la différence de `resolve_name`)."""
+    keys = [k for k in dict.fromkeys(label_keys) if k]
+    if not keys or not available():
+        return {}
+    owns = con is None
+    if owns:
+        con = connect_readonly()
+        if con is None:
+            return {}
+    try:
+        rows = _in_chunks(con, "SELECT name_key, name FROM labels WHERE name_key IN ({})", keys)
+    except sqlite3.OperationalError:
+        return {}
+    finally:
+        if owns:
+            con.close()
+    out = {}
+    for name_key, name in rows:
+        out.setdefault(name_key, name)
+    return out
+
+
 def search_local(label_keys=None, styles=None, year_range=None, limit=5000, vinyl_only=True):
     """[{id, title, artist, label, catno, year, genres, styles}] — recherche
     ciblée en local, triée par année décroissante (cf. diagnostic D6). Depuis

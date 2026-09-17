@@ -102,7 +102,7 @@ NODE_DEPS = {
     "artist_label_signal": ("label_tier_map", "wmap"),
     "ascore": ("artist_tier_map", "graph_rescore", "artist_label_signal"),
     "label_artist_signal": ("ascore",),
-    "label_db_signal": ("artist_tier_map", "graph_rescore"),
+    "label_db_signal": ("artist_tier_map", "graph_rescore", "label_tier_map"),
     "reco_rows": ("label_artist_signal", "label_db_signal", "label_tier_map", "wmap"),
     "reco_index": ("reco_rows",),
 }
@@ -546,17 +546,22 @@ class Ctx:
         return out
 
     def label_db_signal(self):
-        """{label_key: 0-1} — deux calculs complémentaires du référentiel
-        local (aucun appel API), tous deux "un artiste que j'aime a un
-        disque chez ce label" mais avec des garanties différentes : DIRECT
+        """{label_key: 0-1} — trois calculs complémentaires du référentiel
+        local (aucun appel API), tous "un artiste/label que j'aime est lié à
+        ce label" mais avec des garanties différentes : DIRECT
         (`discogs_dump.label_ids_for_artists`, artistes Cœur/Aimés
-        uniquement, disponible immédiatement, aucun job requis) et GRAPHE
+        uniquement, disponible immédiatement, aucun job requis), GRAPHE
         (`label_edges` déjà calculé par job_build_graph, pondéré par palier
         Cœur/Aimés/autre — plus large car il couvre aussi les artistes
         seulement résolus, mais seulement à jour depuis le dernier lancement
-        du job). Combinés pour ne pas dépendre uniquement du job ; jamais
-        redondants avec `label_artist_signal` (qui ne voit que le corpus
-        écouté, un sous-ensemble minuscule du catalogue)."""
+        du job) et VOISINAGE (`catalog_labelgraph.neighbors_for`, ajouté le
+        17/09 — brief VPS, constat 3 : le graphe label<->label du catalogue
+        PARTAGÉ, jamais lu par personne jusque là. Un label jamais possédé,
+        jamais écouté, sans co-crédit direct connu, mais qui PARTAGE UN
+        ARTISTE ou est un SOUS-LABEL Discogs d'un label suivi (Cœur/Aimé)
+        doit pouvoir remonter). Combinés pour ne pas dépendre uniquement du
+        job ; jamais redondants avec `label_artist_signal` (qui ne voit que
+        le corpus écouté, un sous-ensemble minuscule du catalogue)."""
         return self._memo("label_db_signal", self._compute_label_db_signal)["score"]
 
     def label_db_names(self):
@@ -567,6 +572,7 @@ class Ctx:
 
     def _compute_label_db_signal(self):
         from . import discogs_dump as dd
+        from . import catalog_labelgraph as clg
         liked_ids = [int(k[3:]) for k in self.artist_tier_map() if k.startswith("id:")]
         direct = dd.label_ids_for_artists(liked_ids) if liked_ids else {}
         direct_n = {k: len(v["artist_ids"]) for k, v in direct.items()}
@@ -574,13 +580,43 @@ class Ctx:
         graph_sc = {k: v["score"] for k, v in graph.items()}
         names = {k: v["name"] for k, v in graph.items()}
         names.update({k: v["name"] for k, v in direct.items()})   # direct prioritaire si les 2 existent
+        # VOISINAGE (17/09) : seeds = tout label suivi (Cœur/Aimé), pondéré par
+        # scoring.graph.tier_w (même table que les graines du graphe artistes —
+        # réutilisée plutôt que d'inventer un 2e barème pour le même geste "un
+        # Cœur compte plus qu'un Aimé"). Un label déjà suivi n'a pas besoin d'être
+        # "découvert" par son propre voisinage -- exclu de l'agrégat.
+        neigh_sc, neigh_names = {}, {}
+        seeds = self.label_tier_map()
+        if seeds and clg.available():
+            tier_w = self.scoring["graph"]["tier_w"]
+            neigh_map = clg.neighbors_for(seeds)
+            agg = {}
+            for seed_key, edges in neigh_map.items():
+                w_seed = float(tier_w.get(seeds[seed_key], tier_w["none"]))
+                for e in edges:
+                    other = e["label_key"]
+                    if other in seeds:
+                        continue
+                    agg[other] = agg.get(other, 0.0) + e["weight"] * w_seed
+            scale_n = _robust_scale(agg)
+            neigh_sc = {k: _log_ratio(v, scale_n) for k, v in agg.items()}
+            missing_names = [k for k in neigh_sc if k not in names]
+            if missing_names:
+                neigh_names = dd.label_names_for(missing_names)
+        names.update(neigh_names)
         scale_d, scale_g = _robust_scale(direct_n), _robust_scale(graph_sc)
         score = {}
-        for k in set(direct_n) | set(graph_sc):
+        for k in set(direct_n) | set(graph_sc) | set(neigh_sc):
             d = _log_ratio(direct_n.get(k, 0), scale_d)
             g = _log_ratio(graph_sc.get(k, 0), scale_g)
-            score[k] = round(0.65 * d + 0.35 * g, 4)   # direct plus fiable (Cœur/Aimés stricts,
-            # pas d'attente de job) qu'un score de graphe agrégé sur toutes les graines résolues
+            n = neigh_sc.get(k, 0.0)
+            # direct plus fiable (Cœur/Aimés stricts, pas d'attente de job) que le
+            # graphe agrégé sur les graines résolues, lui-même plus fiable qu'une
+            # simple proximité structurelle catalogue (aucun lien comportemental,
+            # cf. docstring de label_db_signal) -- pondération arbitrée côté cloud
+            # le 17/09, à ajuster si l'usage réel le justifie (brief laissait le
+            # 3e poids ouvert : "à arbitrer").
+            score[k] = round(0.5 * d + 0.3 * g + 0.2 * n, 4)
         return {"score": score, "name": names}
 
     def artist_label_signal(self):
@@ -640,19 +676,27 @@ class Ctx:
         w_coll, w_aff = float(w.get("collection", 0.6)), float(w.get("affinity", 0.4))
         w_corp, w_art = float(w.get("corpus", 0.5)), float(w.get("artist", 0.4))
         w_db = float(w.get("db_link", 0.35))
+        w_tier = float(w.get("tier", 0.0))
+        label_tier_w = self.scoring.get("label_tiers", {})
         coll_raw = {k: lc.get(k, 0) + wf * wc.get(k, 0) for k in set(lc) | set(wc)}
         max_coll = max(coll_raw.values(), default=1.0) or 1.0
         max_corp = max(cs.values(), default=1.0) or 1.0
         max_art = max((v[0] for v in las.values()), default=1.0) or 1.0
         floor = float(self.scoring["label_affinity_floor"] or 0)
         label_tiers = self.label_tier_map()
-        # `db` (artiste Cœur/Aimés au catalogue + graphe de co-crédits, référentiel local)
-        # élargit l'univers classé au-delà de ce que collection/corpus/las connaissent déjà —
-        # un label jamais possédé ni écouté mais où un artiste aimé a un disque doit pouvoir
-        # apparaître, pas seulement être visible dans la liste "candidats du graphe" à part.
+        # `db` (artiste Cœur/Aimés au catalogue + graphe de co-crédits + voisinage
+        # catalog_labelgraph depuis le 17/09, cf. Ctx.label_db_signal) élargit l'univers
+        # classé au-delà de ce que collection/corpus/las connaissent déjà — un label jamais
+        # possédé ni écouté mais où un artiste aimé a un disque, OU voisin d'un label suivi,
+        # doit pouvoir apparaître, pas seulement être visible dans une liste à part.
         keys = set(coll_raw) | set(cs) | set(las) | set(db)
         affinities = self.label_affinities(keys)
         db_names = self.label_db_names()
+        # rétrécissement vers un a priori neutre, même formule/constantes qu'album_score
+        # (diagnostic N3) : un label noté sur un seul signal (ex. seulement l'affinité de
+        # style) ne doit pas s'afficher avec la même confiance qu'un label noté sur les
+        # cinq à la fois — cf. brief VPS 17/09, constat 2.
+        K, PRIOR = 0.35, 45
         rows = []
         for k in keys:
             info = self.collection.get("label_ids", {}).get(k, {})
@@ -663,22 +707,42 @@ class Ctx:
             if floor and aff is not None and aff < floor:
                 continue
             art_val, art_n = las.get(k, (0.0, 0))
+            tier = label_tiers.get(k)
+            tier_manual = float(label_tier_w.get(tier, 0)) if tier else None
             feat = {"collection": coll_raw.get(k, 0) / max_coll,
                     "corpus": cs.get(k, 0) / max_corp,
                     "artist": art_val / max_art,
                     "affinity": (aff / 100) if aff is not None else 0,
-                    "db_link": db.get(k, 0.0)}
-            # normalisé par la somme des poids réellement en jeu (jamais Σw fixe = 1.9,
-            # cf. diagnostic N2) : la même formule que album_score, sur la même échelle /100.
-            terms = [(w_coll, feat["collection"]), (w_corp, feat["corpus"]),
-                     (w_art, feat["artist"]), (w_aff, feat["affinity"]),
-                     (w_db, feat["db_link"])]
+                    "db_link": db.get(k, 0.0),
+                    "tier": tier_manual or 0.0}
+            # normalisé par les poids RÉELLEMENT EN JEU pour CE label (17/09, brief VPS
+            # constat 2) : un signal structurellement absent (jamais possédé/écouté/lié,
+            # jamais profilé de style, pas de tier suivi) est exclu du terme ET de son
+            # poids au dénominateur — avant ce correctif, `tot` était TOUJOURS la somme
+            # fixe des 5 poids configurés (Σw = 4.05 avec les réglages par défaut), donc
+            # un label sans aucun signal comportemental plafonnait à 100×w_aff/Σw quelle
+            # que soit son affinité, jamais au-dessus (mesuré 24,7/100 avec une affinité
+            # parfaite) — voir aussi Ctx.album_score, même principe déjà appliqué là-bas.
+            terms = []
+            if k in coll_raw:
+                terms.append((w_coll, feat["collection"] * 100))
+            if k in cs:
+                terms.append((w_corp, feat["corpus"] * 100))
+            if k in las:
+                terms.append((w_art, feat["artist"] * 100))
+            if aff is not None:
+                terms.append((w_aff, feat["affinity"] * 100))
+            if k in db:
+                terms.append((w_db, feat["db_link"] * 100))
+            if tier_manual is not None:
+                terms.append((w_tier, tier_manual * 100))
             tot = sum(t[0] for t in terms)
-            score = min(100, round(100 * sum(t[0] * t[1] for t in terms) / tot)) if tot else 0
+            score = (min(100, round((sum(t[0] * t[1] for t in terms) + K * PRIOR) / (tot + K)))
+                     if tot else 0)
             rows.append({"key": k, "name": info.get("name") or db_names.get(k) or k, "score": score,
                          "owned": lc.get(k, 0), "want": wc.get(k, 0),
                          "corpus": round(cs.get(k, 0), 1), "aff": aff, "coverage": coverage,
-                         "artists": art_n, "tier": label_tiers.get(k), "feat": feat})
+                         "artists": art_n, "tier": tier, "feat": feat})
         rows.sort(key=lambda r: r["score"], reverse=True)
         return rows
 

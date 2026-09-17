@@ -2438,7 +2438,7 @@ async def settings_save(request: Request):
     f = await request.form()
     c = _cfg()
     sc = c["scoring"]
-    for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link")),
+    for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link", "tier")),
                       ("album", ("label", "artist", "style", "artist_max_vs_mean")),
                       ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link")),
                       ("recos", ("min_score", "max_new_releases",
@@ -2453,6 +2453,8 @@ async def settings_save(request: Request):
     for t in ("1", "2"):
         if f.get(f"artist_tiers__{t}"):
             sc["artist_tiers"][t] = float(f[f"artist_tiers__{t}"])
+        if f.get(f"label_tiers__{t}"):
+            sc["label_tiers"][t] = float(f[f"label_tiers__{t}"])
     for t in ("1", "2", "3"):
         if f.get(f"taste_tiers__{t}"):
             sc["taste_tiers"][t] = float(f[f"taste_tiers__{t}"])

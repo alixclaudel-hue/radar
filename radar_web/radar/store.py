@@ -94,8 +94,13 @@ CAT2 = {"1": "Cœur", "2": "Aimés"}
 DEFAULT_SCORING = {
     "taste_tiers":  {"1": 1.0, "2": 0.6, "3": 0.3},
     "artist_tiers": {"1": 1.0, "2": 0.5},
+    # poids manuel du tier Cœur/Aimé d'un LABEL, même modèle qu'artist_tiers --
+    # avant le 17/09 (brief VPS), label_tier_map() n'était lu QUE comme filtre
+    # d'appartenance (scoring.py:597 ex.), jamais comme un vrai poids : reclasser
+    # un label entre Cœur et Aimé n'avait alors aucun effet sur reco_rows.
+    "label_tiers": {"1": 1.0, "2": 0.5},
     "reco":  {"collection": 0.6, "corpus": 0.5, "artist": 0.4,
-              "affinity": 0.4, "want_factor": 0.6, "db_link": 0.35},
+              "affinity": 0.4, "want_factor": 0.6, "db_link": 0.35, "tier": 0.5},
     "album": {"label": 0.4, "artist": 0.4, "style": 0.2, "artist_max_vs_mean": 0.6},
     "artist_score": {"manual": 0.5, "corpus": 0.18, "collection": 0.1,
                      "graph": 0.14, "djset": 0.08, "label_link": 0.15},

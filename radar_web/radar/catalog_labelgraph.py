@@ -264,6 +264,54 @@ def build(dump_con=None, progress_cb=None, stop_cb=None,
             dump_con.close()
 
 
+def neighbors_for(label_keys, kinds=None, min_weight=1, con=None):
+    """Comme `neighbors()`, mais pour tout un ENSEMBLE de labels en un nombre
+    borné de requêtes SQL plutôt qu'une requête par label -- ajouté le 17/09
+    (brief VPS, constat 3) pour `Ctx.label_db_signal` : plusieurs milliers de
+    labels suivis (Cœur/Aimé) en seeds rendrait `neighbors()` beaucoup trop
+    lent appelé un par un.
+
+    Renvoie {label_key: [{"label_key": autre, "kind", "weight", "role"}, ...]}
+    -- pas de LIMIT par label ici (à l'appelant d'agréger/retenir ce qui
+    l'intéresse), [] pour les clés sans aucun voisin. {} entier si le graphe
+    n'est pas encore construit.
+
+    Découpé par lots de 400 clés (comme `discogs_dump._in_chunks`, mais avec
+    une marge plus large ici : chaque clé apparaît dans DEUX clauses IN de la
+    requête, sous `SQLITE_MAX_VARIABLE_NUMBER`=999)."""
+    keys = [k for k in dict.fromkeys(label_keys) if k]
+    if not keys or (not available() and con is None):
+        return {}
+    owns = con is None
+    if owns:
+        con = sqlite3.connect(DB_PATH)
+    try:
+        kind_filter, extra = "", []
+        if kinds:
+            kind_filter = f" AND kind IN ({','.join('?' for _ in kinds)})"
+            extra = list(kinds)
+        out = {k: [] for k in keys}
+        for i in range(0, len(keys), 400):
+            chunk = keys[i:i + 400]
+            qmarks = ",".join("?" * len(chunk))
+            rows = con.execute(
+                f"SELECT a AS key_, b AS other, kind, weight, 'a' AS key_col FROM label_pairs "
+                f"WHERE a IN ({qmarks}) AND weight >= ?{kind_filter} "
+                f"UNION ALL "
+                f"SELECT b AS key_, a AS other, kind, weight, 'b' AS key_col FROM label_pairs "
+                f"WHERE b IN ({qmarks}) AND weight >= ?{kind_filter}",
+                [*chunk, min_weight, *extra, *chunk, min_weight, *extra]).fetchall()
+            for key_, other, kind, weight, key_col in rows:
+                role = None
+                if kind == KIND_PARENT:
+                    role = "child" if key_col == "a" else "parent"
+                out[key_].append({"label_key": other, "kind": kind, "weight": weight, "role": role})
+        return out
+    finally:
+        if owns:
+            con.close()
+
+
 def neighbors(label_key, kinds=None, min_weight=1, limit=20, con=None):
     """Labels les plus liés à `label_key` sur le catalogue global, toutes
     origines confondues et triés par poids décroissant, sauf si `kinds`

@@ -1,9 +1,10 @@
 """Radar — interface FastAPI + HTMX. Données PARTAGÉES avec l'appli Streamlit.
 Lancement :  uvicorn radar_web.app:app --reload --port 8600
 
-Nav : 👤 Mon profil · 🔍 Chercher un disque · 📻 Nouveautés · 🌐 Mes labels & artistes ·
+Nav : 👤 Mon profil · 🔍 Chercher un disque · 🌐 Mes labels & artistes ·
 🎯 Reco Radar · 🎛️ Réglages
 (URLs historiques inchangées : /patte, /search, /veille, /univers, /reco-radar, /settings)
+📻 Nouveautés (/veille) est en pause depuis le 2026-09-17, cf. VEILLE_ENABLED.
 """
 import hashlib
 import hmac
@@ -19,7 +20,7 @@ from datetime import datetime
 from urllib.parse import quote_plus, urlencode
 
 import requests
-from fastapi import FastAPI, Form, Request, UploadFile
+from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -42,6 +43,22 @@ RECOS_MAX_TRACKS = 5
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
+
+# Fonctionnalité « Nouveautés » (/veille : règles de veille + nouveautés vendeurs)
+# en PAUSE depuis le 2026-09-17 (décision utilisateur : pas utilisée pour l'instant,
+# gardée pour plus tard). Un seul interrupteur : repasser à True rend la page, son
+# entrée de nav et ses deux jobs (scan_veille/scan_sellers). Rien n'est effacé — le
+# gabarit, les règles (cfg["veille_rules"]), la liste de vendeurs et les files déjà
+# scannées restent en place. Les deux jobs n'ont aucune boucle automatique côté
+# worker : les retirer de VALID_JOBS suffit à les mettre à l'arrêt.
+VEILLE_ENABLED = False
+templates.env.globals["veille_enabled"] = VEILLE_ENABLED
+
+
+def _veille_guard():
+    """404 tant que la fonctionnalité Nouveautés est en pause (cf. VEILLE_ENABLED)."""
+    if not VEILLE_ENABLED:
+        raise HTTPException(status_code=404, detail="Nouveautés : fonctionnalité en pause.")
 
 
 def _pl_id(url):
@@ -1545,6 +1562,7 @@ def inbox_meta_batch(ids: str = ""):
     pastilles de la Recherche. Répond en pastilles hx-swap-oob (#inbox-meta-{id}),
     distinctes de #cover-{id} (la file Nouveautés n'a pas de grande pochette carrée
     à remplacer, juste une ligne compacte)."""
+    _veille_guard()
     rids = [r for r in dict.fromkeys(i.strip() for i in ids.split(",")) if r.isdigit()]
     if not rids:
         return HTMLResponse("")
@@ -1580,6 +1598,7 @@ def _inbox(request, path, source_key, key_ns, mins=30):
 
 @app.get("/inbox/{kind}", response_class=HTMLResponse)
 def inbox(request: Request, kind: str, mins: int = 30):
+    _veille_guard()
     if kind == "veille":
         return _inbox(request, _pu().veille_new, "rule", "veille", mins)
     return _inbox(request, _pu().sellers_new, "seller", "sellers", mins)
@@ -1587,12 +1606,14 @@ def inbox(request: Request, kind: str, mins: int = 30):
 
 @app.post("/inbox/{kind}/clear", response_class=HTMLResponse)
 def inbox_clear(request: Request, kind: str):
+    _veille_guard()
     save(_pu().veille_new if kind == "veille" else _pu().sellers_new, [])
     return inbox(request, kind)
 
 
 @app.post("/inbox/{kind}/dismiss", response_class=HTMLResponse)
 def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
+    _veille_guard()
     path = _pu().veille_new if kind == "veille" else _pu().sellers_new
     idf = "release_id" if kind == "veille" else "listing_id"
     save(path, [x for x in load(path, []) if str(x.get(idf)) != rid])
@@ -1601,6 +1622,7 @@ def inbox_dismiss(request: Request, kind: str, rid: str = Form("")):
 
 @app.get("/veille", response_class=HTMLResponse)
 def veille_page(request: Request, saved: int = 0):
+    _veille_guard()
     c = _cfg()
     followed_labels = [n for cid in ("1", "2") for n in c.get("label_categories", {}).get(cid, [])]
     return render(request, "pages/veille.html", active="veille", saved=saved,
@@ -1612,6 +1634,7 @@ def veille_page(request: Request, saved: int = 0):
 
 @app.post("/veille/rules")
 async def veille_rules_save(request: Request):
+    _veille_guard()
     f = await request.form()
     c = _cfg()
     rules = c.setdefault("veille_rules", [])
@@ -1642,6 +1665,7 @@ async def veille_rules_save(request: Request):
 
 @app.post("/sellers/add")
 def sellers_add(name: str = Form("")):
+    _veille_guard()
     c = _cfg()
     for n in re.split(r"[,\s]+", name.strip()):
         n = n.strip().strip("@/")
@@ -1656,6 +1680,7 @@ def sellers_add(name: str = Form("")):
 
 @app.post("/sellers/remove")
 def sellers_remove(name: str = Form("")):
+    _veille_guard()
     c = _cfg()
     c["sellers"] = [s for s in c.get("sellers", []) if s != name]
     store.save_config(c)
@@ -2159,6 +2184,11 @@ VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_ba
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
               "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog",
               "import_discogs_dump", "scan_recos", "publish_recos"}
+if not VEILLE_ENABLED:
+    # Les deux jobs de la page Nouveautés ne sont lançables que depuis elle : les
+    # retirer ici les arrête aussi bien pour /jobs/<nom>/launch que pour
+    # /patte/run/<nom>, qui passe par la même validation.
+    VALID_JOBS -= {"scan_veille", "scan_sellers"}
 JOB_PARAMS = {"ingest_youtube": {"deep": True}, "ingest_spotify": {"deep": True},
               "ingest_bandcamp": {"deep": True}}
 

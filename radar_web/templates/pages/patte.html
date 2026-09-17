@@ -227,7 +227,9 @@
   <div class="stat" title="artistes que tu as classés dans tes deux catégories de goût"><b>{{ st.coeur }} / {{ st.aimes }}</b><span>artistes Principaux / Secondaires</span></div>
   <div class="stat" title="parmi tes artistes classés, ceux dont l'identité Discogs a été retrouvée avec certitude"><b>{{ st.artists_resolved }}</b><span>artistes reconnus sur Discogs</span></div>
   <div class="stat" title="titres (YouTube, Spotify, Bandcamp, DJ sets...) déjà analysés pour affiner tes recommandations"><b>{{ st.tracks }}</b><span>titres analysés</span></div>
-  <div class="stat" title="règles de nouveautés actives / vendeurs suivis"><b>{{ st.veille_rules_active }} / {{ st.sellers }}</b><span>nouveautés / vendeurs</span></div>
+  {# les deux compteurs ne portent que sur la page Nouveautés (règles + vendeurs suivis),
+     en pause : masqués par le même interrupteur, cf. app.py VEILLE_ENABLED #}
+  {% if veille_enabled %}<div class="stat" title="règles de nouveautés actives / vendeurs suivis"><b>{{ st.veille_rules_active }} / {{ st.sellers }}</b><span>nouveautés / vendeurs</span></div>{% endif %}
   {% if st.not_found %}
   <div class="stat" title="labels ou artistes jamais retrouvés sur Discogs — vérifie l'orthographe ou retire-les"><b><a href="/univers">{{ st.not_found }}</a></b><span>jamais identifiés sur Discogs</span></div>
   {% endif %}

@@ -188,15 +188,5 @@
   <hr>
   <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
 
-{% elif tab == 'cart' %}
-  <p class="muted small">Ta wantlist Discogs (synchronisée avec ton compte).{% if sellers_enabled %}
-    But : regrouper la commande chez un même vendeur pour ne pas multiplier les frais de port.{% endif %}</p>
-  <div hx-get="/cart" hx-trigger="load"></div>
-  {% if sellers_enabled %}
-  <hr>
-  <div class="section-title"><h3>Regrouper chez un vendeur</h3></div>
-  <div hx-get="/cart/sellers" hx-trigger="load"></div>
-  {% endif %}
-  <script src="/static/wltoggle.js" defer></script>
 {% endif %}
 {% endblock %}

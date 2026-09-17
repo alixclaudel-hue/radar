@@ -22,7 +22,7 @@
       {% set cur = active|default('') %}
       <div class="topbar-right">
         <a href="/patte" class="chip profile-tab {{ 'active' if cur=='patte' }}" title="Mon profil">👤 Mon profil</a>
-        <a class="chip cart-tab" href="/univers?tab=cart" title="Wantlist Discogs">{{ icons.cart("ic-lg") }}{% if n_cart %} {{ n_cart }}{% endif %}</a>
+        <a class="chip cart-tab" href="/wantlist" title="Wantlist Discogs">{{ icons.cart("ic-lg") }}{% if n_cart %} {{ n_cart }}{% endif %}</a>
       </div>
     </div>
     <nav class="nav">

@@ -16,11 +16,12 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .radar import catalog_labelgraph, discogs_dump, jobs, paths, sellers, store
+from .radar import catalog_labelgraph, discogs_dump, features, jobs, paths, sellers, store
 
 POLL = 2.0
 JOB_TIMEOUT = 6 * 3600
-# Scan hebdo du catalogue de vendeurs : opt-in via RADAR_SELLER_SCAN=1.
+# Scan hebdo du catalogue de vendeurs : opt-in via RADAR_SELLER_SCAN=1,
+# et seulement si features.SELLERS_ENABLED (fonctionnalité en pause depuis le 17/09).
 SELLER_SCAN_EVERY = 7 * 86400
 _last_seller_check = 0.0
 # Import mensuel du dump Discogs : opt-in via RADAR_DISCOGS_DUMP_SYNC=1.
@@ -68,6 +69,10 @@ PARIS_TZ = ZoneInfo("Europe/Paris")
 def _maybe_weekly_scan():
     """Enfile scan_catalog (owner) si aucun vendeur n'a été scanné depuis 7 j."""
     global _last_seller_check
+    # Fonctionnalité Vendeurs en pause : on ignore RADAR_SELLER_SCAN, même posé
+    # dans l'environnement du service (cf. radar/features.py).
+    if not features.SELLERS_ENABLED:
+        return
     if os.environ.get("RADAR_SELLER_SCAN") != "1":
         return
     if time.time() - _last_seller_check < 3600:

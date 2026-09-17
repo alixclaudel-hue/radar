@@ -17,25 +17,29 @@
   <h3>{{ icons.label() }} Score label (reco)
     {{ reset_btn([['reco__collection', sc.reco.collection], ['reco__corpus', sc.reco.corpus],
                   ['reco__artist', sc.reco.artist], ['reco__affinity', sc.reco.affinity],
-                  ['reco__want_factor', sc.reco.want_factor], ['reco__db_link', sc.reco.db_link]]) }}
+                  ['reco__want_factor', sc.reco.want_factor], ['reco__db_link', sc.reco.db_link],
+                  ['reco__tier', sc.reco.tier]]) }}
   </h3>
   <p class="muted small">Classe tes labels dans Mon univers (recommandations) : combien suivre ce label a de
-    sens vu ta collection, ton écoute (corpus), tes artistes Cœur/Aimés qui y ont sorti, ton affinité de style
-    et ta wantlist.</p>
+    sens vu ta collection, ton écoute (corpus), tes artistes Cœur/Aimés qui y ont sorti, ton affinité de style,
+    ta wantlist, et le fait que tu le suives déjà (Cœur/Aimé).</p>
   <div class="wgroup">
     {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
                  ['reco__artist','artiste'], ['reco__affinity','affinité'],
-                 ['reco__want_factor','want'], ['reco__db_link','base Discogs']]) }}
+                 ['reco__want_factor','want'], ['reco__db_link','base Discogs'],
+                 ['reco__tier','Cœur/Aimé']]) }}
     <div class="row wgroup__fields">
-      {% for k in ['collection','corpus','artist','affinity','want_factor','db_link'] %}
+      {% for k in ['collection','corpus','artist','affinity','want_factor','db_link','tier'] %}
       <div class="field"><label>{{ k }}
         <input name="reco__{{ k }}" type="number" step="any" value="{{ sc.reco[k] }}"></label></div>
       {% endfor %}
       <div class="field" style="flex-basis:100%"><label>Seuil d'affinité label (0 = off)
         <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></label></div>
     </div>
-    <p class="muted small">« base Discogs » : un artiste Cœur/Aimés a un disque chez ce label,
-      ou le graphe de co-crédits en repère un proche — référentiel local, aucun appel API.</p>
+    <p class="muted small">« base Discogs » : un artiste Cœur/Aimés a un disque chez ce label, le graphe de
+      co-crédits en repère un proche, ou il est voisin (co-crédit ou sous-label Discogs) d'un label que tu suis
+      déjà — référentiel local, aucun appel API. « Cœur/Aimé » : le fait même de suivre ce label, pondéré par
+      son rang ci-dessous — avant le 17/09 ce rang n'avait aucun effet sur ce score.</p>
   </div>
 
   <h3>{{ icons.album() }} Score album
@@ -84,18 +88,22 @@
     {{ reset_btn([['taste_tiers__1', sc.taste_tiers['1']],
                   ['taste_tiers__2', sc.taste_tiers['2']],
                   ['artist_tiers__1', sc.artist_tiers['1']],
-                  ['artist_tiers__2', sc.artist_tiers['2']]]) }}
+                  ['artist_tiers__2', sc.artist_tiers['2']],
+                  ['label_tiers__1', sc.label_tiers['1']],
+                  ['label_tiers__2', sc.label_tiers['2']]]) }}
   </h3>
-  <p class="muted small">Poids appliqué selon le rang que tu donnes à un style ou un artiste : Cœur (référence)
-    compte plus que Aimés (+) dans les scores ci-dessus — c'est ici qu'on règle l'écart entre les deux.</p>
+  <p class="muted small">Poids appliqué selon le rang que tu donnes à un style, un artiste ou un label : Cœur
+    (référence) compte plus que Aimés (+) dans les scores ci-dessus — c'est ici qu'on règle l'écart entre les deux.</p>
   <div class="wgroup">
-    {{ wr.toile([['taste_tiers__1','style cat.1'], ['artist_tiers__1','artiste cat.1'],
-                 ['taste_tiers__2','style cat.2'], ['artist_tiers__2','artiste cat.2']]) }}
+    {{ wr.toile([['taste_tiers__1','style cat.1'], ['artist_tiers__1','artiste cat.1'], ['label_tiers__1','label cat.1'],
+                 ['taste_tiers__2','style cat.2'], ['artist_tiers__2','artiste cat.2'], ['label_tiers__2','label cat.2']]) }}
     <div class="row wgroup__fields">
       <div class="field"><label>Style — Cœur<input name="taste_tiers__1" type="number" step="any" value="{{ sc.taste_tiers['1'] }}"></label></div>
       <div class="field"><label>Style — Aimés<input name="taste_tiers__2" type="number" step="any" value="{{ sc.taste_tiers['2'] }}"></label></div>
       <div class="field"><label>Artiste — Cœur<input name="artist_tiers__1" type="number" step="any" value="{{ sc.artist_tiers['1'] }}"></label></div>
       <div class="field"><label>Artiste — Aimés<input name="artist_tiers__2" type="number" step="any" value="{{ sc.artist_tiers['2'] }}"></label></div>
+      <div class="field"><label>Label — Cœur<input name="label_tiers__1" type="number" step="any" value="{{ sc.label_tiers['1'] }}"></label></div>
+      <div class="field"><label>Label — Aimés<input name="label_tiers__2" type="number" step="any" value="{{ sc.label_tiers['2'] }}"></label></div>
     </div>
   </div>
 

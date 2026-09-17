@@ -1139,7 +1139,7 @@ def cart_frag(request: Request):
 
 @app.post("/cart/add", response_class=HTMLResponse)
 def cart_add(request: Request, rid: str = Form(""), title: str = Form(""), artist: str = Form(""),
-             thumb: str = Form(""), label: str = Form("")):
+             thumb: str = Form(""), label: str = Form(""), track: str = Form("")):
     rid = (rid or "").strip()
     if not rid:
         return _err("id manquant")
@@ -1154,16 +1154,25 @@ def cart_add(request: Request, rid: str = Form(""), title: str = Form(""), artis
     # telle quelle à la wantlist Discogs : on propose à la place le(s) pressage(s)
     # vinyle de la même piste (artiste+titre), même mécanisme que /release_matches
     # (DJ sets) — y compris son message explicite si aucun n'existe.
+    #
+    # `track` (titre de la PISTE) prime sur `title` (titre de la SORTIE) pour cette
+    # recherche : la recherche Discogs est filtrée sur le champ `track`, donc lui
+    # passer un titre de sortie ne renvoie rien. Cas réel (retour utilisateur
+    # 2026-09-17) : la piste "12 Till 8" d'Inland Knights découverte sur la
+    # compilation CD "Drop Music" (USM Records) — chercher artiste="Inland Knights"
+    # + track="Drop Music" donne 0 résultat, alors que track="12 Till 8" retrouve
+    # bien le 12" d'origine (Drop Music DRM011).
     from .radar import discogs_dump as dd
     if dd.available():
         info = dd.lookup_release(rid)
         if info and not info.get("is_vinyl"):
+            q = track.strip() or title.strip()
             try:
-                rows = _vinyl_matches(token, artist.strip(), title.strip())
+                rows = _vinyl_matches(token, artist.strip(), q)
             except discogs.DiscogsError as e:
                 return _err(e)
             return frag(request, "partials/release_matches.html", rows=rows,
-                        a=artist.strip(), t=title.strip(), in_cart=_cart_ids())
+                        a=artist.strip(), t=q, in_cart=_cart_ids())
 
     try:
         user = _discogs_username(cfg, token)

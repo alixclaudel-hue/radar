@@ -641,6 +641,7 @@ def job_fetch_collection(job, params):
     if not user:
         return job.finish(error="Identité Discogs illisible (token ?).")
     lc, wc, lids, ac = {}, {}, {}, {}
+    owned_ids, owned_keys = set(), set()
     n_coll = n_want = 0
     for kind, path, rk, tgt in (
         ("collection", f"/users/{user}/collection/folders/0/releases", "releases", lc),
@@ -662,10 +663,24 @@ def job_fetch_collection(job, params):
                     tgt[k] = tgt.get(k, 0) + 1
                     if lb.get("id") and k not in lids:
                         lids[k] = {"name": nm, "id": lb.get("id")}
-                for ar in bi.get("artists", []):
-                    nm = (ar.get("name") or "").strip()
+                names = [(ar.get("name") or "").strip() for ar in bi.get("artists", [])]
+                for nm in names:
                     if nm and nm.lower() != "various":
                         ac[nm] = ac.get(nm, 0) + 1
+                if kind == "collection":
+                    # Identité des disques POSSÉDÉS, pour ne plus les proposer en
+                    # reco (retour utilisateur 2026-09-17). L'id seul ne suffit
+                    # pas : la collection porte UN pressage, la découverte RECOS
+                    # peut en remonter un autre — d'où la clé artiste+titre en
+                    # plus (`_release_identity_key`). `basic_information.id` est
+                    # l'id de la SORTIE, l'objet racine portant aussi un
+                    # `instance_id` propre à la copie possédée.
+                    rid = bi.get("id") or it.get("id")
+                    if str(rid).isdigit():
+                        owned_ids.add(int(rid))
+                    k = _release_identity_key(", ".join(n for n in names if n), bi.get("title"))
+                    if k:
+                        owned_keys.add(k)
             if kind == "collection":
                 n_coll += len(items)
             else:
@@ -677,7 +692,8 @@ def job_fetch_collection(job, params):
                 time.sleep(1.1)
     cache = {"username": user, "fetched_at": datetime.now().isoformat(timespec="seconds"),
              "n_collection": n_coll, "n_wants": n_want, "label_counts": lc,
-             "want_label_counts": wc, "label_ids": lids, "artist_counts": ac}
+             "want_label_counts": wc, "label_ids": lids, "artist_counts": ac,
+             "owned_release_ids": sorted(owned_ids), "owned_release_keys": sorted(owned_keys)}
     save_json(COLLECTION_CACHE_PATH, cache)
     # merge labels into base + seed resolved
     if params.get("merge_base", True):
@@ -2138,6 +2154,32 @@ def _strip_discogs_suffix(name):
     return ", ".join(p for p in parts if p)
 
 
+def _release_identity_key(artist, title):
+    """Identité d'une SORTIE ("artiste||titre" normalisés), sur le même principe
+    que l'identité de PISTE du dédoublonnage RECOS (cf. CLAUDE.md point 19).
+    Sert à reconnaître un disque déjà possédé même sous un autre pressage : la
+    collection Discogs porte un release_id précis, la découverte RECOS peut en
+    remonter un autre (repress, édition CD/vinyle, réédition) pour le même
+    album. Le suffixe de désambiguïsation Discogs ("Rhythm (2)") est retiré de
+    l'artiste, jamais du titre (un titre peut légitimement finir par "(2)")."""
+    a = style_key(_strip_discogs_suffix(artist))
+    t = style_key(title)
+    # les deux moitiés sont exigées : une clé à artiste vide rapprocherait deux
+    # disques homonymes sans crédit, un faux positif exclurait une reco à tort.
+    return f"{a}||{t}" if a and t else ""
+
+
+def _owned_releases():
+    """(ids, clés d'identité) des sorties déjà dans la collection Discogs, lues
+    dans collection_cache.json (job_fetch_collection). Vides tant que la
+    collection n'a pas été récupérée depuis ce correctif, ou si l'utilisateur
+    n'en a jamais lancé la synchronisation : le filtre est alors sans effet,
+    jamais bloquant."""
+    coll = load_json(COLLECTION_CACHE_PATH, {})
+    ids = {int(x) for x in coll.get("owned_release_ids", []) if str(x).isdigit()}
+    return ids, set(coll.get("owned_release_keys", []))
+
+
 def job_scan_recos(job, params):
     """Candidats pour la playlist RECOS RADAR — refondu au Lot 5 de la refonte
     scoring (cf. CLAUDE.md point 43) : lit directement radar/scorestore.py
@@ -2170,6 +2212,12 @@ def job_scan_recos(job, params):
     job_scorestore_tracks). Ne touche ni recos_playlist.json (déjà publié) ni
     recos_history.json (vidéos déjà proposées, jamais réajoutées).
 
+    Écarte aussi les pistes des albums DÉJÀ POSSÉDÉS (collection Discogs, cf.
+    `_owned_releases` — retour utilisateur 2026-09-17 : toutes les pistes de
+    « Asakusa Light » proposées alors que l'album est en collection), par
+    release_id ET par identité artiste+titre (un autre pressage du même disque
+    porte un id différent).
+
     Écarte (diagnostic VPS 2026-09-15, décision utilisateur) les pistes sans
     artiste exploitable (`TRIM(ts.artist) <> ''`, cf. `_track_credit_artist`) —
     pas de recherche YouTube au titre seul, `_best_match` ne sait pas trancher
@@ -2192,7 +2240,7 @@ def job_scan_recos(job, params):
     try:
         rows = con.execute(
             "SELECT ts.artist, ts.title, ts.score, ts.detail_json, "
-            "ts.release_id, rs.title, rs.label, rs.year "
+            "ts.release_id, rs.title, rs.label, rs.year, rs.artist "
             "FROM track_scores ts JOIN release_scores rs ON rs.release_id = ts.release_id "
             "WHERE ts.score >= ? AND TRIM(ts.artist) <> '' "
             "ORDER BY ts.score DESC", (min_score,)).fetchall()
@@ -2220,15 +2268,21 @@ def job_scan_recos(job, params):
     known_tracks = ({(style_key(c.get("artist")), style_key(c.get("title")))
                      for c in candidates + playlist}
                     | _recos_history_track_keys(_recos_history_load()))
+    owned_ids, owned_keys = _owned_releases()
     now = datetime.now().isoformat(timespec="seconds")
     job.st["total"] = min(len(rows), max_new)
-    n_added = 0
-    for artist, title, score, detail_json, release_id, release_title, label, year in rows:
+    n_added, n_owned = 0, 0
+    for (artist, title, score, detail_json, release_id, release_title, label, year,
+         release_artist) in rows:
         if job.stopped() or n_added >= max_new or len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
             break
         title = (title or "").strip()
         k = (style_key(artist), style_key(title))
         if not title or k in known_tracks or _is_continuous_mix(title):
+            continue
+        if (release_id in owned_ids
+                or _release_identity_key(release_artist, release_title) in owned_keys):
+            n_owned += 1
             continue
         known_tracks.add(k)
         detail = json.loads(detail_json) if detail_json else {}
@@ -2242,8 +2296,9 @@ def job_scan_recos(job, params):
         n_added += 1
         job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
+    owned_note = f" {n_owned} piste(s) écartée(s) (album déjà en collection)." if n_owned else ""
     job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
-               f"file : {len(candidates)}.")
+               f"file : {len(candidates)}.{owned_note}")
 
 
 def _publish_recos_last_message():

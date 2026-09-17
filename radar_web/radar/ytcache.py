@@ -199,7 +199,14 @@ def _error_kind(r):
 
 def _throttle():
     """Espace les appels HTTP d'au moins _MIN_CALL_INTERVAL, toutes clés/threads
-    confondus (worker sériel, cf. worker.py -- pas besoin de verrou)."""
+    confondus -- mais PAR PROCESSUS seulement (`_last_call_ts` est un global
+    de module) : garanti à l'intérieur du worker sériel (worker.py), PAS entre
+    le worker et le conteneur web (`radar_web/app.py::/yt/first` tourne dans
+    un processus distinct avec son propre `_last_call_ts`) -- diagnostic VPS
+    16/09, BUG 4. Les deux peuvent donc partir en rafale l'un contre l'autre.
+    Un partage réel demanderait un marqueur dans SHARED_DIR + un verrou
+    fichier entre processus -- pas fait ici, à arbitrer si ça devient un
+    problème mesuré en pratique."""
     global _last_call_ts
     wait = _last_call_ts + _MIN_CALL_INTERVAL - time.time()
     if wait > 0:

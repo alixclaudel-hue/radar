@@ -2306,94 +2306,127 @@ def job_publish_recos(job, params):
     history = _recos_history_load()
     history_keys = _recos_history_track_keys(history)
     job.st["total"] = len(candidates)
-    remaining, added, searched, quota_hit = [], 0, 0, False
+    remaining, added, searched, quota_hit, rate_hit = [], 0, 0, False, False
     daily_hit = False
     now = datetime.now().isoformat(timespec="seconds")
-    for c in candidates:
-        if (job.stopped() or quota_hit or searched >= searches_per_run
-                or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
-            if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
-                daily_hit = True
-            remaining.append(c)
-            continue
-        if len(playlist) >= max_tracks:
-            remaining.append(c)
-            continue
-        ck = (style_key(c.get("artist")), style_key(c.get("title")))
-        if ck in history_keys:
-            # identité déjà connue : aucune recherche réseau, ne compte pas dans le budget.
-            job.tick(f"{c['artist']} — {c['title']} : déjà publiée par le passé")
-            continue
-        art_q = _strip_discogs_suffix(c.get("artist"))
-        label_q = _strip_discogs_suffix(c.get("label") or "")
-        try:
-            # force=True dès la 1re relance (attempts >= 1) : sinon la nouvelle
-            # tentative ne fait que relire le même échec en cache (NEG_TTL 6h,
-            # cf. ytcache.search_video_diag) au lieu de vraiment réinterroger
-            # l'API — les RECOS_MAX_ATTEMPTS tentatives ne cherchaient donc
-            # jamais rien de nouveau (retour utilisateur 2026-09-10).
-            vid, why = ytcache.search_video_diag(
-                f"{art_q} {c['title']}", keys,
-                artist=art_q, title=c.get("title"), label=label_q,
-                force=bool(c.get("attempts")))
-        except ytcache.QuotaExhausted:
-            searched += 1
-            job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
-            quota_hit = True
-            remaining.append(c)
-            continue
-        except ytcache.RateLimited:
-            # Transitoire (limite de débit par seconde, PAS le quota du jour,
-            # diagnostic VPS 16/09 : un appel direct a réussi 20s plus tard sur
-            # la même clé) : ne coûte pas d'unité de quota Google, donc ne
-            # décompte pas `searched` (cf. _recos_searches_record plus bas), et
-            # n'abandonne pas tout le run comme QuotaExhausted — le candidat
-            # repasse simplement au tour suivant.
-            job.tick(f"{c['artist']} — {c['title']} : YouTube limite le débit "
-                     f"— nouvelle tentative au prochain lancement.")
-            remaining.append(c)
-            continue
-        searched += 1
-        if not vid:
-            # BUG trouvé le 10/09 (retour utilisateur : "aucune vidéo trouvée"
-            # systématique malgré le correctif scoring de 9f1eb04) : ce `continue`
-            # ne remettait PAS `c` dans `remaining` — le candidat était détruit dès
-            # le 1er échec, alors que sa sortie reste marquée "vue" dans
-            # recos_seen.json (job_scan_recos) et ne sera donc jamais re-proposée.
-            # Résultat : chaque échec de recherche perdait la piste pour toujours,
-            # jusqu'à vider la file sans jamais rien publier. On retente désormais
-            # RECOS_MAX_ATTEMPTS fois (le cache négatif NEG_TTL de ytcache expire
-            # sous 6h, laissant une chance à une meilleure indexation YouTube ou un
-            # changement de scoring) avant d'abandonner explicitement.
-            c["attempts"] = c.get("attempts", 0) + 1
-            if c["attempts"] < RECOS_MAX_ATTEMPTS:
-                job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why}) "
-                         f"— nouvelle tentative au prochain lancement "
-                         f"({c['attempts']}/{RECOS_MAX_ATTEMPTS}).")
+    try:
+        for c in candidates:
+            if (job.stopped() or quota_hit or rate_hit or searched >= searches_per_run
+                    or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
+                if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
+                    daily_hit = True
                 remaining.append(c)
-            else:
-                job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why}) "
-                         f"— abandonnée après {RECOS_MAX_ATTEMPTS} tentatives.")
-            continue
-        if vid in history:
-            job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")
-            continue
-        playlist.append({**c, "video_id": vid, "published_at": now})
-        history[vid] = {"video_id": vid, "artist": c.get("artist"), "title": c.get("title")}
-        history_keys.add(ck)
-        added += 1
-        job.tick(f"{c['artist']} — {c['title']} : ajoutée")
+                continue
+            if len(playlist) >= max_tracks:
+                remaining.append(c)
+                continue
+            ck = (style_key(c.get("artist")), style_key(c.get("title")))
+            if ck in history_keys:
+                # identité déjà connue : aucune recherche réseau, ne compte pas dans le budget.
+                job.tick(f"{c['artist']} — {c['title']} : déjà publiée par le passé")
+                continue
+            art_q = _strip_discogs_suffix(c.get("artist"))
+            label_q = _strip_discogs_suffix(c.get("label") or "")
+            try:
+                # force=True dès la 1re relance (attempts >= 1) : sinon la nouvelle
+                # tentative ne fait que relire le même échec en cache (NEG_TTL 6h,
+                # cf. ytcache.search_video_diag) au lieu de vraiment réinterroger
+                # l'API — les RECOS_MAX_ATTEMPTS tentatives ne cherchaient donc
+                # jamais rien de nouveau (retour utilisateur 2026-09-10).
+                vid, why = ytcache.search_video_diag(
+                    f"{art_q} {c['title']}", keys,
+                    artist=art_q, title=c.get("title"), label=label_q,
+                    force=bool(c.get("attempts")))
+            except ytcache.QuotaExhausted:
+                # Ne décompte PAS `searched` (diagnostic VPS 16/09, BUG 2) : un
+                # rejet 429/403 ne consomme aucune unité de quota Google — le
+                # compter ici gonflait le budget quotidien d'une fausse unité à
+                # chaque tick horaire tant que le quota restait épuisé.
+                job.msg("Quota YouTube (recherche) épuisé — reprendra au prochain scan.")
+                quota_hit = True
+                remaining.append(c)
+                continue
+            except ytcache.RateLimited:
+                # Transitoire (limite de débit par seconde, PAS le quota du jour,
+                # diagnostic VPS 16/09 : un appel direct a réussi 20s plus tard sur
+                # la même clé) : ne coûte pas d'unité de quota Google, donc ne
+                # décompte pas `searched`. `rate_hit` arrête le run PROPREMENT
+                # dès la 1re occurrence (BUG 3, diagnostic VPS 16/09) : sans lui,
+                # chaque candidat suivant rejouait ses propres 4 tentatives +
+                # 1+2+4s de backoff (ytcache._get) contre une clé déjà connue
+                # limitée dans ce run, jusqu'à ~70s perdues sur 10 candidats,
+                # sans jamais transformer ça en QuotaExhausted ni perdre la
+                # journée.
+                job.tick(f"{c['artist']} — {c['title']} : YouTube limite le débit "
+                         f"— nouvelle tentative au prochain lancement.")
+                rate_hit = True
+                remaining.append(c)
+                continue
+            except requests.RequestException as e:
+                # Aléa réseau (timeout, coupure) : le candidat n'a pas été
+                # réellement tenté, on le remet en file sans compter de
+                # recherche ni abandonner tout le run pour un aléa transitoire
+                # (BUG 1, diagnostic VPS 16/09 — auparavant non rattrapé du
+                # tout, remontait jusqu'à main() et perdait aussi l'état des
+                # candidats déjà traités dans ce run, cf. `finally` ci-dessous).
+                job.tick(f"{c['artist']} — {c['title']} : erreur réseau ({e}) "
+                         f"— nouvelle tentative au prochain lancement.")
+                remaining.append(c)
+                continue
+            searched += 1
+            if not vid:
+                # BUG trouvé le 10/09 (retour utilisateur : "aucune vidéo trouvée"
+                # systématique malgré le correctif scoring de 9f1eb04) : ce `continue`
+                # ne remettait PAS `c` dans `remaining` — le candidat était détruit dès
+                # le 1er échec, alors que sa sortie reste marquée "vue" dans
+                # recos_seen.json (job_scan_recos) et ne sera donc jamais re-proposée.
+                # Résultat : chaque échec de recherche perdait la piste pour toujours,
+                # jusqu'à vider la file sans jamais rien publier. On retente désormais
+                # RECOS_MAX_ATTEMPTS fois (le cache négatif NEG_TTL de ytcache expire
+                # sous 6h, laissant une chance à une meilleure indexation YouTube ou un
+                # changement de scoring) avant d'abandonner explicitement.
+                c["attempts"] = c.get("attempts", 0) + 1
+                if c["attempts"] < RECOS_MAX_ATTEMPTS:
+                    job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why}) "
+                             f"— nouvelle tentative au prochain lancement "
+                             f"({c['attempts']}/{RECOS_MAX_ATTEMPTS}).")
+                    remaining.append(c)
+                else:
+                    job.tick(f"{c['artist']} — {c['title']} : aucune vidéo trouvée ({why}) "
+                             f"— abandonnée après {RECOS_MAX_ATTEMPTS} tentatives.")
+                continue
+            if vid in history:
+                job.tick(f"{c['artist']} — {c['title']} : déjà ajoutée un jour")
+                continue
+            playlist.append({**c, "video_id": vid, "published_at": now})
+            history[vid] = {"video_id": vid, "artist": c.get("artist"), "title": c.get("title")}
+            history_keys.add(ck)
+            added += 1
+            job.tick(f"{c['artist']} — {c['title']} : ajoutée")
+            save_json(RECOS_HISTORY_PATH, list(history.values()))
+            save_json(RECOS_PLAYLIST_PATH, playlist)
+    finally:
+        # `finally`, pas juste en fin de fonction (BUG 1, diagnostic VPS 16/09) :
+        # une exception non rattrapée ci-dessus (ex. RuntimeError d'une erreur
+        # API non classée, cf. ytcache.request) sortait auparavant de la
+        # fonction SANS jamais exécuter ces 4 lignes — les candidats déjà
+        # `attempts`-incrémentés dans ce run et les recherches déjà parties
+        # (jusqu'à `searches_per_run`, ~900 unités de quota Google) étaient
+        # perdus du fichier de budget, qui existe précisément pour protéger
+        # le quota. `remaining` ne contient pas le candidat en cours au moment
+        # de l'exception (il n'a pas pu être classé) : perte limitée à 1
+        # candidat sur un aléa réellement anormal, pas au run entier.
         save_json(RECOS_HISTORY_PATH, list(history.values()))
         save_json(RECOS_PLAYLIST_PATH, playlist)
-    save_json(RECOS_HISTORY_PATH, list(history.values()))
-    save_json(RECOS_PLAYLIST_PATH, playlist)
-    save_json(RECOS_CANDIDATES_PATH, remaining)
-    _recos_searches_record(searched)
+        save_json(RECOS_CANDIDATES_PATH, remaining)
+        _recos_searches_record(searched)
     note = (f" — limite de recherche ({searches_per_run}) atteinte."
             if searched >= searches_per_run else "")
     if daily_hit:
         note += (f" Budget quotidien atteint ({budget_used + searched}/"
                  f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
+    if rate_hit:
+        note += " YouTube limite le débit — reprendra au prochain lancement."
     if len(playlist) >= max_tracks and remaining:
         note += (f" Playlist pleine ({max_tracks}) — plus d'ajout tant qu'aucune "
                  f"piste n'est marquée écoutée (clic sur une ligne, purge à minuit).")

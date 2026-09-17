@@ -4,6 +4,7 @@ Un objet Ctx charge toutes les données une fois ; les fonctions le prennent en 
 v0 : label + style complets ; terme « artiste » simplifié (liste manuelle + corpus +
 collection ; le graphe de producteurs viendra ensuite)."""
 import hashlib
+import json
 import math
 import os
 import re
@@ -65,6 +66,21 @@ def _files_sig(*paths_):
         except OSError:
             out.append(None)
     return tuple(out)
+
+
+def _config_scoring_sig(cfg):
+    """Empreinte du seul sous-arbre de config qui alimente les nœuds
+    mémoïsés de `Ctx` (`scoring`, `artist_categories`, `label_categories`,
+    `taste_categories` -- seuls `self.cfg`/`self.scoring` lus depuis
+    `wmap`/`artist_tier_map`/`label_tier_map`/`seed_category_weight`, cf.
+    `NODE_DEPS`), PAS la mtime du fichier `crate_radar_config.json` entier :
+    sinon enregistrer un réglage sans rapport (ex. une clé API YouTube dans
+    Mon profil) invalidait tout `_DERIVED`, y compris `graph_rescore` sur
+    le graphe complet (153 182 artistes mesurés, 132s à recalculer --
+    diagnostic VPS 17/09)."""
+    subset = {k: cfg.get(k) for k in
+              ("scoring", "artist_categories", "label_categories", "taste_categories")}
+    return hashlib.sha1(json.dumps(subset, sort_keys=True, default=str).encode()).hexdigest()
 
 
 # Lot 3 (refonte scoring) : graphe explicite des nœuds de calcul de Ctx, chacun
@@ -133,7 +149,15 @@ def _node_stack():
 
 
 class Ctx:
-    """Instantané des données. Recréer à chaque requête (peu coûteux, fichiers < 3 Mo)."""
+    """Instantané des données. Recréer à chaque requête -- attention,
+    PAS "peu coûteux" en général malgré l'ancienne docstring : les fichiers
+    lus ici peuvent dépasser 50 Mo (`producer_graph.json` mesuré à 69,3 Mo
+    en prod, diagnostic VPS 17/09), pas < 3 Mo comme annoncé avant. Les
+    calculs DÉRIVÉS de ces fichiers (graphe, scores) sont mémoïsés sous
+    `_key` (cf. `_memo`) -- eux restent quasi gratuits une fois en cache,
+    mais le premier accès après invalidation (nouveau process, fichier
+    modifié) ne l'est pas : ne jamais forcer un nœud coûteux (`ascore`,
+    `graph_rescore`) pour un simple comptage, cf. `stats()`."""
 
     def __init__(self, uid=None):
         self.uid = uid or store.current_uid()
@@ -148,8 +172,8 @@ class Ctx:
         self.artists_res = store.load_cached(self.P.artists_res, {})
         self.graph = store.load_cached(self.P.graph, {})
         from . import discogs_dump as dd
-        self._key = (self.uid, _files_sig(
-            self.P.config, self.P.graph, self.P.artists_res,
+        self._key = (self.uid, _config_scoring_sig(self.cfg), _files_sig(
+            self.P.graph, self.P.artists_res,
             self.P.corpus, self.P.collection, self.P.profile, dd.DB_PATH))
 
     def _memo(self, name, compute):
@@ -445,6 +469,11 @@ class Ctx:
         return out
 
     def stats(self):
+        """Compteurs de la page Mon profil (`patte.html`) — AUCUN ne doit
+        dépendre d'un nœud coûteux du DAG. Les deux qui le faisaient
+        (`artists_identified` via `ascore`/`graph_rescore`, et `graph_edges`)
+        ont été retirés avec leurs tuiles le 17/09 (demande utilisateur) :
+        ne pas les réintroduire sans relire le pt 54 de CLAUDE.md."""
         ac = self.cfg.get("artist_categories", {})
         res_ok = sum(1 for v in self.artists_res.values()
                      if v.get("discogs_id") and v.get("status") in ("exact", "approx", "confirmed"))
@@ -459,9 +488,7 @@ class Ctx:
             "coeur": len(ac.get("1", [])),
             "aimes": len(ac.get("2", [])),
             "artists_resolved": res_ok,
-            "artists_identified": len(self.ascore),
             "not_found": not_found,
-            "graph_edges": len((self.graph or {}).get("edges", {})),
             "tracks": len(self.corpus),
             "tracks_by_source": self.corpus_by_source(),
             "veille_rules_active": len([r for r in self.cfg.get("veille_rules", []) if r.get("active", True)]),

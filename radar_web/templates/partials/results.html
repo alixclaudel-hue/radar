@@ -15,6 +15,7 @@
   {% else %}
   <p class="muted small">Aucun résultat pour ces filtres{% if not has_token %} — sans token Discogs, seul le catalogue local (figé au dernier import mensuel) est cherché{% endif %}.</p>
   {% endif %}
+  {% if seller_note %}<p class="muted small">{{ seller_note }}</p>{% endif %}
   {% if searched %}<p class="muted small">Labels cherchés : {{ searched|join(', ') }}</p>{% endif %}
 {% else %}
   <div class="section-title">
@@ -27,6 +28,7 @@
   </div>
   {% if dump_date %}<p class="muted small">catalogue local au {{ dump_date[:4] }}-{{ dump_date[4:6] }}-{{ dump_date[6:] }}
     — coche « inclure les nouveautés » pour les sorties plus récentes</p>{% endif %}
+  {% if seller_note %}<p class="muted small">{{ seller_note }}</p>{% endif %}
   {% if searched %}<p class="muted small">Labels cherchés ({{ searched|length }}) : {{ searched|join(', ') }}</p>{% endif %}
   {% set pager %}
   {% if total_pages and total_pages > 1 %}

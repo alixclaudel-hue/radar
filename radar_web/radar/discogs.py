@@ -65,6 +65,46 @@ def remove_from_wantlist(token, username, release_id):
     delete(f"/users/{username}/wants/{release_id}", token=token)
 
 
+def seller_inventory(username, token="", max_pages=10, per_page=100):
+    """([{release_id, price, currency, condition, sleeve, artist, format, listing_id}],
+    tronque) — articles « For Sale » d'un vendeur, pagination suivie jusqu'à
+    `max_pages`. `tronque` dit que le vendeur a encore du stock au-delà, pour que
+    l'appelant puisse le signaler au lieu de laisser croire à un inventaire complet.
+
+    Un compte inconnu ou sans boutique lève `DiscogsError` via `_check` (404) —
+    pas de retour vide silencieux, l'utilisateur doit savoir qu'il s'est trompé de
+    nom. Les champs `artist`/`format` viennent de la réponse, sans appel
+    supplémentaire ; tout le reste (styles, genres, année, label) est ensuite lu
+    dans le référentiel local par `release_id`.
+
+    Volontairement indépendant de `sellers.py` et du catalogue de vendeurs, en
+    pause depuis le 2026-09-17 (cf. point 56 de CLAUDE.md) : ici l'utilisateur
+    nomme un vendeur à la volée et veut son stock du moment, pas un instantané
+    daté d'un scan de fond."""
+    out, page = [], 1
+    while page <= max_pages:
+        d = get(f"/users/{username}/inventory",
+                {"status": "For Sale", "per_page": per_page, "page": page,
+                 "sort": "listed", "sort_order": "desc"}, token=token)
+        for x in d.get("listings", []):
+            rel = x.get("release") or {}
+            rid = rel.get("id")
+            if not rid:
+                continue
+            pr = x.get("price") or {}
+            out.append({"release_id": int(rid), "listing_id": x.get("id"),
+                        "price": pr.get("value"), "currency": pr.get("currency"),
+                        "condition": x.get("condition"),
+                        "sleeve": x.get("sleeve_condition"),
+                        "artist": rel.get("artist"), "format": rel.get("format"),
+                        "title": rel.get("title")})
+        if page >= d.get("pagination", {}).get("pages", 1):
+            return out, False
+        page += 1
+        time.sleep(1.1)                   # 60 requêtes/min côté Discogs
+    return out, True
+
+
 def search(token="", **params):
     params.setdefault("type", "release")
     return get("/database/search", params, token=token)

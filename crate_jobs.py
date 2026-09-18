@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from radar_web.radar import store, ytcache
+from radar_web.radar import store, textmatch, ytcache
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Répertoire des données : partagé avec radar_web via CRATE_DATA_DIR (volume
@@ -111,6 +111,12 @@ RECOS_DAILY_SEARCH_BUDGET = 80
 # d'une clé unique — le plafond effectif reste alors le quota Google.
 RECOS_SEARCHES_PER_RUN = 5  # repli si scoring.recos.searches_per_run absent
 RECOS_MAX_ATTEMPTS = 3
+# Plafonne les sorties interrogées chez Discogs par lancement pour retrouver une
+# vidéo déjà attachée à la sortie (cf. `_discogs_release_video`). Ressource
+# différente du budget YouTube : Discogs limite au DÉBIT (60 requêtes/minute,
+# d'où le sleep de 1,1 s), pas à la journée. Le plafond borne surtout la DURÉE du
+# run, qui sinon tiendrait ~90 s rien qu'en attente sur une file pleine.
+RECOS_DISCOGS_LOOKUPS_PER_RUN = 40
 # plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
 # ajouts réussis (correctif 10/09, retour utilisateur) : un plafond sur les seuls
 # ajouts laissait la boucle chercher sur tous les candidats en échec (cf. points
@@ -2310,6 +2316,33 @@ def _publish_recos_last_message():
     return (s.get("message") or "").strip()
 
 
+def _discogs_release_video(token, release_id, artist, title, keys):
+    """Identifiant de la vidéo YouTube que Discogs attache DÉJÀ à cette sortie pour
+    cette piste, ou "" si aucune ne correspond (ou si la sortie n'en a aucune).
+
+    Même appariement que le bouton play de la tracklist de /search
+    (`textmatch.best_video_uri`) : une sortie Discogs porte une liste de vidéos,
+    rarement une par piste, souvent sans ordre ni position — seul le recoupement
+    du titre permet de dire laquelle est la piste demandée.
+
+    Deux raisons de préférer ce chemin à une recherche YouTube quand il aboutit :
+    c'est la vidéo que Discogs associe à la sortie, pas le meilleur résultat d'une
+    recherche textuelle ; et il ne consomme aucune unité du quota de RECHERCHE
+    (~100 par recherche, 80 recherches/jour au mieux, cf. RECOS_DAILY_SEARCH_BUDGET)
+    — seule la vérification de lisibilité coûte 1 unité sur `/videos`, métrique
+    distincte qui reste servie même quand le quota de recherche du jour est épuisé
+    (point 52 de CLAUDE.md).
+
+    La vérification n'est pas optionnelle : un lien Discogs peut pointer vers une
+    vidéo supprimée, privée ou bloquée, et la playlist ne doit contenir que du
+    lisible. `QuotaExhausted`/`RateLimited`/`requests.RequestException` remontent
+    à l'appelant, qui les traite comme pour une recherche."""
+    d = discogs_get(token, f"/releases/{release_id}")
+    time.sleep(1.1)                       # 60 requêtes/min côté Discogs
+    vid = ytcache.youtube_id(textmatch.best_video_uri(d.get("videos") or [], artist, title))
+    return vid if vid and ytcache.playable_video(vid, keys) else ""
+
+
 def job_publish_recos(job, params):
     """Recherche YouTube + ajout à la playlist RECOS RADAR (Fonctionnalité 1, lot 2) —
     consomme la file produite par job_scan_recos (recos_candidates.json). La playlist
@@ -2345,13 +2378,20 @@ def job_publish_recos(job, params):
         return job.finish("Aucun candidat en attente.")
 
     budget_used = _recos_searches_used_today()
-    if budget_used >= RECOS_DAILY_SEARCH_BUDGET:
+    playlist = load_json(RECOS_PLAYLIST_PATH, [])
+    cfg = cfg_load()
+    token = cfg.get("token", "")
+    keys = ytcache.youtube_keys(cfg)
+    if budget_used >= RECOS_DAILY_SEARCH_BUDGET and not token:
+        # Sans token Discogs, le budget épuisé ne laisse rien à faire : les vidéos
+        # attachées aux sorties (`_discogs_release_video`) sont le seul chemin qui
+        # ne dépend pas du quota de RECHERCHE, et il demande ce token. Avec token,
+        # le run continue : la boucle ci-dessous n'applique le budget qu'au repli
+        # par recherche (coût assumé : jusqu'à RECOS_DISCOGS_LOOKUPS_PER_RUN appels
+        # Discogs, cadencés à 1,1 s, par lancement).
         return job.finish(f"Budget quotidien de recherches YouTube atteint ({budget_used}/"
                            f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
 
-    playlist = load_json(RECOS_PLAYLIST_PATH, [])
-    cfg = cfg_load()
-    keys = ytcache.youtube_keys(cfg)
     rc = cfg.get("scoring", {}).get("recos", {})
     searches_per_run = int(rc.get("searches_per_run", RECOS_SEARCHES_PER_RUN))
     max_tracks = int(rc.get("max_tracks", RECOS_MAX_TRACKS))
@@ -2363,13 +2403,11 @@ def job_publish_recos(job, params):
     job.st["total"] = len(candidates)
     remaining, added, searched, quota_hit, rate_hit = [], 0, 0, False, False
     daily_hit = False
+    discogs_lookups, from_discogs = 0, 0
     now = datetime.now().isoformat(timespec="seconds")
     try:
         for c in candidates:
-            if (job.stopped() or quota_hit or rate_hit or searched >= searches_per_run
-                    or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
-                if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
-                    daily_hit = True
+            if job.stopped():
                 remaining.append(c)
                 continue
             if len(playlist) >= max_tracks:
@@ -2382,16 +2420,38 @@ def job_publish_recos(job, params):
                 continue
             art_q = _strip_discogs_suffix(c.get("artist"))
             label_q = _strip_discogs_suffix(c.get("label") or "")
+            vid, why, via_discogs = "", "", False
             try:
-                # force=True dès la 1re relance (attempts >= 1) : sinon la nouvelle
-                # tentative ne fait que relire le même échec en cache (NEG_TTL 6h,
-                # cf. ytcache.search_video_diag) au lieu de vraiment réinterroger
-                # l'API — les RECOS_MAX_ATTEMPTS tentatives ne cherchaient donc
-                # jamais rien de nouveau (retour utilisateur 2026-09-10).
-                vid, why = ytcache.search_video_diag(
-                    f"{art_q} {c['title']}", keys,
-                    artist=art_q, title=c.get("title"), label=label_q,
-                    force=bool(c.get("attempts")))
+                # (1) Vidéo déjà attachée à la sortie chez Discogs — essayée AVANT la
+                # recherche YouTube (demande utilisateur 2026-09-18) : plus fiable
+                # qu'un résultat de recherche textuelle, et gratuite en quota de
+                # recherche. Les garde-fous de quota ci-dessous ne s'appliquent donc
+                # pas à ce chemin : une piste trouvée ici se publie même une fois le
+                # budget du jour épuisé.
+                if token and c.get("release_id") and discogs_lookups < RECOS_DISCOGS_LOOKUPS_PER_RUN:
+                    discogs_lookups += 1
+                    vid = _discogs_release_video(token, c["release_id"], art_q,
+                                                 c.get("title"), keys)
+                    via_discogs = bool(vid)
+
+                # (2) Repli : recherche YouTube, sous budget.
+                if not vid:
+                    if (quota_hit or rate_hit or searched >= searches_per_run
+                            or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
+                        if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
+                            daily_hit = True
+                        remaining.append(c)
+                        continue
+                    # force=True dès la 1re relance (attempts >= 1) : sinon la nouvelle
+                    # tentative ne fait que relire le même échec en cache (NEG_TTL 6h,
+                    # cf. ytcache.search_video_diag) au lieu de vraiment réinterroger
+                    # l'API — les RECOS_MAX_ATTEMPTS tentatives ne cherchaient donc
+                    # jamais rien de nouveau (retour utilisateur 2026-09-10).
+                    vid, why = ytcache.search_video_diag(
+                        f"{art_q} {c['title']}", keys,
+                        artist=art_q, title=c.get("title"), label=label_q,
+                        force=bool(c.get("attempts")))
+                    searched += 1
             except ytcache.QuotaExhausted:
                 # Ne décompte PAS `searched` (diagnostic VPS 16/09, BUG 2) : un
                 # rejet 429/403 ne consomme aucune unité de quota Google — le
@@ -2428,7 +2488,6 @@ def job_publish_recos(job, params):
                          f"— nouvelle tentative au prochain lancement.")
                 remaining.append(c)
                 continue
-            searched += 1
             if not vid:
                 # BUG trouvé le 10/09 (retour utilisateur : "aucune vidéo trouvée"
                 # systématique malgré le correctif scoring de 9f1eb04) : ce `continue`
@@ -2457,7 +2516,9 @@ def job_publish_recos(job, params):
             history[vid] = {"video_id": vid, "artist": c.get("artist"), "title": c.get("title")}
             history_keys.add(ck)
             added += 1
-            job.tick(f"{c['artist']} — {c['title']} : ajoutée")
+            from_discogs += int(via_discogs)
+            job.tick(f"{c['artist']} — {c['title']} : ajoutée "
+                     f"({'vidéo Discogs' if via_discogs else 'recherche YouTube'})")
             save_json(RECOS_HISTORY_PATH, list(history.values()))
             save_json(RECOS_PLAYLIST_PATH, playlist)
     finally:
@@ -2485,8 +2546,10 @@ def job_publish_recos(job, params):
     if len(playlist) >= max_tracks and remaining:
         note += (f" Playlist pleine ({max_tracks}) — plus d'ajout tant qu'aucune "
                  f"piste n'est marquée écoutée (clic sur une ligne, purge à minuit).")
+    origin = (f" {from_discogs} via une vidéo déjà attachée à la sortie chez Discogs "
+              f"(0 recherche YouTube), {added - from_discogs} par recherche." if added else "")
     job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{max_tracks}, "
-               f"{len(remaining)} en attente.{note}")
+               f"{len(remaining)} en attente.{origin}{note}")
 
 
 def job_scan_catalog(job, params):

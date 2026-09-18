@@ -334,6 +334,49 @@ def search_video_diag(query, keys, ttl=DEFAULT_TTL, artist=None, title=None, lab
     return (vid or None), ("" if vid else why)
 
 
+_YT_ID_RE = re.compile(
+    r"(?:youtube\.com/(?:watch\?(?:[^#]*&)?v=|embed/|v/|shorts/)|youtu\.be/)([A-Za-z0-9_-]{11})")
+
+
+def youtube_id(url):
+    """Identifiant de vidéo contenu dans `url`, ou "" si ce n'en est pas une.
+
+    Les vidéos attachées à une sortie Discogs (`release["videos"][]["uri"]`) sont
+    presque toujours des liens YouTube, mais sous plusieurs graphies (watch?v=,
+    youtu.be, embed). L'appli, elle, ne manipule que l'identifiant : la playlist
+    RECOS RADAR le stocke (`video_id`) et le lecteur IFrame ne lit que ça."""
+    m = _YT_ID_RE.search(url or "")
+    return m.group(1) if m else ""
+
+
+def _is_playable(item):
+    """Une entrée de `/videos` est-elle lisible par un visiteur ? (traitée, et
+    publique ou non listée). Partagé par `_best_match` et `playable_video` : une
+    vidéo privée, supprimée ou encore en cours de traitement ne doit jamais
+    entrer dans la playlist, quelle que soit sa provenance."""
+    st = (item or {}).get("status", {})
+    return st.get("uploadStatus") == "processed" and st.get("privacyStatus") in ("public", "unlisted")
+
+
+def playable_video(vid, keys):
+    """La vidéo `vid` est-elle lisible ? Pour valider un identifiant qu'on tient
+    déjà d'ailleurs (vidéo attachée à une sortie Discogs) plutôt que d'une
+    recherche : 1 unité de quota (`/videos`) au lieu d'environ 101 pour une
+    recherche complète, et cette métrique-là reste servie quand le quota de
+    RECHERCHE de la journée est épuisé (cf. point 52 de CLAUDE.md). `False` en
+    cas d'erreur API non classée : sans confirmation, on ne publie pas.
+    `QuotaExhausted`/`RateLimited` remontent à l'appelant, comme ailleurs."""
+    if not vid:
+        return False
+    try:
+        d = request("/videos", {"part": "status", "id": vid}, keys)
+    except (QuotaExhausted, RateLimited):
+        raise
+    except RuntimeError:
+        return False
+    return any(_is_playable(it) for it in d.get("items", []) if it.get("id") == vid)
+
+
 def _best_match(ids, query, artist, title, label, keys):
     """(meilleur id lisible, raison d'échec) parmi `ids`, selon recoupement des
     métadonnées (snippet : titre, chaîne, description) avec la piste demandée. Coût
@@ -351,11 +394,7 @@ def _best_match(ids, query, artist, title, label, keys):
     items = {it.get("id"): it for it in d.get("items", [])}
 
     def playable(i):
-        it = items.get(i)
-        if not it:
-            return False
-        st = it.get("status", {})
-        return st.get("uploadStatus") == "processed" and st.get("privacyStatus") in ("public", "unlisted")
+        return _is_playable(items.get(i))
 
     # `want`/`t_toks` sur le titre "core" (sans mentions de version type
     # « (Original Mix) ») : ces mentions n'apparaissent presque jamais telles

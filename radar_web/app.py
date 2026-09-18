@@ -29,7 +29,7 @@ from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, la
                     learn, paths, sellers, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
-from .radar.textmatch import overlap, toks
+from .radar.textmatch import best_video_uri
 
 
 def _pu():
@@ -1432,20 +1432,14 @@ def tracklist(request: Request, rid: int):
     labels = data.get("labels") or []
     label1 = (labels[0].get("name") if labels and isinstance(labels[0], dict) else "") or ""
     year = data.get("year") or ""
-    videos = [{"uri": v.get("uri"), "tok": toks(v.get("title"))}
-              for v in (data.get("videos") or []) if v.get("uri")]
+    videos = data.get("videos") or []
     rows = []
     for t in real_tracks(data.get("tracklist", [])):
         ttl = (t.get("title") or "").strip()
         tart = ", ".join(a.get("name", "") for a in t.get("artists", [])) or ra
-        want = toks(f"{tart} {ttl}")
-        best, best_sc = None, 0.0
-        for v in videos:
-            sc = overlap(want, v["tok"])
-            if sc > best_sc:
-                best, best_sc = v, sc
-        if best and best_sc >= 0.55:
-            play, kind = best["uri"], "discogs"
+        uri = best_video_uri(videos, tart, ttl)
+        if uri:
+            play, kind = uri, "discogs"
         else:
             q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
             play, kind = "/yt/first?q=" + quote_plus(q), "yt"

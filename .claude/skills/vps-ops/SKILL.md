@@ -10,8 +10,9 @@ description: >
   JAMAIS à la session de dev cloud (dépôt frais, sans accès VPS/données
   réelles) — celle-là ne doit pas suivre ce contrat, elle code et ouvre des
   PR. Déclencheurs : "diagnostic VPS", "vérifie en prod", "lance ce job sur
-  le VPS", "redémarre le conteneur", ou toute demande d'action/vérification
-  qui suppose un accès réel au serveur.
+  le VPS", "redémarre le conteneur", "active ce drapeau", "ajoute la variable
+  au .env", ou toute demande d'action/vérification qui suppose un accès réel
+  au serveur.
 ---
 
 # Opérations VPS — contrat
@@ -19,8 +20,16 @@ description: >
 Tu es une session Claude Code qui tourne directement sur le VPS de
 production, avec un accès que la session de dev cloud n'a jamais : la base
 réelle, les conteneurs, les jobs en cours, les logs, les données. Historique
-de ce contrat (créé 02/09, élargi 17/09) → `CLAUDE.md` pt 5/59 du dépôt
-`radar`.
+de ce contrat (créé 02/09, élargi 17/09 puis 18/09) → `CLAUDE.md`
+pt 5/59/63 du dépôt `radar`.
+
+**Tes droits viennent de deux sources, et elles doivent bouger ensemble** :
+ce fichier (dans le dépôt, modifié par la session cloud via PR) dit ce que tu
+as le **droit** de faire ; `~/.claude/settings.json` (sur le VPS, hors dépôt,
+modifié par l'utilisateur seul) dit ce que tu **peux techniquement** faire.
+Tu ne modifies jamais `settings.json` toi-même. Si une action autorisée ici
+t'est refusée par les permissions machine, dis-le à l'utilisateur en une
+ligne — c'est à lui d'ouvrir la permission, pas à toi de contourner.
 
 La session de dev cloud (sur `claude.ai/code`, jamais sur le VPS) code et
 ouvre des PR. **Le code ne passe jamais par toi** : deux mains sur le même
@@ -44,7 +53,9 @@ s'est élargi le 17/09.
 - **Ne jamais modifier le code de l'appli.** `~/radar` est en lecture seule.
   `git pull` pour lire la version déployée : oui. Commit, push, checkout
   d'une autre branche, édition d'un fichier : non — tout changement de code
-  passe par la session cloud, via PR.
+  passe par la session cloud, via PR. **Une seule exception, ajoutée le
+  18/09** : les drapeaux `RADAR_*` du `.env` (section dédiée plus bas). Elle
+  ne s'étend à aucun autre fichier du dépôt.
 - **Ne jamais écrire dans `/data` à la main.** Ouvrir SQLite en lecture
   seule (`sqlite3.connect("file:...?mode=ro", uri=True)`), lire les JSON,
   jamais écrire/déplacer/supprimer toi-même (édition directe d'un fichier,
@@ -98,6 +109,63 @@ l'opérationnel VPS ne passe plus par la session cloud**.
   job existant par une réimplémentation ad hoc (relancer le vrai job, pas le
   reproduire à la main).
 
+## Drapeaux d'environnement `~/radar/.env` — élargi le 18/09
+
+C'est la **seule exception** à « `~/radar` est en lecture seule ». Activer une
+fonctionnalité en production passe par une ligne du `.env`, puis par une
+recréation des conteneurs : sans cette exception, tu ne peux que signaler
+qu'un opt-in manque, jamais l'appliquer.
+
+**Ce que tu peux modifier** : les lignes de bascule fonctionnelle préfixées
+`RADAR_`, **sauf** les cinq clés ci-dessous, qui restent interdites sans
+exception malgré leur préfixe :
+
+| Clé interdite | Pourquoi |
+|---|---|
+| `RADAR_NO_AUTH` | désactive toute l'authentification de l'appli (`radar_web/app.py`) |
+| `RADAR_WEB_BIND` | adresse de publication du port 8600 (`docker-compose.yml`) — défaut `127.0.0.1` ; la changer peut exposer l'appli sur Internet |
+| `RADAR_SECURE_COOKIE` | drapeau de sécurité du cookie de session |
+| `RADAR_UID` | utilisateur sous lequel tournent les jobs — le changer fait écrire les jobs dans les données de quelqu'un d'autre |
+| `RADAR_FEEDBACK_GH_TOKEN` | c'est un secret, malgré son préfixe |
+
+Les drapeaux réellement concernés aujourd'hui : `RADAR_CATALOG_LABELGRAPH`,
+`RADAR_SCORESTORE`, `RADAR_RECOS_SCAN`, `RADAR_RECO_INDEX`,
+`RADAR_AUTO_MAINTENANCE`, `RADAR_DISCOGS_DUMP_SYNC`. Une future clé `RADAR_*`
+absente du tableau d'interdits est autorisée d'office : si elle est sensible,
+c'est à la session cloud de l'ajouter à ce tableau dans la PR qui
+l'introduit.
+
+**Activer un drapeau : demande l'accord de l'utilisateur d'abord.** Un opt-in
+a un coût d'exploitation réel — le worker exécute ses jobs en série, sans
+préemption (pt 46 de `CLAUDE.md`) : un job long retarde d'autant un clic
+utilisateur déjà en file. Explique le coût, propose, attends la réponse.
+**Désactiver un drapeau pendant un incident est autonome** : une remédiation
+urgente n'attend pas.
+
+Conditions, à chaque modification :
+
+- **Sauvegarde horodatée avant toute écriture** :
+  `cp ~/radar/.env ~/radar/.env.bak-$(date -u +%Y%m%dT%H%M%SZ)`.
+  Elle reste dans `~/radar/` (couverte par `.gitignore`, jamais commitée) —
+  **jamais dans `~/radar-diag/`**, qui est poussé sur GitHub : ce fichier
+  contient tous les secrets du `.env`.
+- **Ne jamais afficher ni journaliser une ligne de secret** (`APP_PASSWORD`,
+  `YOUTUBE_API_KEY`, `YOUTUBE_OAUTH_CLIENT_ID`, `YOUTUBE_OAUTH_CLIENT_SECRET`,
+  `RADAR_FEEDBACK_GH_TOKEN`), même partiellement. Lis la seule ligne qui
+  t'intéresse (`grep '^RADAR_RECO_INDEX=' ~/radar/.env`), jamais le fichier
+  entier : un `cat .env` met tous les secrets dans le transcript, donc
+  potentiellement dans un rapport.
+- **Annonce la valeur avant et après** dans le bloc « Actions effectuées » du
+  rapport — clé, ancienne valeur, nouvelle valeur.
+- **Recrée les conteneurs** pour que la valeur soit relue : un conteneur qui
+  reste « Running » après un changement d'environnement ne l'a pas relu
+  (`docker compose up -d --force-recreate`, piège du pt 2 de `CLAUDE.md`).
+  Les garde-fous de la section précédente s'appliquent : aucun job long en
+  cours, aucun déploiement automatique en vol.
+- **Rien d'autre dans `~/radar`.** Cette exception porte sur les lignes
+  `RADAR_*` autorisées du `.env`, point. Aucun autre fichier, jamais de
+  commit, et jamais un `git pull` destiné à écraser un état local.
+
 ## Ton outillage : `~/radar-diag/`
 
 Tu as le droit — et c'est encouragé — de développer tes propres outils de
@@ -106,6 +174,12 @@ hors du dépôt de l'appli.
 
 - Versionne-les dans leur propre dépôt git (`radar-diag`), pushé sur GitHub :
   un VPS se reconstruit, ton outillage ne doit pas disparaître avec.
+- **Prérequis, à vérifier si le VPS est un jour reconstruit** : `radar-diag`
+  est un dépôt distinct de `radar`, et une clé de déploiement GitHub ne vaut
+  que pour un seul dépôt. Sans une clé dédiée autorisée en écriture sur
+  `radar-diag` (clé + alias SSH, en place depuis le 18/09), ni ton outillage
+  ni ta mémoire ne sortent de la machine — c'était le cas jusque-là, et les
+  `git commit`/`git push` échouaient.
 - Structure suggérée : `checks/` (un script par vérification, autonome,
   sortie texte ou JSON), `run.sh` (enchaîne les checks du run courant),
   `README.md` (ce que chaque check vérifie et pourquoi).
@@ -114,6 +188,36 @@ hors du dépôt de l'appli.
 - Tes scripts respectent les mêmes interdits que toi : lecture seule sur
   l'appli et ses données ; un job lancé via `crate_jobs.py`/Docker, lui, peut
   écrire dans `/data` normalement (cf. ci-dessus).
+
+## Ta mémoire persistante : `~/radar-diag/memory/`
+
+Ta mémoire vit dans `~/radar-diag/memory/`, versionnée dans le dépôt
+`radar-diag` ci-dessus. Le dossier que Claude Code charge automatiquement,
+`~/.claude/projects/-home-ubuntu-radar/memory/`, est un lien symbolique vers
+ce dossier : ce que tu écris là est à la fois rechargé dans tes sessions
+suivantes et versionné.
+
+Deux usages, à ne pas confondre :
+
+- **Fichiers de mémoire** — faits durables, un fichier par sujet, avec un
+  frontmatter `name` / `description` / `metadata.type`.
+- **`memory/journal/<AAAA-MM>.md`** — une entrée horodatée UTC par action qui
+  change un état en production : la commande, le motif, le résultat, le sha
+  déployé au moment de l'action. Une action déclarée dans « Actions
+  effectuées » se journalise aussi ici.
+
+**Frontière avec `CLAUDE.md`, c'est le point important** : `CLAUDE.md` reste
+la vérité projet, écrite uniquement par la session cloud, via PR. Ta mémoire
+ne la duplique pas et ne la corrige pas — elle enregistre l'opérationnel : ce
+qui a réellement tourné, ce qui a été mesuré, ce qui reste à vérifier. Une
+correction à apporter à `CLAUDE.md` se demande à la session cloud, dans un
+brief ; elle ne s'écrit pas dans ta mémoire.
+
+Mêmes interdits que partout ailleurs : **aucun secret dans un fichier de
+mémoire** — il part sur GitHub comme le reste.
+
+**Committe et pousse `radar-diag` en fin d'intervention**, mémoire et
+outillage compris.
 
 ## Ce que tu vérifies, en diagnostic
 
@@ -150,8 +254,10 @@ Structure, dans cet ordre :
 
 sha déployé : <sha court> · run : <horodatage UTC>
 
-## Actions effectuées (si tu as changé un état — job lancé, conteneur redémarré/rebuild)
-<liste horodatée : quoi, pourquoi, résultat. Vide si run purement observationnel.>
+## Actions effectuées (si tu as changé un état — job lancé, conteneur redémarré/rebuild, drapeau .env modifié)
+<liste horodatée UTC : quoi, pourquoi, résultat. Pour un drapeau : clé,
+valeur avant, valeur après, jamais la valeur d'une ligne de secret. Vide si
+run purement observationnel.>
 
 ### [B1] <titre court>          ← B = bloquant, M = majeur, m = mineur
 - **Où** : fichier:ligne, ou « runtime VPS » / « base /data »

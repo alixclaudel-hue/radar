@@ -1,0 +1,61 @@
+{% import "partials/_icons.html" as icons -%}
+{#- Lignes de la playlist RECOS RADAR — extrait de pages/reco_radar.html pour que
+   la suppression d'une piste (🗑️) puisse rendre le tableau à jour sans recharger
+   la page (retour utilisateur 2026-09-18, cf. app.py::reco_radar_delete_track).
+   Le tbody entier est remplacé, pas juste la ligne retirée : la numérotation (#)
+   reste ainsi juste. Le JS de la page écoute par délégation sur la table, pas sur
+   les lignes, pour survivre à ce remplacement. -#}
+<tbody id="reco-rows">
+  {% for t in playlist %}
+  <tr data-vid="{{ t.video_id }}">
+    <td class="small muted">
+      {{ loop.index }}
+      {% if t.album_score is not none %}
+      <span class="badge small" title="Score album /100">{{ icons.album() }} {{ t.album_score }}</span>
+      {% endif %}
+    </td>
+    <td>{{ t.artist }} - {{ t.title }}</td>
+    <td>
+      {{ t.release_title or '—' }}
+      {% if t.label %}<br><a class="small" href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}
+    </td>
+    <td class="num small muted">{{ t.year or '—' }}</td>
+    <td>
+      {% set v = (voted or {}).get(t.release_id) %}
+      <span class="vote" hx-swap="outerHTML">
+        {% if v %}
+          <span class="small muted {{ 'up' if v == 'up' else 'down' }}">{{ icons.thumbup() if v == 'up' else icons.thumbdown() }}</span>
+        {% else %}
+        <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ t.release_id }}","name":{{ (t.release_title or "")|tojson }},"verdict":"up","score":"{{ t.album_score }}","f_label":"{{ (t.d_label or 0)/100 }}","f_artist":"{{ (t.d_artist or 0)/100 }}","f_style":"{{ (t.d_style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
+        <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ t.release_id }}","name":{{ (t.release_title or "")|tojson }},"verdict":"down","score":"{{ t.album_score }}","f_label":"{{ (t.d_label or 0)/100 }}","f_artist":"{{ (t.d_artist or 0)/100 }}","f_style":"{{ (t.d_style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
+        {% endif %}
+      </span>
+    </td>
+    <td>
+      <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t"
+         target="_blank" rel="noopener" class="ic-btn" title="Chercher sur Bandcamp">{{ icons.bandcamp() }}</a>
+    </td>
+    <td>
+      {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
+        <span class="small ok" title="Déjà en wantlist">✓</span>
+      {% else %}
+      <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
+        <input type="hidden" name="rid" value="{{ t.release_id }}">
+        <input type="hidden" name="title" value="{{ t.release_title }}">
+        <input type="hidden" name="artist" value="{{ t.artist }}">
+        <!-- titre de la PISTE : sert à retrouver les pressages vinyle quand la
+             sortie proposée n'est pas du vinyle (cf. app.py::cart_add) -->
+        <input type="hidden" name="track" value="{{ t.title }}">
+        <input type="hidden" name="label" value="{{ t.label or '' }}">
+        <button type="submit" class="ic-btn" title="Ajouter le release à la wantlist Discogs">{{ icons.cart() }}</button>
+      </form>
+      {% endif %}
+    </td>
+    <td>
+      <button type="button" class="small" title="Retirer cette piste de la playlist"
+              hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'
+              hx-target="#reco-rows" hx-swap="outerHTML">🗑️</button>
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>

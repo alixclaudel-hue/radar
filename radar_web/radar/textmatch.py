@@ -38,3 +38,44 @@ def overlap(want, cand):
     if not want or not cand:
         return 0.0
     return len(want & cand) / len(want)
+
+
+# Seuil de recouvrement au-dessus duquel une vidéo attachée à une sortie Discogs
+# est considérée comme étant CETTE piste. Valeur d'origine de la tracklist de
+# /search (bouton play), reprise telle quelle par la playlist RECOS RADAR : une
+# vidéo mal appariée est pire que pas de vidéo (même principe que
+# ytcache.MIN_MATCH_SCORE).
+VIDEO_MATCH_MIN = 0.55
+# Le titre de la PISTE doit être couvert à lui seul, en plus du recouplement
+# global : une sortie porte une poignée de vidéos pour des pistes différentes,
+# toutes du même artiste. Sans cette seconde condition, « Inland Knights —
+# Inconnue » repassait le seuil global face à la vidéo « Inland Knights — 12
+# Till 8 » (2 jetons partagés sur 3) et héritait de la vidéo d'une AUTRE piste.
+VIDEO_TITLE_MATCH_MIN = 0.5
+
+
+def best_video_uri(videos, artist, title, min_overlap=VIDEO_MATCH_MIN,
+                    min_title_overlap=VIDEO_TITLE_MATCH_MIN):
+    """URL de la vidéo qui correspond le mieux à `artist` + `title` parmi les
+    vidéos attachées à une sortie Discogs (`release["videos"]`), ou "" si aucune
+    ne satisfait les deux seuils.
+
+    Partagé par la tracklist de /search (bouton play) et par la playlist RECOS
+    RADAR, qui cherchent la même chose : Discogs a-t-il déjà la vidéo de cette
+    piste, avant de dépenser une recherche YouTube ? Les entrées sans `uri` sont
+    ignorées, une liste vide ou `None` renvoie "". Un titre vide ne peut rien
+    apparier : sans titre, rien ne distingue les pistes d'une même sortie."""
+    want = toks(f"{artist or ''} {title or ''}")
+    t_toks = toks(title)
+    best, best_sc = "", 0.0
+    for v in videos or []:
+        uri = (v or {}).get("uri")
+        if not uri:
+            continue
+        v_toks = toks(v.get("title"))
+        if overlap(t_toks, v_toks) < min_title_overlap:
+            continue
+        sc = overlap(want, v_toks)
+        if sc > best_sc:
+            best, best_sc = uri, sc
+    return best if best_sc >= min_overlap else ""

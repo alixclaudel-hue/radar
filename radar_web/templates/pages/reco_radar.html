@@ -42,98 +42,82 @@
 <div class="tbl-wrap">
 <table class="tbl">
   <thead><tr>
-    <th style="width:34px">#</th>
+    <th style="width:52px">#</th>
     <th>Track</th>
-    <th>Release</th>
-    <th>Label</th>
+    <th>Release / Label</th>
     <th class="num" style="width:60px">Année</th>
-    <th class="num" style="width:60px">Score</th>
     <th style="width:64px"></th>
     <th style="width:34px"></th>
     <th style="width:34px"></th>
     <th style="width:34px"></th>
   </tr></thead>
-  <tbody id="reco-rows">
-    {% for t in playlist %}
-    <tr data-index="{{ loop.index0 }}">
-      <td class="small muted">{{ loop.index }}</td>
-      <td>{{ t.artist }} - {{ t.title }}</td>
-      <td>{{ t.release_title or '—' }}</td>
-      <td>{% if t.label %}<a href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}</td>
-      <td class="num small muted">{{ t.year or '—' }}</td>
-      <td class="num small muted">{{ t.album_score }}</td>
-      <td>
-        {% set v = (voted or {}).get(t.release_id) %}
-        <span class="vote" hx-swap="outerHTML">
-          {% if v %}
-            <span class="small muted {{ 'up' if v == 'up' else 'down' }}">{{ icons.thumbup() if v == 'up' else icons.thumbdown() }}</span>
-          {% else %}
-          <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ t.release_id }}","name":{{ (t.release_title or "")|tojson }},"verdict":"up","score":"{{ t.album_score }}","f_label":"{{ (t.d_label or 0)/100 }}","f_artist":"{{ (t.d_artist or 0)/100 }}","f_style":"{{ (t.d_style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
-          <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ t.release_id }}","name":{{ (t.release_title or "")|tojson }},"verdict":"down","score":"{{ t.album_score }}","f_label":"{{ (t.d_label or 0)/100 }}","f_artist":"{{ (t.d_artist or 0)/100 }}","f_style":"{{ (t.d_style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>
-          {% endif %}
-        </span>
-      </td>
-      <td>
-        <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t"
-           target="_blank" rel="noopener" class="ic-btn" title="Chercher sur Bandcamp">{{ icons.bandcamp() }}</a>
-      </td>
-      <td>
-        {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
-          <span class="small ok" title="Déjà en wantlist">✓</span>
-        {% else %}
-        <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
-          <input type="hidden" name="rid" value="{{ t.release_id }}">
-          <input type="hidden" name="title" value="{{ t.release_title }}">
-          <input type="hidden" name="artist" value="{{ t.artist }}">
-          <!-- titre de la PISTE : sert à retrouver les pressages vinyle quand la
-               sortie proposée n'est pas du vinyle (cf. app.py::cart_add) -->
-          <input type="hidden" name="track" value="{{ t.title }}">
-          <input type="hidden" name="label" value="{{ t.label or '' }}">
-          <button type="submit" class="ic-btn" title="Ajouter le release à la wantlist Discogs">{{ icons.cart() }}</button>
-        </form>
-        {% endif %}
-      </td>
-      <td>
-        <form method="post" action="/reco-radar/delete">
-          <input type="hidden" name="video_id" value="{{ t.video_id }}">
-          <button type="submit" class="small" title="Retirer cette piste de la playlist">🗑️</button>
-        </form>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
+  {% include "partials/reco_rows.html" %}
 </table>
 </div>
 
 <script>
 (() => {
-  const videoIds = {{ playlist | map(attribute='video_id') | list | tojson }};
-  const rows = document.querySelectorAll('#reco-rows tr');
+  // Le lecteur IFrame charge SA liste de vidéos une fois, au chargement de la page.
+  // Les lignes du tableau, elles, sont remplacées à chaque suppression (htmx, sans
+  // rechargement — retour utilisateur 2026-09-18). Les deux sont donc appariés par
+  // identifiant de vidéo (data-vid), jamais par position : un index de ligne se
+  // décale dès la première suppression, un identifiant non. Conséquence assumée :
+  // une piste supprimée reste dans la liste du LECTEUR jusqu'au prochain
+  // chargement de page ; si elle est en cours de lecture, on passe à la suivante.
+  const initialIds = {{ playlist | map(attribute='video_id') | list | tojson }};
+  const wrap = document.querySelector('.tbl-wrap');
   let player = null;
 
-  function highlight(index) {
-    rows.forEach(r => r.classList.toggle('now-playing', Number(r.dataset.index) === index));
-    const active = rows[index];
+  const rows = () => wrap.querySelectorAll('#reco-rows tr');
+  const currentVid = () => {
+    if (!player || !player.getPlaylist) return null;
+    const list = player.getPlaylist() || [];
+    return list[player.getPlaylistIndex()] || null;
+  };
+
+  function highlight() {
+    const vid = currentVid();
+    let active = null;
+    rows().forEach(r => {
+      const on = r.dataset.vid === vid;
+      r.classList.toggle('now-playing', on);
+      if (on) active = r;
+    });
     if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  rows.forEach(r => r.addEventListener('click', (e) => {
-    if (e.target.closest('button, a, form')) return;
-    const idx = Number(r.dataset.index);
-    if (player) player.playVideoAt(idx);
+  wrap.addEventListener('click', (e) => {
+    const r = e.target.closest('#reco-rows tr');
+    if (!r || e.target.closest('button, a, form')) return;
+    const vid = r.dataset.vid;
+    if (player) {
+      const idx = (player.getPlaylist() || []).indexOf(vid);
+      if (idx >= 0) player.playVideoAt(idx);
+    }
     fetch('/reco-radar/mark-played', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'video_id=' + encodeURIComponent(videoIds[idx]),
+      body: 'video_id=' + encodeURIComponent(vid),
     });
-  }));
+  });
+
+  // Après une suppression : si la piste retirée est celle en cours de lecture,
+  // sa ligne n'existe plus — on enchaîne sur la suivante plutôt que de laisser
+  // jouer un titre que l'utilisateur vient d'écarter.
+  wrap.addEventListener('htmx:afterSwap', () => {
+    const vid = currentVid();
+    if (player && vid && !wrap.querySelector(`#reco-rows tr[data-vid="${vid}"]`)) {
+      player.nextVideo();
+    }
+    highlight();
+  });
 
   window.onYouTubeIframeAPIReady = () => {
     player = new YT.Player('yt-player', {
       playerVars: { playsinline: 1 },
       events: {
-        onReady: () => player.loadPlaylist({ playlist: videoIds, index: 0 }),
-        onStateChange: () => highlight(player.getPlaylistIndex()),
+        onReady: () => player.loadPlaylist({ playlist: initialIds, index: 0 }),
+        onStateChange: highlight,
       },
     });
   };

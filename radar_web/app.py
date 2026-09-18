@@ -29,7 +29,7 @@ from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, la
                     learn, paths, sellers, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
-from .radar.textmatch import overlap, toks
+from .radar.textmatch import best_video_uri
 
 
 def _pu():
@@ -497,19 +497,26 @@ def reco_radar_page(request: Request):
                   in_cart=_cart_ids(), voted=_voted_map())
 
 
-@app.post("/reco-radar/delete")
-def reco_radar_delete_track(video_id: str = Form("")):
+@app.post("/reco-radar/delete", response_class=HTMLResponse)
+def reco_radar_delete_track(request: Request, video_id: str = Form("")):
     """Retire UNE piste de la playlist RECOS RADAR à la main (retour utilisateur
     2026-09-10). N'efface pas recos_history.json : la vidéo reste marquée « déjà
-    proposée » et ne sera pas réajoutée automatiquement par un futur scan. Rechargement
-    complet de la page (pas de htmx) : le lecteur IFrame charge sa liste de vidéos une
-    fois au chargement, une suppression en place la désynchroniserait des lignes."""
+    proposée » et ne sera pas réajoutée automatiquement par un futur scan.
+
+    Renvoie le tableau des pistes à jour (htmx, plus de rechargement complet de la
+    page — retour utilisateur 2026-09-18). Le tbody ENTIER est rendu, pas seulement
+    la ligne retirée, pour que la numérotation (#) reste juste. Le lecteur IFrame,
+    lui, garde la liste de vidéos chargée au démarrage : la page l'apparie aux
+    lignes par identifiant de vidéo et non par position, justement pour survivre à
+    ces suppressions (cf. le script de pages/reco_radar.html)."""
+    playlist = load(_pu().recos_playlist, [])
     if video_id:
-        playlist = load(_pu().recos_playlist, [])
         new_playlist = [t for t in playlist if t.get("video_id") != video_id]
         if len(new_playlist) != len(playlist):
             save(_pu().recos_playlist, new_playlist)
-    return RedirectResponse("/reco-radar", status_code=303)
+            playlist = new_playlist
+    return frag(request, "partials/reco_rows.html", playlist=playlist,
+                in_cart=_cart_ids(), voted=_voted_map())
 
 
 @app.post("/reco-radar/mark-played")
@@ -1425,20 +1432,14 @@ def tracklist(request: Request, rid: int):
     labels = data.get("labels") or []
     label1 = (labels[0].get("name") if labels and isinstance(labels[0], dict) else "") or ""
     year = data.get("year") or ""
-    videos = [{"uri": v.get("uri"), "tok": toks(v.get("title"))}
-              for v in (data.get("videos") or []) if v.get("uri")]
+    videos = data.get("videos") or []
     rows = []
     for t in real_tracks(data.get("tracklist", [])):
         ttl = (t.get("title") or "").strip()
         tart = ", ".join(a.get("name", "") for a in t.get("artists", [])) or ra
-        want = toks(f"{tart} {ttl}")
-        best, best_sc = None, 0.0
-        for v in videos:
-            sc = overlap(want, v["tok"])
-            if sc > best_sc:
-                best, best_sc = v, sc
-        if best and best_sc >= 0.55:
-            play, kind = best["uri"], "discogs"
+        uri = best_video_uri(videos, tart, ttl)
+        if uri:
+            play, kind = uri, "discogs"
         else:
             q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
             play, kind = "/yt/first?q=" + quote_plus(q), "yt"

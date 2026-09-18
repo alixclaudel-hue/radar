@@ -68,7 +68,12 @@
                   onclick="var t=document.getElementById('tracks-{{ rr.id }}'); if(t.dataset.loaded==='1'){t.innerHTML='';t.dataset.loaded='';}else{t.dataset.loaded='1';htmx.ajax('GET','/release/{{ rr.id }}/tracks',{target:t,swap:'innerHTML'});}">{{ icons.tracks() }}</button>
           {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener"
              title="Fiche Discogs" class="ic-btn">{{ icons.discogs() }}</a>{% endif %}
-          {% if in_cart and (rr.id | string) in in_cart %}
+          {% if seller %}
+            {% if rr.listing_id %}
+            <a href="https://www.discogs.com/sell/item/{{ rr.listing_id }}" target="_blank" rel="noopener"
+               title="Ajouter au panier chez {{ seller }} (Discogs)" class="ic-btn">{{ icons.cart() }}</a>
+            {% endif %}
+          {% elif in_cart and (rr.id | string) in in_cart %}
             <span class="small ok">✓ en wantlist</span>
           {% else %}
           <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">

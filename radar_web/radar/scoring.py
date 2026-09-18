@@ -83,6 +83,25 @@ def _config_scoring_sig(cfg):
     return hashlib.sha1(json.dumps(subset, sort_keys=True, default=str).encode()).hexdigest()
 
 
+def derived_key(uid, cfg):
+    """Signature des ENTRÉES de tous les nœuds dérivés de `Ctx` : identité de
+    l'utilisateur, sous-arbre de config qui compte (`_config_scoring_sig`) et
+    (mtime, taille) de chaque fichier lu. Toute écriture d'un job ou de
+    `save_config` la change, ce qui invalide d'office le cache mémoire
+    (`_DERIVED`) et le cache disque de `reco_index` (`recoindex.py`).
+
+    Volontairement calculable SANS instancier `Ctx` : le worker doit pouvoir
+    dire si le cache disque est encore valide sans payer les ~4 s de
+    chargement d'un `Ctx` (dont `producer_graph.json`, 69,3 Mo en prod).
+    Une seule définition pour les deux usages -- deux copies dériveraient."""
+    from . import catalog_labelgraph as clg
+    from . import discogs_dump as dd
+    P = paths.user_paths(uid)
+    return (uid, _config_scoring_sig(cfg), _files_sig(
+        P.graph, P.artists_res, P.corpus, P.collection, P.profile,
+        dd.DB_PATH, clg.DB_PATH))
+
+
 # Lot 3 (refonte scoring) : graphe explicite des nœuds de calcul de Ctx, chacun
 # listant les AUTRES nœuds dont il dépend. Avant ce lot, ces dépendances n'existaient
 # que sous forme d'appels `self.xxx()` enchevêtrés dans le corps des méthodes — vrai
@@ -104,7 +123,11 @@ NODE_DEPS = {
     "label_artist_signal": ("ascore",),
     "label_db_signal": ("artist_tier_map", "graph_rescore", "label_tier_map"),
     "reco_rows": ("label_artist_signal", "label_db_signal", "label_tier_map", "wmap"),
-    "reco_index": ("reco_rows",),
+    # reco_index dérivait de reco_rows jusqu'au 18/09 : il portait donc les 787 Mo de
+    # lignes complètes en mémoire alors qu'il n'en retient que {clé: score} (20 Mo
+    # mesurés en prod). Les deux nœuds partagent maintenant le même générateur
+    # (`_iter_reco_rows`) et les mêmes dépendances, sans l'un retenir l'autre.
+    "reco_index": ("label_artist_signal", "label_db_signal", "label_tier_map", "wmap"),
 }
 
 
@@ -171,10 +194,7 @@ class Ctx:
         self.resolved = store.load_cached(self.P.resolved, {})
         self.artists_res = store.load_cached(self.P.artists_res, {})
         self.graph = store.load_cached(self.P.graph, {})
-        from . import discogs_dump as dd
-        self._key = (self.uid, _config_scoring_sig(self.cfg), _files_sig(
-            self.P.graph, self.P.artists_res,
-            self.P.corpus, self.P.collection, self.P.profile, dd.DB_PATH))
+        self._key = derived_key(self.uid, self.cfg)
 
     def _memo(self, name, compute):
         stack = _node_stack()
@@ -656,16 +676,63 @@ class Ctx:
 
     @property
     def reco_index(self):
-        # reco_rows() est déjà mémoïsé, mais reconstruire ce dict à chaque accès a un
-        # coût réel : album_score() y accède dans une boucle, sur ~50-100 lignes de
-        # résultats par recherche -> autant de rebuilds d'un dict de la taille de la
-        # base de labels (diagnostic Lot 1, mineur).
-        return self._memo("reco_index", lambda: {r["key"]: r["score"] for r in self.reco_rows()})
+        """{label_key: score} — la seule partie de la reco dont `album_score` ait
+        besoin. Mémoïsé : `album_score()` y accède dans une boucle, sur ~50-100
+        lignes de résultats par recherche (diagnostic Lot 1).
+
+        Ne passe plus par `reco_rows()` depuis le 18/09 (brief VPS, M1) : les
+        lignes complètes pèsent 787 Mo en prod (465 284 dicts à 11 clés) contre
+        20 Mo pour cet index, et `reco_rows` étant lui aussi mémoïsé, ces 787 Mo
+        restaient en mémoire pour rien sur tout le chemin recherche. Les deux
+        nœuds consomment maintenant le même générateur, sans que l'un retienne
+        l'autre — aucune règle de scoring ne change, les scores sont identiques."""
+        return self._memo("reco_index", self._compute_reco_index)
+
+    def _compute_reco_index(self):
+        # Cache disque (recoindex.py, brief VPS 18/09 M1 couche 3) : le calcul complet
+        # met 183 s à froid en prod, payés par la première recherche après chaque
+        # redémarrage. Le worker le reconstruit hors requête ; ici on se contente de
+        # le relire quand sa signature correspond encore. Repli obligatoire sur le
+        # calcul en ligne : aucune page ne doit dépendre de l'existence du cache
+        # (première installation, changement de goût -> ralenti, jamais cassé).
+        from . import recoindex
+        cached = recoindex.load(self.uid, self._key)
+        if cached is not None:
+            return cached
+        return self.build_reco_index()
+
+    def build_reco_index(self):
+        """Recalcule l'index SANS lire le cache disque ni retenir les lignes.
+        Utilisé par le job `reco_index` (crate_jobs.py), qui alimente ce cache."""
+        return {r["key"]: r["score"] for r in self._iter_reco_rows()}
+
+    def reco_index_is_fresh(self):
+        """Le cache disque correspond-il aux données que CE `Ctx` a chargées ?"""
+        from . import recoindex
+        return recoindex.is_fresh(self.uid, self._key)
+
+    def save_reco_index(self):
+        """Recalcule l'index et l'écrit dans le cache disque ; renvoie son méta.
+        Réservé au job `reco_index` (worker) : 183 s à froid en prod, à ne
+        jamais déclencher depuis une requête HTTP."""
+        from . import recoindex
+        return recoindex.save(self.uid, self._key, self.build_reco_index())
 
     def reco_rows(self):
+        """Lignes complètes, triées par score décroissant — pour l'affichage
+        (`/univers/reco/labels`). Beaucoup plus lourd que `reco_index` : ne
+        l'appeler que si les colonnes autres que le score servent réellement."""
         return self._memo("reco_rows", self._compute_reco_rows)
 
     def _compute_reco_rows(self):
+        return sorted(self._iter_reco_rows(), key=lambda r: r["score"], reverse=True)
+
+    def _iter_reco_rows(self):
+        """Produit les lignes de reco une à une, dans un ordre quelconque.
+
+        Corps commun à `reco_rows` (qui retient tout et trie) et à `reco_index`
+        (qui ne retient que {clé: score}) : c'est ce qui permet au chemin
+        recherche de ne jamais matérialiser les 465 284 lignes complètes."""
         lc = self.collection.get("label_counts", {})
         wc = self.collection.get("want_label_counts", {})
         cs = self.corpus_label_scores()
@@ -697,7 +764,6 @@ class Ctx:
         # style) ne doit pas s'afficher avec la même confiance qu'un label noté sur les
         # cinq à la fois — cf. brief VPS 17/09, constat 2.
         K, PRIOR = 0.35, 45
-        rows = []
         for k in keys:
             info = self.collection.get("label_ids", {}).get(k, {})
             aff, coverage = affinities[k]["aff"], affinities[k]["coverage"]
@@ -739,12 +805,10 @@ class Ctx:
             tot = sum(t[0] for t in terms)
             score = (min(100, round((sum(t[0] * t[1] for t in terms) + K * PRIOR) / (tot + K)))
                      if tot else 0)
-            rows.append({"key": k, "name": info.get("name") or db_names.get(k) or k, "score": score,
-                         "owned": lc.get(k, 0), "want": wc.get(k, 0),
-                         "corpus": round(cs.get(k, 0), 1), "aff": aff, "coverage": coverage,
-                         "artists": art_n, "tier": tier, "feat": feat})
-        rows.sort(key=lambda r: r["score"], reverse=True)
-        return rows
+            yield {"key": k, "name": info.get("name") or db_names.get(k) or k, "score": score,
+                   "owned": lc.get(k, 0), "want": wc.get(k, 0),
+                   "corpus": round(cs.get(k, 0), 1), "aff": aff, "coverage": coverage,
+                   "artists": art_n, "tier": tier, "feat": feat}
 
     # -------------------------------------------------------------- score album
     def album_score(self, r):

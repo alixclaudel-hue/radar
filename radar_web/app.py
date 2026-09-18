@@ -705,6 +705,8 @@ FEEDBACK_GH_ISSUE = 62
 
 def _hist_summary(p):
     bits = []
+    if p.get("seller"):
+        bits.append(f"chez {p['seller']}")
     if p.get("label"):
         bits.append(p["label"])
     if p.get("genre"):
@@ -941,14 +943,93 @@ def _local_rows_to_raw(rows, genres):
     return out
 
 
+SEARCH_SELLER_MAX_PAGES = 10          # 100 articles/page : 1000 articles au plus par recherche
+
+
+def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
+    """Articles « For Sale » d'un vendeur -> mêmes lignes que `_local_rows_to_raw`,
+    et (lignes, n_hors_dump, n_non_vinyle).
+
+    L'inventaire Discogs ne porte que `release_id`, `artist`, `format` et le prix :
+    ni style, ni genre, ni année, ni label. Tout ça est relu dans le référentiel
+    local PAR IDENTIFIANT (clé primaire, donc instantané) — c'est ce qui permet
+    d'appliquer à un vendeur exactement les mêmes filtres que le reste de la page
+    sans un appel API par disque.
+
+    Une sortie absente du référentiel (ajoutée sur Discogs depuis le dernier import
+    mensuel) n'a aucun de ces champs : elle est gardée telle quelle quand aucun
+    filtre ne porte dessus, et écartée sinon — on ne peut pas affirmer qu'elle passe
+    un filtre qu'on n'a pas les moyens de vérifier. Le compte est renvoyé pour le
+    dire à l'utilisateur plutôt que de l'escamoter.
+
+    Filtre vinyle comme le reste de /search (`search_local(vinyl_only=True)`, cf.
+    point 48 de CLAUDE.md) : cet écran répond à « quel disque acheter ». Le
+    référentiel tranche quand il connaît la sortie, sinon repli sur l'heuristique
+    de format de `sellers.is_12in`."""
+    from .radar import sellers as scat
+    needs_ref = bool(genres or styles or label.strip() or year_range)
+    out, n_off_dump, n_not_vinyl = [], 0, 0
+    con = dd.connect_readonly() if dd.available() else None
+    label_key = normalize_label(label) if label.strip() else ""
+    try:
+        for it in listings:
+            rid = it["release_id"]
+            ref = dd.lookup_release(rid, con) if con else None
+            if ref is None:
+                if needs_ref:
+                    n_off_dump += 1
+                    continue
+                if not scat.is_12in(it.get("format")):
+                    n_not_vinyl += 1
+                    continue
+                title = (f"{it['artist']} - {it['title']}" if it.get("artist") and it.get("title")
+                         else (it.get("title") or it.get("artist") or ""))
+                out.append({"id": rid, "title": title, "label": [], "style": [],
+                            "catno": "", "year": "", "cover_image": None, "thumb": None,
+                            "uri": f"/release/{rid}"})
+                continue
+            if not ref.get("is_vinyl"):
+                n_not_vinyl += 1
+                continue
+            row_styles = (ref.get("styles") or "").split(", ") if ref.get("styles") else []
+            row_genres = (ref.get("genres") or "").split(", ") if ref.get("genres") else []
+            if styles and not any(x in row_styles for x in styles):
+                continue
+            if genres and not any(g in row_genres for g in genres):
+                continue
+            if label_key and normalize_label(ref.get("label") or "") != label_key:
+                continue
+            if year_range:
+                yr = ref.get("year")
+                if not yr or not (year_range[0] <= yr <= year_range[1]):
+                    continue
+            title = (f"{ref['artist']} - {ref['title']}" if ref.get("artist")
+                     else (ref.get("title") or ""))
+            out.append({
+                "id": rid, "title": title,
+                "label": [ref["label"]] if ref.get("label") else [],
+                "style": row_styles, "catno": ref.get("catno") or "",
+                "year": ref.get("year") or "", "cover_image": None, "thumb": None,
+                "uri": f"/release/{rid}",
+            })
+    finally:
+        if con:
+            con.close()
+    return out, n_off_dump, n_not_vinyl
+
+
 @app.post("/search", response_class=HTMLResponse)
-def search_run(request: Request, label: str = Form(""),
+def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
                genre: str = Form(""), style: str = Form(""),
                year_from: str = Form(""), year_to: str = Form(""),
                pages: str = Form("2"),
                base_metric: str = Form(""), base_min: str = Form(""),
                label_min: str = Form(""), artist_min: str = Form(""),
                page: str = Form("1")):
+    """`seller` (nom d'utilisateur Discogs) restreint la recherche au stock « For
+    Sale » de CE vendeur : la source des sorties change, tous les autres filtres
+    de la page (label, genre, style, période, seuils de score) s'appliquent
+    ensuite à l'identique. Sans lui, comportement inchangé."""
     from .radar import discogs_dump as dd
     c = Ctx()
     token = c.cfg.get("token", "")
@@ -970,7 +1051,39 @@ def search_run(request: Request, label: str = Form(""),
     raw, seen_ids = [], set()
     used_local = dd.available()
     dump_date = None
-    if used_local:
+    seller = seller.strip().lstrip("@")
+    seller_note = None
+    if seller:
+        # Mode vendeur : la source des sorties devient son stock du moment, pas le
+        # référentiel ni la recherche Discogs. Court-circuite les deux chemins
+        # ci-dessous, y compris « chercher dans mes labels » (une même recherche ne
+        # peut pas partir de deux sources à la fois) — signalé plutôt que subi.
+        if not token:
+            return frag(request, "partials/results.html",
+                        error="Chercher chez un vendeur demande un token Discogs "
+                              "(Mon profil → Discogs) : son stock n'est lisible que par l'API.")
+        try:
+            listings, truncated = discogs.seller_inventory(
+                seller, token=token, max_pages=SEARCH_SELLER_MAX_PAGES)
+        except discogs.DiscogsError as e:
+            return frag(request, "partials/results.html",
+                        error=f"Vendeur « {seller} » : {e}")
+        yb = _year_bounds(year_from, year_to)
+        year_range = None if (yb[0] <= SEARCH_MIN_YEAR and yb[1] >= int(time.strftime("%Y"))) else yb
+        raw, n_off_dump, n_not_vinyl = _seller_rows_to_raw(
+            listings, dd, genres, styles, label, year_range)
+        bits = [f"{len(listings)} article(s) en vente chez {seller}"]
+        if truncated:
+            bits.append(f"stock tronqué aux {SEARCH_SELLER_MAX_PAGES * 100} plus récents")
+        if n_not_vinyl:
+            bits.append(f"{n_not_vinyl} hors vinyle 12\"/LP")
+        if n_off_dump:
+            bits.append(f"{n_off_dump} absent(s) du référentiel local, donc non filtrable(s)")
+        seller_note = " · ".join(bits)
+        if dd.available():
+            dump_date = dd.get_meta().get("dump_date")
+        base_labels = []
+    elif used_local:
         if base_labels:
             label_keys = [normalize_label(lb) for lb in base_labels]
         elif label.strip():
@@ -990,7 +1103,7 @@ def search_run(request: Request, label: str = Form(""),
             raw.append(r)
         dump_date = dd.get_meta().get("dump_date")
 
-    if not used_local:
+    if not used_local and not seller:
         gs = [(g, s) for g in (genres or [""]) for s in (styles or [""])]
         if base_labels:
             npages = min(npages, 1)                       # N labels -> 1 page chacun
@@ -1043,11 +1156,11 @@ def search_run(request: Request, label: str = Form(""),
             empty_reason = "thresholds"
         elif not used_local and not token:
             empty_reason = "no_source"
-        elif not label.strip() and not base_labels and not styles and not genres:
+        elif not label.strip() and not base_labels and not styles and not genres and not seller:
             empty_reason = "no_criteria"
         else:
             empty_reason = "no_match"
-    params = {"label": label.strip(), "genre": genres, "style": styles,
+    params = {"label": label.strip(), "seller": seller, "genre": genres, "style": styles,
               "year_from": year_from.strip(), "year_to": year_to.strip(),
               "pages": npages,
               "base_metric": base_metric, "base_min": str(base_min or "").strip(),
@@ -1062,7 +1175,7 @@ def search_run(request: Request, label: str = Form(""),
     return frag(request, "partials/results.html", results=page_results,
                 searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date,
                 empty_reason=empty_reason, has_token=bool(token), n_matches=n_matches,
-                page=page_num, total_pages=total_pages)
+                page=page_num, total_pages=total_pages, seller=seller, seller_note=seller_note)
 
 
 _DISCO_CACHE = _TtlCache(ttl=300, maxlen=60)      # (kind, key) -> sorties brutes

@@ -20,7 +20,7 @@ from .store import load, load_cached, normalize_label, save
 _NOT_12IN = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD")
 
 
-def _is_12in(fmt):
+def is_12in(fmt):
     """Heuristique sur la chaîne `format` de Discogs (ex. '12", EP', 'LP, Album, RE',
     '7", Single') : exclut explicitement les formats non-12", le reste (LP ou 12"
     explicite) est du 12"."""
@@ -45,7 +45,7 @@ def seller_affinity(inv, ctx):
     con = dd.connect_readonly()
     try:
         for rid, item in inv.items():
-            if not _is_12in(item.get("format")):
+            if not is_12in(item.get("format")):
                 continue
             n_12in += 1
             arts = ctx.split_credit_artists(item.get("artist") or "")

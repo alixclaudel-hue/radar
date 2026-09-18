@@ -62,7 +62,7 @@ _NOT_VINYL_MARKERS = ('7"', '10"', "CD", "Cassette", "Cass", "File", "DVD", "Blu
 
 
 def _is_vinyl(fmt_names, fmt_descriptions):
-    """Restreint au 12"/LP, comme sellers._is_12in — le nom de format 'Vinyl'
+    """Restreint au 12"/LP, comme sellers.is_12in — le nom de format 'Vinyl'
     à lui seul couvre AUSSI les 7" et 10" (la taille n'est que dans les
     descriptions), donc l'exclusion doit être vérifiée avant, pas après."""
     if "Vinyl" not in fmt_names:

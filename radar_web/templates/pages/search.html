@@ -16,6 +16,15 @@
     <div id="label-suggest" class="lbl-suggest" hidden></div>
   </div>
 
+  <div class="field">
+    <label for="f-seller">Vendeur Discogs <span class="muted">· optionnel · cherche dans son stock en vente</span></label>
+    <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
+           autocomplete="off">
+    <p class="small muted">Nom d'utilisateur Discogs. Les filtres ci-dessous s'appliquent alors à
+      son stock plutôt qu'au catalogue entier. Remplace le label unique et « chercher dans mes
+      labels » comme source des sorties.</p>
+  </div>
+
   <details class="acc" {{ 'open' if q.base_metric }}>
     <summary>🏷️ ou : chercher dans mes labels {% if q.base_metric %}<span class="tag">actif</span>{% endif %}</summary>
     <div class="acc__body">

@@ -191,6 +191,33 @@ class SearchSellerTestCase(unittest.TestCase):
         html, inv = self._post(seller="@boutique")
         self.assertEqual(inv.call_args[0][0], "boutique")
 
+    def test_bouton_panier_pointe_vers_l_annonce_discogs_du_vendeur(self):
+        """En mode vendeur, le bouton n'ajoute plus à la wantlist : il ouvre
+        directement la fiche de vente (listing_id, pas release_id) chez Discogs,
+        seul endroit où « ajouter au panier » existe réellement (l'API publique
+        n'expose aucun endpoint panier — vérifié avant de coder)."""
+        html, _ = self._post()
+        self.assertIn("https://www.discogs.com/sell/item/1", html)   # Deep One
+        self.assertIn("https://www.discogs.com/sell/item/2", html)   # Techno Two
+        self.assertNotIn("Ajouter à la wantlist", html)
+        self.assertNotIn("hx-post=\"/cart/add\"", html)
+
+    def test_hors_mode_vendeur_le_bouton_wantlist_est_inchange(self):
+        """Non-régression au niveau du gabarit (pas de la base locale, dont le
+        schéma minimal de ce fixture n'exerce pas `search_local`) : sans vendeur,
+        le bouton wantlist reste affiché, jamais un lien vers une annonce."""
+        raw = [{"id": 101, "title": "Artiste A - Deep One", "label": ["Aim Records"],
+                "style": ["Deep House"], "catno": "CAT1", "year": 2001,
+                "cover_image": None, "thumb": None, "uri": "/release/101"}]
+        results = appmod._scored_rows(appmod.Ctx(paths.DEFAULT_UID), raw)
+        html = appmod.templates.env.get_template("partials/results.html").render(
+            results=results, seller="", seller_note=None, searched=[], dump_date=None,
+            voted={}, in_cart={}, empty_reason=None, has_token=True,
+            n_matches=len(results), page=1, total_pages=1)
+        self.assertIn("Ajouter à la wantlist", html)
+        self.assertIn('hx-post="/cart/add"', html)
+        self.assertNotIn("discogs.com/sell/item", html)
+
 
 if __name__ == "__main__":
     unittest.main()

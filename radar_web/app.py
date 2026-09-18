@@ -445,7 +445,8 @@ def _scored_rows(c, raw, keep_styles=None):
                             "style": rstyles, "catno": r.get("catno", ""),
                             "year": r.get("year", ""),
                             "thumb": r.get("cover_image") or r.get("thumb"),
-                            "uri": r.get("uri", "")},
+                            "uri": r.get("uri", ""),
+                            "listing_id": r.get("listing_id")},
                     "score": sc,
                     "detail": {"label": det.get("label"), "artist": det.get("artist"),
                                "style": det.get("style")}})
@@ -993,7 +994,7 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
                          else (it.get("title") or it.get("artist") or ""))
                 out.append({"id": rid, "title": title, "label": [], "style": [],
                             "catno": "", "year": "", "cover_image": None, "thumb": None,
-                            "uri": f"/release/{rid}"})
+                            "uri": f"/release/{rid}", "listing_id": it.get("listing_id")})
                 continue
             if not ref.get("is_vinyl"):
                 n_not_vinyl += 1
@@ -1017,7 +1018,7 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
                 "label": [ref["label"]] if ref.get("label") else [],
                 "style": row_styles, "catno": ref.get("catno") or "",
                 "year": ref.get("year") or "", "cover_image": None, "thumb": None,
-                "uri": f"/release/{rid}",
+                "uri": f"/release/{rid}", "listing_id": it.get("listing_id"),
             })
     finally:
         if con:

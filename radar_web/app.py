@@ -497,19 +497,26 @@ def reco_radar_page(request: Request):
                   in_cart=_cart_ids(), voted=_voted_map())
 
 
-@app.post("/reco-radar/delete")
-def reco_radar_delete_track(video_id: str = Form("")):
+@app.post("/reco-radar/delete", response_class=HTMLResponse)
+def reco_radar_delete_track(request: Request, video_id: str = Form("")):
     """Retire UNE piste de la playlist RECOS RADAR à la main (retour utilisateur
     2026-09-10). N'efface pas recos_history.json : la vidéo reste marquée « déjà
-    proposée » et ne sera pas réajoutée automatiquement par un futur scan. Rechargement
-    complet de la page (pas de htmx) : le lecteur IFrame charge sa liste de vidéos une
-    fois au chargement, une suppression en place la désynchroniserait des lignes."""
+    proposée » et ne sera pas réajoutée automatiquement par un futur scan.
+
+    Renvoie le tableau des pistes à jour (htmx, plus de rechargement complet de la
+    page — retour utilisateur 2026-09-18). Le tbody ENTIER est rendu, pas seulement
+    la ligne retirée, pour que la numérotation (#) reste juste. Le lecteur IFrame,
+    lui, garde la liste de vidéos chargée au démarrage : la page l'apparie aux
+    lignes par identifiant de vidéo et non par position, justement pour survivre à
+    ces suppressions (cf. le script de pages/reco_radar.html)."""
+    playlist = load(_pu().recos_playlist, [])
     if video_id:
-        playlist = load(_pu().recos_playlist, [])
         new_playlist = [t for t in playlist if t.get("video_id") != video_id]
         if len(new_playlist) != len(playlist):
             save(_pu().recos_playlist, new_playlist)
-    return RedirectResponse("/reco-radar", status_code=303)
+            playlist = new_playlist
+    return frag(request, "partials/reco_rows.html", playlist=playlist,
+                in_cart=_cart_ids(), voted=_voted_map())
 
 
 @app.post("/reco-radar/mark-played")

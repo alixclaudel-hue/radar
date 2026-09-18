@@ -3209,6 +3209,35 @@ def job_prune_labels(job, params):
                    f"Relancer avec apply=1 pour appliquer.")
 
 
+def job_reco_index(job, params):
+    """Reconstruit le cache disque de `Ctx.reco_index` (radar_web/radar/recoindex.py)
+    — couche 3 du chantier M1, brief VPS du 18/09.
+
+    Le calcul complet met 183,5 s à froid sur les données réelles (465 284 labels
+    classés) et il était payé par la PREMIÈRE recherche suivant chaque redémarrage
+    du conteneur. Ce job le sort du chemin HTTP : le worker l'enfile quand la
+    signature des données change, les requêtes ne font plus que relire le fichier.
+
+    Ne recalcule rien si le cache est déjà à jour, sauf `force=1` — le worker
+    l'enfile sur une simple cadence, pas sur un événement précis.
+
+    Le cache reste un raccourci : `Ctx._compute_reco_index` retombe sur le calcul
+    en ligne s'il est absent ou périmé. Ce job peut donc échouer ou ne jamais
+    tourner sans rien casser, seulement ralentir."""
+    from radar_web.radar import recoindex
+    from radar_web.radar.scoring import Ctx
+    ctx = Ctx(uid=RADAR_UID)
+    if not params.get("force") and ctx.reco_index_is_fresh():
+        meta = recoindex.read_meta(RADAR_UID) or {}
+        return job.finish(f"Cache déjà à jour ({meta.get('n', 0)} labels, "
+                          f"construit le {meta.get('built_at', '?')}).")
+    job.tick("calcul de l'index de reco (aucun appel réseau)")
+    meta = ctx.save_reco_index()
+    job.finish(f"{meta['n']} label(s) en cache — la recherche n'a plus à recalculer "
+               f"l'index tant que le goût, la collection, le corpus ou le référentiel "
+               f"ne changent pas.")
+
+
 JOBS = {
     "scan_catalog": job_scan_catalog,
     "import_discogs_dump": job_import_discogs_dump,
@@ -3232,6 +3261,7 @@ JOBS = {
     "scorestore_releases": job_scorestore_releases,
     "scorestore_tracks": job_scorestore_tracks,
     "prune_labels": job_prune_labels,
+    "reco_index": job_reco_index,
 }
 
 

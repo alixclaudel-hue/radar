@@ -16,7 +16,8 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from .radar import catalog_labelgraph, discogs_dump, features, jobs, paths, sellers, store
+from .radar import (catalog_labelgraph, discogs_dump, features, jobs, paths, recoindex,
+                    scoring, sellers, store)
 
 POLL = 2.0
 JOB_TIMEOUT = 6 * 3600
@@ -201,6 +202,45 @@ def _last_successful_run(name):
         return 0.0
 
 
+# Cache disque de `Ctx.reco_index` (couche 3 du chantier M1, brief VPS 18/09) :
+# opt-in via RADAR_RECO_INDEX=1. Le calcul complet met 183,5 s à froid sur les
+# données réelles et il est sinon payé par la première recherche suivant chaque
+# redémarrage du conteneur. Opt-in et non actif d'office parce que le worker
+# exécute ses jobs EN SÉRIE, sans préemption (cf. docstring du module) : un job
+# de 183 s peut retarder d'autant un clic utilisateur déjà en file. À activer
+# quand ce compromis est accepté — sans lui, tout continue de fonctionner, la
+# première recherche est simplement lente (repli de Ctx._compute_reco_index).
+RECO_INDEX_CHECK_EVERY = 3600
+_last_reco_index_check = 0.0
+
+
+def _maybe_reco_index_build():
+    """Enfile `reco_index` pour chaque utilisateur dont le cache est périmé.
+
+    La fraîcheur est jugée sur `scoring.derived_key(uid, config)` — la MÊME
+    signature que le cache mémoire de `Ctx` — volontairement calculée sans
+    instancier `Ctx` : un `Ctx()` coûte ~4 s (il charge `producer_graph.json`,
+    69,3 Mo en prod), inacceptable à chaque tour de boucle juste pour répondre
+    « rien à faire »."""
+    global _last_reco_index_check
+    if os.environ.get("RADAR_RECO_INDEX") != "1":
+        return
+    if time.time() - _last_reco_index_check < RECO_INDEX_CHECK_EVERY:
+        return
+    _last_reco_index_check = time.time()
+    try:
+        queued = {(j["uid"], j["name"]) for j in jobs.load_queue()}
+        for uid in paths.all_uids():
+            if (uid, "reco_index") in queued:
+                continue
+            if recoindex.is_fresh(uid, scoring.derived_key(uid, store.read_config(uid))):
+                continue
+            jobs.launch("reco_index", {}, uid=uid, priority=0)
+            print(f"[worker] reco_index enfilé ({uid})", file=sys.stderr, flush=True)
+    except Exception as e:                       # noqa: BLE001
+        print(f"[worker] reco_index check : {e}", file=sys.stderr, flush=True)
+
+
 def _maybe_auto_maintenance():
     """Enfile canonicalize / profile_labels / build_graph (owner) chacun selon
     sa propre cadence, sans action de l'utilisateur — remplace les boutons
@@ -337,6 +377,7 @@ def main():
             _maybe_recos_scan()
             _maybe_recos_midnight_purge()
             _maybe_scorestore_build()
+            _maybe_reco_index_build()
             time.sleep(POLL)
             continue
         job["state"] = "running"

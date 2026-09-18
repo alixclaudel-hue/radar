@@ -1147,7 +1147,19 @@ def label_style_counts(label_keys, con=None):
     catalogue importé (tous formats depuis le 11/09), pour les clés demandées
     uniquement (pas de chargement de la table entière). {} si le dump n'est pas disponible,
     ou si `label_styles` n'existe pas encore (base construite avant D5,
-    en attente du prochain import mensuel) : repli à la charge de l'appelant."""
+    en attente du prochain import mensuel) : repli à la charge de l'appelant.
+
+    Découpé par lots (`_in_chunks`) depuis le 18/09 : SQLite plafonne le nombre
+    de paramètres liés d'une requête à SQLITE_MAX_VARIABLE_NUMBER (999 par
+    défaut) et `Ctx.label_affinities` appelle cette fonction avec la TOTALITÉ
+    des clés de `reco_rows` (465 284 mesurées en prod). Sans découpage, SQLite
+    levait `OperationalError: too many SQL variables`, que l'ancien `except`
+    convertissait en dict vide — indistinguable d'« aucun label n'a de styles » :
+    le terme `affinity` (le poids le plus lourd de reco_rows) disparaissait en
+    silence pour ~90 % de l'univers classé, et tous ces labels s'écrasaient dans
+    la bande 25-39 (diagnostic VPS 18/09, B1). Le repli « table absente » est
+    désormais testé explicitement (`_has_table`) plutôt que déduit d'une
+    exception, pour ne plus masquer une vraie erreur SQL."""
     keys = [k for k in dict.fromkeys(label_keys) if k]
     if not keys or not available():
         return {}
@@ -1157,12 +1169,10 @@ def label_style_counts(label_keys, con=None):
         if con is None:
             return {}
     try:
-        qmarks = ",".join("?" * len(keys))
-        rows = con.execute(
-            f"SELECT label_key, style, n FROM label_styles WHERE label_key IN ({qmarks})",
-            keys).fetchall()
-    except sqlite3.OperationalError:
-        return {}
+        if not _has_table(con, "label_styles"):
+            return {}
+        rows = _in_chunks(
+            con, "SELECT label_key, style, n FROM label_styles WHERE label_key IN ({})", keys)
     finally:
         if owns:
             con.close()
@@ -1170,6 +1180,16 @@ def label_style_counts(label_keys, con=None):
     for lk, style, n in rows:
         out.setdefault(lk, {})[style] = n
     return out
+
+
+def _has_table(con, name):
+    """True si la table existe dans la base ouverte. Sert à distinguer « base
+    construite avant telle migration » (repli légitime sur {}) d'une vraie
+    erreur SQL — que les `except sqlite3.OperationalError` des fonctions de
+    lecture avalaient sans distinction jusqu'au 18/09 (cf. label_style_counts)."""
+    return bool(con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=? LIMIT 1",
+        (name,)).fetchone())
 
 
 def _in_chunks(con, sql_tmpl, ids, extra_params=()):

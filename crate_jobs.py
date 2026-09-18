@@ -3169,9 +3169,7 @@ def job_prune_labels(job, params):
     heard = ctx.corpus_label_scores()
 
     keys = sorted({normalize_label(n) for _, n in entries})
-    style_counts = {}
-    for i in range(0, len(keys), 900):   # sous SQLITE_MAX_VARIABLE_NUMBER (label_style_counts non chunké)
-        style_counts.update(dd.label_style_counts(keys[i:i + 900]))
+    style_counts = dd.label_style_counts(keys)   # découpe elle-même par lots depuis le 18/09
 
     job.st["total"] = len(entries)
     kept, removed = [], []

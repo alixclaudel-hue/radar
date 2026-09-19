@@ -1,0 +1,31 @@
+[
+  {
+    "id": "various_channel_match",
+    "comment": "Compilation créditée « Various » sur Discogs (pt 27 CLAUDE.md) : ytcache reçoit ici le crédit RÉEL de la piste (déjà résolu en amont par _track_credit_artist), pas « Various ». Vérifie le bonus chaîne=artiste.",
+    "artist": "Alkalino",
+    "title": "Meccano",
+    "label": "Aquasonic",
+    "query": "Alkalino Meccano",
+    "expect": "match",
+    "expected_video_id": "vid_alkalino_official"
+  },
+  {
+    "id": "reject_remix",
+    "comment": "La recherche remonte le Original Mix ET un Remix : le remix ne doit pas être choisi quand la piste demandée est l'originale (pt _ALT_VERSION).",
+    "artist": "Noir & Haze",
+    "title": "Around",
+    "label": "",
+    "query": "Noir & Haze Around",
+    "expect": "match",
+    "expected_video_id": "vid_around_original"
+  },
+  {
+    "id": "no_match_below_threshold",
+    "comment": "Aucun résultat ne recoupe vraiment artiste+titre : mieux vaut aucune vidéo qu'une mauvaise (pt _best_match, repli permissif supprimé).",
+    "artist": "Candi Staton",
+    "title": "Hallelujah Anyway",
+    "label": "",
+    "query": "Candi Staton Hallelujah Anyway",
+    "expect": "no_match"
+  }
+]

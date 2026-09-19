@@ -1,10 +1,36 @@
 {% import "partials/_icons.html" as icons %}
+{# Mode vendeur : état de son inventaire local + relance de la lecture complète
+   (point 68). Le suivi du job s'auto-rafraîchit tout seul via /jobs/…/status. #}
+{% set seller_block %}
+{% if seller_sync %}
+<div class="notice small">
+  {% if seller_sync.fetched_at %}
+  Inventaire de <b>{{ seller_sync.seller }}</b> : {{ seller_sync.n_items }} disque(s),
+  lu le {{ seller_sync.fetched_at[:16].replace('T', ' à ') }}{% if seller_sync.partial %}
+  — <b>incomplet</b> (lecture interrompue){% endif %}.
+  {% else %}
+  Lecture du stock de <b>{{ seller_sync.seller }}</b> en cours : tout son inventaire est lu
+  page par page (~100 disques toutes les 1,1 s), une seule fois — les recherches suivantes
+  filtrent ce stock instantanément. Tu peux fermer cette page, le job continue, puis relancer
+  la recherche.
+  {% endif %}
+  <form hx-post="/search/seller/sync" hx-target="#job-seller_inventory" hx-swap="outerHTML"
+        style="display:inline">
+    <input type="hidden" name="seller" value="{{ seller_sync.seller }}">
+    <button class="small" type="submit">↻ relire tout le stock</button>
+  </form>
+  <div id="job-seller_inventory" hx-get="/jobs/seller_inventory/status" hx-trigger="load"></div>
+</div>
+{% endif %}
+{% endset %}
 {% if error %}
   <p class="notice warn">{{ error }}</p>
 {% elif results is not defined %}
   <p class="muted small">Aucune recherche lancée.</p>
 {% elif not results %}
-  {% if empty_reason == 'no_source' %}
+  {% if empty_reason == 'seller_sync' %}
+  {{ seller_block }}
+  {% elif empty_reason == 'no_source' %}
   <p class="muted small">Aucun disque : ni catalogue local, ni token Discogs configuré — impossible de chercher quoi que ce soit.</p>
   <p class="small"><a href="/patte">Renseigner le token Discogs → Mon profil</a></p>
   {% elif empty_reason == 'thresholds' %}
@@ -15,6 +41,7 @@
   {% else %}
   <p class="muted small">Aucun résultat pour ces filtres{% if not has_token %} — sans token Discogs, seul le catalogue local (figé au dernier import mensuel) est cherché{% endif %}.</p>
   {% endif %}
+  {% if empty_reason != 'seller_sync' %}{{ seller_block }}{% endif %}
   {% if seller_note %}<p class="muted small">{{ seller_note }}</p>{% endif %}
   {% if searched %}<p class="muted small">Labels cherchés : {{ searched|join(', ') }}</p>{% endif %}
 {% else %}
@@ -28,6 +55,7 @@
   </div>
   {% if dump_date %}<p class="muted small">catalogue local au {{ dump_date[:4] }}-{{ dump_date[4:6] }}-{{ dump_date[6:] }}
     — coche « inclure les nouveautés » pour les sorties plus récentes</p>{% endif %}
+  {{ seller_block }}
   {% if seller_note %}<p class="muted small">{{ seller_note }}</p>{% endif %}
   {% if searched %}<p class="muted small">Labels cherchés ({{ searched|length }}) : {{ searched|join(', ') }}</p>{% endif %}
   {% set pager %}

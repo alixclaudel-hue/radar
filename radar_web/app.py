@@ -951,12 +951,11 @@ def _local_rows_to_raw(rows, genres):
     return out
 
 
-SEARCH_SELLER_MAX_PAGES = 10          # 100 articles/page : 1000 articles au plus par recherche
-
-
 def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
     """Articles « For Sale » d'un vendeur -> mêmes lignes que `_local_rows_to_raw`,
-    et (lignes, n_hors_dump, n_non_vinyle).
+    et (lignes, n_hors_dump, n_non_vinyle). `listings` vient du snapshot complet
+    écrit par le job `seller_inventory` (point 68), pas d'un appel API : les
+    filtres ci-dessous portent donc sur TOUT le stock du vendeur.
 
     L'inventaire Discogs ne porte que `release_id`, `artist`, `format` et le prix :
     ni style, ni genre, ni année, ni label. Tout ça est relu dans le référentiel
@@ -1061,28 +1060,38 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
     dump_date = None
     seller = seller.strip().lstrip("@")
     seller_note = None
+    seller_sync = None
     if seller:
-        # Mode vendeur : la source des sorties devient son stock du moment, pas le
-        # référentiel ni la recherche Discogs. Court-circuite les deux chemins
-        # ci-dessous, y compris « chercher dans mes labels » (une même recherche ne
-        # peut pas partir de deux sources à la fois) — signalé plutôt que subi.
+        # Mode vendeur : la source des sorties devient TOUT le stock en vente de ce
+        # vendeur, lu une fois par le job de fond `seller_inventory` et relu ici
+        # instantanément (cf. point 68). Court-circuite les deux chemins ci-dessous,
+        # y compris « chercher dans mes labels » (une même recherche ne peut pas
+        # partir de deux sources à la fois) — signalé plutôt que subi.
         if not token:
             return frag(request, "partials/results.html",
                         error="Chercher chez un vendeur demande un token Discogs "
                               "(Mon profil → Discogs) : son stock n'est lisible que par l'API.")
-        try:
-            listings, truncated = discogs.seller_inventory(
-                seller, token=token, max_pages=SEARCH_SELLER_MAX_PAGES)
-        except discogs.DiscogsError as e:
-            return frag(request, "partials/results.html",
-                        error=f"Vendeur « {seller} » : {e}")
+        inv, meta = sellers.load_inventory(seller), sellers.inv_meta(seller)
+        seller_sync = {"seller": seller, "fetched_at": meta.get("fetched_at"),
+                       "n_items": meta.get("n_items"), "partial": meta.get("partial")}
+        if not inv:
+            # Jamais lu : on lance la lecture et on le dit, plutôt que de renvoyer
+            # un échantillon tronqué qui donnerait de faux « aucun résultat ».
+            jobs.launch("seller_inventory", {"seller": seller})
+            return frag(request, "partials/results.html", results=[], seller=seller,
+                        empty_reason="seller_sync", seller_sync=seller_sync,
+                        has_token=True)
+        listings = [dict(it or {}, release_id=int(rid)) for rid, it in inv.items()
+                    if str(rid).isdigit()]
         yb = _year_bounds(year_from, year_to)
         year_range = None if (yb[0] <= SEARCH_MIN_YEAR and yb[1] >= int(time.strftime("%Y"))) else yb
         raw, n_off_dump, n_not_vinyl = _seller_rows_to_raw(
             listings, dd, genres, styles, label, year_range)
-        bits = [f"{len(listings)} article(s) en vente chez {seller}"]
-        if truncated:
-            bits.append(f"stock tronqué aux {SEARCH_SELLER_MAX_PAGES * 100} plus récents")
+        bits = [f"{len(listings)} disque(s) en vente chez {seller}"]
+        if meta.get("fetched_at"):
+            bits.append(f"inventaire lu le {meta['fetched_at'][:16].replace('T', ' à ')}")
+        if meta.get("partial"):
+            bits.append("lecture interrompue : stock incomplet")
         if n_not_vinyl:
             bits.append(f"{n_not_vinyl} hors vinyle 12\"/LP")
         if n_off_dump:
@@ -1183,7 +1192,19 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
     return frag(request, "partials/results.html", results=page_results,
                 searched=base_labels, voted=_voted_map(), in_cart=_cart_ids(), dump_date=dump_date,
                 empty_reason=empty_reason, has_token=bool(token), n_matches=n_matches,
-                page=page_num, total_pages=total_pages, seller=seller, seller_note=seller_note)
+                page=page_num, total_pages=total_pages, seller=seller,
+                seller_note=seller_note, seller_sync=seller_sync)
+
+
+@app.post("/search/seller/sync", response_class=HTMLResponse)
+def search_seller_sync(seller: str = Form("")):
+    """Relance la lecture complète du stock d'un vendeur (point 68). Route à part
+    de /jobs/<nom>/launch, qui ne sait pas transporter le nom du vendeur ; renvoie
+    le même fragment de suivi que les autres jobs, qui s'auto-rafraîchit."""
+    seller = (seller or "").strip().lstrip("@")
+    if seller:
+        jobs.launch("seller_inventory", {"seller": seller})
+    return job_status_frag("seller_inventory")
 
 
 _DISCO_CACHE = _TtlCache(ttl=300, maxlen=60)      # (kind, key) -> sorties brutes
@@ -2329,7 +2350,11 @@ def univers_artists_export():
 VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp",
               "merge_corpus", "scan_veille", "scan_sellers", "build_graph", "profile_labels",
               "ingest_djsets", "resolve_artists", "canonicalize", "enrich", "scan_catalog",
-              "import_discogs_dump", "scan_recos", "publish_recos"}
+              "import_discogs_dump", "scan_recos", "publish_recos", "seller_inventory"}
+# seller_inventory n'a pas de bouton « lancer » propre (il part de /search, qui
+# seul connaît le vendeur, via /search/seller/sync) : il est ici pour que le
+# bouton « ■ arrêter » de job_status_frag fonctionne — /jobs/<nom>/stop passe par
+# cette même liste. Lancé sans vendeur, le job se termine sur un message explicite.
 if not features.VEILLE_ENABLED:
     # Les deux jobs de la page Nouveautés ne sont lançables que depuis elle : les
     # retirer ici les arrête aussi bien pour /jobs/<nom>/launch que pour

@@ -1,0 +1,895 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "pABV0mrgeLdi78YX3p3ozWlZP2I",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "jgo_87a3PLg5BKA-Y9-zR8NU4yQ",
+      "id": "9jjwpGGL_RA",
+      "snippet": {
+        "publishedAt": "2014-07-03T00:58:04Z",
+        "channelId": "UCnC3cQrPZAxJcQ02VgrmU5g",
+        "title": "Roger Whittaker - Du - Du bist nicht allein (ZDF Hitparade 2.11.1988)",
+        "description": "Der Auftritt von Roger Whittaker zu „Du - Du bist nicht allein“ bei der ZDF Hitparade 02.11.1988.\n \nAlle Lieder von Roger Whittaker kannst Du hier anhören: https://lnk.to/RogerWhittakerAY \n\nJetzt Kanal abonnieren und Glocke aktivieren: https://www.youtube.com/channel/UCaYKeUGwhVrUyCOCmcXfEYg \n► https://www.rogerwhittaker.com/ \n► https://www.facebook.com/RogerWhittakerFans\n\n-----------------------------------------------------------------------------------------------------------\n\nLyrics:\n\nSiehst du den Silberstreif am Horizont?\nSchon fängt ein neuer Morgen an\n\nDu - du bist nicht allein\nNiemals mehr allein\nAuch wenn die Sonne deines Lebens\nEine Zeit lang mal nicht scheint\nDu - du bist nicht allein\nIch werd bei dir sein\nViel mehr als Geld und gute Worte\nBist zählt auf dieser Welt ein Freund\n\nWenn im Dunkel der Nacht\nDeine Sehnsucht erwacht\nUnd dir die Zärtlichkeit so fehlt\nAllein O ho, ho, ho, ho\nWeil die Liebe zerbrach\nUnd dir alles danach\nUnendlich leer und sinnlos scheint\nAls gäb' es nie mehr einen Hoffnungsschimmer\nDann wird ich bei dir sein\nWortlos bei dir sein\nDie grauen tage geh'n vorüber\nDenn du bist nicht mehr allein\n\nWenn im Dunkel der Nacht\nDeine Sehnsucht erwacht\nStürmt die Erinn'rung auf dich ein\nO ho, ho, ho, ho\nAlle Stunden voll Glück\nKommen lautlos zurück\nSchnüren dir Herz und Kehle zu\nAlle machen die Einsamkeit\nNur noch viel schwerer\nDann wird ich bei dir sein\nWortlos bei dir sein\nDie grauen Tage geh'n vorüber\nDenn du bist nicht mehr allein\n\nNiemals mehr allein\nDu bist nicht allein\n\n#RogerWhittaker #DuDuBistNichtAllein #Live",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/9jjwpGGL_RA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/9jjwpGGL_RA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/9jjwpGGL_RA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/9jjwpGGL_RA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/9jjwpGGL_RA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "RogerWhittakerVEVO",
+        "tags": [
+          "roger whittaker",
+          "roger wittaker",
+          "du du bist nicht allein",
+          "roger whittaker du du bist nicht allein",
+          "du du bist nicht allein roger whittaker",
+          "roger whittaker musikvideo",
+          "roger whittaker live",
+          "du du bist nicht allein lyrics",
+          "roger whittaker albany",
+          "albany roger whittaker",
+          "ein bisschen aroma",
+          "roger whittaker ein bisschen aroma",
+          "ein kissen voller träume roger whittaker",
+          "albany",
+          "abschied ist ein scharfes schwert",
+          "roger whittaker eloisa"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker - Du - Du bist nicht allein (ZDF Hitparade 2.11.1988)",
+          "description": "Der Auftritt von Roger Whittaker zu „Du - Du bist nicht allein“ bei der ZDF Hitparade 02.11.1988.\n \nAlle Lieder von Roger Whittaker kannst Du hier anhören: https://lnk.to/RogerWhittakerAY \n\nJetzt Kanal abonnieren und Glocke aktivieren: https://www.youtube.com/channel/UCaYKeUGwhVrUyCOCmcXfEYg \n► https://www.rogerwhittaker.com/ \n► https://www.facebook.com/RogerWhittakerFans\n\n-----------------------------------------------------------------------------------------------------------\n\nLyrics:\n\nSiehst du den Silberstreif am Horizont?\nSchon fängt ein neuer Morgen an\n\nDu - du bist nicht allein\nNiemals mehr allein\nAuch wenn die Sonne deines Lebens\nEine Zeit lang mal nicht scheint\nDu - du bist nicht allein\nIch werd bei dir sein\nViel mehr als Geld und gute Worte\nBist zählt auf dieser Welt ein Freund\n\nWenn im Dunkel der Nacht\nDeine Sehnsucht erwacht\nUnd dir die Zärtlichkeit so fehlt\nAllein O ho, ho, ho, ho\nWeil die Liebe zerbrach\nUnd dir alles danach\nUnendlich leer und sinnlos scheint\nAls gäb' es nie mehr einen Hoffnungsschimmer\nDann wird ich bei dir sein\nWortlos bei dir sein\nDie grauen tage geh'n vorüber\nDenn du bist nicht mehr allein\n\nWenn im Dunkel der Nacht\nDeine Sehnsucht erwacht\nStürmt die Erinn'rung auf dich ein\nO ho, ho, ho, ho\nAlle Stunden voll Glück\nKommen lautlos zurück\nSchnüren dir Herz und Kehle zu\nAlle machen die Einsamkeit\nNur noch viel schwerer\nDann wird ich bei dir sein\nWortlos bei dir sein\nDie grauen Tage geh'n vorüber\nDenn du bist nicht mehr allein\n\nNiemals mehr allein\nDu bist nicht allein\n\n#RogerWhittaker #DuDuBistNichtAllein #Live"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "TXU9yagEqBM5xwg_eT1ntYqQ2gs",
+      "id": "FR2j27tO4-Y",
+      "snippet": {
+        "publishedAt": "2013-06-20T12:36:42Z",
+        "channelId": "UCsdfT_v2TilwdMbjHGDkKNg",
+        "title": "Roger Whittaker - Du - du bist nicht allein (1988)",
+        "description": "Roger Whittaker\nDu - du bist nicht allein\n\nMusik & Text: Nick Munro\n\nAus dem Album\n\"Du bist nicht allein\", 1988\n\n\n Siehst du den Silberstreif am Horizont?\n Schon fängt ein neuer Morgen an.\n\n Du - du bist nicht allein.\n Niemals mehr allein.\n Auch wenn die Sonne deines Lebens\n eine Zeit lang mal nicht scheint.\n Du - du bist nicht allein.\n Ich werd bei dir sein.\n Viel mehr als Geld und gute Worte\n zählt auf dieser Welt ein Freund.\n\n Wenn im Dunkel der Nacht\n deine Sehnsucht erwacht\n und dir die Zärtlichkeit so fehlt.\n O ho, ho, ho, ho, weil die Liebe zerbrach\n und dir alles danach\n unendlich leer und sinnlos scheint.\n Als gäb' es nie mehr einen Hoffnungsschimmer.\n Dann wird ich bei dir sein, wortlos bei dir sein.\n Die grauen tage geh'n vorüber,\n denn du bist nicht mehr allein.\n\n Wenn im Dunkel der Nacht\n deine Sehnsucht erwacht,\n stürmt die Erinn'rung auf dich ein.\n O ho, ho, ho, ho, alle Stunden voll Glück\n kommen lautlos zurück,\n schnüren dir Herz und Kehle zu,\n machen die Einsamkeit nur noch viel schwerer.\n Dann wird ich bei dir sein, wortlos bei dir sein.\n Die grauen Tage geh'n vorüber,\n denn du bist nicht mehr allein.\n\n Niemals mehr allein.\n Du bist nicht allein.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/FR2j27tO4-Y/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/FR2j27tO4-Y/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/FR2j27tO4-Y/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/FR2j27tO4-Y/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Mr. Whittaker's Music",
+        "tags": [
+          "Roger Whittaker",
+          "Du - du bist nicht allein",
+          "Schlager",
+          "picture",
+          "painting",
+          "photography",
+          "slideshow"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker - Du - du bist nicht allein (1988)",
+          "description": "Roger Whittaker\nDu - du bist nicht allein\n\nMusik & Text: Nick Munro\n\nAus dem Album\n\"Du bist nicht allein\", 1988\n\n\n Siehst du den Silberstreif am Horizont?\n Schon fängt ein neuer Morgen an.\n\n Du - du bist nicht allein.\n Niemals mehr allein.\n Auch wenn die Sonne deines Lebens\n eine Zeit lang mal nicht scheint.\n Du - du bist nicht allein.\n Ich werd bei dir sein.\n Viel mehr als Geld und gute Worte\n zählt auf dieser Welt ein Freund.\n\n Wenn im Dunkel der Nacht\n deine Sehnsucht erwacht\n und dir die Zärtlichkeit so fehlt.\n O ho, ho, ho, ho, weil die Liebe zerbrach\n und dir alles danach\n unendlich leer und sinnlos scheint.\n Als gäb' es nie mehr einen Hoffnungsschimmer.\n Dann wird ich bei dir sein, wortlos bei dir sein.\n Die grauen tage geh'n vorüber,\n denn du bist nicht mehr allein.\n\n Wenn im Dunkel der Nacht\n deine Sehnsucht erwacht,\n stürmt die Erinn'rung auf dich ein.\n O ho, ho, ho, ho, alle Stunden voll Glück\n kommen lautlos zurück,\n schnüren dir Herz und Kehle zu,\n machen die Einsamkeit nur noch viel schwerer.\n Dann wird ich bei dir sein, wortlos bei dir sein.\n Die grauen Tage geh'n vorüber,\n denn du bist nicht mehr allein.\n\n Niemals mehr allein.\n Du bist nicht allein."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "wWCcAQ-iBG3dgSHXl1S6lzL60X0",
+      "id": "cWt5-Y1ku7k",
+      "snippet": {
+        "publishedAt": "2014-11-06T18:00:16Z",
+        "channelId": "UC3-7kHmCMl9KQjcJ1czY-5w",
+        "title": "Du - Du bist nicht allein",
+        "description": "Provided to YouTube by Ariola\n\nDu - Du bist nicht allein · Roger Whittaker\n\nDas Beste von der Stimme des Herzens\n\n℗ 1988 BMG Entertainment International\n\nReleased on: 1994-07-04\n\nVocal: Roger Whittaker\nLyricist, Composer: Nick Munro\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/cWt5-Y1ku7k/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/cWt5-Y1ku7k/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/cWt5-Y1ku7k/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/cWt5-Y1ku7k/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/cWt5-Y1ku7k/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker - Topic",
+        "tags": [
+          "Roger Whittaker",
+          "Das Beste von der Stimme des Herzens",
+          "Du - Du bist nicht allein"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Du - Du bist nicht allein",
+          "description": "Provided to YouTube by Ariola\n\nDu - Du bist nicht allein · Roger Whittaker\n\nDas Beste von der Stimme des Herzens\n\n℗ 1988 BMG Entertainment International\n\nReleased on: 1994-07-04\n\nVocal: Roger Whittaker\nLyricist, Composer: Nick Munro\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "U0P14VcaKawnvuWl_7wko21-zNo",
+      "id": "8YqB1WCv-Bs",
+      "snippet": {
+        "publishedAt": "2017-11-19T19:05:07Z",
+        "channelId": "UC3-7kHmCMl9KQjcJ1czY-5w",
+        "title": "Du - Du bist nicht allein",
+        "description": "Provided to YouTube by Ariola\n\nDu - Du bist nicht allein · Roger Whittaker\n\nDas Beste von der Stimme des Herzens\n\n℗ 1988 BMG Entertainment International\n\nReleased on: 1994-07-04\n\nVocal: Roger Whittaker\nComposer, Lyricist: Nick Munro\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/8YqB1WCv-Bs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/8YqB1WCv-Bs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/8YqB1WCv-Bs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/8YqB1WCv-Bs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/8YqB1WCv-Bs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker - Topic",
+        "tags": [
+          "Roger Whittaker",
+          "Das Beste von der Stimme des Herzens",
+          "Du - Du bist nicht allein"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Du - Du bist nicht allein",
+          "description": "Provided to YouTube by Ariola\n\nDu - Du bist nicht allein · Roger Whittaker\n\nDas Beste von der Stimme des Herzens\n\n℗ 1988 BMG Entertainment International\n\nReleased on: 1994-07-04\n\nVocal: Roger Whittaker\nComposer, Lyricist: Nick Munro\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "b930KG_LiqKAgrTpRP4uXAiFGpc",
+      "id": "k2jyPDCPcRE",
+      "snippet": {
+        "publishedAt": "2014-11-06T17:58:12Z",
+        "channelId": "UC3-7kHmCMl9KQjcJ1czY-5w",
+        "title": "Du - du bist nicht allein (Live)",
+        "description": "Provided to YouTube by Ariola\n\nDu - du bist nicht allein (Live) · Roger Whittaker\n\nDie Stimme für Millionen\n\n℗ 1989 BMG International\n\nReleased on: 1989-04-17\n\nVocal: Roger Whittaker\nLyricist, Composer, Producer: Nick Munro\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/k2jyPDCPcRE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/k2jyPDCPcRE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/k2jyPDCPcRE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/k2jyPDCPcRE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/k2jyPDCPcRE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker - Topic",
+        "tags": [
+          "Roger Whittaker",
+          "Die Stimme für Millionen",
+          "Du - du bist nicht allein"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Du - du bist nicht allein (Live)",
+          "description": "Provided to YouTube by Ariola\n\nDu - du bist nicht allein (Live) · Roger Whittaker\n\nDie Stimme für Millionen\n\n℗ 1989 BMG International\n\nReleased on: 1989-04-17\n\nVocal: Roger Whittaker\nLyricist, Composer, Producer: Nick Munro\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "EqZWJs0bb-Nq-vJ3xYA8r3SxuNY",
+      "id": "pt1n54WRCNQ",
+      "snippet": {
+        "publishedAt": "2022-05-15T05:58:52Z",
+        "channelId": "UCaTN2d4oOBO4rlY0rLsSYKQ",
+        "title": "Roger Whittaker - Du bist nicht allein",
+        "description": "Roger Whittaker - Du-du bist nicht allein\n\naus dem Jahr 1988",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/pt1n54WRCNQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/pt1n54WRCNQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/pt1n54WRCNQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/pt1n54WRCNQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/pt1n54WRCNQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Jürgen D.",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de-DE",
+        "localized": {
+          "title": "Roger Whittaker - Du bist nicht allein",
+          "description": "Roger Whittaker - Du-du bist nicht allein\n\naus dem Jahr 1988"
+        },
+        "defaultAudioLanguage": "zxx"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "fh6bLuT1Oa_3YpcYK3b7u385bzM",
+      "id": "ycKBleD6zx8",
+      "snippet": {
+        "publishedAt": "2022-10-16T03:41:04Z",
+        "channelId": "UC6YuMoc2aRkdQmz3Eqc-VsQ",
+        "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Du - Du Bist Nicht Allein",
+        "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ycKBleD6zx8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ycKBleD6zx8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ycKBleD6zx8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ycKBleD6zx8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ycKBleD6zx8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker's Music",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Du - Du Bist Nicht Allein",
+          "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "lQTcx3QzyMDvqhvYwAZ7q8P4TJs",
+      "id": "NI4Lv7SEgdc",
+      "snippet": {
+        "publishedAt": "2021-08-31T04:36:02Z",
+        "channelId": "UC4YXDFF0YtkDKt8Cd6Xazzw",
+        "title": "Roger Whittaker - Du bist nicht allein",
+        "description": "Schlager von 1988",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/NI4Lv7SEgdc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/NI4Lv7SEgdc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/NI4Lv7SEgdc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/NI4Lv7SEgdc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/NI4Lv7SEgdc/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Alte Schlager von Rolf",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker - Du bist nicht allein",
+          "description": "Schlager von 1988"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "NjAZj-n_LtHnBic8NH4jSYlP-kU",
+      "id": "uZ6Gvx5uhPc",
+      "snippet": {
+        "publishedAt": "2024-11-24T11:01:03Z",
+        "channelId": "UCal-JyYB9SY8qo09rJVkjPQ",
+        "title": "Roger Whittaker - Du - Du bist nicht allein (Karaoke Version)",
+        "description": "Karaoke mit reduziertem Hintergrundgesang und Text / Karaoke with reduced background vocals and lyrics\nOriginal-Version: https://www.youtube.com/watch?v=cWt5-Y1ku7k\n\nComposer: Nick Munro\nLyricist: Nick Munro\nKaraokevideo: DJ K.E.N.\n\n#RogerWhittaker #Du #DuBistNichtAllein #Karaoke #Schlager #Deutsch #Freundschaft #DJKen",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/uZ6Gvx5uhPc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/uZ6Gvx5uhPc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/uZ6Gvx5uhPc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/uZ6Gvx5uhPc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/uZ6Gvx5uhPc/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "DJ K.E.N.",
+        "tags": [
+          "Roger",
+          "Whittaker",
+          "Nicht",
+          "Allein",
+          "Karaoke",
+          "Schlager",
+          "Deutsch",
+          "Freundschaft",
+          "DJKen"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker - Du - Du bist nicht allein (Karaoke Version)",
+          "description": "Karaoke mit reduziertem Hintergrundgesang und Text / Karaoke with reduced background vocals and lyrics\nOriginal-Version: https://www.youtube.com/watch?v=cWt5-Y1ku7k\n\nComposer: Nick Munro\nLyricist: Nick Munro\nKaraokevideo: DJ K.E.N.\n\n#RogerWhittaker #Du #DuBistNichtAllein #Karaoke #Schlager #Deutsch #Freundschaft #DJKen"
+        },
+        "defaultAudioLanguage": "de"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "r5UIwGrHBbNaEL0rTzsaz-TUC4g",
+      "id": "GGidhb0kfAE",
+      "snippet": {
+        "publishedAt": "2023-10-14T06:00:12Z",
+        "channelId": "UCMTdhCMAdfamxzGChUhXrFw",
+        "title": "Roger Whittaker- Du, du bist nicht allein",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/GGidhb0kfAE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/GGidhb0kfAE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/GGidhb0kfAE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/GGidhb0kfAE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/GGidhb0kfAE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Schlager, Oldies und mehr",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker- Du, du bist nicht allein",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "sqWLq1zeeldgiTh49dNdTav9FVQ",
+      "id": "ygvZ3YjDtm0",
+      "snippet": {
+        "publishedAt": "2025-01-14T19:40:26Z",
+        "channelId": "UCKtArFfrYJetPSGO0GL8t2w",
+        "title": "Roger Whittaker   Du bist nicht alleine   komplette LP 1988",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ygvZ3YjDtm0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ygvZ3YjDtm0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ygvZ3YjDtm0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ygvZ3YjDtm0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ygvZ3YjDtm0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "schellackmaster",
+        "tags": [
+          "Grammophon",
+          "Schellackplatte",
+          "Vorkrieg",
+          "Plattenspieler"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker   Du bist nicht alleine   komplette LP 1988",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ehjrb7Q3gZBUpLiAISfhY_xDCp8",
+      "id": "OSM1hnWZzRc",
+      "snippet": {
+        "publishedAt": "2022-10-16T03:40:56Z",
+        "channelId": "UC6YuMoc2aRkdQmz3Eqc-VsQ",
+        "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Gutwetterfreunde",
+        "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/OSM1hnWZzRc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/OSM1hnWZzRc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/OSM1hnWZzRc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/OSM1hnWZzRc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/OSM1hnWZzRc/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker's Music",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Gutwetterfreunde",
+          "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "9Nj0ZxtlZlGJR2cvE2E_Tn9mG4M",
+      "id": "FVMpw9-wn4o",
+      "snippet": {
+        "publishedAt": "2014-07-03T10:06:24Z",
+        "channelId": "UCnC3cQrPZAxJcQ02VgrmU5g",
+        "title": "Roger Whittaker - Schoen war die Zeit (Melodien für Millionen 29.04.1990) (VOD)",
+        "description": "Roger Whittaker performt „Schön war die Zeit“ bei Melodien für Millionen (29.04.1990)\nDas Beste von Roger Whittaker: https://lnk.to/RogerWhittaker\nDen Kanal hier abonnieren: https://www.youtube.com/user/RogerWhittakerVEVO?sub_confirmation=1\n\nMehr Videos von Roger Whittaker:  \nAlbany: https://youtu.be/yb8SSDmhyaM\nEloisa: https://youtu.be/zUzoXPL7nWw\n\n_______________________________________________________________________________\nSchön war die Zeit, als wir verliebt und glücklich waren,\nnoch jung und unerfahren, fast wie im Rausch flog jede Stunde dahin.\nSchön war die Zeit, was hilft es uns ihr nach zu trauern,\nsie kann nicht ewig dauern, was auch geschehen ist,\nkeinen Tag brauchten wir je zu bereuen,\nnein wir haben uns nichts zu verzeihen,\nauch wenn jeder von uns heut eigne Wege geht.\nSchön war die Zeit, das Paradies das wir besessen,\nich werd es nie vergessen, wir glaubten, dass uns keiner daraus vertreibt, \nwird es auch alt, dein Bild ist tief in mir geblieben,\nich wird es ewig lieben, was auch geschehen ist,\nkeinen Tag brauchten wir je zu bereuen,\nnein wir haben uns nichts zu verzeihen\nauch wenn jeder von uns heut eigene Wege geht\nUnd hätte ich die Wahl, ich würd alles genau so... wieder machen,\nnoch einmal mit dir wieder weinen und lachen,\ndurch die Tiefen und Höhen der Liebe mit dir gehen.\nDenn die Zeit mit uns beiden war so unendlich schön.\n\n#RogerWhittaker #SchoenWarDieZeit #Live",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/FVMpw9-wn4o/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/FVMpw9-wn4o/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/FVMpw9-wn4o/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/FVMpw9-wn4o/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/FVMpw9-wn4o/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "RogerWhittakerVEVO",
+        "tags": [
+          "roger whittaker",
+          "roger wittaker",
+          "schoen war die zeit",
+          "roger whittaker schoen war die zeit",
+          "schoen war die zeit roger whittaker",
+          "roger whittaker musikvideo",
+          "roger whittaker live",
+          "schoen war die zeit lyrics",
+          "roger whittaker albany",
+          "albany roger whittaker",
+          "ein bisschen aroma",
+          "roger whittaker ein bisschen aroma",
+          "ein kissen voller träume roger whittaker",
+          "albany",
+          "abschied ist ein scharfes schwert",
+          "roger whittaker eloisa",
+          "eloisa roger whittaker ein kissen voller träume"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Roger Whittaker - Schoen war die Zeit (Melodien für Millionen 29.04.1990) (VOD)",
+          "description": "Roger Whittaker performt „Schön war die Zeit“ bei Melodien für Millionen (29.04.1990)\nDas Beste von Roger Whittaker: https://lnk.to/RogerWhittaker\nDen Kanal hier abonnieren: https://www.youtube.com/user/RogerWhittakerVEVO?sub_confirmation=1\n\nMehr Videos von Roger Whittaker:  \nAlbany: https://youtu.be/yb8SSDmhyaM\nEloisa: https://youtu.be/zUzoXPL7nWw\n\n_______________________________________________________________________________\nSchön war die Zeit, als wir verliebt und glücklich waren,\nnoch jung und unerfahren, fast wie im Rausch flog jede Stunde dahin.\nSchön war die Zeit, was hilft es uns ihr nach zu trauern,\nsie kann nicht ewig dauern, was auch geschehen ist,\nkeinen Tag brauchten wir je zu bereuen,\nnein wir haben uns nichts zu verzeihen,\nauch wenn jeder von uns heut eigne Wege geht.\nSchön war die Zeit, das Paradies das wir besessen,\nich werd es nie vergessen, wir glaubten, dass uns keiner daraus vertreibt, \nwird es auch alt, dein Bild ist tief in mir geblieben,\nich wird es ewig lieben, was auch geschehen ist,\nkeinen Tag brauchten wir je zu bereuen,\nnein wir haben uns nichts zu verzeihen\nauch wenn jeder von uns heut eigene Wege geht\nUnd hätte ich die Wahl, ich würd alles genau so... wieder machen,\nnoch einmal mit dir wieder weinen und lachen,\ndurch die Tiefen und Höhen der Liebe mit dir gehen.\nDenn die Zeit mit uns beiden war so unendlich schön.\n\n#RogerWhittaker #SchoenWarDieZeit #Live"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Omp8Ck5TIKKvSbl3QCqmOGKCd0M",
+      "id": "K7HHkylbyHk",
+      "snippet": {
+        "publishedAt": "2022-10-16T03:40:35Z",
+        "channelId": "UC6YuMoc2aRkdQmz3Eqc-VsQ",
+        "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Musik ist Magie",
+        "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/K7HHkylbyHk/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/K7HHkylbyHk/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/K7HHkylbyHk/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/K7HHkylbyHk/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/K7HHkylbyHk/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker's Music",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Musik ist Magie",
+          "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ltlRsYyLLPWJ5gt8CFOfcUbcK0I",
+      "id": "qyGCAWNjrQg",
+      "snippet": {
+        "publishedAt": "2022-10-16T03:41:13Z",
+        "channelId": "UC6YuMoc2aRkdQmz3Eqc-VsQ",
+        "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Kann Dich nicht vergessen",
+        "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/qyGCAWNjrQg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/qyGCAWNjrQg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/qyGCAWNjrQg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/qyGCAWNjrQg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/qyGCAWNjrQg/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Roger Whittaker's Music",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Roger Whittaker - Du Bist Nicht Allein (Remastered) - Kann Dich nicht vergessen",
+          "description": "Roger Whittaker's \"Du Bist Nicht Allein\" album, originally released in 1988 (CD, AVON 861.563). For this upload I have used the 2016 remastered version released as part of the \"Mein Geschenk an Dich\" 30 CD Box (SONY, 88985356472) as it has a noticeably better sound quality. \r\n\r\n[Note, I am not the copyright holder of these recordings or songs - simply a fan sharing rare recordings I've sat on for many years with other fans. Should anyone feel this recording infringes on copyright please let me know and I'll take it down]"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

@@ -13,8 +13,24 @@ mesure hors-ligne (`scripts/bench_ytcache.py`) rejoue le scoring contre des
 réponses YouTube capturées une fois, sans appel réseau ni quota à chaque
 rejeu. 3 cas construits à la main existent déjà (`tests/fixtures/ytcache/`).
 Objectif de cette tâche : **étoffer ce jeu de cas avec de vraies captures**,
-depuis l'historique réel RECOS (`recos_playlist_history.json`) — des pistes
-déjà validées un jour, donc un corpus de non-régression.
+depuis l'historique réel RECOS (`recos_playlist_history.json`).
+
+**Tâche EXÉCUTÉE le 19/09 (40 cas capturés) — relire ceci avant d'en relancer
+une, la prémisse de ce brief était fausse** : rejouer des SUCCÈS historiques ne
+discrimine pas. Ces cas passent même avec le scoring de `_best_match`
+entièrement court-circuité (mesuré : 25/25 du plancher passaient encore sous
+sabordage), parce que YouTube renvoie déjà la bonne vidéo en 1re position pour
+une requête « Artiste Titre » bien formée. Ils ne sont donc gardés que comme
+PLANCHER (`kind: "floor"` — détectent une casse franche du type « plus aucune
+vidéo trouvée »), jamais comme mesure d'amélioration. Deux autres défauts
+relevés à l'intégration : 15 des 40 cas portaient un artiste placeholder
+(« Various ») d'avant les pts 47/49, écartés depuis par le script de capture ;
+et l'identifiant vidéo historique n'est PAS une vérité terrain (une piste a
+souvent plusieurs uploads valables — le code actuel préfère désormais la chaîne
+officielle « Artiste - Topic », ce qui n'est pas une régression).
+**Conclusion : une nouvelle capture depuis l'historique n'apporterait presque
+rien.** Ce qui manque, ce sont des cas ADVERSES — cf. « Suite » en fin de
+fichier.
 
 **La suite (faire évoluer `ytcache.py` lui-même à partir de ce banc) reste
 côté session cloud, pas ici** — cf. « Ce que tu NE fais PAS » ci-dessous.
@@ -93,10 +109,26 @@ côté session cloud, pas ici** — cf. « Ce que tu NE fais PAS » ci-dessous.
 - **Ne pas afficher la clé YouTube** utilisée, même partiellement, dans le
   rapport ou le journal.
 
-## Suite (hors périmètre de ce brief, pour information)
+## Suite — capturer des cas ADVERSES (le vrai manque)
 
-Une fois les fixtures poussées sur `radar-diag`, l'utilisateur (ou un
-prochain tour de la session cloud) récupère ce dossier, l'intègre à
-`tests/fixtures/ytcache/` du dépôt `radar` et fusionne `cases.json`, puis
-lance une boucle d'itération sur `ytcache.py` mesurée par ce banc — sur une
-branche dédiée, jamais directement sur `main`.
+Fait le 19/09 : 40 cas capturés côté VPS, 25 intégrés au dépôt via PR côté
+cloud. Le banc mesure donc 3 cas discriminants + 25 de plancher.
+
+**Ce qu'il faut maintenant, et qui n'est PAS dans ce brief** : des cas où le
+matching ÉCHOUE ou se trompe — les seuls capables de dire si un changement de
+scoring améliore ou dégrade. Où les trouver, dans l'ordre d'intérêt :
+
+1. **Journal de `publish_recos`** : les candidats rejetés avec « meilleur score
+   X < 0.5 » alors que la piste est trouvable à la main. Ce sont des faux
+   négatifs — l'inverse exact de ce que le plancher couvre.
+2. **Retours 👎** sur des pistes de la playlist : faux positifs (mauvaise vidéo
+   prise pour la bonne piste), risque accru depuis le pt 67 qui a assoupli le
+   seuil global.
+3. **Compilations et remix/dub** : les pièges déjà connus (pts 27/67), où
+   plusieurs versions coexistent dans les résultats.
+
+Un cas adverse se capture comme les autres (mêmes `search.json`/`videos.json`)
+mais se déclare `kind: "adversarial"` avec l'attendu VÉRIFIÉ à la main (identifiant
+exact via `expect: "match"`, ou `expect: "no_match"` si aucune vidéo ne convient).
+Un tel cas demande donc une vérification humaine — il ne peut pas être généré
+automatiquement depuis l'historique, contrairement au plancher.

@@ -1,0 +1,864 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "YpVetCq8DiwhJW321XjZK-cpFN0",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "IYu4JDBfvuK1JBGsFS_a5sRu0-k",
+      "id": "9MDgDzcGvDo",
+      "snippet": {
+        "publishedAt": "2015-07-14T19:32:19Z",
+        "channelId": "UCQy8gyjB-WaJ9bD8KT85OXA",
+        "title": "Chris Cramer ‎– High Life",
+        "description": "CHRIS CRAMER - Michael Scheickl\n\nMichael Scheickl: \"1987 kam Chris Cramer, Ex-Sänger der in Österreich legendären Truppe „Halluzination Companie“ zu mir ins Studio und wir starteten seine Solokarriere. Der erste Song „Meet me at midnight“ brachte viele Rundfunkeinsätze, doch der richtige Durchbruch gelang mit dem Song „High life“, der ihn in Österreich zur Nr.1 der Charts werden ließ.\"",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/9MDgDzcGvDo/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/9MDgDzcGvDo/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/9MDgDzcGvDo/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/9MDgDzcGvDo/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/9MDgDzcGvDo/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Michael Scheickl",
+        "tags": [
+          "michael scheickl",
+          "chris cramer",
+          "higher life"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Chris Cramer ‎– High Life",
+          "description": "CHRIS CRAMER - Michael Scheickl\n\nMichael Scheickl: \"1987 kam Chris Cramer, Ex-Sänger der in Österreich legendären Truppe „Halluzination Companie“ zu mir ins Studio und wir starteten seine Solokarriere. Der erste Song „Meet me at midnight“ brachte viele Rundfunkeinsätze, doch der richtige Durchbruch gelang mit dem Song „High life“, der ihn in Österreich zur Nr.1 der Charts werden ließ.\""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "wW5pJpuAQ8Q3cv1IqcMOOzt8r4E",
+      "id": "sDONxNwQXGc",
+      "snippet": {
+        "publishedAt": "2017-04-08T09:30:41Z",
+        "channelId": "UCcbCTGneME9TurpPO-HIJYQ",
+        "title": "chris cramer- High Life",
+        "description": "just with me-1988\n\r\n\r-Video Upload powered by https://www.TunesToTube.com",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/sDONxNwQXGc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/sDONxNwQXGc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/sDONxNwQXGc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/sDONxNwQXGc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/sDONxNwQXGc/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "deep rock",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "chris cramer- High Life",
+          "description": "just with me-1988\n\r\n\r-Video Upload powered by https://www.TunesToTube.com"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "G1ZPYf7n1uydAYCRBBAJalC9lac",
+      "id": "tLnk1WZC2pM",
+      "snippet": {
+        "publishedAt": "2015-01-09T15:13:38Z",
+        "channelId": "UC42MNz-OZC7UIvUA3DYX3NA",
+        "title": "Chris Cramer ‎– High Life",
+        "description": "Label:\nOK Musica ‎– 76.11923\nFormat:\nVinyl, 7\", 45 RPM, Single\nCountry:\nAustria\nReleased:\n1988\nGenre:\nElectronic, Pop\nStyle:\nSynth-pop",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/tLnk1WZC2pM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/tLnk1WZC2pM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/tLnk1WZC2pM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/tLnk1WZC2pM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/tLnk1WZC2pM/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "ItaloDisco 1961",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Chris Cramer ‎– High Life",
+          "description": "Label:\nOK Musica ‎– 76.11923\nFormat:\nVinyl, 7\", 45 RPM, Single\nCountry:\nAustria\nReleased:\n1988\nGenre:\nElectronic, Pop\nStyle:\nSynth-pop"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "zE0elqAzv9w2eoIgAw1MnkiPfx4",
+      "id": "njoIPrATRys",
+      "snippet": {
+        "publishedAt": "2015-07-25T11:12:50Z",
+        "channelId": "UCWKl-alBbjg8gmccZ8gUwvA",
+        "title": "Chris Cramer - High Life",
+        "description": "High Life Remix 89",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/njoIPrATRys/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/njoIPrATRys/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/njoIPrATRys/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/njoIPrATRys/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "chrisskremerdotcom",
+        "tags": [
+          "Chris Cramer"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Chris Cramer - High Life",
+          "description": "High Life Remix 89"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Brg34lqPv9Joi_JEIVuM8YPZd_U",
+      "id": "I5k3kWDv6ro",
+      "snippet": {
+        "publishedAt": "2024-06-04T08:07:44Z",
+        "channelId": "UC1iUYsHGUZYqK5YZPEyzNvw",
+        "title": "CHRIS CRAMER - HIGH LIFE",
+        "description": "RARE MUSIC 80's      1988.\n\n#SYNTHPOP80#NEWWAVE80#RAREMUSIC80#",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/I5k3kWDv6ro/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/I5k3kWDv6ro/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/I5k3kWDv6ro/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/I5k3kWDv6ro/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/I5k3kWDv6ro/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BACK TO THE 80'S",
+        "tags": [
+          "Музыка 80-х",
+          "Хиты 80-х",
+          "Музыка-ретро",
+          "Песни 80-х годов",
+          "Редкие песни 80-х",
+          "Лучшие песни80-х",
+          "Rare music 80s",
+          "Ньювейф 80-х",
+          "Электропоп 80-х",
+          "Поп 80-х",
+          "Синти поп 80х",
+          "Электронная музыка 80х",
+          "Итало диско 80-х",
+          "Italo disco 80's",
+          "Rare italo disco 80s",
+          "Забытые хиты 80-х",
+          "New Wave 80's",
+          "Synthpop 80's",
+          "Хиты с винила",
+          "Музыка 80-х годов",
+          "Дискотека 80-х годов",
+          "Хиты с магнитной ленты",
+          "Ньювейф 80-х годов",
+          "Музыка Нью вейф",
+          "Europop 80s",
+          "Eurodisco 80s",
+          "Pop80s",
+          "Electropop 80s",
+          "Disco 80s"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "CHRIS CRAMER - HIGH LIFE",
+          "description": "RARE MUSIC 80's      1988.\n\n#SYNTHPOP80#NEWWAVE80#RAREMUSIC80#"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "eNjoPiTwkduZnmCNUhBZ0RJJWVs",
+      "id": "nnNYqDDwv8w",
+      "snippet": {
+        "publishedAt": "2010-04-05T20:24:13Z",
+        "channelId": "UCtCifHU2KGm4MJi_6povyqQ",
+        "title": "High Life 1987",
+        "description": " ",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/nnNYqDDwv8w/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/nnNYqDDwv8w/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/nnNYqDDwv8w/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/nnNYqDDwv8w/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "abalone234",
+        "tags": [
+          "Aufnahme6"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "High Life 1987",
+          "description": " "
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "cDpSOjtOTIW0con8CcFim-OyyOI",
+      "id": "q9YAxf1Hm8g",
+      "snippet": {
+        "publishedAt": "2018-12-31T23:15:42Z",
+        "channelId": "UC_UCBrudtEc-Z2vr9Jc73sg",
+        "title": "High Life",
+        "description": "Provided to YouTube by DistroKid\n\nHigh Life · Crsmr\n\nHigh Life\n\n℗ Chillin Records\n\nReleased on: 2018-12-31\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/q9YAxf1Hm8g/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/q9YAxf1Hm8g/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/q9YAxf1Hm8g/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/q9YAxf1Hm8g/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/q9YAxf1Hm8g/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Crsmr - Topic",
+        "tags": [
+          "Crsmr",
+          "High Life"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "High Life",
+          "description": "Provided to YouTube by DistroKid\n\nHigh Life · Crsmr\n\nHigh Life\n\n℗ Chillin Records\n\nReleased on: 2018-12-31\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "SlcnYmMrUcq7R3nWaFB9muDQTfk",
+      "id": "oYHGgFAuPyU",
+      "snippet": {
+        "publishedAt": "2012-04-05T10:50:31Z",
+        "channelId": "UC9s3drKb9EzJLh-wlWvQ9_w",
+        "title": "Chris Cramer - Don't Say",
+        "description": "Austrian Artist. From album \"Just With Me\" 1988",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/oYHGgFAuPyU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/oYHGgFAuPyU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/oYHGgFAuPyU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/oYHGgFAuPyU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "wurzlseppp",
+        "tags": [
+          "Chris",
+          "Cramer",
+          "Don't",
+          "Say"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Chris Cramer - Don't Say",
+          "description": "Austrian Artist. From album \"Just With Me\" 1988"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "WvEui4z3nJ-yxZYGTl3Vce283rY",
+      "id": "0puOd6L1Fr0",
+      "snippet": {
+        "publishedAt": "2015-07-24T15:34:08Z",
+        "channelId": "UC42MNz-OZC7UIvUA3DYX3NA",
+        "title": "Chris Cramer ‎– Dance The Body",
+        "description": "Label:\nOK Musica ‎– 76.11906\nFormat:\nVinyl, 7\", 45 RPM, Single\nCountry:\nAustria\nReleased:\n1986\nGenre:\nElectronic, Pop\nStyle:\nSynth-pop",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/0puOd6L1Fr0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/0puOd6L1Fr0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/0puOd6L1Fr0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/0puOd6L1Fr0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/0puOd6L1Fr0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "ItaloDisco 1961",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Chris Cramer ‎– Dance The Body",
+          "description": "Label:\nOK Musica ‎– 76.11906\nFormat:\nVinyl, 7\", 45 RPM, Single\nCountry:\nAustria\nReleased:\n1986\nGenre:\nElectronic, Pop\nStyle:\nSynth-pop"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "RewWzh8UVUe9WiUpwTYf1_4NvKE",
+      "id": "HTJUFo6NrDU",
+      "snippet": {
+        "publishedAt": "2021-10-06T17:20:01Z",
+        "channelId": "UClBUR54nIZxiid5ePlIvXGQ",
+        "title": "Chris Cramer - Dance The Body 1986",
+        "description": "https://www.discogs.com/master/1022873-Chris-Cramer-Dance-The-Body",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/HTJUFo6NrDU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/HTJUFo6NrDU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/HTJUFo6NrDU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/HTJUFo6NrDU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/HTJUFo6NrDU/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Nightfight_Funk",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Chris Cramer - Dance The Body 1986",
+          "description": "https://www.discogs.com/master/1022873-Chris-Cramer-Dance-The-Body"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "aBlB3P5HtQuR0MV6oQPDQkB8PS8",
+      "id": "SR9AkZZwk9I",
+      "snippet": {
+        "publishedAt": "2015-07-14T19:32:19Z",
+        "channelId": "UCQy8gyjB-WaJ9bD8KT85OXA",
+        "title": "CHRIS CRAMER - Meet Me At Midnight -1987",
+        "description": "CHRIS CRAMER - Michael Scheickl\n\nMichael Scheickl: \"1987 kam Chris Cramer, Ex-Sänger der in Österreich legendären Truppe „Halluzination Companie“ zu mir ins Studio und wir starteten seine Solokarriere. Der erste Song „Meet me at midnight“ brachte viele Rundfunkeinsätze, doch der richtige Durchbruch gelang mit dem Song „High life“, der ihn in Österreich zur Nr.1 der Charts werden ließ.\"",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SR9AkZZwk9I/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SR9AkZZwk9I/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SR9AkZZwk9I/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/SR9AkZZwk9I/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Michael Scheickl",
+        "tags": [
+          "Michael Scheickl",
+          "Chris Cramer",
+          "Meet me at midnight",
+          "Pop Music (Musical Genre)"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "CHRIS CRAMER - Meet Me At Midnight -1987",
+          "description": "CHRIS CRAMER - Michael Scheickl\n\nMichael Scheickl: \"1987 kam Chris Cramer, Ex-Sänger der in Österreich legendären Truppe „Halluzination Companie“ zu mir ins Studio und wir starteten seine Solokarriere. Der erste Song „Meet me at midnight“ brachte viele Rundfunkeinsätze, doch der richtige Durchbruch gelang mit dem Song „High life“, der ihn in Österreich zur Nr.1 der Charts werden ließ.\""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "3Ep_SBP_5tnpDB2xJZ_IqB4twWY",
+      "id": "Jx6aruX2p0E",
+      "snippet": {
+        "publishedAt": "2012-02-27T07:56:23Z",
+        "channelId": "UCstdNazQCm-hmr-5p3eGt-g",
+        "title": "Chris Cramer-Children of the Night",
+        "description": "Chris Cramer\nTitle:Children of the night (from Album \"Just with me\")\n Label: OK Musica ( Austria) 1988",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Jx6aruX2p0E/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Jx6aruX2p0E/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Jx6aruX2p0E/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Jx6aruX2p0E/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Igor Blokh (Italomaniak)",
+        "tags": [
+          "Chris",
+          "Cramer",
+          "Children",
+          "of",
+          "the",
+          "Night"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Chris Cramer-Children of the Night",
+          "description": "Chris Cramer\nTitle:Children of the night (from Album \"Just with me\")\n Label: OK Musica ( Austria) 1988"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "JbLbph12lytndS6DOCeYSq2BxvQ",
+      "id": "aAsdu4THCDU",
+      "snippet": {
+        "publishedAt": "2015-07-28T17:39:39Z",
+        "channelId": "UCWKl-alBbjg8gmccZ8gUwvA",
+        "title": "Chris Cramer - Good Girls",
+        "description": "89 release...",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/aAsdu4THCDU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/aAsdu4THCDU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/aAsdu4THCDU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/aAsdu4THCDU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "chrisskremerdotcom",
+        "tags": [
+          "Chris Cramer"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Chris Cramer - Good Girls",
+          "description": "89 release..."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Q_I5engWA_lEZpVoLM-tstUCNGA",
+      "id": "unXfcYebtaQ",
+      "snippet": {
+        "publishedAt": "2015-07-26T11:36:47Z",
+        "channelId": "UCWKl-alBbjg8gmccZ8gUwvA",
+        "title": "Chris Cramer - Just with me",
+        "description": "88 release...",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/unXfcYebtaQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/unXfcYebtaQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/unXfcYebtaQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/unXfcYebtaQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "chrisskremerdotcom",
+        "tags": [
+          "Chris Cramer"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "de",
+        "localized": {
+          "title": "Chris Cramer - Just with me",
+          "description": "88 release..."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ZgARxCWRbCMwaBA4wPJxXcuMKFo",
+      "id": "3AuLlzZ2ork",
+      "snippet": {
+        "publishedAt": "2023-05-15T08:00:02Z",
+        "channelId": "UC5GMDh3Y2A39v0zeMF_PvkA",
+        "title": "Top 3 stocks of the superinvestor's (Chris Hohn) portfolio",
+        "description": "Thank You For Watching!\n\nDo You Like This Video? ⬇⬇⬇\nThank you for subscribe - www.youtube.com/channel/UC5GMDh3Y2A39v0zeMF_PvkA?sub_confirmation=1\n\nOther Videos:\n7 Rules Of Success - https://youtu.be/TYK7VQMlKiw\nHow Bernard Arnault Got Rich? - https://youtu.be/jTtMMg9gkW0\nHow Warren Buffett Got Rich? - https://youtu.be/tuxHQxvWNn0\n\n\nMy website - https://tradinghelp6.webnode.page/\nMy Instagram - https://www.instagram.com/trading_help5/\n\n\n\n\n\n\n\n#stocks #investing #money #success #dividend #share #shares #stock #stockmarket #profit #investment #investments #invest #advice #investion #profits #successmotivation #portfolio #shareportfolio #stockportfolio #stockportfolioreview #stockportfolios #usa #rich #mostmotivational #etf \n\n\n\n\n\n\n\n\n\n\n\n\n\nRemember, I am not a financial advisor - all your investment actions are YOUR DECISION ONLY. DON'T MAKE INVESTMENTS BASED ON THIS VIDEO ALONE, VIDEO CAN GET OLD OVER TIME AND INVESTMENT MARKETS CHANGE, ALWAYS DO YOUR OWN ANALYSIS AND DON'T BE GUIDED BY \"VIDEOS ONLY\".",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/3AuLlzZ2ork/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/3AuLlzZ2ork/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/3AuLlzZ2ork/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/3AuLlzZ2ork/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/3AuLlzZ2ork/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "TradingHelp",
+        "tags": [
+          "TradingHelp",
+          "Investing",
+          "Trading",
+          "Learn"
+        ],
+        "categoryId": "27",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en-US",
+        "localized": {
+          "title": "Top 3 stocks of the superinvestor's (Chris Hohn) portfolio",
+          "description": "Thank You For Watching!\n\nDo You Like This Video? ⬇⬇⬇\nThank you for subscribe - www.youtube.com/channel/UC5GMDh3Y2A39v0zeMF_PvkA?sub_confirmation=1\n\nOther Videos:\n7 Rules Of Success - https://youtu.be/TYK7VQMlKiw\nHow Bernard Arnault Got Rich? - https://youtu.be/jTtMMg9gkW0\nHow Warren Buffett Got Rich? - https://youtu.be/tuxHQxvWNn0\n\n\nMy website - https://tradinghelp6.webnode.page/\nMy Instagram - https://www.instagram.com/trading_help5/\n\n\n\n\n\n\n\n#stocks #investing #money #success #dividend #share #shares #stock #stockmarket #profit #investment #investments #invest #advice #investion #profits #successmotivation #portfolio #shareportfolio #stockportfolio #stockportfolioreview #stockportfolios #usa #rich #mostmotivational #etf \n\n\n\n\n\n\n\n\n\n\n\n\n\nRemember, I am not a financial advisor - all your investment actions are YOUR DECISION ONLY. DON'T MAKE INVESTMENTS BASED ON THIS VIDEO ALONE, VIDEO CAN GET OLD OVER TIME AND INVESTMENT MARKETS CHANGE, ALWAYS DO YOUR OWN ANALYSIS AND DON'T BE GUIDED BY \"VIDEOS ONLY\"."
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

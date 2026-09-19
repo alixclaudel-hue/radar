@@ -1,0 +1,869 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "pPnXPl-VLF4sszXpsGs0tcLuzxc",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "-MmF1_NrPJ1YL5OgKzYv4OOJAPc",
+      "id": "VPAbu8QUz_E",
+      "snippet": {
+        "publishedAt": "2017-09-13T00:24:10Z",
+        "channelId": "UCReYzertX6orFSx0AhdLF0Q",
+        "title": "Toyin Agbetu presents Shades Of Black - Deeper Still",
+        "description": "+ 0rder +\nhttps://frameofmindrec.bandcamp.com/album/deepest-shades-ep\nhttps://www.discogs.com/Toyin-Agbetu-presents-Shades-Of-Black-Deepest-Shades-EP/release/10839882\n\n\n\n\n- - - (~) - - -\nhttps://www.youtube.com/SawmonandNatalie\nhttps://www.facebook.com/sawmonandnatalie/\nhttps://twitter.com/sw0nt",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/VPAbu8QUz_E/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/VPAbu8QUz_E/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/VPAbu8QUz_E/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/VPAbu8QUz_E/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/VPAbu8QUz_E/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Saw-mon and Natalie",
+        "tags": [
+          "saw-mon",
+          "natalie",
+          "saw-mon and natalie",
+          "discogs",
+          "bandcamp",
+          "house music",
+          "deep house",
+          "underground music",
+          "underground house music",
+          "electronic music",
+          "underground electronic music",
+          "dance music",
+          "underground dance music",
+          "ambient house",
+          "vinyl",
+          "vancouver",
+          "british columbia",
+          "canada",
+          "Toyin Agbetu",
+          "Shades of Black",
+          "Deeper still",
+          "Toyin Agbetu presents Shades Of Black - Deeper Still",
+          "Frame Of Mind",
+          "Netherlands",
+          "Deepest Shades EP"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu presents Shades Of Black - Deeper Still",
+          "description": "+ 0rder +\nhttps://frameofmindrec.bandcamp.com/album/deepest-shades-ep\nhttps://www.discogs.com/Toyin-Agbetu-presents-Shades-Of-Black-Deepest-Shades-EP/release/10839882\n\n\n\n\n- - - (~) - - -\nhttps://www.youtube.com/SawmonandNatalie\nhttps://www.facebook.com/sawmonandnatalie/\nhttps://twitter.com/sw0nt"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "gv1Xgwh7JfA5P_cWtrr6C3MZp6k",
+      "id": "z7npl5UfEwQ",
+      "snippet": {
+        "publishedAt": "2019-08-03T16:47:31Z",
+        "channelId": "UCdFRMrUoKdlNjeqZTVys-Qw",
+        "title": "Shades Of Black - Deeper Still",
+        "description": "https://www.discogs.com/Various-Produced-By-Nemesis-Vol-2/release/39433",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/z7npl5UfEwQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/z7npl5UfEwQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/z7npl5UfEwQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/z7npl5UfEwQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/z7npl5UfEwQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Felizmente",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "pt-PT",
+        "localized": {
+          "title": "Shades Of Black - Deeper Still",
+          "description": "https://www.discogs.com/Various-Produced-By-Nemesis-Vol-2/release/39433"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "JruYs0AlaKRxRoVghq0zO9nwQyc",
+      "id": "I_4Zlg9Ofz4",
+      "snippet": {
+        "publishedAt": "2022-04-29T22:45:23Z",
+        "channelId": "UCcTl5sBCsAD7DKDc3BPX_6g",
+        "title": "Toyin Agbetu presents Shades Of Black - Deeper Still",
+        "description": "Label: Frame Of Mind \r\nFormat: \r\nVinyl, 12\", EP, Compilation\r\nCountry: Netherlands\r\nReleased: Sep 12, 2017\r\nGenre: Electronic\r\nStyle: House, Deep House",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/I_4Zlg9Ofz4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/I_4Zlg9Ofz4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/I_4Zlg9Ofz4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/I_4Zlg9Ofz4/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/I_4Zlg9Ofz4/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "OLD SKOOL HOUSE",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu presents Shades Of Black - Deeper Still",
+          "description": "Label: Frame Of Mind \r\nFormat: \r\nVinyl, 12\", EP, Compilation\r\nCountry: Netherlands\r\nReleased: Sep 12, 2017\r\nGenre: Electronic\r\nStyle: House, Deep House"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Yhelp_OegeGIxwK1kntf7J8MCkA",
+      "id": "JFwJcuoDlYI",
+      "snippet": {
+        "publishedAt": "2016-03-13T18:52:02Z",
+        "channelId": "UCFh5xbWLIkhCoFN6CP4VklQ",
+        "title": "SHADES OF BLACK - DEEPER STILL",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/JFwJcuoDlYI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/JFwJcuoDlYI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/JFwJcuoDlYI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/JFwJcuoDlYI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/JFwJcuoDlYI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "groovegardengang",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "it",
+        "localized": {
+          "title": "SHADES OF BLACK - DEEPER STILL",
+          "description": ""
+        },
+        "defaultAudioLanguage": "it"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ZJH9RraG71efN_5LXzQl6ApOLoc",
+      "id": "8j6KTSLS-KI",
+      "snippet": {
+        "publishedAt": "2018-05-05T17:21:56Z",
+        "channelId": "UCc6q0oyTYD8zYY5dNjRBmYw",
+        "title": "Shades Of Black  ‎– Deeper Still",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/8j6KTSLS-KI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/8j6KTSLS-KI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/8j6KTSLS-KI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/8j6KTSLS-KI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Tuzzi",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "it",
+        "localized": {
+          "title": "Shades Of Black  ‎– Deeper Still",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "LHPNDI_N75G9WG4-EMTaKXPk_v4",
+      "id": "rCllxiKBXc4",
+      "snippet": {
+        "publishedAt": "2017-11-19T01:25:02Z",
+        "channelId": "UCujt6aaC7kMV-7RtAzLk1nA",
+        "title": "Toyin Agbetu presents Shades Of Black - Deeper Still",
+        "description": "Label: Frame Of Mind ‎- FOM003\nFormat: Vinyl, 12\", EP, Compilation \nCountry: Netherlands\nReleased: 12 Sep 2017\nGenre: Electronic\nStyle: House, Deep House\n\nFor promotional purposes only* (please support artists by buying their music!)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/rCllxiKBXc4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/rCllxiKBXc4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/rCllxiKBXc4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/rCllxiKBXc4/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "IndiciousSoul",
+        "tags": [
+          "Toyin Agbetu presents Shades Of Black",
+          "Deeper Still",
+          "Deepest Shades EP",
+          "Frame Of Mind",
+          "Vinyl",
+          "House",
+          "Deep House"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu presents Shades Of Black - Deeper Still",
+          "description": "Label: Frame Of Mind ‎- FOM003\nFormat: Vinyl, 12\", EP, Compilation \nCountry: Netherlands\nReleased: 12 Sep 2017\nGenre: Electronic\nStyle: House, Deep House\n\nFor promotional purposes only* (please support artists by buying their music!)"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "i800zpguApDMo1SiMw6usAyyZIE",
+      "id": "G0VQIXDfbRE",
+      "snippet": {
+        "publishedAt": "2016-06-11T01:55:25Z",
+        "channelId": "UCJHXmDZ9TOMIotU-91TpYzw",
+        "title": "Deeper Still (feat. Shades of Black)",
+        "description": "Provided to YouTube by DistroKid\n\nDeeper Still (feat. Shades of Black) · Toyin Agbetu · Shades of Black\n\nProduced. By Nemesis (Vol I & II)\n\n℗ Intrigue\n\nReleased on: 2016-06-08\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/G0VQIXDfbRE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/G0VQIXDfbRE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/G0VQIXDfbRE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/G0VQIXDfbRE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/G0VQIXDfbRE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Toyin Agbetu - Topic",
+        "tags": [
+          "Toyin Agbetu",
+          "Shades of Black",
+          "Produced. By Nemesis (Vol I & II)",
+          "Deeper Still (feat. Shades of Black)"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Deeper Still (feat. Shades of Black)",
+          "description": "Provided to YouTube by DistroKid\n\nDeeper Still (feat. Shades of Black) · Toyin Agbetu · Shades of Black\n\nProduced. By Nemesis (Vol I & II)\n\n℗ Intrigue\n\nReleased on: 2016-06-08\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "pDYVkfKL7azwrDXQDWKsE54ikrg",
+      "id": "xVBUB8YDLm0",
+      "snippet": {
+        "publishedAt": "2018-10-04T10:01:20Z",
+        "channelId": "UCpLX4H5zMqXrY8WMvPkvIHA",
+        "title": "Toyin Agbetu Presents Shades Of Black - Deeper Still (Frame Of Mind)",
+        "description": "Shades Of Black re-issue released through our sister label Frame Of Mind. Now also available from the 4lux Bandcamp page:\nhttps://4luxrecordings.bandcamp.com/album/deepest-shades",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/xVBUB8YDLm0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/xVBUB8YDLm0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/xVBUB8YDLm0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/xVBUB8YDLm0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/xVBUB8YDLm0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "4luxRecordings",
+        "tags": [
+          "4lux",
+          "clone",
+          "deep house"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu Presents Shades Of Black - Deeper Still (Frame Of Mind)",
+          "description": "Shades Of Black re-issue released through our sister label Frame Of Mind. Now also available from the 4lux Bandcamp page:\nhttps://4luxrecordings.bandcamp.com/album/deepest-shades"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "0iZraMOzUPoQKnxU8dJoZ6OInMc",
+      "id": "t4C1OKj4Q3c",
+      "snippet": {
+        "publishedAt": "2009-08-25T18:21:26Z",
+        "channelId": "UCA2jQ_zE3THHBw5j1-WRTlA",
+        "title": "Psycatron - Deeper Shades Of Black (After Dark Mix)",
+        "description": "Psycatron Deeper Shades Of Black After Dark Mix",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/t4C1OKj4Q3c/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/t4C1OKj4Q3c/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/t4C1OKj4Q3c/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "EdilijusR",
+        "tags": [
+          "Psycatron",
+          "Deeper",
+          "Shades",
+          "Of",
+          "Black",
+          "After",
+          "Dark",
+          "Mix",
+          "House",
+          "Minimal",
+          "Techno",
+          "Progressive",
+          "Tribal",
+          "Electro",
+          "Dance"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Psycatron - Deeper Shades Of Black (After Dark Mix)",
+          "description": "Psycatron Deeper Shades Of Black After Dark Mix"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "-dVYSl22Qn3F7dzzchZZ55tGRmE",
+      "id": "iBONBYxOjGo",
+      "snippet": {
+        "publishedAt": "2017-08-31T18:40:53Z",
+        "channelId": "UCObsUupit1C6-DdIoYaw-4g",
+        "title": "SHADES OF BLACK   Deep",
+        "description": "Intrigue Records \n1990",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/iBONBYxOjGo/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/iBONBYxOjGo/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/iBONBYxOjGo/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/iBONBYxOjGo/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "dholter1987",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "SHADES OF BLACK   Deep",
+          "description": "Intrigue Records \n1990"
+        },
+        "defaultAudioLanguage": "zxx"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "QM8-JsPCMohnzx_uhGkvDh2pGVs",
+      "id": "VDFwKLi35I0",
+      "snippet": {
+        "publishedAt": "2017-11-19T01:24:48Z",
+        "channelId": "UCujt6aaC7kMV-7RtAzLk1nA",
+        "title": "Toyin Agbetu presents Shades Of Black - Shadow",
+        "description": "Label: Frame Of Mind ‎- FOM003\nFormat: Vinyl, 12\", EP, Compilation \nCountry: Netherlands\nReleased: 12 Sep 2017\nGenre: Electronic\nStyle: House, Deep House\n\nFor promotional purposes only* (please support artists by buying their music!)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/VDFwKLi35I0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/VDFwKLi35I0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/VDFwKLi35I0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/VDFwKLi35I0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "IndiciousSoul",
+        "tags": [
+          "Toyin Agbetu presents Shades Of Black",
+          "Shadow",
+          "Frame Of Mind",
+          "Deepest Shades EP",
+          "Vinyl",
+          "House",
+          "Deep House"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu presents Shades Of Black - Shadow",
+          "description": "Label: Frame Of Mind ‎- FOM003\nFormat: Vinyl, 12\", EP, Compilation \nCountry: Netherlands\nReleased: 12 Sep 2017\nGenre: Electronic\nStyle: House, Deep House\n\nFor promotional purposes only* (please support artists by buying their music!)"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Mu9zhbZ5yIQrfzs_iygQorYOZyw",
+      "id": "92PO8d5KrHE",
+      "snippet": {
+        "publishedAt": "2017-11-19T01:24:17Z",
+        "channelId": "UCujt6aaC7kMV-7RtAzLk1nA",
+        "title": "Toyin Agbetu presents Shades Of Black - 2 Deep",
+        "description": "Label: Frame Of Mind ‎- FOM003\nFormat: Vinyl, 12\", EP, Compilation \nCountry: Netherlands\nReleased: 12 Sep 2017\nGenre: Electronic\nStyle: House, Deep House\n\nFor promotional purposes only* (please support artists by buying their music!)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/92PO8d5KrHE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/92PO8d5KrHE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/92PO8d5KrHE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/92PO8d5KrHE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "IndiciousSoul",
+        "tags": [
+          "Toyin Agbetu presents Shades Of Black",
+          "2 Deep",
+          "Frame Of Mind",
+          "Vinyl",
+          "Deepest Shades EP",
+          "House",
+          "Deep House"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu presents Shades Of Black - 2 Deep",
+          "description": "Label: Frame Of Mind ‎- FOM003\nFormat: Vinyl, 12\", EP, Compilation \nCountry: Netherlands\nReleased: 12 Sep 2017\nGenre: Electronic\nStyle: House, Deep House\n\nFor promotional purposes only* (please support artists by buying their music!)"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "_dnkV-r93WnZ7ecP5elp2tu1mxA",
+      "id": "RqvkM0Wbg8s",
+      "snippet": {
+        "publishedAt": "2009-09-21T17:32:53Z",
+        "channelId": "UCi_JdfUmqDKvl6wDa01xDrQ",
+        "title": "Psycatron - Deeper Shades of Black (Original Mix)",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/RqvkM0Wbg8s/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/RqvkM0Wbg8s/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/RqvkM0Wbg8s/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "mnmlman101",
+        "tags": [
+          "Psycatron",
+          "Deeper Shades of Black"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Psycatron - Deeper Shades of Black (Original Mix)",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "mdtI-jI54h3Lrws6XzFqfvuuT34",
+      "id": "DJGX7jIzWdE",
+      "snippet": {
+        "publishedAt": "2018-10-04T00:52:13Z",
+        "channelId": "UCpLX4H5zMqXrY8WMvPkvIHA",
+        "title": "Toyin Agbetu Presents Shades Of Black - 2 Deep (Frame Of Mind)",
+        "description": "Shades Of Black re-issue released through our sister label Frame Of Mind. Now also available from the 4lux Bandcamp page:\nhttps://4luxrecordings.bandcamp.com/album/deepest-shades",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/DJGX7jIzWdE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/DJGX7jIzWdE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/DJGX7jIzWdE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/DJGX7jIzWdE/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/DJGX7jIzWdE/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "4luxRecordings",
+        "tags": [
+          "4lux",
+          "clone",
+          "deep house"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Toyin Agbetu Presents Shades Of Black - 2 Deep (Frame Of Mind)",
+          "description": "Shades Of Black re-issue released through our sister label Frame Of Mind. Now also available from the 4lux Bandcamp page:\nhttps://4luxrecordings.bandcamp.com/album/deepest-shades"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Da-0QHHBkzjKNPsBwgW6PGnSGXU",
+      "id": "3bOm0d91yJI",
+      "snippet": {
+        "publishedAt": "2013-07-23T17:15:25Z",
+        "channelId": "UCwRBP-3ZtmwEshx8fESAYmQ",
+        "title": "Shades Of Black - Classic Cuts 2 - Memo   1992",
+        "description": "Intrigue Records - Producer - Nemesis - Toyin Agbetu",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/3bOm0d91yJI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/3bOm0d91yJI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/3bOm0d91yJI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Jacyhouse",
+        "tags": [
+          "Toyin Agbetu",
+          "Nemesis",
+          "Shades of black",
+          "house",
+          "deephouse",
+          "acid house"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Shades Of Black - Classic Cuts 2 - Memo   1992",
+          "description": "Intrigue Records - Producer - Nemesis - Toyin Agbetu"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

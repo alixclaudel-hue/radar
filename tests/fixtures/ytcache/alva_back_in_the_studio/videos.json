@@ -1,0 +1,1010 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "gDhpfCpPwIgniRmheTEjySXKg24",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "-K3e1ANnA2xSmDpx9fjSYIUahQk",
+      "id": "NdT4t3LRF-E",
+      "snippet": {
+        "publishedAt": "2019-02-20T15:00:07Z",
+        "channelId": "UC58C_BhzlZIJTeomuVSD2lA",
+        "title": "Alva - Back In The Studio",
+        "description": "PREMIERE on Soundcloud: https://goo.gl/2bM2UU\n\nLabel: Virage\nArtist: ALVA\nFormat: Vinyl & Digital\nCat Number: VIRAGE004\nEP Title: Quatre à la Suite EP\nRelease Date: March 22nd, 2019\n\nVirage:\nhttps://soundcloud.com/viragerecords\nhttps://www.facebook.com/Viragerecords\n\nALVA:\nhttps://soundcloud.com/alva \nhttps://www.facebook.com/alvamusics\n---------------------------------------------------------------------------------------------------------------------------------------------------------------\nHouseum:\nhttps://soundcloud.com/houseum\nhttps://www.facebook.com/houseum.yt\nhttps://www.instagram.com/houseumrecords\nhttps://houseum.yt@gmail.com",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/NdT4t3LRF-E/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/NdT4t3LRF-E/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/NdT4t3LRF-E/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/NdT4t3LRF-E/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/NdT4t3LRF-E/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Houseum",
+        "tags": [
+          "alva",
+          "back in the studio",
+          "virage004",
+          "houseum",
+          "lo-fi",
+          "deep house",
+          "vinyl house",
+          "deep",
+          "funky",
+          "groovy",
+          "disco",
+          "underground",
+          "slav",
+          "OOUKFunkyOO",
+          "vanderkraft",
+          "pretiosum",
+          "church",
+          "lobster theremin",
+          "pulse msc",
+          "shall not fade",
+          "toy tonics",
+          "detroit swindle",
+          "andy hart",
+          "coeo",
+          "route 8",
+          "moomin",
+          "omar s",
+          "ross from friends",
+          "adryiano",
+          "leon vynehall",
+          "nick holder",
+          "max graef",
+          "mall grab",
+          "folamour",
+          "dj seinfeld",
+          "dj boring",
+          "bellaire",
+          "sweely",
+          "harrison bdp",
+          "demuja",
+          "subjoi",
+          "black loops",
+          "aleksandir"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Alva - Back In The Studio",
+          "description": "PREMIERE on Soundcloud: https://goo.gl/2bM2UU\n\nLabel: Virage\nArtist: ALVA\nFormat: Vinyl & Digital\nCat Number: VIRAGE004\nEP Title: Quatre à la Suite EP\nRelease Date: March 22nd, 2019\n\nVirage:\nhttps://soundcloud.com/viragerecords\nhttps://www.facebook.com/Viragerecords\n\nALVA:\nhttps://soundcloud.com/alva \nhttps://www.facebook.com/alvamusics\n---------------------------------------------------------------------------------------------------------------------------------------------------------------\nHouseum:\nhttps://soundcloud.com/houseum\nhttps://www.facebook.com/houseum.yt\nhttps://www.instagram.com/houseumrecords\nhttps://houseum.yt@gmail.com"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ucVYU-b7bDPHOkOaeaEB81GsXrk",
+      "id": "7_JRH9phbaY",
+      "snippet": {
+        "publishedAt": "2023-04-04T10:10:18Z",
+        "channelId": "UCCmrd7eZlbBsFXGDN6vWEdQ",
+        "title": "Alva - Back In The Studio",
+        "description": "Deep House, House",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/7_JRH9phbaY/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/7_JRH9phbaY/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/7_JRH9phbaY/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/7_JRH9phbaY/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/7_JRH9phbaY/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "terry f",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Alva - Back In The Studio",
+          "description": "Deep House, House"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ftqAsWt0R_vMYY6dDFQTjTC1yMM",
+      "id": "DXWByXBj1fw",
+      "snippet": {
+        "publishedAt": "2025-01-16T17:14:27Z",
+        "channelId": "UCHCco167wBnRnGrch2iEMPA",
+        "title": "She Wrote Avril Lavigne’s Hits ✨ #laurenchristy #avrillavigne",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/DXWByXBj1fw/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/DXWByXBj1fw/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/DXWByXBj1fw/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/DXWByXBj1fw/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/DXWByXBj1fw/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Songs You Know with Toby Gad",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "She Wrote Avril Lavigne’s Hits ✨ #laurenchristy #avrillavigne",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "diYHZqdc8wnRolEO5PndnTOLrfY",
+      "id": "4TAV6KcWyhQ",
+      "snippet": {
+        "publishedAt": "2017-08-14T17:00:01Z",
+        "channelId": "UCa1Q2ic8wDlT1WH7LSO_4Sg",
+        "title": "Alva - What It Is",
+        "description": "Subscribe to Eton Messy: http://bit.ly/P7EPdo\nBuy / Stream: https://VA.lnk.to/inseasonsscomp\n\nFollowing on from the success of last years In:Season Compilation we return with the second in the series. ‘Spring/Summer’ packs some serious heat in the artist department, bringing back some stellar tracks from 2017, whilst offering up a wide variety of exclusives to get the party season off the ground.\n\n‘What It Is’ by Alva is a bass line heavy roller which similarly to the previous, incorporates more live guitar elements to add to the power of the rhythm.\n\n•Alva•\nhttps://soundcloud.com/alva\nhttps://facebook.com/alvamusics\nhttps://residentadvisor.net/dj/alva\n\n•Photography by Sweet Ice Cream Photography•\nhttps://unsplash.com/@sweeticecreamphotography\n\n•Photo Link•\nhttps://unsplash.com/photos/S9WMTzGVsW4\n\n✖ Facebook http://on.fb.me/R5QGH6 ✖ Soundcloud http://bit.ly/LMFAUi ✖ Twitter http://bit.ly/PAcpsh ✖SPFYhttp://bit.ly/EMspotify ✖Google+ http://goo.gl/0a3TT4\n\nEton Messy have now fully arrived as some of the most influential tastemakers in the dance world. What started as a YouTube channel has evolved into a label, party series and production outfit that unearths and offers the freshest house, electronica, chill and lounge music to devoted fans everywhere. \n\nEarly on the Eton Messy collective were early supporters of breakthrough artists like Blonde, Bondax and Maribou State. Their monthly mixes picked up a huge following around the world and as such demand for them to DJ around the globe became huge. They now do so each weekend and also host their own stages at various key festivals, as well as leading from the from the front with their Eton Messy label which has even lead to multiple takeovers on on BBC Radio 1. \n\nReleases from Jack Bandit, Just Kiddin, The Golden Boy and many more have all helped established it as an essential outlet for the newest sounds, and their new In: Season compilation once again proves they have their finger well and truly on the pulse.  Support for Eton Messy comes from not only from fellow Djs and dancers all over the world, but also those in the know such as BBC Radio 1 icons Annie Mac, Pete Tong, Danny Howard and Monki. \n\nIf you wish to submit your own track or a copyright infringement please email - http://bit.ly/emsubmissions or etonmessysubmissions@gmail.com\n(All track submissions must be stream links)\n\nFor booking/events enquiries contact:\ncraig@primarytalent.com / tom@primarytalent.com",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/4TAV6KcWyhQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/4TAV6KcWyhQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/4TAV6KcWyhQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/4TAV6KcWyhQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/4TAV6KcWyhQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Eton Messy",
+        "tags": [
+          "What It Is",
+          "Alva",
+          "Dance",
+          "Eton Messy Records",
+          "Eton Messy",
+          "2014",
+          "2015",
+          "2016",
+          "eton",
+          "messy",
+          "eton messy",
+          "eaton",
+          "messi",
+          "records",
+          "majestic",
+          "uk bass",
+          "house",
+          "haus",
+          "deep house",
+          "musik",
+          "musique",
+          "subsoul",
+          "tsyn",
+          "uk",
+          "music",
+          "electronic",
+          "electronica",
+          "dancefloor",
+          "happy",
+          "beauty",
+          "beats",
+          "uk house",
+          "photography",
+          "vibes",
+          "muzyka",
+          "club",
+          "garage",
+          "summer",
+          "future garage",
+          "party",
+          "electro",
+          "yinyue",
+          "ibiza",
+          "house music",
+          "4x4",
+          "sunset",
+          "Big Room",
+          "Detroit",
+          "Chicago",
+          "US House"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Alva - What It Is",
+          "description": "Subscribe to Eton Messy: http://bit.ly/P7EPdo\nBuy / Stream: https://VA.lnk.to/inseasonsscomp\n\nFollowing on from the success of last years In:Season Compilation we return with the second in the series. ‘Spring/Summer’ packs some serious heat in the artist department, bringing back some stellar tracks from 2017, whilst offering up a wide variety of exclusives to get the party season off the ground.\n\n‘What It Is’ by Alva is a bass line heavy roller which similarly to the previous, incorporates more live guitar elements to add to the power of the rhythm.\n\n•Alva•\nhttps://soundcloud.com/alva\nhttps://facebook.com/alvamusics\nhttps://residentadvisor.net/dj/alva\n\n•Photography by Sweet Ice Cream Photography•\nhttps://unsplash.com/@sweeticecreamphotography\n\n•Photo Link•\nhttps://unsplash.com/photos/S9WMTzGVsW4\n\n✖ Facebook http://on.fb.me/R5QGH6 ✖ Soundcloud http://bit.ly/LMFAUi ✖ Twitter http://bit.ly/PAcpsh ✖SPFYhttp://bit.ly/EMspotify ✖Google+ http://goo.gl/0a3TT4\n\nEton Messy have now fully arrived as some of the most influential tastemakers in the dance world. What started as a YouTube channel has evolved into a label, party series and production outfit that unearths and offers the freshest house, electronica, chill and lounge music to devoted fans everywhere. \n\nEarly on the Eton Messy collective were early supporters of breakthrough artists like Blonde, Bondax and Maribou State. Their monthly mixes picked up a huge following around the world and as such demand for them to DJ around the globe became huge. They now do so each weekend and also host their own stages at various key festivals, as well as leading from the from the front with their Eton Messy label which has even lead to multiple takeovers on on BBC Radio 1. \n\nReleases from Jack Bandit, Just Kiddin, The Golden Boy and many more have all helped established it as an essential outlet for the newest sounds, and their new In: Season compilation once again proves they have their finger well and truly on the pulse.  Support for Eton Messy comes from not only from fellow Djs and dancers all over the world, but also those in the know such as BBC Radio 1 icons Annie Mac, Pete Tong, Danny Howard and Monki. \n\nIf you wish to submit your own track or a copyright infringement please email - http://bit.ly/emsubmissions or etonmessysubmissions@gmail.com\n(All track submissions must be stream links)\n\nFor booking/events enquiries contact:\ncraig@primarytalent.com / tom@primarytalent.com"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "bHd4O6HnVzt-upJenbtu-h9Nknw",
+      "id": "ZKGlvwkRapM",
+      "snippet": {
+        "publishedAt": "2026-02-13T16:00:11Z",
+        "channelId": "UCDOeW6gv1pecDigR1UzbbNQ",
+        "title": "Elisha K, Alva, King Luca, Yvuti, Achu Normad - Mi Corazon (Official Video)",
+        "description": "New Music titled Mi Corazon, \nPerformed by: Elisha K, Alva, King Luca, Yvuti and Achu Normad\nWritten and composed by: Achu Normad, Elisha K and King Luca\n\nDirector: Mr Adrenaline (Buea)\nVixens : Blacky, Options, Atta. Danelle, Sheridane\n\nProduced by: Akumba Studios\nMixed and Mastered by: Dub\nProduction Director: Achu Normad\nRecord Label: Akumba Music \nProduction Company: Akumba Media Group Ltd\n\nLet’s Kickstart the year Properly with a Mega release scheduled for this Friday titled “Mi Corazon” \nThis is a song by Starboy Elisha K, our Queen Alva, Wonderboy King Luca and Baby Ninja Yvuti, who is our newest signee. \nThis is the first ever joint Artists project at Akumba Music and it’s an in-house musical duel between 2 teams, A clash of the titans, a head to head designed to bring out the Best in each of our Artists. Achu Normad,  the Production Director and label boss also makes a significant performance in this project with his Signature Afro Chants, which a the basic building blocks of the \"Sound of Akumba\" This will hit hard and you are going to want to Brace yourselves for impact! \nTeam A \nStarboy & the Queen \nTeam B \nWonder Boy and Baby Ninja 🥷 \nE go worry! Ça va peter 🔥 \n\nLyrics\n\nElisha K and Alva\n\nOh mon Bebe\niroko tree go fall down are you availa\nthis your mini skirt na trojan corrupt my brain\nah ah Mola tu me rend si fole, jai les frissions oh oh\nah ah ton schema. marche,  je t'assure\ne di do me like pepper\nI'm a lover boy\nevery time i say goodbye, you only see me come back\nMr. Loverboy Mi Corazon I want to see you come back\nMi Corazon, I want to see you come back\nMi Corazon X3\n\nKing Luca and yvuti\nyou be ma last bus stop\nje traverse la route avec les yeux bande je sais que tu me guidera\nest-ce que tu va m'attraper si je tombe\nget a grip, cuz what is this, I'm loosing it\ne be like say you don dey do me abrakadabra\nje me sens hypnotiser, il faut que tu sage je suis envoute\nif you no fit reach for junction make you leave me for here\nmy king in rainy days je te choisirai sans hesitations \nwill you do same to mi corazon\ni like to see you come back \n\nMi Corazon x3\n\n\n\n#ElishaK #Alva #KingLuca 🤴🏾#Yvuti #MiCorazon #AkumbaMusic",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ZKGlvwkRapM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ZKGlvwkRapM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ZKGlvwkRapM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ZKGlvwkRapM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ZKGlvwkRapM/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Akumba Music",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Elisha K, Alva, King Luca, Yvuti, Achu Normad - Mi Corazon (Official Video)",
+          "description": "New Music titled Mi Corazon, \nPerformed by: Elisha K, Alva, King Luca, Yvuti and Achu Normad\nWritten and composed by: Achu Normad, Elisha K and King Luca\n\nDirector: Mr Adrenaline (Buea)\nVixens : Blacky, Options, Atta. Danelle, Sheridane\n\nProduced by: Akumba Studios\nMixed and Mastered by: Dub\nProduction Director: Achu Normad\nRecord Label: Akumba Music \nProduction Company: Akumba Media Group Ltd\n\nLet’s Kickstart the year Properly with a Mega release scheduled for this Friday titled “Mi Corazon” \nThis is a song by Starboy Elisha K, our Queen Alva, Wonderboy King Luca and Baby Ninja Yvuti, who is our newest signee. \nThis is the first ever joint Artists project at Akumba Music and it’s an in-house musical duel between 2 teams, A clash of the titans, a head to head designed to bring out the Best in each of our Artists. Achu Normad,  the Production Director and label boss also makes a significant performance in this project with his Signature Afro Chants, which a the basic building blocks of the \"Sound of Akumba\" This will hit hard and you are going to want to Brace yourselves for impact! \nTeam A \nStarboy & the Queen \nTeam B \nWonder Boy and Baby Ninja 🥷 \nE go worry! Ça va peter 🔥 \n\nLyrics\n\nElisha K and Alva\n\nOh mon Bebe\niroko tree go fall down are you availa\nthis your mini skirt na trojan corrupt my brain\nah ah Mola tu me rend si fole, jai les frissions oh oh\nah ah ton schema. marche,  je t'assure\ne di do me like pepper\nI'm a lover boy\nevery time i say goodbye, you only see me come back\nMr. Loverboy Mi Corazon I want to see you come back\nMi Corazon, I want to see you come back\nMi Corazon X3\n\nKing Luca and yvuti\nyou be ma last bus stop\nje traverse la route avec les yeux bande je sais que tu me guidera\nest-ce que tu va m'attraper si je tombe\nget a grip, cuz what is this, I'm loosing it\ne be like say you don dey do me abrakadabra\nje me sens hypnotiser, il faut que tu sage je suis envoute\nif you no fit reach for junction make you leave me for here\nmy king in rainy days je te choisirai sans hesitations \nwill you do same to mi corazon\ni like to see you come back \n\nMi Corazon x3\n\n\n\n#ElishaK #Alva #KingLuca 🤴🏾#Yvuti #MiCorazon #AkumbaMusic"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "OYu0GV7Vlh1p8H87F3jTz3R1msw",
+      "id": "RoB03y4ddI8",
+      "snippet": {
+        "publishedAt": "2024-08-25T21:30:01Z",
+        "channelId": "UCKI9exdqwE0jKlsgAhv6yDQ",
+        "title": "Mr. Ho's Orchestrotica, live at Alva's Studio in San Pedro, California (2016)",
+        "description": "Mr. Ho's Orchestrotica makes their west coast debut with a 4 date southern California tour.  Recorded February 20, 2016 at Alva's in Pomona, California.\n\nMr. Ho's Orchestrotica is a quintet and 22 piece megaband.  The quintet performs original music based on ideas from exotica and tiki of the 1950's/1960's, but using instruments found in Eastern European / Baltic music.  The 22 piece megaband performs the work of Esquivel who did not keep records of his sheet music.  Mr. Ho (Brian O'Neil) painstakingly transcribed many of Esquivel's best songs so it could be preserved, and faithfully performed live.\n\nSet list:\n\n00:00:48 Third River Rangoon\n00:06:17 Autumn Digging Dance\n00:12:51 Sansaz\n00:23:14 Chiseling Music\n00:31:22 Terre Exotique\n00:41:12 Moai Thief\n00:45:43 Phoenix, Goodbye\n00:53:23 Prelude for Piano I\n01:00:10 Prelude for Piano II\n01:07:24 Prelude for Piano III\n01:12:56 Shen Khar Venakhi\n01:19:14 Maracatune for Chalco\n\nNOTE:  The first 90 seconds were recorded on my smartphone because the show started while I was still getting set up.  The venue did not allow use of a tripod, so I had to shoot it handheld. I was so close to the stage I could not fit everything into view and had to pan back n' forth to capture the action.  Hence the shaky video.  Stabilization software was used to smooth the camera shakes, but has a side effect of introducing larger looping camera movements.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/RoB03y4ddI8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/RoB03y4ddI8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/RoB03y4ddI8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/RoB03y4ddI8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/RoB03y4ddI8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "avidsiman",
+        "tags": [
+          "Mr. Ho's Orchestrotica",
+          "Third River Rangoon",
+          "Where Here Meets There",
+          "Esquivel",
+          "Brian O'Neil",
+          "Alva's",
+          "Pomona",
+          "California",
+          "Chiseling Music",
+          "Vibraphone",
+          "Tiki",
+          "Autumn Digging Dance",
+          "Sansaz",
+          "Terre Exotique",
+          "Moai Thief",
+          "Phoenix Goodbye",
+          "Prelude for Piano",
+          "Shen Khar Venakhi",
+          "Maracatune for Chalco",
+          "Mr. Ho"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Mr. Ho's Orchestrotica, live at Alva's Studio in San Pedro, California (2016)",
+          "description": "Mr. Ho's Orchestrotica makes their west coast debut with a 4 date southern California tour.  Recorded February 20, 2016 at Alva's in Pomona, California.\n\nMr. Ho's Orchestrotica is a quintet and 22 piece megaband.  The quintet performs original music based on ideas from exotica and tiki of the 1950's/1960's, but using instruments found in Eastern European / Baltic music.  The 22 piece megaband performs the work of Esquivel who did not keep records of his sheet music.  Mr. Ho (Brian O'Neil) painstakingly transcribed many of Esquivel's best songs so it could be preserved, and faithfully performed live.\n\nSet list:\n\n00:00:48 Third River Rangoon\n00:06:17 Autumn Digging Dance\n00:12:51 Sansaz\n00:23:14 Chiseling Music\n00:31:22 Terre Exotique\n00:41:12 Moai Thief\n00:45:43 Phoenix, Goodbye\n00:53:23 Prelude for Piano I\n01:00:10 Prelude for Piano II\n01:07:24 Prelude for Piano III\n01:12:56 Shen Khar Venakhi\n01:19:14 Maracatune for Chalco\n\nNOTE:  The first 90 seconds were recorded on my smartphone because the show started while I was still getting set up.  The venue did not allow use of a tripod, so I had to shoot it handheld. I was so close to the stage I could not fit everything into view and had to pan back n' forth to capture the action.  Hence the shaky video.  Stabilization software was used to smooth the camera shakes, but has a side effect of introducing larger looping camera movements."
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": false,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "CAB8v5U3mTMULfdPhtK66kb1aIA",
+      "id": "gqtNzacgdek",
+      "snippet": {
+        "publishedAt": "2019-03-26T09:12:39Z",
+        "channelId": "UC5I2hjZYiW9gZPVkvzM8_Cw",
+        "title": "HiFi - Swapping a Turntable Cartridge & The Cambridge Alva Duo Phono Pre-Amp",
+        "description": "A couple of Hi-Fi upgrades/side-grades - The Goldring E3 MM Turntable Cartridge & Cambridge Audio Alva Duo Phono Stage\n\nLinks (All links are affiliated - see note at bottom) \nGoldring E3 MM Cartridge\nUK: https://amzn.to/2HyHxIY\n\nCambridge Audio Alva Duo Phono Pre-amp\nUK: https://amzn.to/2JritFy\nUS: https://amzn.to/2JrizNq\nDE: https://amzn.to/2UMR16o\n\nWooden Bull Leather & Cork Turntable Mat\nUK: https://amzn.to/2UIceOZ\n\nTurntable Cartridge Protractor\nUK: https://amzn.to/2Ycg1Gh\nUS: https://amzn.to/2Ycgmc1\n\nStylus Scale\nUK: https://amzn.to/2TQ4rlC\nUS: https://amzn.to/2ULvw6f\nDE: https://amzn.to/2OhoTWK\n\n---------------SUBSCRIBE------------------\n http://www.youtube.com/user/Techmoan?sub_confirmation=1\n\n-------------Merchandise-----------------\nhttps://teespring.com/stores/techmoan-merch\n\n-------------SUPPORT---------------\nThis channel can be supported through Patreon \nhttps://www.patreon.com/techmoan\n\n********* Patrons usually have early access to videos **********\n\n----------Outro Music-----------\nOver Time - Vibe Tracks https://youtu.be/VSSswVZSgJw\n\n------Outro Sound Effect------\nThatSFXGuy - https://youtu.be/5M3-ZV5-QDM\n\n------AFFILIATED LINKS/ADVERTISING NOTICE-------\nAll links are Affiliated where possible.\nWhen you click on links to various merchants posted here and make a purchase, this can result in me earning a commission. Affiliate programs and affiliations include, but are not limited to, the eBay Partner Network & Amazon. \nI am a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to AMAZON Sites (including, but not limited to Amazon US/UK/DE/ES/FR/NL/IT/CAN)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/gqtNzacgdek/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/gqtNzacgdek/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/gqtNzacgdek/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/gqtNzacgdek/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/gqtNzacgdek/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Techmoan",
+        "tags": [
+          "Techmoan",
+          "4K",
+          "Cambridge Audio",
+          "Goldring",
+          "Goldring E3",
+          "Alva Duo",
+          "E3",
+          "Cambridge",
+          "Phono Pre-amp",
+          "Pre-Amp",
+          "Phono Stage",
+          "Phono",
+          "Stage",
+          "How to",
+          "Swap a turntable cartridge",
+          "phono cart",
+          "cartridge",
+          "cart",
+          "record player",
+          "needle",
+          "stylus",
+          "Hi-Fi",
+          "Hifi",
+          "Upgrade",
+          "MM",
+          "MC",
+          "Moving Magnet",
+          "Moving Coil",
+          "vs",
+          "Protractor",
+          "Alignment"
+        ],
+        "categoryId": "28",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "HiFi - Swapping a Turntable Cartridge & The Cambridge Alva Duo Phono Pre-Amp",
+          "description": "A couple of Hi-Fi upgrades/side-grades - The Goldring E3 MM Turntable Cartridge & Cambridge Audio Alva Duo Phono Stage\n\nLinks (All links are affiliated - see note at bottom) \nGoldring E3 MM Cartridge\nUK: https://amzn.to/2HyHxIY\n\nCambridge Audio Alva Duo Phono Pre-amp\nUK: https://amzn.to/2JritFy\nUS: https://amzn.to/2JrizNq\nDE: https://amzn.to/2UMR16o\n\nWooden Bull Leather & Cork Turntable Mat\nUK: https://amzn.to/2UIceOZ\n\nTurntable Cartridge Protractor\nUK: https://amzn.to/2Ycg1Gh\nUS: https://amzn.to/2Ycgmc1\n\nStylus Scale\nUK: https://amzn.to/2TQ4rlC\nUS: https://amzn.to/2ULvw6f\nDE: https://amzn.to/2OhoTWK\n\n---------------SUBSCRIBE------------------\n http://www.youtube.com/user/Techmoan?sub_confirmation=1\n\n-------------Merchandise-----------------\nhttps://teespring.com/stores/techmoan-merch\n\n-------------SUPPORT---------------\nThis channel can be supported through Patreon \nhttps://www.patreon.com/techmoan\n\n********* Patrons usually have early access to videos **********\n\n----------Outro Music-----------\nOver Time - Vibe Tracks https://youtu.be/VSSswVZSgJw\n\n------Outro Sound Effect------\nThatSFXGuy - https://youtu.be/5M3-ZV5-QDM\n\n------AFFILIATED LINKS/ADVERTISING NOTICE-------\nAll links are Affiliated where possible.\nWhen you click on links to various merchants posted here and make a purchase, this can result in me earning a commission. Affiliate programs and affiliations include, but are not limited to, the eBay Partner Network & Amazon. \nI am a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to AMAZON Sites (including, but not limited to Amazon US/UK/DE/ES/FR/NL/IT/CAN)"
+        },
+        "defaultAudioLanguage": "en-GB"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "V2rwKn-3Yn_ExGnDBHFMLjdZj14",
+      "id": "9rzslvoBbpw",
+      "snippet": {
+        "publishedAt": "2022-11-10T05:54:31Z",
+        "channelId": "UCii4__bwWBO_cq_sn01s67A",
+        "title": "How To Defeat Alva - God of War Ragnarok Gameplay Guide",
+        "description": "How To Defeat Alva - God of War Ragnarok Gameplay Guide\n\nIn this video I give a few tips on how to defeat Alva in God of War Ragnarok. Alva is what I consider to be the first difficult boss in God of War Ragnarok. I went into this fight knowing it was going to be tough to mirror the Dark Elf boss from God of War (2018), but I wasn't expecting the fast combos at first. Luckily, once you understand the flow of the fight, the pieces fall into place.\n\nEmbark on an epic and heartfelt journey as Kratos and Atreus struggle with holding on and letting go\nFrom Santa Monica Studio comes the sequel to the critically acclaimed God of War (2018). Fimbulwinter is well underway. Kratos and Atreus must journey to each of the Nine Realms in search of answers as Asgardian forces prepare for a prophesied battle that will end the world. Along the way they will explore stunning, mythical landscapes, and face fearsome enemies in the form of Norse gods and monsters. The threat of Ragnarök grows ever closer. Kratos and Atreus must choose between their own safety and the safety of the realms.\n\nTHE NORSE SAGA CONTINUES\nA future, unwritten. Atreus seeks knowledge to help him understand the prophecy of “Loki” and establish his role in Ragnarök. Kratos must decide whether he will be chained by the fear of repeating his mistakes or break free of his past to be the father Atreus needs.\n\nInstruments of war. The Leviathan Axe, Blades of Chaos and Guardian Shield return alongside a host of new abilities for both Kratos and Atreus. Kratos’ deadly Spartan skills will be tested like never before as he battles gods and monsters across Nine Realms to protect his family.\n\nExplore vast realms. Journey through dangerous and stunning landscapes while facing a wide variety of enemy creatures, monsters and Norse gods as Kratos and Atreus search for answers.\n\n#godofwarragnarok \n\nThanks for watching How To Defeat Alva - God of War Ragnarok Gameplay Guide!",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/9rzslvoBbpw/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/9rzslvoBbpw/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/9rzslvoBbpw/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/9rzslvoBbpw/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/9rzslvoBbpw/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "theJOSHfeed",
+        "tags": [
+          "how to defeat alva",
+          "god of war ragnarok alva fight",
+          "god of war ragnarok alva boss",
+          "god of war ragnarok alva guide",
+          "god of war ragnarok alva boss guide",
+          "alva god of war ragnarok",
+          "alva god of war",
+          "how to beat alva",
+          "how to beat alva god of war ragnarok",
+          "alva boss guide",
+          "alva boss fight",
+          "alva give me god of war",
+          "god of war ragnarok how to defeat alva",
+          "thejoshfeed alva boss guide",
+          "god of war ragnarok alva tips",
+          "alva boss battle",
+          "alva boss god of war"
+        ],
+        "categoryId": "20",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "How To Defeat Alva - God of War Ragnarok Gameplay Guide",
+          "description": "How To Defeat Alva - God of War Ragnarok Gameplay Guide\n\nIn this video I give a few tips on how to defeat Alva in God of War Ragnarok. Alva is what I consider to be the first difficult boss in God of War Ragnarok. I went into this fight knowing it was going to be tough to mirror the Dark Elf boss from God of War (2018), but I wasn't expecting the fast combos at first. Luckily, once you understand the flow of the fight, the pieces fall into place.\n\nEmbark on an epic and heartfelt journey as Kratos and Atreus struggle with holding on and letting go\nFrom Santa Monica Studio comes the sequel to the critically acclaimed God of War (2018). Fimbulwinter is well underway. Kratos and Atreus must journey to each of the Nine Realms in search of answers as Asgardian forces prepare for a prophesied battle that will end the world. Along the way they will explore stunning, mythical landscapes, and face fearsome enemies in the form of Norse gods and monsters. The threat of Ragnarök grows ever closer. Kratos and Atreus must choose between their own safety and the safety of the realms.\n\nTHE NORSE SAGA CONTINUES\nA future, unwritten. Atreus seeks knowledge to help him understand the prophecy of “Loki” and establish his role in Ragnarök. Kratos must decide whether he will be chained by the fear of repeating his mistakes or break free of his past to be the father Atreus needs.\n\nInstruments of war. The Leviathan Axe, Blades of Chaos and Guardian Shield return alongside a host of new abilities for both Kratos and Atreus. Kratos’ deadly Spartan skills will be tested like never before as he battles gods and monsters across Nine Realms to protect his family.\n\nExplore vast realms. Journey through dangerous and stunning landscapes while facing a wide variety of enemy creatures, monsters and Norse gods as Kratos and Atreus search for answers.\n\n#godofwarragnarok \n\nThanks for watching How To Defeat Alva - God of War Ragnarok Gameplay Guide!"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "toGKW-mLD8Zsuh8pY31PnpiSBXM",
+      "id": "D3YA8I4zRhU",
+      "snippet": {
+        "publishedAt": "2022-06-02T16:00:06Z",
+        "channelId": "UCc1G80Jjz1vkJKVqUy2zmoQ",
+        "title": "Vrioon Masterpiece From Alva Noto and Ryuichi Sakamoto Finally Back on Vinyl!",
+        "description": "EXPLORE AUDIOPHILE REISSUES AND ORIGINAL PRESSINGS:\n\nhttps://shop.michael45.com/\nhttps://shop-obc.michael45.com/\n\nThe most rewarding record discussions connect listening with collecting. I use “Vrioon Masterpiece From Alva Noto and Ryuichi Sakamoto Finally Back on Vinyl” to explain the details that shaped my own response.\n\nI focus on the music, presentation, and collector context discussed in the video, while keeping listening impressions clearly personal. The aim is to show why this record held my attention and where it may fit for other collectors.\n\nWhat stands out most to you about this record?\n\nGet new arrivals and limited pressings first — join my free newsletter:\nhttps://shop.michael45.com/newsletter/?utm_source=youtube&utm_medium=description\n\nSubscribe to 45 RPM Audiophile for pressing comparisons, record recommendations and the stories behind the music:\nhttps://www.youtube.com/@Michael45RPM\n\nDisclosure: The Michael45 shop links above lead to my own shops. Availability may change.\n\n#VinylCommunity #AudiophileVinyl #VinylRecords",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/D3YA8I4zRhU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/D3YA8I4zRhU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/D3YA8I4zRhU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/D3YA8I4zRhU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/D3YA8I4zRhU/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "45 RPM Audiophile",
+        "tags": [
+          "45 RPM Audiophile",
+          "45 rpm",
+          "Alva Noto",
+          "Michael 45",
+          "Michael45",
+          "Ryuichi Sakamoto",
+          "Vinyl Room",
+          "Vrioon Masterpiece From Alva Noto and Ryuichi Sakamoto Finally Back on Vinyl!",
+          "ambient",
+          "audiophile vinyl",
+          "high end audio",
+          "minimalist",
+          "record collecting",
+          "record review",
+          "record reviews",
+          "reissue",
+          "vinyl collector",
+          "vinyl community",
+          "vinyl recommendations",
+          "vinyl records",
+          "vinyl review"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Vrioon Masterpiece From Alva Noto and Ryuichi Sakamoto Finally Back on Vinyl!",
+          "description": "EXPLORE AUDIOPHILE REISSUES AND ORIGINAL PRESSINGS:\n\nhttps://shop.michael45.com/\nhttps://shop-obc.michael45.com/\n\nThe most rewarding record discussions connect listening with collecting. I use “Vrioon Masterpiece From Alva Noto and Ryuichi Sakamoto Finally Back on Vinyl” to explain the details that shaped my own response.\n\nI focus on the music, presentation, and collector context discussed in the video, while keeping listening impressions clearly personal. The aim is to show why this record held my attention and where it may fit for other collectors.\n\nWhat stands out most to you about this record?\n\nGet new arrivals and limited pressings first — join my free newsletter:\nhttps://shop.michael45.com/newsletter/?utm_source=youtube&utm_medium=description\n\nSubscribe to 45 RPM Audiophile for pressing comparisons, record recommendations and the stories behind the music:\nhttps://www.youtube.com/@Michael45RPM\n\nDisclosure: The Michael45 shop links above lead to my own shops. Availability may change.\n\n#VinylCommunity #AudiophileVinyl #VinylRecords"
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "48v_2AVO-L9OFvtaU3VGsql7m3U",
+      "id": "QKpCKmjMWkM",
+      "snippet": {
+        "publishedAt": "2018-07-12T11:49:16Z",
+        "channelId": "UCcACs8k02qanYjSA6QblRuQ",
+        "title": "A walkaround the newly opened Alva Studios West with Oliver Lowrie",
+        "description": "Oliver Lowrie from Ackroyd Lowrie walks around Alva Studios West- London's most high-tech Photographic Studio, discussing how the design responded to the client's brief, and how the latest technology was used in the design",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/QKpCKmjMWkM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/QKpCKmjMWkM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/QKpCKmjMWkM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/QKpCKmjMWkM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Ackroyd Lowrie",
+        "tags": [
+          "Alva studios",
+          "Virtual Reality",
+          "Architecture",
+          "Crittal",
+          "Proptech"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "A walkaround the newly opened Alva Studios West with Oliver Lowrie",
+          "description": "Oliver Lowrie from Ackroyd Lowrie walks around Alva Studios West- London's most high-tech Photographic Studio, discussing how the design responded to the client's brief, and how the latest technology was used in the design"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "UjAftoA_dj0cX2FpDQHT_1IzOP4",
+      "id": "3NvwJn1xG58",
+      "snippet": {
+        "publishedAt": "2025-10-26T14:21:28Z",
+        "channelId": "UCi2UTQ-Lulvrifs03yEmdMg",
+        "title": "Momen Thomas Alva Punya Anak Didik Dari Rusia #viralvideo #shortvideo #brewogaudio #brewog #memed",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/3NvwJn1xG58/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/3NvwJn1xG58/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/3NvwJn1xG58/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/3NvwJn1xG58/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/3NvwJn1xG58/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "IM HOREG",
+        "categoryId": "24",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "id",
+        "localized": {
+          "title": "Momen Thomas Alva Punya Anak Didik Dari Rusia #viralvideo #shortvideo #brewogaudio #brewog #memed",
+          "description": ""
+        },
+        "defaultAudioLanguage": "id"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "AtCn_d68HcUZwfspa_dct89Hrjo",
+      "id": "EeIYlIi71Ss",
+      "snippet": {
+        "publishedAt": "2019-06-27T15:51:25Z",
+        "channelId": "UCtIzM1ELl9WTEyD04zkC69A",
+        "title": "Tony Alva - Humanity Stoked Documentary Teaser",
+        "description": "Why is Tony Alva first? It’s personal.\n.\nWe’re damn proud to release this first teaser footage of the Humanity Stoked Documentary, featuring Tony Alva, and here's why. I was born in Brooklyn, New York in 1966, and ten years later, my family relocated to Southern California. That move changed what skateboarding meant to me forever, and seeing Tony Alva in skateboarding magazines was part of the reason why. Just a few years earlier, Tony and his fellow Zephyr surfing team members asked Zephyr shop owners Jeff Ho and Skip Engblom to start a skateboard team, and an epic 40 year skateboard journey began for Tony.\n.\n\nFor the last decade, Tony's been on a personal and spiritual journey as well. It's been a profound period of growth for him, turning away from the shallow trappings of ego and self-destructive behavior, and adjusting his value system to prioritize love, acceptance and being of service to others. As for me, back in 1979, at 12 years old, when my family returned to New York without having ever met Tony, I had no idea that 40 years later, I’d be sitting in recording studio with him, deep in a spiritual conversation for this documentary, and finding myself admiring him once again, yet for entirely new reasons. I could not have imagined that he and I would join together, along with so many other amazing people in the film, to help inspire others. I too have been on an journey of awakening, and along the way, I’ve learned that beautiful and amazing things await each of us, if we open up our hearts, accept ourselves, let go of fear, embrace uncertainty, and embrace one another in the process. Thank you Tony, and much love to you, Brother! .....@michael Michael Ien Cohen, Producer/Director\n.\nBe the change! This is a non-profit film, with all our revenue going to charity. If you believe in the mission of inspiring people to think more deeply about things that affect humanity, please like, follow and share. Together, we can all change the world.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/EeIYlIi71Ss/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/EeIYlIi71Ss/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/EeIYlIi71Ss/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/EeIYlIi71Ss/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/EeIYlIi71Ss/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Humanity Stoked",
+        "tags": [
+          "#humanitystoked",
+          "#whatstopsyoufoundation",
+          "#humanitystokedthefilm",
+          "#skateboarding",
+          "#tonyalva"
+        ],
+        "categoryId": "1",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Tony Alva - Humanity Stoked Documentary Teaser",
+          "description": "Why is Tony Alva first? It’s personal.\n.\nWe’re damn proud to release this first teaser footage of the Humanity Stoked Documentary, featuring Tony Alva, and here's why. I was born in Brooklyn, New York in 1966, and ten years later, my family relocated to Southern California. That move changed what skateboarding meant to me forever, and seeing Tony Alva in skateboarding magazines was part of the reason why. Just a few years earlier, Tony and his fellow Zephyr surfing team members asked Zephyr shop owners Jeff Ho and Skip Engblom to start a skateboard team, and an epic 40 year skateboard journey began for Tony.\n.\n\nFor the last decade, Tony's been on a personal and spiritual journey as well. It's been a profound period of growth for him, turning away from the shallow trappings of ego and self-destructive behavior, and adjusting his value system to prioritize love, acceptance and being of service to others. As for me, back in 1979, at 12 years old, when my family returned to New York without having ever met Tony, I had no idea that 40 years later, I’d be sitting in recording studio with him, deep in a spiritual conversation for this documentary, and finding myself admiring him once again, yet for entirely new reasons. I could not have imagined that he and I would join together, along with so many other amazing people in the film, to help inspire others. I too have been on an journey of awakening, and along the way, I’ve learned that beautiful and amazing things await each of us, if we open up our hearts, accept ourselves, let go of fear, embrace uncertainty, and embrace one another in the process. Thank you Tony, and much love to you, Brother! .....@michael Michael Ien Cohen, Producer/Director\n.\nBe the change! This is a non-profit film, with all our revenue going to charity. If you believe in the mission of inspiring people to think more deeply about things that affect humanity, please like, follow and share. Together, we can all change the world."
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": false,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "nWb8rUTqRDs8ly1JrLgXPs-rDb8",
+      "id": "7Crz6-97F34",
+      "snippet": {
+        "publishedAt": "2018-06-08T18:01:44Z",
+        "channelId": "UChi_DhUgRF1RCX7MLkWoXsQ",
+        "title": "LE-YO & Alva Tomlinson  (Cheatx) EP",
+        "description": "LE-YO has been keeping Germany on its feet with countless afro beat hits back-to-back challenging himself creatively and testing musical boundaries are characteristics that have defined LE-YO's career since he was first discovered by Banksfilms. Explore Climax EP and learn more about the musician behind the music.\n\nLE-YO is an energetic, powerful and talented artist who do not brag just as a recording artist but also Dancer and sound engineer \n\nThe 2nd studio ep album from LE-YO (Fameboy) climax. \n\nEmbrace the struggle & Play through pain. Real legends don't die We just change the game. \n\nClimax EP Comprises of 7 songs, 1 Dance hall 4 Afro pop songs, 1 Hip hop Trap & 1 R&B \n\nBuy & stream ON\n\nTidal : http://tidal.com/album/88786595 \nGoogle play : https://play.google.com/store/music/a... \nSpottily : https://open.spotify.com/album/45HgDe... \niTunes : https://itunes.apple.com/us/album/cli... \nAmazon : http://www.amazon.com/gp/product/B07D... \nDeeze : https://www.deezer.com/album/63485 \n\nFollow LE-YO: \nhttps://www.facebook.com/leyo.official/ https://www.instagram.com/leyofameboy/ https://soundcloud.com/leyofameboy\n\nReleased by: Banksfilms Release date: 08.06. 2018 P-line: ℗ 2018 (P) 2017 Banksfilms Entertainment Ltd., under exclusive license to Banksfilms Explicit",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/7Crz6-97F34/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/7Crz6-97F34/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/7Crz6-97F34/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/7Crz6-97F34/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/7Crz6-97F34/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "LE-YO",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "LE-YO & Alva Tomlinson  (Cheatx) EP",
+          "description": "LE-YO has been keeping Germany on its feet with countless afro beat hits back-to-back challenging himself creatively and testing musical boundaries are characteristics that have defined LE-YO's career since he was first discovered by Banksfilms. Explore Climax EP and learn more about the musician behind the music.\n\nLE-YO is an energetic, powerful and talented artist who do not brag just as a recording artist but also Dancer and sound engineer \n\nThe 2nd studio ep album from LE-YO (Fameboy) climax. \n\nEmbrace the struggle & Play through pain. Real legends don't die We just change the game. \n\nClimax EP Comprises of 7 songs, 1 Dance hall 4 Afro pop songs, 1 Hip hop Trap & 1 R&B \n\nBuy & stream ON\n\nTidal : http://tidal.com/album/88786595 \nGoogle play : https://play.google.com/store/music/a... \nSpottily : https://open.spotify.com/album/45HgDe... \niTunes : https://itunes.apple.com/us/album/cli... \nAmazon : http://www.amazon.com/gp/product/B07D... \nDeeze : https://www.deezer.com/album/63485 \n\nFollow LE-YO: \nhttps://www.facebook.com/leyo.official/ https://www.instagram.com/leyofameboy/ https://soundcloud.com/leyofameboy\n\nReleased by: Banksfilms Release date: 08.06. 2018 P-line: ℗ 2018 (P) 2017 Banksfilms Entertainment Ltd., under exclusive license to Banksfilms Explicit"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "U89eSvvFzPrIyWFFHtRTIlgV4Nk",
+      "id": "JycuPzf8eTE",
+      "snippet": {
+        "publishedAt": "2017-05-28T21:00:25Z",
+        "channelId": "UCXhFmMZmRRNwjPZDtKplSlw",
+        "title": "John Alva Leger And Pas Bon Playboys in Kbon studio",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/JycuPzf8eTE/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/JycuPzf8eTE/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/JycuPzf8eTE/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "John Alva Leger And The Pas Bon Playboys ",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "John Alva Leger And Pas Bon Playboys in Kbon studio",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "mw5IH_TukHoKrP4ESQ9YmBKNG2E",
+      "id": "x74YUB44Yxg",
+      "snippet": {
+        "publishedAt": "2021-03-02T13:36:43Z",
+        "channelId": "UCYS_aH8qwsYWORNTxyt5rbg",
+        "title": "Video Institucional Alva Studio",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/x74YUB44Yxg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/x74YUB44Yxg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/x74YUB44Yxg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "Br Magazine TV",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "es",
+        "localized": {
+          "title": "Video Institucional Alva Studio",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

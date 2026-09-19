@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "vid_unrelated_gospel",
+      "snippet": {
+        "title": "Random Gospel Compilation Mix",
+        "channelTitle": "GospelChannel",
+        "description": "various gospel hits"
+      },
+      "status": {"uploadStatus": "processed", "privacyStatus": "public"}
+    },
+    {
+      "id": "vid_unrelated_pop",
+      "snippet": {
+        "title": "Totally Unrelated Pop Song",
+        "channelTitle": "PopChannel",
+        "description": "pop hits 2020"
+      },
+      "status": {"uploadStatus": "processed", "privacyStatus": "public"}
+    }
+  ]
+}

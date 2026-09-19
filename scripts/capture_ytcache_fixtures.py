@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""Capture des fixtures ytcache RÉELLES — à lancer SUR LE VPS (vrai token,
+vrai réseau, coûte du quota YouTube réel). Contrepartie de scripts/bench_ytcache.py
+(hors-ligne) : ce script-ci fait les vrais appels une fois, bench_ytcache.py les
+rejoue ensuite gratuitement à volonté.
+
+Source des cas : recos_playlist_history.json (pistes déjà ajoutées à RECOS RADAR
+un jour, donc déjà un match jugé correct à l'époque) — sert de corpus de
+non-régression : un futur changement de ytcache.py ne doit pas casser ces
+matches déjà trouvés. Complète les 3 cas de pièges déjà écrits à la main
+(tests/fixtures/ytcache/cases.json).
+
+Usage (sur le VPS, dans le conteneur ou avec CRATE_DATA_DIR positionné) :
+    python scripts/capture_ytcache_fixtures.py --limit 15
+Puis commit de tests/fixtures/ytcache/ (pas de secret dedans — uniquement des
+réponses API publiques : titres/chaînes/ids de vidéos).
+"""
+import argparse
+import json
+import os
+import re
+import sys
+import time
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+FIXTURES = os.path.join(REPO, "tests", "fixtures", "ytcache")
+sys.path.insert(0, REPO)
+
+from radar_web.radar import paths, store, ytcache  # noqa: E402
+
+
+def _slug(artist, title):
+    s = re.sub(r"[^a-z0-9]+", "_", f"{artist}_{title}".lower()).strip("_")
+    return (s[:60] or "case")
+
+
+def capture_one(case_id, artist, title, keys):
+    query = f"{artist} {title}"
+    search_resp = ytcache.request(
+        "/search", {"part": "id", "type": "video", "maxResults": 15, "q": query}, keys)
+    ids = [((it.get("id") or {}).get("videoId") or "") for it in search_resp.get("items", [])]
+    ids = [i for i in ids if i]
+    if not ids:
+        return None, "aucun résultat de recherche"
+    videos_resp = ytcache.request("/videos", {"part": "snippet,status", "id": ",".join(ids)}, keys)
+
+    d = os.path.join(FIXTURES, case_id)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "search.json"), "w", encoding="utf-8") as f:
+        json.dump(search_resp, f, ensure_ascii=False, indent=2)
+    with open(os.path.join(d, "videos.json"), "w", encoding="utf-8") as f:
+        json.dump(videos_resp, f, ensure_ascii=False, indent=2)
+    return query, None
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--limit", type=int, default=10,
+                     help="nombre de nouveaux cas à capturer (défaut 10 — chaque cas "
+                          "coûte ~101 unités de quota YouTube réel : 100 pour /search + 1 pour /videos)")
+    args = ap.parse_args()
+
+    cfg = store.load_config(paths.DEFAULT_UID)
+    keys = ytcache.youtube_keys(cfg)
+    if not keys:
+        sys.exit("Aucune clé YouTube utilisable (config ou variable YOUTUBE_API_KEY).")
+
+    history_path = paths.user_paths(paths.DEFAULT_UID).recos_history
+    if not os.path.isfile(history_path):
+        sys.exit(f"Pas d'historique RECOS trouvé : {history_path}")
+    history = json.load(open(history_path, encoding="utf-8"))
+    candidates = [h for h in history
+                  if isinstance(h, dict) and h.get("artist") and h.get("title") and h.get("video_id")]
+    print(f"{len(candidates)} entrée(s) exploitable(s) dans l'historique RECOS "
+          f"(sur {len(history)} au total).")
+
+    cases_path = os.path.join(FIXTURES, "cases.json")
+    cases = json.load(open(cases_path, encoding="utf-8")) if os.path.isfile(cases_path) else []
+    existing_ids = {c["id"] for c in cases}
+
+    n_captured = 0
+    for h in candidates:
+        if n_captured >= args.limit:
+            break
+        case_id = _slug(h["artist"], h["title"])
+        if case_id in existing_ids:
+            continue
+        query, err = capture_one(case_id, h["artist"], h["title"], keys)
+        if err:
+            print(f"  [SKIP] {case_id} — {err}")
+            continue
+        cases.append({
+            "id": case_id, "artist": h["artist"], "title": h["title"], "label": "",
+            "query": query, "expect": "match", "expected_video_id": h["video_id"],
+            "comment": "capturé depuis recos_playlist_history.json (non-régression)",
+        })
+        existing_ids.add(case_id)
+        n_captured += 1
+        print(f"  [OK] {case_id}")
+        time.sleep(0.3)  # ménage le débit API, pas seulement le quota journalier
+
+    with open(cases_path, "w", encoding="utf-8") as f:
+        json.dump(cases, f, ensure_ascii=False, indent=2)
+    print(f"\n{n_captured} nouveau(x) cas capturé(s). {len(cases)} au total dans cases.json.")
+    print("Vérifie avec : python scripts/bench_ytcache.py -v")
+
+
+if __name__ == "__main__":
+    main()

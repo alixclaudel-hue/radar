@@ -8,8 +8,10 @@ description: >
   réellement. Utiliser quand on demande d'améliorer, corriger, optimiser ou faire
   progresser un script d'après ses erreurs en production — par exemple
   « /script-loop ytcache ». Fonctionne pour tout script inscrit à
-  scripts/loop/registry.json, pas seulement la recherche YouTube. Session cloud
-  uniquement : c'est elle qui écrit le code (contrat vps-ops).
+  scripts/loop/registry.json, pas seulement la recherche YouTube. Utilisable
+  par la session cloud comme par la session VPS — cette dernière travaille dans
+  un clone séparé, ~/radar-work, jamais dans le checkout de production
+  (contrat vps-ops).
 ---
 
 # Boucle d'amélioration d'un script
@@ -22,10 +24,21 @@ qui échouait AVANT lui et passe APRÈS. Sans ça on ne corrige rien, on déplac
 code. C'est la leçon du 19/09 — un corpus de 25 cas construit depuis des succès
 de production passait encore avec le scoring entièrement court-circuité.
 
-La boucle traverse deux environnements que le contrat `vps-ops` sépare : le VPS
-observe (il a les données réelles, jamais le droit d'écrire du code), le cloud
-corrige (il écrit le code, n'a aucun accès au VPS). Le dépôt **`radar-diag`** est
-le bus entre les deux : le VPS y pousse ses lots, le cloud les y lit.
+**Qui peut la lancer, et où.** Les deux sessions, sous la même règle : on ne
+corrige jamais le code dans un checkout servi en production.
+
+| Session | Dépôt de travail | Observations |
+|---|---|---|
+| cloud | son clone habituel | lues sur `radar-diag` (l'attacher via `add_repo`) |
+| VPS | **`~/radar-work`**, jamais `~/radar` | déjà sur place, ou collectées par `/script-observe` |
+
+Côté VPS, le périmètre exact est celui de la section « Boucle d'amélioration
+d'un script » du contrat `vps-ops` — lis-la avant de commencer.
+
+**Une seule boucle à la fois par script.** Avant de démarrer, vérifie qu'aucune
+PR de boucle n'est déjà ouverte sur ce script : deux sessions qui corrigent les
+mêmes fichiers en parallèle, c'est le conflit que la séparation historique
+existait pour empêcher.
 
 ---
 
@@ -40,10 +53,13 @@ Lis l'entrée du registre et retiens :
 module     = <module principal>
 bench      = python3 scripts/loop/bench.py <script>
 touchable  = <liste des fichiers modifiables>
-obs_dir    = radar-diag/observations/<script>/
+obs_dir    = <radar-diag>/observations/<script>/
 diag       = docs/diagnostics/<script>-<AAAA-MM-DD>.md
-branche    = claude/loop-<script>-<AAAA-MM-DD>
+branche    = loop/<script>-<AAAA-MM-DD>
 ```
+
+Et le dépôt de travail, selon qui tourne : le clone habituel côté cloud,
+`~/radar-work` côté VPS (jamais `~/radar`).
 
 Un script absent du registre n'entre pas dans la boucle : il lui faut d'abord un
 banc et une source d'observations. Dis-le, propose de les créer, et arrête-toi.
@@ -52,15 +68,19 @@ banc et une source d'observations. Dis-le, propose de les créer, et arrête-toi
 
 ## Étape 1 — Récupérer les observations
 
-`radar-diag` est un dépôt distinct. S'il n'est pas dans la session, attache-le
-(`add_repo` puis clone), sinon `git pull`.
+`radar-diag` est un dépôt distinct du dépôt applicatif. Côté cloud, attache-le
+(`add_repo` puis clone) s'il n'est pas dans la session, sinon `git pull`. Côté
+VPS, il est déjà là (`~/radar-diag`) : `git pull`.
 
 Prends le lot le plus récent de `obs_dir`, lis son `meta.json`.
 
-**Branche A — aucun lot.** La boucle n'a rien à diagnostiquer. Écris la demande
-de collecte dans `docs/diagnostics/<script>-collecte-demandee.md` (une phrase :
-quel script, quelles familles d'échecs, plafond de quota), dis à l'utilisateur
-de lancer `/script-observe <script>` sur sa session VPS, et **arrête-toi**.
+**Branche A — aucun lot.** La boucle n'a rien à diagnostiquer.
+- Côté VPS : lance la collecte toi-même (`/script-observe <script>`), puis
+  reprends ici.
+- Côté cloud : écris la demande dans
+  `docs/diagnostics/<script>-collecte-demandee.md` (une phrase : quel script,
+  quelles familles d'échecs, plafond de quota), dis à l'utilisateur de lancer
+  `/script-observe <script>` sur sa session VPS, et **arrête-toi**.
 
 **Branche B — lot plus vieux que le dernier déploiement.** Compare
 `meta.deployed_sha` au `HEAD` de `main`. Si du code du périmètre `touchable` a

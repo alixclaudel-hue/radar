@@ -2,9 +2,10 @@
 name: script-observe
 description: >
   Collecte un lot d'observations de production pour un script de Radar, sur le
-  VPS, et le pousse sur le dépôt `radar-diag` où la session cloud le récupère.
-  C'est la jambe « observer » de la boucle autonome d'amélioration des scripts
-  (l'autre jambe, `script-loop`, diagnostique et corrige côté cloud). À utiliser
+  VPS, et le pousse sur le dépôt `radar-diag`. C'est la jambe « observer » de la
+  boucle d'amélioration des scripts ; l'autre jambe, `script-loop`, diagnostique
+  et corrige — elle peut être menée par la session VPS elle-même (dans le clone
+  séparé ~/radar-work) ou par la session cloud. À utiliser
   quand on demande de collecter, observer, relever les échecs, ou alimenter la
   boucle pour un script — par exemple « /script-observe ytcache ». Réservé à une
   session qui tourne RÉELLEMENT sur le VPS : elle seule voit les journaux, les
@@ -87,7 +88,7 @@ charges utiles brutes listées dans `observe.replay_payloads`.
 ```
 
 - `expected_hint` : ce que TU as vérifié à la main comme étant la bonne réponse.
-  Sans lui, la session cloud ne peut pas écrire un cas de banc qui affirme
+  Sans lui, la boucle ne peut pas écrire un cas de banc qui affirme
   quelque chose. Si tu n'as pas pu trancher, mets `null` et dis-le dans
   `notes.md` — un échec sans réponse connue reste utile pour compter, pas pour
   tester.
@@ -124,15 +125,18 @@ GitHub.
 ## Étape 4 — rapport
 
 Format habituel du contrat `vps-ops` (verdict, actions effectuées, ce qui
-reste). Termine par la ligne que la session cloud attend :
+reste). Termine par la ligne que la boucle attend :
 
 > Lot prêt : `observations/<script>/<horodatage>/` — N échecs, sha `<sha>`.
 
 ## Ce que tu ne fais pas
 
-- **Ne modifie pas le script.** Diagnostiquer et corriger est le travail de la
-  session cloud (`script-loop`), via PR. Deux sessions sur le même code, c'est
-  le conflit que le contrat `vps-ops` existe pour empêcher.
-- **N'écris rien dans `~/radar`**, pas même un fichier de travail.
+- **N'écris rien dans `~/radar`**, pas même un fichier de travail. Collecter
+  est une opération en lecture seule sur le checkout de production.
+- **Ne corrige pas le script depuis ce skill.** Collecter et corriger sont deux
+  temps distincts : une fois le lot poussé, enchaîne avec `/script-loop
+  <script>`, qui travaille dans `~/radar-work` (clone séparé) et suit ses
+  propres garde-fous. Passer directement du journal au correctif, sans cas de
+  banc qui échoue d'abord, c'est exactement ce que le process interdit.
 - **Ne collecte pas des succès pour faire du volume.** Un lot de 5 vrais échecs
   vaut mieux que 50 succès : les succès ne mesurent rien (cf. en-tête).

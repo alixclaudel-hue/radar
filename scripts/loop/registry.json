@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "Registre des scripts pilotables par la boucle autonome (.claude/skills/script-loop).",
+    "Un script y entre quand il a (a) un banc de mesure hors-ligne et (b) une source",
+    "d'observations en production. Sans les deux, la boucle n'a rien à mesurer et refuse",
+    "de tourner dessus — c'est volontaire : une boucle qui ne mesure pas ne fait que",
+    "déplacer du code au hasard.",
+    "",
+    "touchable = périmètre de fichiers que la boucle a le droit de modifier pour CE script.",
+    "C'est le garde-fou de rayon d'explosion du merge automatique : un correctif qui déborde",
+    "de cette liste n'est jamais mergé tout seul, il part en PR pour relecture humaine."
+  ],
+
+  "ytcache": {
+    "description": "Matching d'une piste vers une vidéo YouTube : construction de la requête, puis scoring des 15 candidats (radar_web/radar/ytcache.py::_best_match).",
+    "bench": ["python3", "scripts/bench_ytcache.py"],
+    "fixtures": "tests/fixtures/ytcache",
+    "touchable": [
+      "radar_web/radar/ytcache.py",
+      "radar_web/radar/textmatch.py",
+      "tests/fixtures/ytcache/",
+      "scripts/bench_ytcache.py"
+    ],
+    "observe": {
+      "source": "journal du job publish_recos + recos_candidates.json",
+      "what": "Les ÉCHECS de matching, pas les succès : candidats rejetés avec « meilleur score X < 0.5 », « aucune vidéo trouvée », et les pistes marquées 👎 dans reco_feedback.json (faux positifs).",
+      "replay_payloads": ["/search", "/videos"],
+      "why_failures_only": "Mesuré le 19/09 : rejouer des succès ne discrimine rien (YouTube renvoie déjà la bonne vidéo en 1re position pour une requête bien formée — les 25 cas de plancher passent même avec le scoring court-circuité). Seuls les échecs disent si un changement améliore quoi que ce soit."
+    }
+  }
+}

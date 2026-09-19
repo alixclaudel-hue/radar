@@ -94,7 +94,7 @@ def _mock_request(case_id):
     return fake
 
 
-def run_case(case, verbose=False):
+def run_case(case, verbose=False, quiet=False):
     real_request = ytcache.request
     ytcache.request = _mock_request(case["id"])
     try:
@@ -126,7 +126,10 @@ def run_case(case, verbose=False):
 
     if verbose or not ok:
         status = "OK  " if ok else "FAIL"
-        print(f"[{status}] {case['id']} — {detail}")
+        # stderr et pas stdout : en mode --json, stdout ne porte QUE le verdict
+        # normalisé (une ligne [FAIL] au milieu casserait le contrat lu par
+        # scripts/loop/bench.py).
+        print(f"[{status}] {case['id']} — {detail}", file=sys.stderr if quiet else sys.stdout)
     return ok
 
 
@@ -136,12 +139,24 @@ def main():
     ap.add_argument("-v", action="store_true", help="détail de chaque cas, pas seulement les échecs")
     ap.add_argument("--fixtures-dir", default=FIXTURES,
                      help="dossier de fixtures à rejouer (défaut : tests/fixtures/ytcache/ du dépôt)")
+    ap.add_argument("--json", action="store_true",
+                     help="verdict normalisé sur stdout, pour scripts/loop/bench.py (voir son "
+                          "en-tête : c'est le SEUL contrat qu'un banc doit respecter)")
     args = ap.parse_args()
     FIXTURES = os.path.abspath(os.path.expanduser(args.fixtures_dir))
 
     cases = json.load(open(os.path.join(FIXTURES, "cases.json"), encoding="utf-8"))
-    results = [(c, run_case(c, args.v)) for c in cases]
+    results = [(c, run_case(c, args.v, quiet=args.json)) for c in cases]
     n_ok = sum(1 for _, ok in results if ok)
+
+    if args.json:
+        out = {"script": "ytcache", "failed": []}
+        for kind in ("adversarial", "floor"):
+            sub = [(c, ok) for c, ok in results if c.get("kind", "floor") == kind]
+            out[kind] = {"ok": sum(1 for _, ok in sub if ok), "total": len(sub)}
+            out["failed"] += [c["id"] for c, ok in sub if not ok]
+        json.dump(out, sys.stdout)
+        return 0 if n_ok == len(results) else 1
 
     # Deux familles, comptées SÉPARÉMENT : un total global masquerait que le
     # plancher passe quoi qu'il arrive (mesuré le 19/09 — matcher court-circuité

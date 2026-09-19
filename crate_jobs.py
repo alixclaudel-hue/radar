@@ -2339,7 +2339,11 @@ def _discogs_release_video(token, release_id, artist, title, keys):
     à l'appelant, qui les traite comme pour une recherche."""
     d = discogs_get(token, f"/releases/{release_id}")
     time.sleep(1.1)                       # 60 requêtes/min côté Discogs
-    vid = ytcache.youtube_id(textmatch.best_video_uri(d.get("videos") or [], artist, title))
+    # min_overlap=0 : ces vidéos sont déjà rattachées à LA bonne sortie, l'artiste
+    # n'a donc rien à apporter au score global (diagnostic VPS 2026-09-18, cf.
+    # textmatch.best_video_uri) — seule la couverture du titre de la piste compte.
+    uri = textmatch.best_video_uri(d.get("videos") or [], artist, title, min_overlap=0)
+    vid = ytcache.youtube_id(uri)
     return vid if vid and ytcache.playable_video(vid, keys) else ""
 
 

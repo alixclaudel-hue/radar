@@ -1551,7 +1551,9 @@ def tracklist(request: Request, rid: int):
     for t in real_tracks(data.get("tracklist", [])):
         ttl = (t.get("title") or "").strip()
         tart = ", ".join(a.get("name", "") for a in t.get("artists", [])) or ra
-        uri = best_video_uri(videos, tart, ttl)
+        # min_overlap=0 : même raison que crate_jobs._discogs_release_video, cf.
+        # textmatch.best_video_uri (diagnostic VPS 2026-09-18).
+        uri = best_video_uri(videos, tart, ttl, min_overlap=0)
         if uri:
             play, kind = uri, "discogs"
         else:

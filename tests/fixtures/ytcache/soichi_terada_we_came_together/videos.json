@@ -1,0 +1,898 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "KnXkU4Msd0McyrhNBMwjrqJiItc",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "4PK-Kj8sjRRhdQP3McxemoRgHaE",
+      "id": "ulOfvLLpUM0",
+      "snippet": {
+        "publishedAt": "2015-12-02T22:20:43Z",
+        "channelId": "UCqSMQXJ8MieGFIxgZNDeLdQ",
+        "title": "Soichi Terada - We Came Together",
+        "description": "LOW BITRATE (96kbps). Follow Soichi Terada: https://www.facebook.com/soichiteradamusic/?fref=ts\r\nBuy Record: http://www.discogs.com/Soichi-Terada-Sounds-From-The-Far-East/release/7211527\r\nMore Music: https://www.facebook.com/DoFunkk\r\n\r\nI do not own the rights of anything uploaded and broadcasted form this channel.\r\n\r\nCopyright holder?\r\n\r\nPlease message me, comment below or email me to dofunkk.channel2@gmail.com before sending a strike. I always remove everything I am requested to remove within 10 min of receiving a message. \r\n\r\nThis would prevent this channel to close after the strike and would allow music lovers and record diggers find some fantastic music which they more likely buy in record stores, second hand shops and discos. \r\n\r\nCredit to artists, label, and purchase links are given in each upload to facilitate the listeners getting in touch to their favourite labels, artists and stores.\r\n\r\nEvery track has been compressed to a LOW BITRATE (96kbps) to avoid any kind of piracy and youtube rips.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ulOfvLLpUM0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ulOfvLLpUM0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ulOfvLLpUM0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ulOfvLLpUM0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ulOfvLLpUM0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Do Funkk",
+        "tags": [
+          "Soichi Terada - We Came Toget",
+          "Soichi",
+          "Terada",
+          "We",
+          "Came",
+          "Together",
+          "house",
+          "‎–",
+          "Sounds",
+          "From",
+          "The",
+          "Far",
+          "East",
+          "Recording",
+          "‎Rush",
+          "Hour",
+          "Recordings",
+          "RH",
+          "RSS",
+          "12",
+          "Club",
+          "Der",
+          "Visionaere",
+          "Get",
+          "Perlonized",
+          "CDV",
+          "discogs",
+          "do-funkk",
+          "dofunkk",
+          "do",
+          "funkk",
+          "funk",
+          "vinyl",
+          "only",
+          "berghain",
+          "panorama",
+          "bar",
+          "record",
+          "store",
+          "romania",
+          "club",
+          "der",
+          "visionaere",
+          "stadtbad",
+          "berlin"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Soichi Terada - We Came Together",
+          "description": "LOW BITRATE (96kbps). Follow Soichi Terada: https://www.facebook.com/soichiteradamusic/?fref=ts\r\nBuy Record: http://www.discogs.com/Soichi-Terada-Sounds-From-The-Far-East/release/7211527\r\nMore Music: https://www.facebook.com/DoFunkk\r\n\r\nI do not own the rights of anything uploaded and broadcasted form this channel.\r\n\r\nCopyright holder?\r\n\r\nPlease message me, comment below or email me to dofunkk.channel2@gmail.com before sending a strike. I always remove everything I am requested to remove within 10 min of receiving a message. \r\n\r\nThis would prevent this channel to close after the strike and would allow music lovers and record diggers find some fantastic music which they more likely buy in record stores, second hand shops and discos. \r\n\r\nCredit to artists, label, and purchase links are given in each upload to facilitate the listeners getting in touch to their favourite labels, artists and stores.\r\n\r\nEvery track has been compressed to a LOW BITRATE (96kbps) to avoid any kind of piracy and youtube rips."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "jjbJmWjrZqR1lT8Q6j_4ZtkrFDE",
+      "id": "I08BcW0E1ZM",
+      "snippet": {
+        "publishedAt": "2025-11-20T10:05:27Z",
+        "channelId": "UCihTrOdF9aRCgYnqCYqYzvw",
+        "title": "We Came Together",
+        "description": "Provided to YouTube by !K7 Music\n\nWe Came Together · Soichi Terada\n\nSounds from the Far East (2025 Edition)\n\n℗ 2025 Rush Hour Recordings\n\nReleased on: 2025-11-21\n\nProducer, Programmer: S. Terada\nMusic Publisher: Rush Hour Music\nLyricist, Composer: S. Terada\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/I08BcW0E1ZM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/I08BcW0E1ZM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/I08BcW0E1ZM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/I08BcW0E1ZM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/I08BcW0E1ZM/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Soichi Terada - Topic",
+        "tags": [
+          "Soichi Terada",
+          "Sounds from the Far East (2025 Edition)",
+          "We Came Together"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "We Came Together",
+          "description": "Provided to YouTube by !K7 Music\n\nWe Came Together · Soichi Terada\n\nSounds from the Far East (2025 Edition)\n\n℗ 2025 Rush Hour Recordings\n\nReleased on: 2025-11-21\n\nProducer, Programmer: S. Terada\nMusic Publisher: Rush Hour Music\nLyricist, Composer: S. Terada\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "mPEbHJNLcPYeWyz1Gqk5TIVHQ64",
+      "id": "n3gMkK7Vsa8",
+      "snippet": {
+        "publishedAt": "2013-04-06T19:34:32Z",
+        "channelId": "UCPaO3t4D4VtJbmVMeZoghQw",
+        "title": "Soichi Terada - Come Together",
+        "description": "Track from Far East Recordings. Year 1993.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/n3gMkK7Vsa8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/n3gMkK7Vsa8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/n3gMkK7Vsa8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/n3gMkK7Vsa8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/n3gMkK7Vsa8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Underground Music Channel",
+        "tags": [
+          "Soichi Terada"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "it",
+        "localized": {
+          "title": "Soichi Terada - Come Together",
+          "description": "Track from Far East Recordings. Year 1993."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "yp4aDpDiJ6mrML8c04Fb0KUGiR8",
+      "id": "X08_CPv5aQs",
+      "snippet": {
+        "publishedAt": "2022-06-08T16:42:53Z",
+        "channelId": "UCkgsvzPniOHiBPcHMLotM9g",
+        "title": "Soichi Terada - 1941 (Far East Recording, 1994)",
+        "description": "https://www.discogs.com/release/2404855-Soichi-Terada-Kimigayo",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/X08_CPv5aQs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/X08_CPv5aQs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/X08_CPv5aQs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/X08_CPv5aQs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/X08_CPv5aQs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "t",
+        "tags": [
+          "Breakbeat",
+          "House Music",
+          "Japanese House Music",
+          "Kimigayo"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Soichi Terada - 1941 (Far East Recording, 1994)",
+          "description": "https://www.discogs.com/release/2404855-Soichi-Terada-Kimigayo"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "L7nU9LpkU8rLc2PZ2g0d68D-uRg",
+      "id": "1dLmJSekV-8",
+      "snippet": {
+        "publishedAt": "2018-08-13T12:41:29Z",
+        "channelId": "UCIpq_8AlNgtKGHV63OYdSDA",
+        "title": "Manabu Nagayama & Soichi Terada - Low Tension (2014 Version)",
+        "description": "https://www.discogs.com/Manabu-Nagayama-Soichi-Terada-Low-Tension/release/6649427\n\nUtopia Records is the anticipated new label project by Alexander Bradley in collaboration with Soho record store Phonica, set to unearth a diverse range of music, from official re-releases and remastering of obscurities to contemporary and cutting edge club and home listening music. Touching on Jazz, Techno, House, Ambient, Disco and Boogie through to left-field Cosmic, Balearic Soul and Rock. The First release comes in the form of an essential ambient Japanese house track by Legendary producers Manabu Nagayama and Soichi Terada. This highly sought after version of Low Tension originally released on the 'La Ronde' EP on BPM Records Japan in 1991, has been remastered for single release for the first time. Also features a stripped back rework by cult Japanese producer Yukihiro Fukutomi and Bradley himself with an extended deep, dubby and melodic Utopian mix. The mythical deep house works of Japanese producers such as Nagayama and Terada have become online folklore with the latter's production for Nami Shimada entitled 'Sunshower' (featuring Larry Levan mix) a holy grail for house heads. Pressed Loud and Limited with its original beautiful stunning artwork on a full picture sleeve - all the trimmings by Phonica / Vinyl Factory London. We hope you enjoy this timeless record for years to come.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/1dLmJSekV-8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/1dLmJSekV-8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/1dLmJSekV-8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/1dLmJSekV-8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/1dLmJSekV-8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "The Utopia Project",
+        "categoryId": "1",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Manabu Nagayama & Soichi Terada - Low Tension (2014 Version)",
+          "description": "https://www.discogs.com/Manabu-Nagayama-Soichi-Terada-Low-Tension/release/6649427\n\nUtopia Records is the anticipated new label project by Alexander Bradley in collaboration with Soho record store Phonica, set to unearth a diverse range of music, from official re-releases and remastering of obscurities to contemporary and cutting edge club and home listening music. Touching on Jazz, Techno, House, Ambient, Disco and Boogie through to left-field Cosmic, Balearic Soul and Rock. The First release comes in the form of an essential ambient Japanese house track by Legendary producers Manabu Nagayama and Soichi Terada. This highly sought after version of Low Tension originally released on the 'La Ronde' EP on BPM Records Japan in 1991, has been remastered for single release for the first time. Also features a stripped back rework by cult Japanese producer Yukihiro Fukutomi and Bradley himself with an extended deep, dubby and melodic Utopian mix. The mythical deep house works of Japanese producers such as Nagayama and Terada have become online folklore with the latter's production for Nami Shimada entitled 'Sunshower' (featuring Larry Levan mix) a holy grail for house heads. Pressed Loud and Limited with its original beautiful stunning artwork on a full picture sleeve - all the trimmings by Phonica / Vinyl Factory London. We hope you enjoy this timeless record for years to come."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "eRhECJqfId0vl0TejtsygmtmVb4",
+      "id": "Y5B4OcY-Yk4",
+      "snippet": {
+        "publishedAt": "2012-08-20T00:56:15Z",
+        "channelId": "UCxONUmPbrFI1-XTXPwp5kVg",
+        "title": "soichi terada & manabu nagayama   walker   1991 ambient house underground",
+        "description": " ",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Y5B4OcY-Yk4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Y5B4OcY-Yk4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Y5B4OcY-Yk4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Y5B4OcY-Yk4/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "djalexdelpo4",
+        "tags": [
+          "soichi",
+          "terada",
+          "&",
+          "manabu",
+          "nagayama",
+          "walker",
+          "1991",
+          "ambient",
+          "house",
+          "underground"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "it",
+        "localized": {
+          "title": "soichi terada & manabu nagayama   walker   1991 ambient house underground",
+          "description": " "
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "PthJ5Nm8K_qmRBt0StiMcj7Q-sw",
+      "id": "sy_ixIqW_ic",
+      "snippet": {
+        "publishedAt": "2015-04-03T11:53:01Z",
+        "channelId": "UC3p1aPxkoKHbPLHsV3eMmTQ",
+        "title": "Soichi Terada & Manabu Nagayama - Walker",
+        "description": "Soichi Terada & Manabu Nagayama - Walker\n\nNick Jones & Kaleem Shabazz - The Experience \n\nLaronte BPM-001\nBPM records (Japan)\nfirst released in 1991\n\nSupport the artist and buy the track !",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/sy_ixIqW_ic/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/sy_ixIqW_ic/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/sy_ixIqW_ic/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/sy_ixIqW_ic/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/sy_ixIqW_ic/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Cheap Records Diggers",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Soichi Terada & Manabu Nagayama - Walker",
+          "description": "Soichi Terada & Manabu Nagayama - Walker\n\nNick Jones & Kaleem Shabazz - The Experience \n\nLaronte BPM-001\nBPM records (Japan)\nfirst released in 1991\n\nSupport the artist and buy the track !"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "oz5IOdM-PR_usSOehaNxNcg3A8E",
+      "id": "TqQQIXg1ChQ",
+      "snippet": {
+        "publishedAt": "2016-09-17T23:46:10Z",
+        "channelId": "UCJp0wyBnSdhBHqmYRwbOC3A",
+        "title": "We Came Together",
+        "description": "Provided to YouTube by CDBaby\n\nWe Came Together · Mishka Shubaly\n\nAlcoholica\n\n℗ 2016 Mishka Shubaly\n\nReleased on: 2016-09-14\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/TqQQIXg1ChQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/TqQQIXg1ChQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/TqQQIXg1ChQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/TqQQIXg1ChQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/TqQQIXg1ChQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Mishka Shubaly - Topic",
+        "tags": [
+          "Mishka",
+          "Shubaly",
+          "Alcoholica",
+          "We",
+          "Came",
+          "Together"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "We Came Together",
+          "description": "Provided to YouTube by CDBaby\n\nWe Came Together · Mishka Shubaly\n\nAlcoholica\n\n℗ 2016 Mishka Shubaly\n\nReleased on: 2016-09-14\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "HqfFhXqk85A4d2sV0NoQon8B4Cw",
+      "id": "jK2udN1zw2c",
+      "snippet": {
+        "publishedAt": "2015-11-09T04:57:44Z",
+        "channelId": "UCyGHx-UVPPKESjSEWfhKtFw",
+        "title": "FER (Soichi Terada) - Breezy",
+        "description": "This is quite a rare Soichi Terada track, because he released it under the name FER (Far East Recording). I purchased it from the Japanese iTunes Store as it was the easiest place for me to find it.\n\nThis video is blocked in the US. Sorry guys.\n\nHere are some additional links to help gather more information about the compilations it was featured on:\n\nhttp://www.jvcmusic.co.jp/-/Discography/A010090/VICL-69073.html\n--\nhttps://itunes.apple.com/jp/album/bonnes-vacances!-2/id214085639\n--\nhttp://www.discogs.com/Various-Take-Me-Aosis-A-Day-In-Paris/release/604880\n--\nhttp://www.jvcmusic.co.jp/-/Discography/A010090/VICL-69092.html\n--\nhttp://www.discogs.com/label/23347-Aosis-Records #SoichiTerada",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/jK2udN1zw2c/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/jK2udN1zw2c/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/jK2udN1zw2c/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/jK2udN1zw2c/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/jK2udN1zw2c/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "CrystalFissure",
+        "tags": [
+          "Soichi Terada",
+          "Aoasis Records",
+          "FER",
+          "Far East Recording",
+          "FER Breezy",
+          "CrystalFissure",
+          "寺田創一",
+          "FER Music",
+          "Soichi Terada Lounge",
+          "Lounge Music",
+          "寺田 創一"
+        ],
+        "categoryId": "20",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "FER (Soichi Terada) - Breezy",
+          "description": "This is quite a rare Soichi Terada track, because he released it under the name FER (Far East Recording). I purchased it from the Japanese iTunes Store as it was the easiest place for me to find it.\n\nThis video is blocked in the US. Sorry guys.\n\nHere are some additional links to help gather more information about the compilations it was featured on:\n\nhttp://www.jvcmusic.co.jp/-/Discography/A010090/VICL-69073.html\n--\nhttps://itunes.apple.com/jp/album/bonnes-vacances!-2/id214085639\n--\nhttp://www.discogs.com/Various-Take-Me-Aosis-A-Day-In-Paris/release/604880\n--\nhttp://www.jvcmusic.co.jp/-/Discography/A010090/VICL-69092.html\n--\nhttp://www.discogs.com/label/23347-Aosis-Records #SoichiTerada"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "cfw4WjTaOKwabzINwHNve4dEHmI",
+      "id": "JvwE3Oo6s7w",
+      "snippet": {
+        "publishedAt": "2022-02-13T17:42:06Z",
+        "channelId": "UCY3indC9o3Ww9x2BA5vs9dg",
+        "title": "Soichi Terada - Diving Into Minds",
+        "description": "Name: Soichi Terada - Asakusa Light\nLabel:  Rush Hour - RHM 041\nCountry: Netherlands /Subgenre: Deep House / Year : Dec 2021",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/JvwE3Oo6s7w/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/JvwE3Oo6s7w/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/JvwE3Oo6s7w/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/JvwE3Oo6s7w/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "DEEP UNDERGROUND",
+        "tags": [
+          "Deep House"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Soichi Terada - Diving Into Minds",
+          "description": "Name: Soichi Terada - Asakusa Light\nLabel:  Rush Hour - RHM 041\nCountry: Netherlands /Subgenre: Deep House / Year : Dec 2021"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "XMflRDh6Rn_zBMx-OGmxTO8oD-c",
+      "id": "RGUBuxj-UQc",
+      "snippet": {
+        "publishedAt": "2015-08-20T11:06:12Z",
+        "channelId": "UCmv3bdkve6-n7zlqsKu2XMA",
+        "title": "Soichi Terada - Into Desert",
+        "description": "music",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/RGUBuxj-UQc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/RGUBuxj-UQc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/RGUBuxj-UQc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/RGUBuxj-UQc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Paolo Sonni",
+        "tags": [
+          "music"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "it",
+        "localized": {
+          "title": "Soichi Terada - Into Desert",
+          "description": "music"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "_--8PSompLFP4v5NzwrMZDE9Jlk",
+      "id": "6HB_SJ8HSQ4",
+      "snippet": {
+        "publishedAt": "2021-02-22T00:19:35Z",
+        "channelId": "UCTOJHlyo8Mlsbo9Rn1FyzaQ",
+        "title": "Soichi terada / How to pray",
+        "description": "Various ‎-- Far East Recording\nLabel:Far East Recording ‎-- FER-06858\nFormat:CD\nCountry:Japan\nReleased:1992\n\nhttps://pixabay.com/photos/zen-garden-meditation-monk-stones-2040340/",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/6HB_SJ8HSQ4/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/6HB_SJ8HSQ4/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/6HB_SJ8HSQ4/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/6HB_SJ8HSQ4/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/6HB_SJ8HSQ4/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Far East Recording",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Soichi terada / How to pray",
+          "description": "Various ‎-- Far East Recording\nLabel:Far East Recording ‎-- FER-06858\nFormat:CD\nCountry:Japan\nReleased:1992\n\nhttps://pixabay.com/photos/zen-garden-meditation-monk-stones-2040340/"
+        },
+        "defaultAudioLanguage": "ja"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "6SS-F_4R9fdWtdKFssVO18pxCWY",
+      "id": "If5tu-LOrQ8",
+      "snippet": {
+        "publishedAt": "2023-05-02T08:00:05Z",
+        "channelId": "UCK8PA9ePVqRstGxJshtw37g",
+        "title": "SOICHI TERADA - 11 - GRAND SENSHUURAKU",
+        "description": "ARTIST : SOICHI TERADA\nALBUM : SUMO JUNGLE\nYEAR : 1996\n\nsi te gusto el video deja tu like, haz algún comentario y no olvides suscribirte a este CANAL para que estés dentro de todos los videos que estoy subiendo todos los días.\n\nIf you liked the video, leave your like, make a comment and do not forget to subscribe to this CHANNEL so that you are among all the videos that I am uploading every day.\n\nactiva tambien las notificaciones 🔔🔔🔔🔔🔔\nALSO ACTIVATE NOTIFICATIONS 🔔🔔🔔🔔🔔\n\nGRACIAS POR VER EL VIDEO Y SUSCRIBANSE A MI CANAL 😃😃😃\nTHANK YOU FOR WATCHING THE VIDEO AND SUBSCRIBE TO MY CHANNEL😃😃\n\nUN ABRAZO!!!\nA HUG!!!",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/If5tu-LOrQ8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/If5tu-LOrQ8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/If5tu-LOrQ8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/If5tu-LOrQ8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/If5tu-LOrQ8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Alien HiFi",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "es-419",
+        "localized": {
+          "title": "SOICHI TERADA - 11 - GRAND SENSHUURAKU",
+          "description": "ARTIST : SOICHI TERADA\nALBUM : SUMO JUNGLE\nYEAR : 1996\n\nsi te gusto el video deja tu like, haz algún comentario y no olvides suscribirte a este CANAL para que estés dentro de todos los videos que estoy subiendo todos los días.\n\nIf you liked the video, leave your like, make a comment and do not forget to subscribe to this CHANNEL so that you are among all the videos that I am uploading every day.\n\nactiva tambien las notificaciones 🔔🔔🔔🔔🔔\nALSO ACTIVATE NOTIFICATIONS 🔔🔔🔔🔔🔔\n\nGRACIAS POR VER EL VIDEO Y SUSCRIBANSE A MI CANAL 😃😃😃\nTHANK YOU FOR WATCHING THE VIDEO AND SUBSCRIBE TO MY CHANNEL😃😃\n\nUN ABRAZO!!!\nA HUG!!!"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "3Zlx1rNLS-KxyLeZHNhChQSr_kU",
+      "id": "0i6KtykAo2w",
+      "snippet": {
+        "publishedAt": "2023-01-11T11:56:01Z",
+        "channelId": "UCqOCztima_uQ_M7Df2NOl5g",
+        "title": "Soichi Terada - I Wanna Be With You (1995)",
+        "description": "Inspired instrumental rework of 1985 boogie classic \"I Wanna Be With You\" by Armanta. Last heard on Terada's hard-to-find \"Far East Recording 2\" release. And, the Chinese Coke label is just beyond dope.\n\nhttps://www.discogs.com/release/1115377-Soichi-Terada-Far-East-Recording-2",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/0i6KtykAo2w/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/0i6KtykAo2w/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/0i6KtykAo2w/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/0i6KtykAo2w/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "pharmer",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Soichi Terada - I Wanna Be With You (1995)",
+          "description": "Inspired instrumental rework of 1985 boogie classic \"I Wanna Be With You\" by Armanta. Last heard on Terada's hard-to-find \"Far East Recording 2\" release. And, the Chinese Coke label is just beyond dope.\n\nhttps://www.discogs.com/release/1115377-Soichi-Terada-Far-East-Recording-2"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "DNudRUNU97lkmZPrtMEDsiSxi2I",
+      "id": "pmWzS1saErs",
+      "snippet": {
+        "publishedAt": "2015-10-20T23:11:03Z",
+        "channelId": "UC8lKusRpDiMxtUWnzbpFvoA",
+        "title": "Soichi Terada (ADE)",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/pmWzS1saErs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/pmWzS1saErs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/pmWzS1saErs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/pmWzS1saErs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Alexander Vos",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "nl",
+        "localized": {
+          "title": "Soichi Terada (ADE)",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

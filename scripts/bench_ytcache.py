@@ -35,11 +35,47 @@ os.environ["CRATE_DATA_DIR"] = tempfile.mkdtemp(prefix="ytcache_bench_")
 sys.path.insert(0, REPO)
 
 from radar_web.radar import ytcache  # noqa: E402
+from radar_web.radar.textmatch import overlap, toks  # noqa: E402
+
+# Couverture minimale du titre de la PISTE par les métadonnées de la vidéo
+# renvoyée, pour un cas `expect: "quality"`.
+#
+# Pourquoi un critère de qualité plutôt que l'identifiant exact attendu : les
+# cas capturés depuis recos_playlist_history.json portent la vidéo choisie LE
+# JOUR de l'ajout. Ce n'est pas une vérité terrain — une piste a souvent
+# plusieurs uploads valables (chaîne officielle « Artiste - Topic », ré-upload
+# tiers…), et les résultats YouTube dérivent avec le temps. Exiger le même
+# identifiant ferait passer pour des régressions des choix au moins aussi bons
+# (mesuré le 19/09 : 8 des 40 cas capturés, tous des préférences entre uploads
+# équivalents, le code actuel préférant la chaîne officielle).
+#
+# Volontairement INDÉPENDANT du score de `_best_match` (qui mêle artiste,
+# description, chaîne, bonus et pénalités) : sans ça le test passerait par
+# construction, la fonction validant son propre classement.
+QUALITY_TITLE_MIN = 0.6
 
 
 def _load(case_id, name):
     with open(os.path.join(FIXTURES, case_id, name), encoding="utf-8") as f:
         return json.load(f)
+
+
+def _video_snippet(case_id, vid):
+    for it in _load(case_id, "videos.json").get("items", []):
+        if it.get("id") == vid:
+            return it.get("snippet", {})
+    return {}
+
+
+def _title_coverage(case_id, vid, title):
+    """Part des mots du titre de piste couverte par le titre/la chaîne de la
+    vidéo renvoyée. Mentions de version entre parenthèses retirées du titre
+    demandé, comme le fait `_best_match` pour construire `want` : elles
+    n'apparaissent presque jamais telles quelles côté YouTube."""
+    sn = _video_snippet(case_id, vid)
+    want = toks(ytcache._strip_parens(title))
+    cand = toks(sn.get("title", "")) | toks(sn.get("channelTitle", ""))
+    return overlap(want, cand)
 
 
 def _mock_request(case_id):
@@ -73,6 +109,15 @@ def run_case(case, verbose=False):
     if case["expect"] == "match":
         ok = vid == case["expected_video_id"]
         detail = f"attendu={case['expected_video_id']!r} obtenu={vid!r}"
+    elif case["expect"] == "quality":
+        if vid is None:
+            ok, detail = False, f"aucune vidéo renvoyée ({why})"
+        else:
+            cov = _title_coverage(case["id"], vid, case.get("title") or "")
+            ok = cov >= QUALITY_TITLE_MIN
+            sn = _video_snippet(case["id"], vid)
+            detail = (f"couverture titre {cov:.2f} (min {QUALITY_TITLE_MIN}) — "
+                      f"{sn.get('title','?')!r} / {sn.get('channelTitle','?')!r}")
     elif case["expect"] == "no_match":
         ok = vid is None
         detail = f"attendu=aucune vidéo obtenu={vid!r} ({why})"
@@ -95,8 +140,20 @@ def main():
     FIXTURES = os.path.abspath(os.path.expanduser(args.fixtures_dir))
 
     cases = json.load(open(os.path.join(FIXTURES, "cases.json"), encoding="utf-8"))
-    results = [(c["id"], run_case(c, args.v)) for c in cases]
+    results = [(c, run_case(c, args.v)) for c in cases]
     n_ok = sum(1 for _, ok in results if ok)
+
+    # Deux familles, comptées SÉPARÉMENT : un total global masquerait que le
+    # plancher passe quoi qu'il arrive (mesuré le 19/09 — matcher court-circuité
+    # pour renvoyer le 1er résultat en aveugle : 25/25 du plancher passaient
+    # encore). Seuls les cas adverses disent si une modification de scoring est
+    # une amélioration ou une régression.
+    for kind, libelle in (("adversarial", "cas adverses (discriminants)"),
+                           ("floor", "plancher (non discriminant)")):
+        sub = [(c, ok) for c, ok in results if c.get("kind", "floor") == kind]
+        if sub:
+            k_ok = sum(1 for _, ok in sub if ok)
+            print(f"{k_ok}/{len(sub)} {libelle}")
     print(f"\n{n_ok}/{len(results)} cas passés ({100 * n_ok / len(results):.0f}%)")
     return 0 if n_ok == len(results) else 1
 

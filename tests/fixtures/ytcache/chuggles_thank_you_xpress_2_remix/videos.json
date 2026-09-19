@@ -1,0 +1,936 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "7WAn2CzmxLwWOR9OOZicuykcIOs",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "Jv73i4GB38yhuf0hO4z-l1vfrTo",
+      "id": "XBVvLl36TB8",
+      "snippet": {
+        "publishedAt": "2012-01-06T10:11:08Z",
+        "channelId": "UCxsHPN-cse0Bntb1sOOGdeA",
+        "title": "chugger - thank you (x-press 2 remix)",
+        "description": "chugger - thank you (x-press 2 remix)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/XBVvLl36TB8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/XBVvLl36TB8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/XBVvLl36TB8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/XBVvLl36TB8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/XBVvLl36TB8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "cinematicb",
+        "tags": [
+          "rip",
+          "cut",
+          "arpiar",
+          "rhadoo",
+          "raresh",
+          "praslea",
+          "petrica",
+          "petre inspirescu",
+          "sunwaves"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "ro",
+        "localized": {
+          "title": "chugger - thank you (x-press 2 remix)",
+          "description": "chugger - thank you (x-press 2 remix)"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "TsiBeP8ETsjnQ3-hRtCfwmTHwC4",
+      "id": "ERWnr1LTkzg",
+      "snippet": {
+        "publishedAt": "2026-08-02T11:14:33Z",
+        "channelId": "UCKb68XBSFcgzV8W8SNDQjhg",
+        "title": "Chugger - Thank You (X-Press 2 Remix Edit) (1996)",
+        "description": "https://www.discogs.com/release/52666-Chugger-Chuggles-Revenge-Thank-You\n\nPromotional Use Only. All Rights belong to their respective owners.\n\nFor supporting my channel: \nPayPal: https://paypal.me/LouisDeniro",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ERWnr1LTkzg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ERWnr1LTkzg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ERWnr1LTkzg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ERWnr1LTkzg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ERWnr1LTkzg/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Louis Deniro",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Chugger - Thank You (X-Press 2 Remix Edit) (1996)",
+          "description": "https://www.discogs.com/release/52666-Chugger-Chuggles-Revenge-Thank-You\n\nPromotional Use Only. All Rights belong to their respective owners.\n\nFor supporting my channel: \nPayPal: https://paypal.me/LouisDeniro"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "p2mpWL93qwINUHlV30iTdtNVW1E",
+      "id": "N1-C94t7AJ8",
+      "snippet": {
+        "publishedAt": "2018-09-23T14:16:53Z",
+        "channelId": "UC924gLFzkNKg_Q_lVSnHx8w",
+        "title": "Chuggles - Thank You (The Hector Lopez Mix) (1993)",
+        "description": "Slow building Deep House grinder on Ron Trent's Prescription record label (Cat no PRES102)/Discogs No 845",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/N1-C94t7AJ8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/N1-C94t7AJ8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/N1-C94t7AJ8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/N1-C94t7AJ8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/N1-C94t7AJ8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "NiteGrooves UK",
+        "tags": [
+          "Chuggles",
+          "Thank You (The Hector Lopez Mix)",
+          "1993",
+          "Deep House",
+          "Prescription record",
+          "Ron Trent",
+          "12 single"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Chuggles - Thank You (The Hector Lopez Mix) (1993)",
+          "description": "Slow building Deep House grinder on Ron Trent's Prescription record label (Cat no PRES102)/Discogs No 845"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "RVGKYhRVI_MKdl-gtkqrAgm8O_I",
+      "id": "HvJD7zor3NY",
+      "snippet": {
+        "publishedAt": "2011-12-06T08:12:12Z",
+        "channelId": "UCW3S3hRRqGERrZiLD3u8VZQ",
+        "title": "Thank you.",
+        "description": "I know no other way to express my gratitude.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/HvJD7zor3NY/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/HvJD7zor3NY/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/HvJD7zor3NY/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/HvJD7zor3NY/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/HvJD7zor3NY/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "chuggles",
+        "tags": [
+          "birthday"
+        ],
+        "categoryId": "24",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Thank you.",
+          "description": "I know no other way to express my gratitude."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "zfYjUHd-Oaw_KF1uuMLjSrNgTwY",
+      "id": "5AQvIOJfscQ",
+      "snippet": {
+        "publishedAt": "2026-03-18T10:01:49Z",
+        "channelId": "UCtDASkoz14aiqLPr1eksALQ",
+        "title": "X Press 2 - Essential Mix (1994-04-16) BBC Radio 1",
+        "description": "X Press 2 - Essential Mix (1994-04-16) BBC Radio 1\nDate: 16 April 1994\n\nEpisode #26\n\nTracklist:\n01. La Funk Mob - Motor Bass Get Phunked Up [Mo Wax - 017]\n02. System VIII - Underground\n03. Phuture Scope - Touch Me Right [Emotive - 747]\n04. Big Fun - Stomp\n05. Phuture - Spirit\n06. M&M - I'm Hot For You\n07. The Question - Everybody\n08. Sonar - State Of Panic\n09. Carl Craig - Domina\n10. Erotic Moments - Touch Me\n11. Chuggles - Thank You\n12. M&M - So Deep, So Good\n13. The Wildchild Experience - Keep It Going\n14. Progression - Reach Further\n15. Tonja Dantzler - In And Out Of My Life\n16. Bassment Culture - Native Stomp\n17. Erick \"More\" Morillo - Dancin'\n18. M People - Movin On Up\n19. Speedy J - Pepper\n20. Johnny Vicious - Activator\n21. Ifrey Max - Lockapellas Vol. 1\n22. 3 Man Jury - Digital Autopsy\n23. Fire Island - There But For The Grace Of God\n24. Pascal's Bongo Massive I - Pere Cochon (I Like It)\n25. Giant - Music\n26. NY Connection - In Front / Wan' It\n27. Al Kooper - The Axe\n28. Mindscape - Two Three Break\n29. Le Funk Mob - Tribulations Extra Sensorielles\n30. Sabres Of Paradise - Edge\n31. Sunz Of Ishen - Who Killed The King [Caustic Vision - 002]\n32. Marden Hill - Hijack\n33. Emperors New Clothes - Unsettled Life [Acid Jazz]\n34. Delta Lady - Swamp Fever\n35. Praise Space Electric - Diggin' At The Dig In\n\n#xpress #xpress2 #essential #mix #bbc #radio #one",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/5AQvIOJfscQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/5AQvIOJfscQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/5AQvIOJfscQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/5AQvIOJfscQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/5AQvIOJfscQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BreakflowUA",
+        "tags": [
+          "xpress",
+          "xpress2",
+          "essential",
+          "mix",
+          "bbc",
+          "radio",
+          "one",
+          "breakflowua",
+          "rave",
+          "live-set"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "X Press 2 - Essential Mix (1994-04-16) BBC Radio 1",
+          "description": "X Press 2 - Essential Mix (1994-04-16) BBC Radio 1\nDate: 16 April 1994\n\nEpisode #26\n\nTracklist:\n01. La Funk Mob - Motor Bass Get Phunked Up [Mo Wax - 017]\n02. System VIII - Underground\n03. Phuture Scope - Touch Me Right [Emotive - 747]\n04. Big Fun - Stomp\n05. Phuture - Spirit\n06. M&M - I'm Hot For You\n07. The Question - Everybody\n08. Sonar - State Of Panic\n09. Carl Craig - Domina\n10. Erotic Moments - Touch Me\n11. Chuggles - Thank You\n12. M&M - So Deep, So Good\n13. The Wildchild Experience - Keep It Going\n14. Progression - Reach Further\n15. Tonja Dantzler - In And Out Of My Life\n16. Bassment Culture - Native Stomp\n17. Erick \"More\" Morillo - Dancin'\n18. M People - Movin On Up\n19. Speedy J - Pepper\n20. Johnny Vicious - Activator\n21. Ifrey Max - Lockapellas Vol. 1\n22. 3 Man Jury - Digital Autopsy\n23. Fire Island - There But For The Grace Of God\n24. Pascal's Bongo Massive I - Pere Cochon (I Like It)\n25. Giant - Music\n26. NY Connection - In Front / Wan' It\n27. Al Kooper - The Axe\n28. Mindscape - Two Three Break\n29. Le Funk Mob - Tribulations Extra Sensorielles\n30. Sabres Of Paradise - Edge\n31. Sunz Of Ishen - Who Killed The King [Caustic Vision - 002]\n32. Marden Hill - Hijack\n33. Emperors New Clothes - Unsettled Life [Acid Jazz]\n34. Delta Lady - Swamp Fever\n35. Praise Space Electric - Diggin' At The Dig In\n\n#xpress #xpress2 #essential #mix #bbc #radio #one"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "VKv6vzrFCiTgp-nh2N1Pd55uBEk",
+      "id": "tandQ9piLVs",
+      "snippet": {
+        "publishedAt": "2014-04-07T18:58:11Z",
+        "channelId": "UCGnE_83rpMO4ORWV5JIAamw",
+        "title": "Chugger - Thank you Oslo!",
+        "description": "Thanks Oslo!",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/tandQ9piLVs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/tandQ9piLVs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/tandQ9piLVs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/tandQ9piLVs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/tandQ9piLVs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "ChuggerTV",
+        "tags": [
+          "concert",
+          "Backstage",
+          "Chugger",
+          "Oslo (City/Town/Village)"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "sv",
+        "localized": {
+          "title": "Chugger - Thank you Oslo!",
+          "description": "Thanks Oslo!"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "qGdH84Cp_Ke2P2KCwH0h6qpC8Js",
+      "id": "ymIzmRLM3Ek",
+      "snippet": {
+        "publishedAt": "2025-11-28T13:26:33Z",
+        "channelId": "UCPLfiCgdP3VHk2KkGjGB1Ig",
+        "title": "Ashley Beedle @ Lakota - Revolution - 1994 (Tracklist In Description Below) 1Track ID Missing",
+        "description": "If you are the genuine owner or producer of any tracks in this mix and you do not want the track online then feel free to contact me and I will remove or mute it instantly.\n\nMany thanks to Brady for the tracklist below & anyone else who helped with the tracklist.\n1. Zeitia Massiah - This Is The Place\n2. Coco Steel & Lovebomb - Feel It\n3. Submarine - Submerged [Yoshitoshi] \n4. Robert Owens - I'll Be Your Friend\n5. Erasure - Always (X Dub Cut) \n6. Chuck Roberts - My House (Acapella)\n7. Tonja Dantzler - In And Out Of My Life (Gems For Jem Main Mix)\n8. Voices - Voices In My Mind (New York Mix) \n9. KC Flightt - Voices\n10. The Look - March (Frankapella)\n11. Brothers In The Struggle - Go Sister, Soul Sister (Many thanks to MikeeBenjamin for the ID)\n12. Dick - Im A Real Sex Maniac\n13. Jaydee - Plastic Dreams\n14. Chugger - (Chuggles Revenge)\n15. X-Press 2 - Rock 2 House (Plastikman's Acid House Remix)\n16. Mike Dunn presents MD Express - God Made Me Phunky [Open]\n17. South Street Players - (Who?) Keeps Changing Your Mind (Sure Is Pure Mix)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ymIzmRLM3Ek/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ymIzmRLM3Ek/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ymIzmRLM3Ek/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ymIzmRLM3Ek/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ymIzmRLM3Ek/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "I.D This",
+        "tags": [
+          "Ashley Beedle",
+          "Revolution",
+          "Lakota",
+          "Bristol",
+          "1994",
+          "Rave",
+          "Tech House",
+          "House",
+          "Deep House",
+          "Tribal House",
+          "Euro House",
+          "Garage House",
+          "Trance",
+          "Oldskool",
+          "Handbag House",
+          "Hard House",
+          "Vocal House",
+          "Progressive",
+          "Acid House",
+          "DJ Mix",
+          "Track ID",
+          "Unknown Track",
+          "X-Press 2",
+          "Black Science Orchestra",
+          "Delta House Of Funk",
+          "Black Sunshine Records"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Ashley Beedle @ Lakota - Revolution - 1994 (Tracklist In Description Below) 1Track ID Missing",
+          "description": "If you are the genuine owner or producer of any tracks in this mix and you do not want the track online then feel free to contact me and I will remove or mute it instantly.\n\nMany thanks to Brady for the tracklist below & anyone else who helped with the tracklist.\n1. Zeitia Massiah - This Is The Place\n2. Coco Steel & Lovebomb - Feel It\n3. Submarine - Submerged [Yoshitoshi] \n4. Robert Owens - I'll Be Your Friend\n5. Erasure - Always (X Dub Cut) \n6. Chuck Roberts - My House (Acapella)\n7. Tonja Dantzler - In And Out Of My Life (Gems For Jem Main Mix)\n8. Voices - Voices In My Mind (New York Mix) \n9. KC Flightt - Voices\n10. The Look - March (Frankapella)\n11. Brothers In The Struggle - Go Sister, Soul Sister (Many thanks to MikeeBenjamin for the ID)\n12. Dick - Im A Real Sex Maniac\n13. Jaydee - Plastic Dreams\n14. Chugger - (Chuggles Revenge)\n15. X-Press 2 - Rock 2 House (Plastikman's Acid House Remix)\n16. Mike Dunn presents MD Express - God Made Me Phunky [Open]\n17. South Street Players - (Who?) Keeps Changing Your Mind (Sure Is Pure Mix)"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "fSE4zoI_EWPCL0imT6bhgXu4kGU",
+      "id": "Q-krGtaurwY",
+      "snippet": {
+        "publishedAt": "2023-07-09T06:09:47Z",
+        "channelId": "UCD3DurvJNta7xEHIgdNIQcA",
+        "title": "The Unknown - Dancin' Music (Prescription/1993)",
+        "description": "Derrick Carter - https://www.discogs.com/release/845-Chuggles-Nagual-The-Unknown-Thank-You-Feel-The-Rhythm-Dancin-Music",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Q-krGtaurwY/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Q-krGtaurwY/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Q-krGtaurwY/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Q-krGtaurwY/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/Q-krGtaurwY/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Mixed Up Music48",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "The Unknown - Dancin' Music (Prescription/1993)",
+          "description": "Derrick Carter - https://www.discogs.com/release/845-Chuggles-Nagual-The-Unknown-Thank-You-Feel-The-Rhythm-Dancin-Music"
+        },
+        "defaultAudioLanguage": "en-GB"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "W9gy1LXfFlasHlHBFOs5__TnVJM",
+      "id": "p9PbQWYDxN0",
+      "snippet": {
+        "publishedAt": "2011-06-24T19:43:55Z",
+        "channelId": "UCXQE-1APU6mrBBHJwf3vwUA",
+        "title": "7 HZ -- Lunar Madness (2-4-25 Mix)",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/p9PbQWYDxN0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/p9PbQWYDxN0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/p9PbQWYDxN0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/p9PbQWYDxN0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "MrTowerdub",
+        "tags": [
+          "Filmato",
+          "0005"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "it",
+        "localized": {
+          "title": "7 HZ -- Lunar Madness (2-4-25 Mix)",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": false,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "coVBzO6zohk0zxl2Fl90_JQxOYM",
+      "id": "KHl35b9a0WM",
+      "snippet": {
+        "publishedAt": "2015-01-24T20:37:53Z",
+        "channelId": "UCUAH6JiooZoOr9EKR1aauDQ",
+        "title": "The Transplant - Afrocentric (Come Together)",
+        "description": "Truly one of the most sought after early breaks records out there!! The bassline pulses on that deep, powerful analogue bass is famous... A true Playscool classic and one of my personal all-time favorites of the style!! Actually produced by Rocky & Diesel of X-Press 2 fame :) Enjoy!! Be sure to subscribe to my channel for the flow of underground classics \"missing\" from YouTube I will be adding regularly as I discover more essential songs that are not represented for home listening :)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/KHl35b9a0WM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/KHl35b9a0WM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/KHl35b9a0WM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/KHl35b9a0WM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/KHl35b9a0WM/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "teach 'em",
+        "tags": [
+          "Afrocentric",
+          "The Transplant",
+          "Chris Sick",
+          "Breakbeat Classics"
+        ],
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "The Transplant - Afrocentric (Come Together)",
+          "description": "Truly one of the most sought after early breaks records out there!! The bassline pulses on that deep, powerful analogue bass is famous... A true Playscool classic and one of my personal all-time favorites of the style!! Actually produced by Rocky & Diesel of X-Press 2 fame :) Enjoy!! Be sure to subscribe to my channel for the flow of underground classics \"missing\" from YouTube I will be adding regularly as I discover more essential songs that are not represented for home listening :)"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "aksmgp6fZxZHpPlHf7TTixRlalw",
+      "id": "ZbNnvw9JsGU",
+      "snippet": {
+        "publishedAt": "2019-01-09T10:14:59Z",
+        "channelId": "UCwjvfyKQJYbL1PzRGAWBwbw",
+        "title": "Fontana \"Mood\" | Feed My Soul (Ivan Classic Mix)",
+        "description": "Underground Music Department (UMD) ‎– UMD 154 | 1995\nVinyl Rips On This Channel Are Recorded From The Original \"12\" By Me",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ZbNnvw9JsGU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ZbNnvw9JsGU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ZbNnvw9JsGU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ZbNnvw9JsGU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ZbNnvw9JsGU/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "In House We Trust",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Fontana \"Mood\" | Feed My Soul (Ivan Classic Mix)",
+          "description": "Underground Music Department (UMD) ‎– UMD 154 | 1995\nVinyl Rips On This Channel Are Recorded From The Original \"12\" By Me"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ShZhXaWXgXSEloFGjs-FR2QQF5k",
+      "id": "3tpOSkNewTA",
+      "snippet": {
+        "publishedAt": "2020-10-16T11:45:47Z",
+        "channelId": "UC924gLFzkNKg_Q_lVSnHx8w",
+        "title": "Splank - All Over The World (1994)",
+        "description": "Sounds a lot like the Johnny Vicious DMX remix of Harold Melvin And The Blue Notes (also on this  channel) on a 20 Greene 10\" (Cat no G2006/Discogs No 64121)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/3tpOSkNewTA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/3tpOSkNewTA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/3tpOSkNewTA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/3tpOSkNewTA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/3tpOSkNewTA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "NiteGrooves UK",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Splank - All Over The World (1994)",
+          "description": "Sounds a lot like the Johnny Vicious DMX remix of Harold Melvin And The Blue Notes (also on this  channel) on a 20 Greene 10\" (Cat no G2006/Discogs No 64121)"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "qe-g7XJRno5hAUCDoCoNbv9Ejx4",
+      "id": "6IONCHsD8Do",
+      "snippet": {
+        "publishedAt": "2021-04-11T02:17:37Z",
+        "channelId": "UC0cgy4ZD3UO6t5dVIpS2CDg",
+        "title": "Christian Pitch - The Bitch [1995] {Tech House}",
+        "description": "www.discogs.com/Christian-Science-The-Bitch/release/251065",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/6IONCHsD8Do/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/6IONCHsD8Do/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/6IONCHsD8Do/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/6IONCHsD8Do/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/6IONCHsD8Do/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Rescued Rhythms",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Christian Pitch - The Bitch [1995] {Tech House}",
+          "description": "www.discogs.com/Christian-Science-The-Bitch/release/251065"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "t1y95rcFsjx1lmLk88eoXbyeAE8",
+      "id": "Ns9ANdeVuTc",
+      "snippet": {
+        "publishedAt": "2016-01-23T13:46:24Z",
+        "channelId": "UCqSMQXJ8MieGFIxgZNDeLdQ",
+        "title": "Shock Therapy - Enjoy It (The Mix Of 9 Turnings)",
+        "description": "LOW BITRATE (96kbps). Follow Shock Therapy: https://www.facebook.com/Derrick-Carter-8264478846\r\nBuy Record: http://www.discogs.com/Shock-Therapy-Enjoy-It/release/52160\r\nMore Music: https://www.facebook.com/DoFunkk\r\n\r\nI do not own the rights of anything uploaded and broadcasted form this channel.\r\n\r\nCopyright holder?\r\n\r\nPlease message me, comment below or email me to dofunkk.channel2@gmail.com before sending a strike. I always remove everything I am requested to remove within 10 min of receiving a message. \r\n\r\nThis would prevent this channel to close after the strike and would allow music lovers and record diggers find some fantastic music which they more likely buy in record stores, second hand shops and discos. \r\n\r\nCredit to artists, label, and purchase links are given in each upload to facilitate the listeners getting in touch to their favourite labels, artists and stores.\r\n\r\nEvery track has been compressed to a LOW BITRATE (96kbps) to avoid any kind of piracy and youtube rips.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Ns9ANdeVuTc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Ns9ANdeVuTc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Ns9ANdeVuTc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Ns9ANdeVuTc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/Ns9ANdeVuTc/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Do Funkk",
+        "tags": [
+          "Shock Therapy - Enjoy It (The",
+          "Shock",
+          "Therapy",
+          "Enjoy",
+          "It",
+          "The",
+          "Mix",
+          "Of",
+          "Turnings",
+          "house",
+          "(2)",
+          "‎–",
+          "Blue",
+          "Cucaracha",
+          "2BC",
+          "Derrick",
+          "Carter",
+          "and",
+          "Chris",
+          "Nazuka",
+          "Mark",
+          "Farina",
+          "Thomas",
+          "Franzmann",
+          "Margaret",
+          "Dygas",
+          "zip",
+          "CMYK",
+          "Club",
+          "Der",
+          "Visionaere",
+          "Get",
+          "Perlonized",
+          "CDV",
+          "discogs",
+          "do-funkk",
+          "dofunkk",
+          "do",
+          "funkk",
+          "funk",
+          "vinyl",
+          "only",
+          "berghain",
+          "panoram"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Shock Therapy - Enjoy It (The Mix Of 9 Turnings)",
+          "description": "LOW BITRATE (96kbps). Follow Shock Therapy: https://www.facebook.com/Derrick-Carter-8264478846\r\nBuy Record: http://www.discogs.com/Shock-Therapy-Enjoy-It/release/52160\r\nMore Music: https://www.facebook.com/DoFunkk\r\n\r\nI do not own the rights of anything uploaded and broadcasted form this channel.\r\n\r\nCopyright holder?\r\n\r\nPlease message me, comment below or email me to dofunkk.channel2@gmail.com before sending a strike. I always remove everything I am requested to remove within 10 min of receiving a message. \r\n\r\nThis would prevent this channel to close after the strike and would allow music lovers and record diggers find some fantastic music which they more likely buy in record stores, second hand shops and discos. \r\n\r\nCredit to artists, label, and purchase links are given in each upload to facilitate the listeners getting in touch to their favourite labels, artists and stores.\r\n\r\nEvery track has been compressed to a LOW BITRATE (96kbps) to avoid any kind of piracy and youtube rips."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "WSOCfE2KhF2BsedzeM_-zptgLUc",
+      "id": "JYgCD5zogzg",
+      "snippet": {
+        "publishedAt": "2023-05-10T21:32:01Z",
+        "channelId": "UCeT1nZFw-DYLUvSKf4aL1Cg",
+        "title": "Midi X Press Feat. May - Fais Ce Qu'il Te Play (Bini & Martini Club Mix)",
+        "description": "2003 -2004 Tribal House Compilation",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/JYgCD5zogzg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/JYgCD5zogzg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/JYgCD5zogzg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/JYgCD5zogzg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Dj Coco",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "fr",
+        "localized": {
+          "title": "Midi X Press Feat. May - Fais Ce Qu'il Te Play (Bini & Martini Club Mix)",
+          "description": "2003 -2004 Tribal House Compilation"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

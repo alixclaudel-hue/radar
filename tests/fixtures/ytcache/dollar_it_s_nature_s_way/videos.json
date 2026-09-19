@@ -1,0 +1,891 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "cyRCFZk8McwU4Jz1ina5u6OXBeQ",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "r--mMkRml7mSubUPalg552wkNRw",
+      "id": "JyvjaVeVIfY",
+      "snippet": {
+        "publishedAt": "2022-02-10T15:59:48Z",
+        "channelId": "UCWEtnEiVwUy7mwFeshyAWLA",
+        "title": "Dollar - It's Nature's Way (No Problem) (Official Music Video)",
+        "description": "You're watching the official music video for Dollar - \"It's Nature's Way (No Problem)\" released in 1988\n\nSubscribe to the Rhino Channel! https://Rhino.lnk.to/YouTubeSubID\n\nCheck Out Our Favorite Playlists:\nClassic Rock https://Rhino.lnk.to/YTClassicRockID\n80s Hits https://Rhino.lnk.to/YT80sHitsID\n80s Hard Rock https://Rhino.lnk.to/YT80sHardRockID\n80s Alternative https://Rhino.lnk.to/YT80sAlternativeID\n90s Hits https://Rhino.lnk.to/YT90sHitsID\n\nStay connected with RHINO on...\nFacebook https://www.facebook.com/RHINO/\nInstagram https://www.instagram.com/rhino_records\nTwitter https://twitter.com/Rhino_Records\nhttps://www.rhino.com/\n\nRHINO is the official YouTube channel of the greatest music catalog in the world. Founded in 1978, Rhino is the world's leading pop culture label specializing in classic rock, soul, and 80's and 90's alternative. The vast Rhino catalog of more than 5,000 albums, videos, and hit songs features material by Warner Music Group artists such as Van Halen, Madonna, Duran Duran, Aretha Franklin, Ray Charles, The Doors, Chicago, Black Sabbath, John Coltrane, Yes, Alice Cooper, Linda Ronstadt, The Ramones, The Monkees, Carly Simon, and Curtis Mayfield, among many others. Check back for classic music videos, live performances, hand-curated playlists, the Rhino Podcast, and more!",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/JyvjaVeVIfY/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/JyvjaVeVIfY/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/JyvjaVeVIfY/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/JyvjaVeVIfY/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "RHINO",
+        "tags": [
+          "RHINO",
+          "Rhino Records",
+          "Classic Rock",
+          "Soul",
+          "80s Alternative",
+          "Classic Music Videos",
+          "80s Hits",
+          "dollar",
+          "dollar songs",
+          "dollar music",
+          "best of dollar",
+          "dollar greatest hits",
+          "dollar music videos",
+          "dollar live",
+          "dollar lyrics",
+          "dollar playlist",
+          "dollar it's nature's way",
+          "it's nature's way",
+          "it's nature's way no problem",
+          "80s pop",
+          "synthpop"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar - It's Nature's Way (No Problem) (Official Music Video)",
+          "description": "You're watching the official music video for Dollar - \"It's Nature's Way (No Problem)\" released in 1988\n\nSubscribe to the Rhino Channel! https://Rhino.lnk.to/YouTubeSubID\n\nCheck Out Our Favorite Playlists:\nClassic Rock https://Rhino.lnk.to/YTClassicRockID\n80s Hits https://Rhino.lnk.to/YT80sHitsID\n80s Hard Rock https://Rhino.lnk.to/YT80sHardRockID\n80s Alternative https://Rhino.lnk.to/YT80sAlternativeID\n90s Hits https://Rhino.lnk.to/YT90sHitsID\n\nStay connected with RHINO on...\nFacebook https://www.facebook.com/RHINO/\nInstagram https://www.instagram.com/rhino_records\nTwitter https://twitter.com/Rhino_Records\nhttps://www.rhino.com/\n\nRHINO is the official YouTube channel of the greatest music catalog in the world. Founded in 1978, Rhino is the world's leading pop culture label specializing in classic rock, soul, and 80's and 90's alternative. The vast Rhino catalog of more than 5,000 albums, videos, and hit songs features material by Warner Music Group artists such as Van Halen, Madonna, Duran Duran, Aretha Franklin, Ray Charles, The Doors, Chicago, Black Sabbath, John Coltrane, Yes, Alice Cooper, Linda Ronstadt, The Ramones, The Monkees, Carly Simon, and Curtis Mayfield, among many others. Check back for classic music videos, live performances, hand-curated playlists, the Rhino Podcast, and more!"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "DOZT6mR_Lp95bM4kkpJi6DueuqI",
+      "id": "6UDGwTIsqB8",
+      "snippet": {
+        "publishedAt": "2013-03-08T12:55:33Z",
+        "channelId": "UC0vPi3mDJ8KjYNrfo2JmKVg",
+        "title": "Dollar ‎- It's Nature's Way (No Problem) (1988)",
+        "description": "Label:\nMetronome ‎-- 886 295-1\nFormat:\nVinyl, 12\", 45 RPM, Maxi-Single\nCountry:\nGermany\nReleased:\n1988\nGenre:\nElectronic, Pop\nStyle:Disco",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/6UDGwTIsqB8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/6UDGwTIsqB8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/6UDGwTIsqB8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/6UDGwTIsqB8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Milan076",
+        "tags": [
+          "euro",
+          "disco"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar ‎- It's Nature's Way (No Problem) (1988)",
+          "description": "Label:\nMetronome ‎-- 886 295-1\nFormat:\nVinyl, 12\", 45 RPM, Maxi-Single\nCountry:\nGermany\nReleased:\n1988\nGenre:\nElectronic, Pop\nStyle:Disco"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Eg9X7mt2B7kCrFEtlAIqQ2vGf7o",
+      "id": "lvlls1Vt07w",
+      "snippet": {
+        "publishedAt": "2014-12-26T06:24:03Z",
+        "channelId": "UClrjJg0vvBmOWFMOWZj3oeQ",
+        "title": "It’s Nature’s Way",
+        "description": "Provided to YouTube by The Orchard Enterprises\n\nIt’s Nature’s Way · Dollar\n\nStar Meeting\n\n℗ 2011 Carinco Neue Medien AG\n\nReleased on: 2011-10-30\n\nMusic Publisher: Bazar Prod.Ltd.\nMusic Publisher: Menace Music Ltd.\nMusic Publisher: Steve Glen Music Ltd.\nMusic Publisher: Conexion Music Ltd.\nMusic Publisher: Universal Music Publ.Int.Ltd.\nMusic Publisher: Universal Music Publ.LTDA.\nMusic Publisher: Fairwood Music Germany GmbH\nMusic Publisher: Universal Music Publ.GmbH\nMusic Publisher: Antenna Musik GmbH\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/lvlls1Vt07w/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/lvlls1Vt07w/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/lvlls1Vt07w/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/lvlls1Vt07w/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/lvlls1Vt07w/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Dollar - Topic",
+        "tags": [
+          "Dollar",
+          "Star",
+          "Meeting",
+          "It’s",
+          "Nature’s",
+          "Way"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "It’s Nature’s Way",
+          "description": "Provided to YouTube by The Orchard Enterprises\n\nIt’s Nature’s Way · Dollar\n\nStar Meeting\n\n℗ 2011 Carinco Neue Medien AG\n\nReleased on: 2011-10-30\n\nMusic Publisher: Bazar Prod.Ltd.\nMusic Publisher: Menace Music Ltd.\nMusic Publisher: Steve Glen Music Ltd.\nMusic Publisher: Conexion Music Ltd.\nMusic Publisher: Universal Music Publ.Int.Ltd.\nMusic Publisher: Universal Music Publ.LTDA.\nMusic Publisher: Fairwood Music Germany GmbH\nMusic Publisher: Universal Music Publ.GmbH\nMusic Publisher: Antenna Musik GmbH\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "qa4B0QQtiMxDcKDWSFcawxVcnwA",
+      "id": "01C0FKpjN8A",
+      "snippet": {
+        "publishedAt": "2014-11-08T22:48:22Z",
+        "channelId": "UClrjJg0vvBmOWFMOWZj3oeQ",
+        "title": "It's Nature's Way (No Problem)",
+        "description": "Provided to YouTube by The Orchard Enterprises\n\nIt's Nature's Way (No Problem) · Dollar\n\nPop Masters: She Melts the Telephone\n\n℗ 2005 Carinco AG\n\nReleased on: 2005-11-17\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/01C0FKpjN8A/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/01C0FKpjN8A/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/01C0FKpjN8A/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/01C0FKpjN8A/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/01C0FKpjN8A/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Dollar - Topic",
+        "tags": [
+          "Dollar",
+          "Pop",
+          "Masters:",
+          "She",
+          "Melts",
+          "the",
+          "Telephone",
+          "It's",
+          "Nature's",
+          "Way",
+          "(No",
+          "Problem)"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "It's Nature's Way (No Problem)",
+          "description": "Provided to YouTube by The Orchard Enterprises\n\nIt's Nature's Way (No Problem) · Dollar\n\nPop Masters: She Melts the Telephone\n\n℗ 2005 Carinco AG\n\nReleased on: 2005-11-17\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Ky28EnA-Y0pFr5pSm4Cngvkrb7o",
+      "id": "SW9lovesK8g",
+      "snippet": {
+        "publishedAt": "2020-08-27T10:30:33Z",
+        "channelId": "UCMqeZrpLLXB1OdAI81UdCFg",
+        "title": "It's Nature's Way (No Problem) (Extended Version) (Remix)",
+        "description": "Provided to YouTube by Warner Music Group - X5 Music Group\n\nIt's Nature's Way (No Problem) (Extended Version) (Remix) · Dollar\n\nIt's Nature's Way (No Problem)\n\n℗ 2020 Warner Music Group - X5 Music Group\n\nReleased on: 2020-08-28\n\nMain  Artist: Dollar\nComposer: BURNS\nComposer: David Van Day\nComposer: Glen\nComposer: Thereza Bazar\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SW9lovesK8g/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SW9lovesK8g/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SW9lovesK8g/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/SW9lovesK8g/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/SW9lovesK8g/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Dollar - Topic",
+        "tags": [
+          "Dollar",
+          "It's Nature's Way (No Problem)",
+          "It's Nature's Way (No Problem) [Extended Version] [Remix]"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "It's Nature's Way (No Problem) (Extended Version) (Remix)",
+          "description": "Provided to YouTube by Warner Music Group - X5 Music Group\n\nIt's Nature's Way (No Problem) (Extended Version) (Remix) · Dollar\n\nIt's Nature's Way (No Problem)\n\n℗ 2020 Warner Music Group - X5 Music Group\n\nReleased on: 2020-08-28\n\nMain  Artist: Dollar\nComposer: BURNS\nComposer: David Van Day\nComposer: Glen\nComposer: Thereza Bazar\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Oe0x7hb-KmS0c0b9azgBLhezeF4",
+      "id": "AeayXyMsx4Y",
+      "snippet": {
+        "publishedAt": "2021-12-07T01:34:42Z",
+        "channelId": "UCdVpomTYkJyKZVZZFHQp7lQ",
+        "title": "Dollar -  Nature's Way (No Problem) (Dub)",
+        "description": "Álbum O L'Amour\n1987\nHi Energy",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/AeayXyMsx4Y/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/AeayXyMsx4Y/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/AeayXyMsx4Y/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/AeayXyMsx4Y/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/AeayXyMsx4Y/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "NRGMusic_80s",
+        "tags": [
+          "Dollar - Nature's Way (No Problem) (Dub)",
+          "Dollar",
+          "It's Nature's Way (No Problem) (Instrumental)",
+          "80s",
+          "High Energy",
+          "Hi NRG",
+          "Italo Disco",
+          "New Italo",
+          "Spacesynth",
+          "Italo new generation"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "es",
+        "localized": {
+          "title": "Dollar -  Nature's Way (No Problem) (Dub)",
+          "description": "Álbum O L'Amour\n1987\nHi Energy"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "pT4Cz8KvBMmU54KVVV5Z3B1-4f0",
+      "id": "4F65_xOsgqk",
+      "snippet": {
+        "publishedAt": "2014-04-15T05:29:17Z",
+        "channelId": "UC9rrEtSjRjfFHq1JPILEzEQ",
+        "title": "Dollar - It's Nature's Way (No Problem)",
+        "description": "Dollar It's Nature's Way No Problem.  1988 single charting at #58 in the UK in July 1988, and #46 in Germany in August 1988.  Produced by Phil Harding & Ian Curnow for PWL.  Official music video HQ 80s 80's you can't run or hide from the tears inside no matter what you say it's only.  ohnoitisnathan",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/4F65_xOsgqk/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/4F65_xOsgqk/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/4F65_xOsgqk/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/4F65_xOsgqk/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "ohnoitisnathan38",
+        "tags": [
+          "Dollar",
+          "It's",
+          "Nature's",
+          "Way",
+          "No",
+          "Problem",
+          "official",
+          "music",
+          "video",
+          "HQ",
+          "high quality",
+          "80s",
+          "80's",
+          "ohnoitisnathan",
+          "ohnoitisnathan38",
+          "PWL"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar - It's Nature's Way (No Problem)",
+          "description": "Dollar It's Nature's Way No Problem.  1988 single charting at #58 in the UK in July 1988, and #46 in Germany in August 1988.  Produced by Phil Harding & Ian Curnow for PWL.  Official music video HQ 80s 80's you can't run or hide from the tears inside no matter what you say it's only.  ohnoitisnathan"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "i8JMADcL6wkkVDuil6-g2T94xsg",
+      "id": "v0Q_hwOKtzU",
+      "snippet": {
+        "publishedAt": "2009-06-15T16:30:39Z",
+        "channelId": "UCyO09doH_zQEMpC6iL_PxTQ",
+        "title": "It's Nature's Way - Dollar",
+        "description": "It's Nature's Way - Dollar. Composers - Steve Glen/Mike Burns/Dollar. See and hear more Steve Glen songs and compositions at the bluemelonmusic Channel at www.spacepoo.tv on-line entertainment.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/v0Q_hwOKtzU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/v0Q_hwOKtzU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/v0Q_hwOKtzU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "bluemelonmusic",
+        "tags": [
+          "It's",
+          "Nature's",
+          "Way",
+          "Dollar",
+          "Composers",
+          "Steve",
+          "Glen",
+          "Mike",
+          "Burns",
+          "bluemelonmusic",
+          "Channel",
+          "www.spacepoo.tv",
+          "on-line",
+          "entertainment"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "It's Nature's Way - Dollar",
+          "description": "It's Nature's Way - Dollar. Composers - Steve Glen/Mike Burns/Dollar. See and hear more Steve Glen songs and compositions at the bluemelonmusic Channel at www.spacepoo.tv on-line entertainment."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Gl63-7rW7m98wI8JNKlK2_e-av4",
+      "id": "yFgPoe0AOrU",
+      "snippet": {
+        "publishedAt": "2021-08-12T02:31:32Z",
+        "channelId": "UC4fIiSi-utYjf_4ulepI98g",
+        "title": "Dollar - It's Nature's Way (No Problem)",
+        "description": "High Energy & Italo Disco, Dollar - It's Nature's Way (No Problem)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/yFgPoe0AOrU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/yFgPoe0AOrU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/yFgPoe0AOrU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/yFgPoe0AOrU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/yFgPoe0AOrU/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "La Capital Mundial Del High Energy",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar - It's Nature's Way (No Problem)",
+          "description": "High Energy & Italo Disco, Dollar - It's Nature's Way (No Problem)"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "fmbWNyAbWo37lQDYZiWyj5YVPv8",
+      "id": "GeIdm9yhCpU",
+      "snippet": {
+        "publishedAt": "2023-02-23T05:00:07Z",
+        "channelId": "UCGzZqQCwRjfB29mgyoD-1VA",
+        "title": "Dollar - It's Nature's Way (No Problem) (Maxi Remix)",
+        "description": "Dollar - It's Nature's Way (No Problem) (Maxi Remix)\n► Label: London Records\n► Country: Germany\n► Released: 1988\n► Genre: Electronic\n► Style: Italo-Disco, Euro-Disco\n\n#DJDaryen, #italodisco, #eurodisco\n\n► You can support my work here: https://www.paypal.me/djdaryen\n                                                              https://www.patreon.com/djdaryen\n\nFor Entertainment Use & Promotional Purposes Only\nAll Credits To The Original Artist, Songwriter, Producer, Record Company & Label\n_________________________________________________________________________________________________\n\nItalo Disco 2023, Italo Disco New Generation, Euro-Disco, New Italo Disco, \n80's, Synthpop, Hi-Nrg, Europop\n_________________________________________________________________________________________________",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/GeIdm9yhCpU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/GeIdm9yhCpU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/GeIdm9yhCpU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/GeIdm9yhCpU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/GeIdm9yhCpU/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "DJ Daryen",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar - It's Nature's Way (No Problem) (Maxi Remix)",
+          "description": "Dollar - It's Nature's Way (No Problem) (Maxi Remix)\n► Label: London Records\n► Country: Germany\n► Released: 1988\n► Genre: Electronic\n► Style: Italo-Disco, Euro-Disco\n\n#DJDaryen, #italodisco, #eurodisco\n\n► You can support my work here: https://www.paypal.me/djdaryen\n                                                              https://www.patreon.com/djdaryen\n\nFor Entertainment Use & Promotional Purposes Only\nAll Credits To The Original Artist, Songwriter, Producer, Record Company & Label\n_________________________________________________________________________________________________\n\nItalo Disco 2023, Italo Disco New Generation, Euro-Disco, New Italo Disco, \n80's, Synthpop, Hi-Nrg, Europop\n_________________________________________________________________________________________________"
+        },
+        "defaultAudioLanguage": "en-CA"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "kv7uIg7T0gDcVomeLSJ6XQXHEW0",
+      "id": "-4uJ_Yz34mA",
+      "snippet": {
+        "publishedAt": "2016-07-15T02:56:58Z",
+        "channelId": "UC8mWA4q_ZQYQJ2UB66IMptg",
+        "title": "Dollar ‎– It's Nature's Way (No Problem)",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/-4uJ_Yz34mA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/-4uJ_Yz34mA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/-4uJ_Yz34mA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/-4uJ_Yz34mA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "ivan miller",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "es",
+        "localized": {
+          "title": "Dollar ‎– It's Nature's Way (No Problem)",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "ilMg9GoPDkJjMUHMLc45jPEmyRU",
+      "id": "ZH60xttTmO0",
+      "snippet": {
+        "publishedAt": "2019-03-15T20:45:03Z",
+        "channelId": "UCMqeZrpLLXB1OdAI81UdCFg",
+        "title": "It's Nature's Way (No Problem)",
+        "description": "Provided to YouTube by Virgin Music Group\n\nIt's Nature's Way (No Problem) · Dollar\n\nShooting Star\n\nReleased on: 2005-01-01\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/ZH60xttTmO0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/ZH60xttTmO0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/ZH60xttTmO0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/ZH60xttTmO0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/ZH60xttTmO0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Dollar - Topic",
+        "tags": [
+          "Dollar",
+          "Shooting Star",
+          "It's Nature's Way (No Problem)"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "It's Nature's Way (No Problem)",
+          "description": "Provided to YouTube by Virgin Music Group\n\nIt's Nature's Way (No Problem) · Dollar\n\nShooting Star\n\nReleased on: 2005-01-01\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "rGXzwK89NLu8UwjiypVdUcNF0cw",
+      "id": "kse5s371ev0",
+      "snippet": {
+        "publishedAt": "2018-02-01T06:31:49Z",
+        "channelId": "UCKt3SJbocFFMTmILBYiewcQ",
+        "title": "Dollar ‎– It's Nature's Way (No Problem) (12\" Version) 1988",
+        "description": "Dollar ‎– It's Nature's Way (No Problem)\nLabel:\nLondon Records ‎– LONX 179\nFormat:\nVinyl, 12\" \nCountry:\nUK\nReleased:\n1988\nGenre:\nElectronic, Pop\nStyle:\nDisco, Synth-pop, Europop",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/kse5s371ev0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/kse5s371ev0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/kse5s371ev0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/kse5s371ev0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/kse5s371ev0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "추억의유로댄스감상실1",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar ‎– It's Nature's Way (No Problem) (12\" Version) 1988",
+          "description": "Dollar ‎– It's Nature's Way (No Problem)\nLabel:\nLondon Records ‎– LONX 179\nFormat:\nVinyl, 12\" \nCountry:\nUK\nReleased:\n1988\nGenre:\nElectronic, Pop\nStyle:\nDisco, Synth-pop, Europop"
+        },
+        "defaultAudioLanguage": "ko"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "WTxSrxuQ6AHbgOQ6geBFm7ujTbM",
+      "id": "YRZEngl7gnQ",
+      "snippet": {
+        "publishedAt": "2010-03-13T14:55:37Z",
+        "channelId": "UCfCZ3V03HA_nBozOoHKzDAw",
+        "title": "*Dollar* It's Nature Way*",
+        "description": "*Awesome* Enjoy*",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/YRZEngl7gnQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/YRZEngl7gnQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/YRZEngl7gnQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "sweetiehabana",
+        "tags": [
+          "Music"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "*Dollar* It's Nature Way*",
+          "description": "*Awesome* Enjoy*"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "dyjAjOKDaX5tb3aSu9-FY4Xb0_U",
+      "id": "fBniilC4-Dw",
+      "snippet": {
+        "publishedAt": "2019-05-06T16:56:47Z",
+        "channelId": "UCiVuNCH37MdhGuCY1C7oKeA",
+        "title": "Dollar - It's Nature's Way (No Problem) [12'' Version] 1988",
+        "description": "תיאור",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/fBniilC4-Dw/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/fBniilC4-Dw/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/fBniilC4-Dw/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/fBniilC4-Dw/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/fBniilC4-Dw/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Disco Dance Classix",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Dollar - It's Nature's Way (No Problem) [12'' Version] 1988",
+          "description": "תיאור"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

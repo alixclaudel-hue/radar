@@ -1,0 +1,954 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "GStdOQ6FSY3Shgc7T5wiSQo9hog",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "nW-fkchf8VE2zYy1eKNwDHtU2PQ",
+      "id": "DJldjE5G7sA",
+      "snippet": {
+        "publishedAt": "2023-11-24T14:40:55Z",
+        "channelId": "UCqAV3JKYNuSUnuZVJy_tDgw",
+        "title": "Random Factor 'Know You're There' (Silver City Remix) - 20:20 Vision",
+        "description": "👽  Random Factor \n🎶  Know You're There (Silver City Remix)\n💿  20:20 Vision \n\nDiscogs: https://www.discogs.com/release/139511-Random-Factor-Know-Youre-There\n\n-\n\nInstagram:  https://www.instagram.com/oisin________/\n\nThe purpose of this channel is to promote artists & music we love. No copyright infringement intended. If you want the music removed, please contact crates.int@gmail.com.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/DJldjE5G7sA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/DJldjE5G7sA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/DJldjE5G7sA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/DJldjE5G7sA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/DJldjE5G7sA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "crates",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Random Factor 'Know You're There' (Silver City Remix) - 20:20 Vision",
+          "description": "👽  Random Factor \n🎶  Know You're There (Silver City Remix)\n💿  20:20 Vision \n\nDiscogs: https://www.discogs.com/release/139511-Random-Factor-Know-Youre-There\n\n-\n\nInstagram:  https://www.instagram.com/oisin________/\n\nThe purpose of this channel is to promote artists & music we love. No copyright infringement intended. If you want the music removed, please contact crates.int@gmail.com."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "5a6TzZhLDn-qsFdi22IawPbKr_w",
+      "id": "Vn4nUxZHXik",
+      "snippet": {
+        "publishedAt": "2026-07-07T16:00:33Z",
+        "channelId": "UCq7IiNoexgdXIploFHnk0fg",
+        "title": "Random Factor - Know You're There (Silver City Remix)",
+        "description": "Random Factor – Know You're There\nLabel: 20:20 Vision – VIS084\nFormat: Vinyle, 12\", 33 ⅓ RPM\nPays: UK\nSortie: 2003\nGenre: Electronic\nStyle: House\n\nUploaded in low quality. Support the artist!\nI don't own the material published in this video. If the copyrights owner doesn't want it on this youtube channel, please contact me at theo.llario@gmail.com & I will delete it immediately.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Vn4nUxZHXik/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Vn4nUxZHXik/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Vn4nUxZHXik/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Vn4nUxZHXik/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/Vn4nUxZHXik/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Lario Zo",
+        "tags": [
+          "house",
+          "house music",
+          "tech house",
+          "minimal",
+          "deep house",
+          "techno",
+          "vynil",
+          "digg"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Random Factor - Know You're There (Silver City Remix)",
+          "description": "Random Factor – Know You're There\nLabel: 20:20 Vision – VIS084\nFormat: Vinyle, 12\", 33 ⅓ RPM\nPays: UK\nSortie: 2003\nGenre: Electronic\nStyle: House\n\nUploaded in low quality. Support the artist!\nI don't own the material published in this video. If the copyrights owner doesn't want it on this youtube channel, please contact me at theo.llario@gmail.com & I will delete it immediately."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "VtoakhCXxKodw0_RHEsL7yeYD8w",
+      "id": "q-kqt_1GBfI",
+      "snippet": {
+        "publishedAt": "2025-11-10T11:14:31Z",
+        "channelId": "UCXdWBnvbKreeJEuIe5_t28Q",
+        "title": "Random Factor - “Know You’re There (Silver City Remix)” [2003] #housemusic",
+        "description": "Going back to 2003, with this groovy old-school tech house. Released via one of my favourite labels, 2020 Vision.\n\nRandom Factor - “Know You’re There (Silver City Remix” [2003]\n\n#techhouse #electronicmusic #vinyl #vinylcollectionpost #vinycommunity",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/q-kqt_1GBfI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/q-kqt_1GBfI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/q-kqt_1GBfI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/q-kqt_1GBfI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/q-kqt_1GBfI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Gali",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Random Factor - “Know You’re There (Silver City Remix)” [2003] #housemusic",
+          "description": "Going back to 2003, with this groovy old-school tech house. Released via one of my favourite labels, 2020 Vision.\n\nRandom Factor - “Know You’re There (Silver City Remix” [2003]\n\n#techhouse #electronicmusic #vinyl #vinylcollectionpost #vinycommunity"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "IVyIODsH4t2fh61oizZa-ufanq4",
+      "id": "htXziMx8Thc",
+      "snippet": {
+        "publishedAt": "2020-07-25T18:24:43Z",
+        "channelId": "UCLnVXHk1Yoo7IA3vdwbgkEg",
+        "title": "Silver City - Shiver (Ewan Pearson Bari Girl Remix)",
+        "description": "✖ SILVER CITY, EWAN PEARSON ✖\n» SoundCloud: https://soundcloud.com/silver-city\n» Facebook: https://www.facebook.com/silvercity.music/\n\n» SoundCloud: https://soundcloud.com/ewan-pearson\n\n✖ DEEP PLEASURE MUSIC ✖\n» Facebook: https://www.facebook.com/DPMPlaylist\n» SoundCloud: https://soundcloud.com/deep-pleasure-music\n» YouTube: https://www.youtube.com/DeepPleasureMusic\n» Instagram: https://www.instagram.com/deep_pleasure_music/\n» DPM: https://www.deeppleasuremusic.com\n» Submit Your Set: https://www.deeppleasuremusic.com/submit-your-set\n\n✖ LETS GO DEEP ✖✖ Promotional use only, will remove on request! ✖",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/htXziMx8Thc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/htXziMx8Thc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/htXziMx8Thc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/htXziMx8Thc/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "KODAI",
+        "tags": [
+          "underground",
+          "music",
+          "dj",
+          "producer",
+          "remix",
+          "remixer",
+          "set",
+          "mix",
+          "club",
+          "weekend",
+          "techno",
+          "techhouse",
+          "house",
+          "progressivehouse",
+          "deephouse",
+          "nudisco",
+          "minimal",
+          "dpm",
+          "bpm",
+          "track",
+          "song"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Silver City - Shiver (Ewan Pearson Bari Girl Remix)",
+          "description": "✖ SILVER CITY, EWAN PEARSON ✖\n» SoundCloud: https://soundcloud.com/silver-city\n» Facebook: https://www.facebook.com/silvercity.music/\n\n» SoundCloud: https://soundcloud.com/ewan-pearson\n\n✖ DEEP PLEASURE MUSIC ✖\n» Facebook: https://www.facebook.com/DPMPlaylist\n» SoundCloud: https://soundcloud.com/deep-pleasure-music\n» YouTube: https://www.youtube.com/DeepPleasureMusic\n» Instagram: https://www.instagram.com/deep_pleasure_music/\n» DPM: https://www.deeppleasuremusic.com\n» Submit Your Set: https://www.deeppleasuremusic.com/submit-your-set\n\n✖ LETS GO DEEP ✖✖ Promotional use only, will remove on request! ✖"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "JYdEsA51o7R4nNThQ_V0IKysai8",
+      "id": "HjEIwR03aiI",
+      "snippet": {
+        "publishedAt": "2020-05-31T07:42:44Z",
+        "channelId": "UCdYXe2qaDrSVq4wgwC-gNmQ",
+        "title": "Silver City - Another Dimension (Spirt Catcher Dub)",
+        "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nSilver City - Another Dimension EP, Released 2005-05-31, 20/20 Vision, VIS119D\nGet it: https://www.beatport.com/release/another-dimension/126378\n\nAlso Check Out:\nATAXIA - Tight Like That EP\nhttp://bit.ly/2SRKszW\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation\n\nTags: #Techno #techhouse #house #deephouse #SilverCity #SpirtCatcher",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/HjEIwR03aiI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/HjEIwR03aiI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/HjEIwR03aiI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "2020Vision",
+        "tags": [
+          "20:20 Vision",
+          "2020 vision",
+          "20/20 vision",
+          "ralph lawson",
+          "house",
+          "house music",
+          "deep house",
+          "tech house",
+          "techno",
+          "Silver City",
+          "Silver City - Another Dimension",
+          "Silver City - Another Dimension (Spirt Catcher Dub)",
+          "Another Dimension (Spirt Catcher Dub)",
+          "Spirt Catcher Silver City",
+          "Another Dimension Spirt Catcher",
+          "Spirt Catcher",
+          "techno 2020"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Silver City - Another Dimension (Spirt Catcher Dub)",
+          "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nSilver City - Another Dimension EP, Released 2005-05-31, 20/20 Vision, VIS119D\nGet it: https://www.beatport.com/release/another-dimension/126378\n\nAlso Check Out:\nATAXIA - Tight Like That EP\nhttp://bit.ly/2SRKszW\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation\n\nTags: #Techno #techhouse #house #deephouse #SilverCity #SpirtCatcher"
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "z542MyzROWZ_chE8T3wMBp9uScE",
+      "id": "24cAlfGZhMI",
+      "snippet": {
+        "publishedAt": "2018-07-31T13:48:33Z",
+        "channelId": "UCdYXe2qaDrSVq4wgwC-gNmQ",
+        "title": "Silver City - La Seine",
+        "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nGet It: https://www.beatport.com/release/sounds-like-summer-vol-3/2359013\nSince we're all getting used to living in the sunshine these days we thought it was the right time to serve up a selection that just makes you feel good in the heat. \nWe've spent time digging through the crates to find some lost gems and forgotten classics that sound as good today as they did back then. \nSounds Like Summer Vol 3 features an eclectic mix of Downtempo, Disco, Deep House and Balearic Beats with music from Crazy P, Maya Jane Coles, 2020Soundsystem, Deadbeats, Debukas, Silver City and many more.\n\nVA - Sounds Like Summer Vol 3, Released 2018-07-25, 20/20 Vision, VIS308\n\nAlso Check Out\nVA - New Editions Vol.3\nhttps://bit.ly/2OqGNWN\n\n#Funk #Soul #Disco #SilverCity\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/24cAlfGZhMI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/24cAlfGZhMI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/24cAlfGZhMI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "2020Vision",
+        "tags": [
+          "Silver City",
+          "Silver City - La Seine",
+          "La Seine",
+          "La Seine Silver City",
+          "VA - Sounds Like Summer Vol 3",
+          "Sounds Like Summer Vol 3",
+          "Sounds Like Summer",
+          "2020 vision",
+          "20/20 vision",
+          "house music",
+          "house",
+          "deep house",
+          "funk",
+          "soul",
+          "disco",
+          "nu disco",
+          "techno station",
+          "various artists",
+          "20/20 vision new",
+          "best house",
+          "electronic music",
+          "summer music"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Silver City - La Seine",
+          "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nGet It: https://www.beatport.com/release/sounds-like-summer-vol-3/2359013\nSince we're all getting used to living in the sunshine these days we thought it was the right time to serve up a selection that just makes you feel good in the heat. \nWe've spent time digging through the crates to find some lost gems and forgotten classics that sound as good today as they did back then. \nSounds Like Summer Vol 3 features an eclectic mix of Downtempo, Disco, Deep House and Balearic Beats with music from Crazy P, Maya Jane Coles, 2020Soundsystem, Deadbeats, Debukas, Silver City and many more.\n\nVA - Sounds Like Summer Vol 3, Released 2018-07-25, 20/20 Vision, VIS308\n\nAlso Check Out\nVA - New Editions Vol.3\nhttps://bit.ly/2OqGNWN\n\n#Funk #Soul #Disco #SilverCity\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation"
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "43L5NPCkao90og5BEDfDLwzjZEI",
+      "id": "8YJR-w24J6Q",
+      "snippet": {
+        "publishedAt": "2019-08-07T15:08:34Z",
+        "channelId": "UCdYXe2qaDrSVq4wgwC-gNmQ",
+        "title": "Silver City - La Seine",
+        "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nGet this release: https://www.beatport.com/release/silver-city-bonus-track-version/334995\nSilver City - Silver City, released on 2005-06-19 by 20/20 Vision - VIS120CD\n\nAlso Check Out:\nCarl Finlow - Electronic EP: http://bit.ly/2X3SCtL\n\n#SilverCity\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/8YJR-w24J6Q/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/8YJR-w24J6Q/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/8YJR-w24J6Q/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/8YJR-w24J6Q/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/8YJR-w24J6Q/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "2020Vision",
+        "tags": [
+          "20:20 Vision",
+          "2020 vision",
+          "20/20 vision",
+          "ralph lawson",
+          "house",
+          "house music",
+          "deep house",
+          "tech house",
+          "techno",
+          "Silver City - La Seine",
+          "La Seine",
+          "La Seine Silver City",
+          "Silver City"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Silver City - La Seine",
+          "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nGet this release: https://www.beatport.com/release/silver-city-bonus-track-version/334995\nSilver City - Silver City, released on 2005-06-19 by 20/20 Vision - VIS120CD\n\nAlso Check Out:\nCarl Finlow - Electronic EP: http://bit.ly/2X3SCtL\n\n#SilverCity\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation"
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "dAckPLS2xz4OeZIBUp-xgADRSt8",
+      "id": "oj5eHAETHrQ",
+      "snippet": {
+        "publishedAt": "2013-02-08T16:26:48Z",
+        "channelId": "UC4HERHGHWU_9wLq--E7KuBQ",
+        "title": "Silver City - Shiver (Ewan Pearson's Bari Girl remix) (2005)",
+        "description": "Subido por Miguel Ortiz para el grupo Nocturnal Transmissions ... http://www.facebook.com/#!/groups/220225551413882/",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/oj5eHAETHrQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/oj5eHAETHrQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/oj5eHAETHrQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/oj5eHAETHrQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Ainhoa “Ainhoa” Rosa",
+        "tags": [
+          "Silver",
+          "City",
+          "Shiver",
+          "Ewan",
+          "Pearson's",
+          "bari",
+          "girl",
+          "remix"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "es",
+        "localized": {
+          "title": "Silver City - Shiver (Ewan Pearson's Bari Girl remix) (2005)",
+          "description": "Subido por Miguel Ortiz para el grupo Nocturnal Transmissions ... http://www.facebook.com/#!/groups/220225551413882/"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "9TvVZouUT_NASi1AAfsPNtA4IrI",
+      "id": "q0PFRkpVSps",
+      "snippet": {
+        "publishedAt": "2023-06-26T08:43:45Z",
+        "channelId": "UCD3DurvJNta7xEHIgdNIQcA",
+        "title": "Stuart Prentice - 20:20 Vision Mix 1 (Groovin') - January 2022",
+        "description": "Originally uploaded to Mixcloud - https://www.mixcloud.com/stuartprentice/stuart-prentice-2020-vision-mix-1-groovin-january-2022/\n\nLegendary Leeds label 20:20 Vision has a vast catalogue of releases as you would expect with an outfit going since 1995. There are so many tracks I love and have great memories of I decided to do two mixes. This one focusses on deeper, funkin’, late-night house & techno spanning from the labels early days, right through to more recent times. It's hard to put in words what a huge influence 20:20 has been on me so I'll let the music do the talking...\n\n1. URB 'N' RI – Dream Of A Groove (Space City EP - VIS010/1996)\n2. BRS – Catch The Boat (Fthing Stereo Mix) (VIS045/2000)\n3. Alton Miller & Urban Farmers ‎– Lolita (The Rhubarb Triangle Mix) (VIS012/1996)\n4. Ataxia – One LFO (Delano Smith Reconstruction) (VIS313/2019)\n5. DJ W!LD ‎– Boys Don’t Cry (Feel Me - VIS244/2013)\n6. Huxley ‎– Out Of My Mind (Out Of The Box EP - VIS219/2012)\n7. Carl A. Finlow, Ralph Lawson & Domenic Capello – The Montana Freight Train Mix (Shielded EP - VIS005/1996)\n8. The Fifth Edition – Road Trip (VIS011/1996)\n9. Wulf n' Bear – Jovian (Space Groover - VIS001/1995)\n10. Dino & Terry ‎– Right Area (Show Me - VIS029/1999)\n11. Tuccillo ‎– Mathematics (VIS212/2011)\n12. Fred Everything – Revolution (Swag's Red Dub Mix) (VIS034/1999)\n13. Tuomas Salmela ‎– Tattoo (Jori Hulkkonen Remix) (36 Ways - VIS022/1998)\n14. Fred Everything ‎– Without (Under The Sun - VISLP002/2000)\n15. Luna City Express – Smokin' Bull (VIS282/2016)\n16. Silver City – Elastic (VIS088/2003)\n17. Random Factor – Swing (Ricochet EP - VIS048/2000)\n18. Random Factor – Lockdown (On The Air EP - VIS031/1999)\n19. Dino & Terry – Freestyle (Free The Rhodes) (VIS021/1998)\n20. Slick 'N Flash ‎– Sunny Side Up (Firewire EP - VIS030/1999)\n21. Wolf n’ Flow – Reactivate (VIS044/2000)\n22. Wulf n’ Bear – Raptures Of The Deep (VIS003/1995)\n23. The Huggy Factor – Ass Jam (VIS037/2000)\n24. Wulf n' Flow ‎– Echo Beach (Wulf's Wax) (VIS023/1998)\n25. Random Factor ‎– After The Tone (Convergence - VIS100CD/2004)\n26. Random Factor ‎– Outlaw (John Tejada Remix) (VIS172/2008)\n27. Random Factor ‎– Moving On (Know You're There - VIS084/2003)\n28. Freak Seven – Surreal (Sebo K Dub Version) (VIS232/2013)\n29. Simon Baker ‎– Too Slow (Radio Slave Panorama Garage Mix) (VIS203/2010)\n30. Random Factor – Reversal Input (VIS004/1995)\n31. Lifeforce – Lifeforce (20/20 After Hours Mix) (VIS017/1997)\n32. Whitesquare ‎– Peaks (VIS270/2015)\n33. James Shinra ‎– On & On (VIS318/2020)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/q0PFRkpVSps/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/q0PFRkpVSps/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/q0PFRkpVSps/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/q0PFRkpVSps/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/q0PFRkpVSps/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Mixed Up Music48",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Stuart Prentice - 20:20 Vision Mix 1 (Groovin') - January 2022",
+          "description": "Originally uploaded to Mixcloud - https://www.mixcloud.com/stuartprentice/stuart-prentice-2020-vision-mix-1-groovin-january-2022/\n\nLegendary Leeds label 20:20 Vision has a vast catalogue of releases as you would expect with an outfit going since 1995. There are so many tracks I love and have great memories of I decided to do two mixes. This one focusses on deeper, funkin’, late-night house & techno spanning from the labels early days, right through to more recent times. It's hard to put in words what a huge influence 20:20 has been on me so I'll let the music do the talking...\n\n1. URB 'N' RI – Dream Of A Groove (Space City EP - VIS010/1996)\n2. BRS – Catch The Boat (Fthing Stereo Mix) (VIS045/2000)\n3. Alton Miller & Urban Farmers ‎– Lolita (The Rhubarb Triangle Mix) (VIS012/1996)\n4. Ataxia – One LFO (Delano Smith Reconstruction) (VIS313/2019)\n5. DJ W!LD ‎– Boys Don’t Cry (Feel Me - VIS244/2013)\n6. Huxley ‎– Out Of My Mind (Out Of The Box EP - VIS219/2012)\n7. Carl A. Finlow, Ralph Lawson & Domenic Capello – The Montana Freight Train Mix (Shielded EP - VIS005/1996)\n8. The Fifth Edition – Road Trip (VIS011/1996)\n9. Wulf n' Bear – Jovian (Space Groover - VIS001/1995)\n10. Dino & Terry ‎– Right Area (Show Me - VIS029/1999)\n11. Tuccillo ‎– Mathematics (VIS212/2011)\n12. Fred Everything – Revolution (Swag's Red Dub Mix) (VIS034/1999)\n13. Tuomas Salmela ‎– Tattoo (Jori Hulkkonen Remix) (36 Ways - VIS022/1998)\n14. Fred Everything ‎– Without (Under The Sun - VISLP002/2000)\n15. Luna City Express – Smokin' Bull (VIS282/2016)\n16. Silver City – Elastic (VIS088/2003)\n17. Random Factor – Swing (Ricochet EP - VIS048/2000)\n18. Random Factor – Lockdown (On The Air EP - VIS031/1999)\n19. Dino & Terry – Freestyle (Free The Rhodes) (VIS021/1998)\n20. Slick 'N Flash ‎– Sunny Side Up (Firewire EP - VIS030/1999)\n21. Wolf n’ Flow – Reactivate (VIS044/2000)\n22. Wulf n’ Bear – Raptures Of The Deep (VIS003/1995)\n23. The Huggy Factor – Ass Jam (VIS037/2000)\n24. Wulf n' Flow ‎– Echo Beach (Wulf's Wax) (VIS023/1998)\n25. Random Factor ‎– After The Tone (Convergence - VIS100CD/2004)\n26. Random Factor ‎– Outlaw (John Tejada Remix) (VIS172/2008)\n27. Random Factor ‎– Moving On (Know You're There - VIS084/2003)\n28. Freak Seven – Surreal (Sebo K Dub Version) (VIS232/2013)\n29. Simon Baker ‎– Too Slow (Radio Slave Panorama Garage Mix) (VIS203/2010)\n30. Random Factor – Reversal Input (VIS004/1995)\n31. Lifeforce – Lifeforce (20/20 After Hours Mix) (VIS017/1997)\n32. Whitesquare ‎– Peaks (VIS270/2015)\n33. James Shinra ‎– On & On (VIS318/2020)"
+        },
+        "defaultAudioLanguage": "en-GB"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "WxS7Q1Ja4w0TEVHM8s7LQhH7DKE",
+      "id": "WRQJUOR3MV0",
+      "snippet": {
+        "publishedAt": "2009-03-12T10:14:43Z",
+        "channelId": "UCuD8uC-DcQCNSXJRdpz2l3g",
+        "title": "Random factor - Digitize [Emperor MacHine Remix Edit]",
+        "description": "From: Fabric 33 - Ralph Lawson",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/WRQJUOR3MV0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/WRQJUOR3MV0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/WRQJUOR3MV0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "woof82",
+        "tags": [
+          "alvaro",
+          "alvarolooking",
+          "ele",
+          "electric kingdom",
+          "electro",
+          "electro artists",
+          "electro house",
+          "electronic",
+          "electronica",
+          "fabric",
+          "njs",
+          "spitz",
+          "synth pop",
+          "synthpop",
+          "tech house",
+          "techno",
+          "technolectro",
+          "technolectro pop",
+          "technolectropop",
+          "the beat"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Random factor - Digitize [Emperor MacHine Remix Edit]",
+          "description": "From: Fabric 33 - Ralph Lawson"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "eAwly682A_bGJbPO9WQG6wmWRWk",
+      "id": "SM94U39z2DY",
+      "snippet": {
+        "publishedAt": "2022-07-31T14:28:06Z",
+        "channelId": "UCn53auivv1Z68vIuHywDc3w",
+        "title": "Royal Royce   Pornopop  2004",
+        "description": "Artist: Royal Royce\nAlbum: Pornopop\nLabel: ВИРУС Production\nFormat: CD, Mixed\nCountry: Ukraine\nReleased: 2004\nGenre: Electronic\nStyle: House, Deep House\n\n01. Phonique Feat. Die Elfen - The Red Dress (Dub Mix)\n02. Random Facto - Dreamstate\n03. Ciudad Feliz - How\n04. The Visitors - No Under On The Ground\n05. Polaroy - A Seperate Way\n06. Hybrid Funk - Go!\n07. Random Factor - After The Ton (DJ T's Tweakin Disco Mix)\n08. Audio Royal - Heavy Dancing (Freestyle Man Main Mix)\n09. Felix Rennefeld - The Max (Audio Royal Big City Mix)\n10. Deco 2 - Elephants And Cube (Felix Rennefeld Main Mx)\n11. Christian Kreuz - Wir Sind Bereit (Leroy Jackson Clubmix)\n12. Deco 2 - Jimmy Connors (Felix Rennefeld Main Mix)\n13. Der Dritte Raum - Klubraum\n14. Ralph Lawson Pres. 2020 Sound System - A Good Day\n15. Silver City - Say Hi (Silver City Dub Mix)",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/SM94U39z2DY/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/SM94U39z2DY/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/SM94U39z2DY/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/SM94U39z2DY/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Volodymyr Lisovenko",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Royal Royce   Pornopop  2004",
+          "description": "Artist: Royal Royce\nAlbum: Pornopop\nLabel: ВИРУС Production\nFormat: CD, Mixed\nCountry: Ukraine\nReleased: 2004\nGenre: Electronic\nStyle: House, Deep House\n\n01. Phonique Feat. Die Elfen - The Red Dress (Dub Mix)\n02. Random Facto - Dreamstate\n03. Ciudad Feliz - How\n04. The Visitors - No Under On The Ground\n05. Polaroy - A Seperate Way\n06. Hybrid Funk - Go!\n07. Random Factor - After The Ton (DJ T's Tweakin Disco Mix)\n08. Audio Royal - Heavy Dancing (Freestyle Man Main Mix)\n09. Felix Rennefeld - The Max (Audio Royal Big City Mix)\n10. Deco 2 - Elephants And Cube (Felix Rennefeld Main Mx)\n11. Christian Kreuz - Wir Sind Bereit (Leroy Jackson Clubmix)\n12. Deco 2 - Jimmy Connors (Felix Rennefeld Main Mix)\n13. Der Dritte Raum - Klubraum\n14. Ralph Lawson Pres. 2020 Sound System - A Good Day\n15. Silver City - Say Hi (Silver City Dub Mix)"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "dTYmvW7YyO8-Tac-xJumPgt4hQg",
+      "id": "fFUwqRjkQaw",
+      "snippet": {
+        "publishedAt": "2016-06-16T02:20:53Z",
+        "channelId": "UC8jLA7EdJ0yLwnQTdmDw5lA",
+        "title": "Shiver Ewan Pearson Remix",
+        "description": "Provided to YouTube by Base79\n\nShiver Ewan Pearson Remix · Silver City\n\nShiver\n\n℗ 2020Vision\n\nReleased on: 2005-01-01\n\nAuto-generated by YouTube.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/fFUwqRjkQaw/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/fFUwqRjkQaw/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/fFUwqRjkQaw/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/fFUwqRjkQaw/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          }
+        },
+        "channelTitle": "Silver City - Topic",
+        "tags": [
+          "Silver",
+          "City",
+          "Shiver",
+          "Ewan",
+          "Pearson",
+          "Remix"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Shiver Ewan Pearson Remix",
+          "description": "Provided to YouTube by Base79\n\nShiver Ewan Pearson Remix · Silver City\n\nShiver\n\n℗ 2020Vision\n\nReleased on: 2005-01-01\n\nAuto-generated by YouTube."
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "Mm8dADMVGibyT-7zHtBbjBl-xmY",
+      "id": "74F5ln_XAKA",
+      "snippet": {
+        "publishedAt": "2018-07-31T13:48:34Z",
+        "channelId": "UCdYXe2qaDrSVq4wgwC-gNmQ",
+        "title": "Deadbeats - Funky For You (Dorfmeister VS Madrid De Los Austrias Remix)",
+        "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nGet It: https://www.beatport.com/release/sounds-like-summer-vol-3/2359013\nSince we're all getting used to living in the sunshine these days we thought it was the right time to serve up a selection that just makes you feel good in the heat. \nWe've spent time digging through the crates to find some lost gems and forgotten classics that sound as good today as they did back then. \nSounds Like Summer Vol 3 features an eclectic mix of Downtempo, Disco, Deep House and Balearic Beats with music from Crazy P, Maya Jane Coles, 2020Soundsystem, Deadbeats, Debukas, Silver City and many more.\n\nVA - Sounds Like Summer Vol 3, Released 2018-07-25, 20/20 Vision, VIS308\n\nAlso Check Out\nVA - New Editions Vol.3\nhttps://bit.ly/2OqGNWN\n\n#Funk #Soul #Disco #Deadbeats #Dorfmeister #MadridDeLosAustrias\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/74F5ln_XAKA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/74F5ln_XAKA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/74F5ln_XAKA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "2020Vision",
+        "tags": [
+          "Deadbeats",
+          "Deadbeats - Funky For You (Dorfmeister VS Madrid De Los Austrias Remix)",
+          "Funky For You (Dorfmeister VS Madrid De Los Austrias Remix)",
+          "Funky For You (Dorfmeister VS Madrid De Los Austrias Remix) Deadbeats",
+          "Dorfmeister",
+          "Madrid De Los Austrias",
+          "VA - Sounds Like Summer Vol 3",
+          "Sounds Like Summer Vol 3",
+          "Sounds Like Summer",
+          "2020 vision",
+          "20/20 vision",
+          "house music",
+          "house",
+          "deep house",
+          "funk",
+          "soul",
+          "disco",
+          "nu disco",
+          "techno station",
+          "various artists",
+          "20/20 vision new",
+          "best house"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Deadbeats - Funky For You (Dorfmeister VS Madrid De Los Austrias Remix)",
+          "description": "Subscribe: http://bit.ly/Subscribe2020Vision\nGet It: https://www.beatport.com/release/sounds-like-summer-vol-3/2359013\nSince we're all getting used to living in the sunshine these days we thought it was the right time to serve up a selection that just makes you feel good in the heat. \nWe've spent time digging through the crates to find some lost gems and forgotten classics that sound as good today as they did back then. \nSounds Like Summer Vol 3 features an eclectic mix of Downtempo, Disco, Deep House and Balearic Beats with music from Crazy P, Maya Jane Coles, 2020Soundsystem, Deadbeats, Debukas, Silver City and many more.\n\nVA - Sounds Like Summer Vol 3, Released 2018-07-25, 20/20 Vision, VIS308\n\nAlso Check Out\nVA - New Editions Vol.3\nhttps://bit.ly/2OqGNWN\n\n#Funk #Soul #Disco #Deadbeats #Dorfmeister #MadridDeLosAustrias\n\nFollow us:\nWebsite: http://www.2020recordings.com\nFacebook: https://www.facebook.com/2020VisionRecordings/\nTwitter: http://www.twitter.com/2020Visionlabel\nSoundcloud: http://www.soundcloud.com/2020visionrecordings\nBeatport: https://pro.beatport.com/label/20-20-vision/9329\n\n2020Vision is one of the most highly respected independent labels in the world. It started in 1994 & took the name through a desire to have a rounded & quality vision of music. The label has been anti-genre & released music in a wide variety of styles: Electronica from Random Factor, Hip Hop from Dubble D, Disco from Crazy P, Techno from Audiojack & Paul Woolford, House from Spirit Catcher & Indie Dance from 2020Soundsystem.\n\nIn recent times, 2020Vision continues to remain current, through both the main label & its exciting new sub-label; Editions - combining intelligent leftfield electronic music from the likes of Doubting Thomas & Photonz, with exciting dance floor house music from the likes of Denney & Mekanism.\n\nThis channel is powered by Techno Station\nSubscribe: http://bit.ly/SubscribeTechnoStation"
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "s0enoyPyhHMwIW1fFz6TxpsaWi0",
+      "id": "-8wawEUoX4c",
+      "snippet": {
+        "publishedAt": "2019-11-16T09:31:00Z",
+        "channelId": "UCQbgY9NKlEFuio6OfVD3wbQ",
+        "title": "Silicone Soul - Feeling Blue (Silver City Remix)",
+        "description": "Silicone Soul - Feeling Blue (Silver City Remix)\nTaken from Silicone Soul - Feeling Blue\n℗ & © 2005 Soma Recordings Ltd. \n\n#siliconesoul #somarecords #feelingblue",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/-8wawEUoX4c/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/-8wawEUoX4c/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/-8wawEUoX4c/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/-8wawEUoX4c/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/-8wawEUoX4c/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Silicone Soul",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Silicone Soul - Feeling Blue (Silver City Remix)",
+          "description": "Silicone Soul - Feeling Blue (Silver City Remix)\nTaken from Silicone Soul - Feeling Blue\n℗ & © 2005 Soma Recordings Ltd. \n\n#siliconesoul #somarecords #feelingblue"
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "bQcyAgZMK3zTmIncsiyXCZJLamg",
+      "id": "Is_2Ng2-yIY",
+      "snippet": {
+        "publishedAt": "2009-02-28T00:29:44Z",
+        "channelId": "UCVHLRJcnRMVBIpdinBLuQwA",
+        "title": "Genesis - Home By The Sea / Second Home By The Sea (Official Music Video)",
+        "description": "Explore more music from Genesis here https://Genesis.lnk.to/BestOf\n\nR-Kive is available to order now \nDigital: smarturl.it/RKivedigital\nPhysical: smarturl.it/RkiveCD\n\nMusic video by Genesis performing Home By The Sea/Second Home By The Sea (2004 Digital Remaster).",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/Is_2Ng2-yIY/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/Is_2Ng2-yIY/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/Is_2Ng2-yIY/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/Is_2Ng2-yIY/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/Is_2Ng2-yIY/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "GenesisVEVO",
+        "tags": [
+          "Genesis",
+          "Home",
+          "The",
+          "Sea/Second",
+          "Sea",
+          "(2004",
+          "Digital",
+          "Remaster)",
+          "Genesis songs",
+          "Genesis album",
+          "Genesis live",
+          "Genesis lyrics",
+          "Genesis audio",
+          "Genesis archive",
+          "Genesis best of",
+          "Genesis greatest hits",
+          "Genesis hits",
+          "Genesis playlist",
+          "Genesis singles",
+          "Genesis UK",
+          "Genesis videos",
+          "Genesis official",
+          "Genesis music video",
+          "Genesis vevo",
+          "Genesis youtube",
+          "Home By The Sea",
+          "Phil Collins",
+          "Tony Banks",
+          "Mike Rutherford"
+        ],
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Genesis - Home By The Sea / Second Home By The Sea (Official Music Video)",
+          "description": "Explore more music from Genesis here https://Genesis.lnk.to/BestOf\n\nR-Kive is available to order now \nDigital: smarturl.it/RKivedigital\nPhysical: smarturl.it/RkiveCD\n\nMusic video by Genesis performing Home By The Sea/Second Home By The Sea (2004 Digital Remaster)."
+        },
+        "defaultAudioLanguage": "en-US"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 15,
+    "resultsPerPage": 15
+  }
+}

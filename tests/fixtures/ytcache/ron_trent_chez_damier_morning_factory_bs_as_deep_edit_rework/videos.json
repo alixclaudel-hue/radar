@@ -1,0 +1,353 @@
+{
+  "kind": "youtube#videoListResponse",
+  "etag": "pFyZqYxNfGQhc6J-o21iKOaH5fQ",
+  "items": [
+    {
+      "kind": "youtube#video",
+      "etag": "sHVmMCXF_N1uuO8axHIhV6mlfgc",
+      "id": "zv8-HjFxPwA",
+      "snippet": {
+        "publishedAt": "2025-07-26T14:07:23Z",
+        "channelId": "UCOuj4Z-ZNnLX496LdlwTInw",
+        "title": "Ron Trent/Chez Damier 'Cry' (Sourires Remix). Morning Factory Remixes. 2025 Recording.",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/zv8-HjFxPwA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/zv8-HjFxPwA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/zv8-HjFxPwA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/zv8-HjFxPwA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/zv8-HjFxPwA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Garage & House Classics On Vinyl",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Ron Trent/Chez Damier 'Cry' (Sourires Remix). Morning Factory Remixes. 2025 Recording.",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "-PeggBiOkT_F8M6Jc-PSIhEsvRE",
+      "id": "fPLMETAlAMM",
+      "snippet": {
+        "publishedAt": "2026-03-25T22:21:00Z",
+        "channelId": "UCSvxbdI4Ixj_KC2o41NAmZQ",
+        "title": "Ron Trent  & Chez Damier - Morning Factory (Atjazz Remix 1) •Morning Factory Remixes • R01 Records",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/fPLMETAlAMM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/fPLMETAlAMM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/fPLMETAlAMM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/fPLMETAlAMM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/fPLMETAlAMM/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "morfeus Opus",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "fr",
+        "localized": {
+          "title": "Ron Trent  & Chez Damier - Morning Factory (Atjazz Remix 1) •Morning Factory Remixes • R01 Records",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "LeDPNA1Ih1CbRED040MVi-eXqGE",
+      "id": "7oK2lvOA_I0",
+      "snippet": {
+        "publishedAt": "2025-09-15T17:50:55Z",
+        "channelId": "UCafaVQ7KFT8Y9dBEKK-ioQA",
+        "title": "Ron Trent / Chez Damier / Ben Vedren – Morning Factory Remixes",
+        "description": "Label: None\nRelease Date: 2025\n\nInto great new and classic techno & ambient as well?\nhttps://www.youtube.com/channel/UC4KGaumASCwGC8SB-k_DbCw/videos\n\nMy Discogs store:\nhttps://www.discogs.com/seller/jancito303/profile\n\nARE YOU THE COPYRIGHT OWNER?\nFirst off, thank you for the music! I am a music enthusiast, vinyl collector (20K+ pieces of wax and counting!) and a record store owner. We promote your vinyl release and if we upload it, it's because we loved it and have or had it in our record store!\nIn fact, feel free to contact us to see if we can help you distribute your vinyl records:\nhttps://radialstore.com/contact​.\n\nIf you don't want this on my channel I totally understand, drop me a line via  vinilum@gmail.com and I will remove it immediately from this channel.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/7oK2lvOA_I0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/7oK2lvOA_I0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/7oK2lvOA_I0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/7oK2lvOA_I0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/7oK2lvOA_I0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Basement Tracks",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Ron Trent / Chez Damier / Ben Vedren – Morning Factory Remixes",
+          "description": "Label: None\nRelease Date: 2025\n\nInto great new and classic techno & ambient as well?\nhttps://www.youtube.com/channel/UC4KGaumASCwGC8SB-k_DbCw/videos\n\nMy Discogs store:\nhttps://www.discogs.com/seller/jancito303/profile\n\nARE YOU THE COPYRIGHT OWNER?\nFirst off, thank you for the music! I am a music enthusiast, vinyl collector (20K+ pieces of wax and counting!) and a record store owner. We promote your vinyl release and if we upload it, it's because we loved it and have or had it in our record store!\nIn fact, feel free to contact us to see if we can help you distribute your vinyl records:\nhttps://radialstore.com/contact​.\n\nIf you don't want this on my channel I totally understand, drop me a line via  vinilum@gmail.com and I will remove it immediately from this channel."
+        },
+        "defaultAudioLanguage": "en"
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "1qntbeAzkI2YAweWhjGUnxSSb4g",
+      "id": "1QoD18JE_34",
+      "snippet": {
+        "publishedAt": "2025-07-14T19:01:48Z",
+        "channelId": "UCOuj4Z-ZNnLX496LdlwTInw",
+        "title": "Ron Trent/Chez Damier 'Berlin Night In Paris' (Fred H Remix) Morning Factory Remixes. 2025 Recording",
+        "description": "",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/1QoD18JE_34/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/1QoD18JE_34/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/1QoD18JE_34/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/1QoD18JE_34/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/1QoD18JE_34/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Garage & House Classics On Vinyl",
+        "categoryId": "22",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "Ron Trent/Chez Damier 'Berlin Night In Paris' (Fred H Remix) Morning Factory Remixes. 2025 Recording",
+          "description": ""
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "PWiUa8JJZlEo7QKA2TB5Vw6RWDk",
+      "id": "dzCXynqVdvc",
+      "snippet": {
+        "publishedAt": "2018-11-20T00:25:50Z",
+        "channelId": "UCudCUL7YVe_dFlgA4c5gpuw",
+        "title": "FTWK   Ron Trent",
+        "description": "For Those Who Know  (FTWK) \nnarrated by T. Carlita\n\nFeaturing Ron Trent\nMusic Playlist: Altered States, Morning Factory, Seduction\n\n\nGet connected...www.inmyhouse65.com. \nIn My House Techno Music Show \ncontinues to stay true to the mission....\n\"Where the TRUE stories are told and GREAT music is played.”\n\nContact: \nT. Carlita, Show Producer/Host\nEmail: inmyhouse65@gmail.com\nWebsite: www.inmyhouse65.com\nPhone: 313.516.9548",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/dzCXynqVdvc/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/dzCXynqVdvc/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/dzCXynqVdvc/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          }
+        },
+        "channelTitle": "In My House Techno Music Show",
+        "tags": [
+          "newmusic",
+          "housemusic",
+          "party",
+          "dancemusic",
+          "deephouse",
+          "bass",
+          "djlife",
+          "techno",
+          "goodmusic",
+          "musiclover",
+          "nightlife",
+          "detroit",
+          "partymusic",
+          "house",
+          "chicago",
+          "techhouse",
+          "producer",
+          "musicvideo",
+          "musicproducer",
+          "electronicmusic",
+          "dj",
+          "progressivehouse",
+          "artist",
+          "musician",
+          "technomusic",
+          "dance"
+        ],
+        "categoryId": "24",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "FTWK   Ron Trent",
+          "description": "For Those Who Know  (FTWK) \nnarrated by T. Carlita\n\nFeaturing Ron Trent\nMusic Playlist: Altered States, Morning Factory, Seduction\n\n\nGet connected...www.inmyhouse65.com. \nIn My House Techno Music Show \ncontinues to stay true to the mission....\n\"Where the TRUE stories are told and GREAT music is played.”\n\nContact: \nT. Carlita, Show Producer/Host\nEmail: inmyhouse65@gmail.com\nWebsite: www.inmyhouse65.com\nPhone: 313.516.9548"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    },
+    {
+      "kind": "youtube#video",
+      "etag": "cm2S5Wmq2NGMGBYzSVbU4kZWvks",
+      "id": "nm8hlv6D1j0",
+      "snippet": {
+        "publishedAt": "2026-06-28T14:54:56Z",
+        "channelId": "UCf1FewnbKBLRr11RKOkNfPA",
+        "title": "One of my favorite #deephouse  tracks of all time, Morning Factory!!",
+        "description": "Coming up on our 250th year, let's celebrate some great American culture by focusing on the Deep sounds of Prescription Records from Chicago in  3 short clips, this label was and is massive for me, especially the mind blowing Morning Factory, the first clip💥🇺🇸 And of course, as an American artist I am very grateful for the support and love that the world has shown  our House and Techno music and blessed to be part of this!🙏🙏🙏#rontrent #chezdamier #abacus #glennunderground #prescriptionrecords",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/nm8hlv6D1j0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/nm8hlv6D1j0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/nm8hlv6D1j0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/nm8hlv6D1j0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/nm8hlv6D1j0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "Dan Curtin Official",
+        "categoryId": "10",
+        "liveBroadcastContent": "none",
+        "defaultLanguage": "en",
+        "localized": {
+          "title": "One of my favorite #deephouse  tracks of all time, Morning Factory!!",
+          "description": "Coming up on our 250th year, let's celebrate some great American culture by focusing on the Deep sounds of Prescription Records from Chicago in  3 short clips, this label was and is massive for me, especially the mind blowing Morning Factory, the first clip💥🇺🇸 And of course, as an American artist I am very grateful for the support and love that the world has shown  our House and Techno music and blessed to be part of this!🙏🙏🙏#rontrent #chezdamier #abacus #glennunderground #prescriptionrecords"
+        }
+      },
+      "status": {
+        "uploadStatus": "processed",
+        "privacyStatus": "public",
+        "license": "youtube",
+        "embeddable": true,
+        "publicStatsViewable": true,
+        "madeForKids": false
+      }
+    }
+  ],
+  "pageInfo": {
+    "totalResults": 6,
+    "resultsPerPage": 6
+  }
+}

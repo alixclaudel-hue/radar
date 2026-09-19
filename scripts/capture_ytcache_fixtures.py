@@ -35,6 +35,20 @@ sys.path.insert(0, REPO)
 from radar_web.radar import paths, store, ytcache  # noqa: E402
 
 
+# Artistes sans valeur d'identification : le pipeline les écarte en amont depuis
+# les pts 47/49 (`job_scan_recos` filtre les pistes sans artiste exploitable),
+# mais l'historique RECOS en contient encore d'AVANT ce correctif — 15 des 40
+# premiers cas capturés le 19/09. Les garder ferait tester un chemin mort, et
+# figerait comme « attendu » le comportement que le pt 27 a justement corrigé.
+# Doit rester aligné sur `crate_jobs._PLACEHOLDER_ARTISTS`.
+_PLACEHOLDER_ARTISTS = {"various", "various artists", "va", "v/a",
+                        "unknown artist", "unknown", "no artist"}
+
+
+def _is_placeholder_artist(name):
+    return re.sub(r"\s*\(\d+\)\s*$", "", (name or "").strip()).lower() in _PLACEHOLDER_ARTISTS
+
+
 def _slug(artist, title):
     s = re.sub(r"[^a-z0-9]+", "_", f"{artist}_{title}".lower()).strip("_")
     return (s[:60] or "case")
@@ -85,7 +99,8 @@ def main():
         sys.exit(f"Pas d'historique RECOS trouvé : {history_path}")
     history = json.load(open(history_path, encoding="utf-8"))
     candidates = [h for h in history
-                  if isinstance(h, dict) and h.get("artist") and h.get("title") and h.get("video_id")]
+                  if isinstance(h, dict) and h.get("artist") and h.get("title") and h.get("video_id")
+                  and not _is_placeholder_artist(h["artist"])]
     print(f"{len(candidates)} entrée(s) exploitable(s) dans l'historique RECOS "
           f"(sur {len(history)} au total).")
 
@@ -111,8 +126,11 @@ def main():
             continue
         out_cases.append({
             "id": case_id, "artist": h["artist"], "title": h["title"], "label": "",
-            "query": query, "expect": "match", "expected_video_id": h["video_id"],
-            "comment": "capturé depuis recos_playlist_history.json (non-régression)",
+            "query": query, "expect": "quality", "kind": "floor",
+            "historical_video_id": h["video_id"],
+            "comment": ("capturé depuis recos_playlist_history.json ; "
+                        "historical_video_id est indicatif (choix du jour de l'ajout), "
+                        "pas une vérité terrain"),
         })
         existing_ids.add(case_id)
         n_captured += 1

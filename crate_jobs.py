@@ -2556,6 +2556,75 @@ def job_publish_recos(job, params):
                f"{len(remaining)} en attente.{origin}{note}")
 
 
+def job_seller_inventory(job, params):
+    """Snapshot EXHAUSTIF du stock « For Sale » d'UN vendeur Discogs nommé à la
+    volée depuis /search (demande utilisateur 2026-09-19, point 68 de CLAUDE.md).
+
+    Pourquoi un job et pas un appel dans la requête HTTP : l'inventaire Discogs
+    se lit 100 articles par page, cadencé à 1,1 s (60 requêtes/min côté
+    Discogs). Un disquaire comme hhv a des dizaines de milliers d'articles, donc
+    plusieurs minutes de pagination — au-delà de ce que tient une requête web, et
+    la page de résultats n'a pas à rester bloquée dessus. Le snapshot est ensuite
+    relu instantanément par /search, qui y applique ses filtres sur la TOTALITÉ
+    du stock au lieu d'un échantillon.
+
+    Écrit au même endroit et au même format que `scan_catalog`
+    (`radar/sellers.py`, `seller_inventory/<vendeur>.json`) : les deux jobs se
+    servent mutuellement leurs snapshots. La pagination, elle, n'est pas
+    factorisée avec celle de `scan_catalog` — cette dernière est enchevêtrée
+    dans la tenue du catalogue (compteur d'échecs, désactivation d'un compte
+    injoignable) d'une fonctionnalité en pause depuis le point 56, que ce lot
+    ne touche pas.
+
+    `max_pages` (défaut 0 = pas de plafond) borne la pagination pour un essai
+    rapide. Un arrêt demandé (bouton « arrêter ») coupe proprement : le snapshot
+    partiel n'est enregistré que s'il n'y en avait aucun, pour ne jamais
+    remplacer un inventaire complet par un morceau."""
+    from radar_web.radar import discogs as dgs
+    from radar_web.radar import sellers as scat
+
+    seller = (params.get("seller") or "").strip().lstrip("@")
+    if not seller:
+        return job.finish(error="Aucun vendeur indiqué — ce job se lance depuis "
+                                "« Chercher un disque » (champ Vendeur Discogs).")
+    token = cfg_load().get("token", "")
+    if not token:
+        return job.finish(error="Pas de token Discogs (Mon profil → Discogs).")
+    max_pages = int(params.get("max_pages", 0) or 0)
+    job.msg(f"{seller} : lecture du stock en vente…")
+
+    def _on_page(n_items, page, pages):
+        job.tick(f"{seller} : page {page}/{pages} · {n_items} article(s) lus", total=pages)
+        job.sub(done=n_items, label=f"{seller} — articles lus")
+        return not job.stopped()
+
+    try:
+        listings, truncated = dgs.seller_inventory(seller, token=token,
+                                                   max_pages=max_pages, on_page=_on_page)
+    except dgs.DiscogsError as e:
+        return job.finish(error=f"Vendeur « {seller} » : {e}")
+
+    snap = {}
+    for it in listings:
+        rid = it.get("release_id")
+        if not rid:
+            continue
+        snap[str(rid)] = {k: it.get(k) for k in
+                          ("listing_id", "price", "currency", "condition",
+                           "sleeve", "listed", "artist", "format", "title")}
+    if truncated and scat.load_inventory(seller):
+        return job.finish(f"{seller} : lecture interrompue à {len(snap)} disque(s) — "
+                          "l'inventaire complet déjà enregistré est conservé.")
+    scat.save_inventory(seller, snap)
+    scat.set_inv_meta(seller, {
+        "fetched_at": datetime.now().isoformat(timespec="seconds"),
+        "n_items": len(snap), "n_listings": len(listings),
+        "n_pages": job.st.get("done", 0), "partial": bool(truncated)})
+    suffix = " (lecture interrompue : stock incomplet)" if truncated else ""
+    return job.finish(f"{seller} : {len(snap)} disque(s) en vente sur "
+                      f"{len(listings)} annonce(s).{suffix}")
+
+
 def job_scan_catalog(job, params):
     """Parcourt le catalogue partagé de vendeurs Discogs (radar/sellers.py) :
     vérifie chaque compte, prend un snapshot de son inventaire « For Sale »
@@ -3306,6 +3375,7 @@ def job_reco_index(job, params):
 
 
 JOBS = {
+    "seller_inventory": job_seller_inventory,
     "scan_catalog": job_scan_catalog,
     "import_discogs_dump": job_import_discogs_dump,
     "build_catalog_labelgraph": job_build_catalog_labelgraph,

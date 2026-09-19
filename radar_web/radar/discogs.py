@@ -65,11 +65,21 @@ def remove_from_wantlist(token, username, release_id):
     delete(f"/users/{username}/wants/{release_id}", token=token)
 
 
-def seller_inventory(username, token="", max_pages=10, per_page=100):
+def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=None):
     """([{release_id, price, currency, condition, sleeve, artist, format, listing_id}],
     tronque) — articles « For Sale » d'un vendeur, pagination suivie jusqu'à
     `max_pages`. `tronque` dit que le vendeur a encore du stock au-delà, pour que
     l'appelant puisse le signaler au lieu de laisser croire à un inventaire complet.
+
+    `max_pages=0` retire le plafond : TOUT le stock, quel que soit le nombre de
+    pages (demande utilisateur 2026-09-19, cf. point 68 de CLAUDE.md). Compter
+    ~100 articles et 1,1 s par page — un gros disquaire prend plusieurs minutes,
+    d'où le job de fond `seller_inventory` plutôt qu'un appel dans une requête
+    HTTP.
+
+    `on_page(n_items, page, pages)` est appelé après chaque page, pour
+    l'avancement ; renvoyer `False` interrompt la pagination proprement (bouton
+    « arrêter » du job) et marque le résultat comme tronqué.
 
     Un compte inconnu ou sans boutique lève `DiscogsError` via `_check` (404) —
     pas de retour vide silencieux, l'utilisateur doit savoir qu'il s'est trompé de
@@ -82,7 +92,7 @@ def seller_inventory(username, token="", max_pages=10, per_page=100):
     nomme un vendeur à la volée et veut son stock du moment, pas un instantané
     daté d'un scan de fond."""
     out, page = [], 1
-    while page <= max_pages:
+    while not max_pages or page <= max_pages:
         d = get(f"/users/{username}/inventory",
                 {"status": "For Sale", "per_page": per_page, "page": page,
                  "sort": "listed", "sort_order": "desc"}, token=token)
@@ -96,9 +106,13 @@ def seller_inventory(username, token="", max_pages=10, per_page=100):
                         "price": pr.get("value"), "currency": pr.get("currency"),
                         "condition": x.get("condition"),
                         "sleeve": x.get("sleeve_condition"),
+                        "listed": x.get("posted"),
                         "artist": rel.get("artist"), "format": rel.get("format"),
                         "title": rel.get("title")})
-        if page >= d.get("pagination", {}).get("pages", 1):
+        pages = d.get("pagination", {}).get("pages", 1)
+        if on_page and on_page(len(out), page, pages) is False:
+            return out, page < pages
+        if page >= pages:
             return out, False
         page += 1
         time.sleep(1.1)                   # 60 requêtes/min côté Discogs

@@ -5,12 +5,20 @@
   top_styles}} — donnée publique, mutualisée. `note`/`n_matched`/`top_styles`
   sont calculés par `seller_affinity()` à partir du goût du propriétaire.
 - `seller_inventory/<username>.json` : {release_id: {listing_id, price, currency,
-  condition, sleeve, listed, artist, format}} — snapshot « For Sale » du dernier
-  scan. `artist`/`format` viennent gratuitement de l'inventaire Discogs (pas
-  d'appel supplémentaire).
+  condition, sleeve, listed, artist, format, title}} — snapshot « For Sale » du
+  dernier scan. `artist`/`format`/`title` viennent gratuitement de l'inventaire
+  Discogs (pas d'appel supplémentaire).
+- `seller_inventory_meta.json` : {username: {fetched_at, n_items, n_listings,
+  n_pages, partial}} — fraîcheur des snapshots, dans un fichier À PART pour ne
+  pas polluer le format ci-dessus (même motif que `catalog_labelgraph_meta.json`)
+  et hors de `seller_inventory/` pour qu'aucun nom de vendeur ne puisse le
+  percuter.
 
-Aucun appel API ici : la lecture est instantanée. Le remplissage se fait par le
-job `scan_catalog` (crate_jobs.py).
+Aucun appel API ici : la lecture est instantanée. DEUX jobs remplissent ces
+fichiers (crate_jobs.py) : `scan_catalog` (catalogue de vendeurs, en pause
+depuis le point 56) et `seller_inventory` (un vendeur nommé à la volée depuis
+/search, point 68) — même format, donc un snapshot écrit par l'un sert à
+l'autre.
 """
 import os
 
@@ -110,6 +118,23 @@ def load_inventory(username):
 
 def save_inventory(username, data):
     save(inv_file(username), data, indent=None)
+
+
+INV_META_PATH = os.path.join(paths.SHARED_DIR, "seller_inventory_meta.json")
+
+
+def inv_meta(username):
+    """{fetched_at, n_items, n_listings, n_pages, partial} du dernier snapshot,
+    ou {} si ce vendeur n'a jamais été lu. `partial` : pagination interrompue
+    (arrêt demandé ou plafond atteint) — le snapshot ne couvre alors pas tout
+    le stock et /search le dit au lieu de le laisser croire."""
+    return (load(INV_META_PATH, {}) or {}).get(username) or {}
+
+
+def set_inv_meta(username, entry):
+    d = load(INV_META_PATH, {}) or {}
+    d[username] = entry
+    save(INV_META_PATH, d)
 
 
 INDEX_PATH = os.path.join(paths.SHARED_DIR, "seller_index.json")

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "vid_alkalino_official",
+      "snippet": {
+        "title": "Alkalino - Meccano",
+        "channelTitle": "Alkalino",
+        "description": "Official upload from Aquasonic label"
+      },
+      "status": {"uploadStatus": "processed", "privacyStatus": "public"}
+    },
+    {
+      "id": "vid_random_unrelated",
+      "snippet": {
+        "title": "Totally Different Track",
+        "channelTitle": "RandomChannel",
+        "description": "no relation"
+      },
+      "status": {"uploadStatus": "processed", "privacyStatus": "public"}
+    }
+  ]
+}

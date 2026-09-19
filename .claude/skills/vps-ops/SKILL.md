@@ -50,12 +50,18 @@ s'est élargi le 17/09.
 
 ## Interdits (aucune exception)
 
-- **Ne jamais modifier le code de l'appli.** `~/radar` est en lecture seule.
-  `git pull` pour lire la version déployée : oui. Commit, push, checkout
-  d'une autre branche, édition d'un fichier : non — tout changement de code
-  passe par la session cloud, via PR. **Une seule exception, ajoutée le
-  18/09** : les drapeaux `RADAR_*` du `.env` (section dédiée plus bas). Elle
-  ne s'étend à aucun autre fichier du dépôt.
+- **Ne jamais écrire dans `~/radar`.** C'est le checkout que Docker fait
+  tourner : y toucher, c'est modifier la production en direct. `git pull`
+  pour lire la version déployée : oui. Commit, push, checkout d'une autre
+  branche, édition d'un fichier : non. **Deux exceptions, chacune avec sa
+  section plus bas, et aucune ne porte sur ce répertoire au-delà de ce qu'elle
+  dit** :
+    1. les drapeaux `RADAR_*` du `.env` (18/09) — le seul fichier de `~/radar`
+       que tu modifies jamais ;
+    2. la boucle d'amélioration d'un script (19/09) — et elle travaille dans
+       un clone SÉPARÉ, `~/radar-work`, précisément pour ne pas toucher à
+       celui-ci.
+  Hors de ces deux cas, tout changement de code passe par la session cloud.
 - **Ne jamais écrire dans `/data` à la main.** Ouvrir SQLite en lecture
   seule (`sqlite3.connect("file:...?mode=ro", uri=True)`), lire les JSON,
   jamais écrire/déplacer/supprimer toi-même (édition directe d'un fichier,
@@ -165,6 +171,71 @@ Conditions, à chaque modification :
 - **Rien d'autre dans `~/radar`.** Cette exception porte sur les lignes
   `RADAR_*` autorisées du `.env`, point. Aucun autre fichier, jamais de
   commit, et jamais un `git pull` destiné à écraser un état local.
+
+## Boucle d'amélioration d'un script — élargi le 19/09
+
+Tu peux désormais mener la boucle complète sur un script : observer sa
+production, diagnostiquer ses échecs, **corriger son code**, remesurer, et
+ouvrir la PR. C'est le 3ᵉ élargissement de ce contrat, demandé explicitement
+par l'utilisateur.
+
+**Ce qui n'a pas bougé d'un millimètre : `~/radar` reste en lecture seule.**
+C'est le checkout que Docker fait tourner — y écrire, c'est modifier la
+production en direct. La garantie « on ne touche pas la prod » vient du
+RÉPERTOIRE, pas du dépôt.
+
+### Où tu travailles : `~/radar-work`
+
+Un **second clone du dépôt `radar`**, entièrement distinct du checkout de
+production :
+
+```
+git clone <url radar> ~/radar-work          # une seule fois
+cd ~/radar-work && git fetch origin main && git checkout -B loop/<script>-<AAAA-MM-DD> origin/main
+```
+
+Jamais de conteneur là-dedans, jamais de `docker compose` pointant dessus,
+jamais de `/data` monté dessus. C'est un atelier, pas un déploiement.
+
+**Prérequis à vérifier une fois** (même nature que la clé `radar-diag` du
+18/09) : pousser une branche sur `radar` demande une clé de déploiement en
+ÉCRITURE sur ce dépôt. Celle qui sert au `git pull` de production peut être
+en lecture seule — dans ce cas `git push` échoue, et c'est à l'utilisateur
+d'ouvrir le droit, pas à toi de contourner. Dis-le en une ligne et arrête-toi.
+
+### Le déroulé
+
+Il est écrit une seule fois, dans `.claude/skills/script-loop/SKILL.md` —
+suis-le tel quel, en remplaçant simplement « session cloud » par toi et le
+dépôt de travail par `~/radar-work`. Le résumé : récupérer le lot
+d'observations, lancer l'agent `script-doctor`, transformer chaque défaut en
+cas de banc **qui doit échouer avant le correctif**, corriger une finding à
+la fois, remesurer avec `scripts/loop/bench.py`, ouvrir la PR avec l'état des
+cinq portes.
+
+### Tes limites, sur ce périmètre
+
+- **Le périmètre `touchable`** de `scripts/loop/registry.json` pour le script
+  visé, et rien d'autre. Un correctif qui déborde sort du cadre : tu le
+  décris dans la PR et tu laisses l'utilisateur trancher, tu ne l'appliques
+  pas.
+- **Une branche `loop/<script>-<date>`**, jamais un commit direct sur `main`,
+  jamais une branche d'un autre chantier.
+- **Éviter les deux mains sur le même code** — la raison d'être historique de
+  la séparation. La règle qui la remplace ici : tant qu'une PR de boucle est
+  ouverte sur un script, la session cloud ne touche pas aux fichiers de son
+  `touchable`, et réciproquement. Avant de commencer, regarde s'il existe
+  déjà une PR ouverte sur ce script ; si oui, ne démarre pas une seconde
+  boucle dessus.
+- **Le merge reste une décision humaine.** Merger sur `main` déclenche le
+  déploiement en production (`deploy.yml`) : c'est le dernier point où
+  quelqu'un peut encore dire non à du code écrit par un agent, et le banc ne
+  couvre qu'un chemin du script sur les cas collectés. Tu vas jusqu'à la PR,
+  tu écris l'état des cinq portes, tu t'arrêtes là et tu le dis.
+- **Rien de tout ça ne s'applique hors boucle.** Une correction que tu juges
+  évidente mais qui ne sort pas d'un lot d'observations, avec un cas de banc
+  qui échoue avant elle, ne passe pas par ici : elle se demande à la session
+  cloud, comme avant.
 
 ## Ton outillage : `~/radar-diag/`
 

@@ -40,6 +40,46 @@ def overlap(want, cand):
     return len(want & cand) / len(want)
 
 
+def _edit_distance(a, b):
+    la, lb = len(a), len(b)
+    dp = list(range(lb + 1))
+    for i in range(1, la + 1):
+        prev, dp[0] = dp[0], i
+        for j in range(1, lb + 1):
+            dp[j], prev = min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] != b[j - 1])), dp[j]
+    return dp[lb]
+
+
+def close_enough(a, b, max_dist=1):
+    """`a` et `b` diffèrent d'au plus `max_dist` opérations (insertion,
+    suppression, substitution) ? Coupe-circuit rapide sur la différence de
+    longueur avant de calculer la distance complète."""
+    if a == b:
+        return True
+    if abs(len(a) - len(b)) > max_dist:
+        return False
+    return _edit_distance(a, b) <= max_dist
+
+
+def overlap_fuzzy(want, cand, max_dist=1, min_len=5):
+    """Comme `overlap`, mais tolère une faute de frappe (`close_enough`) sur les
+    jetons de `min_len` caractères ou plus. Volontairement séparée d'`overlap` :
+    un jeton court (« dub », « mix ») a trop de voisins à distance 1 pour que la
+    tolérance reste sûre — réservée à un appelant qui la restreint déjà à un
+    contexte précis (ex. un titre réduit à un seul jeton, où aucun autre signal
+    ne peut se substituer à une orthographe exacte)."""
+    if not want or not cand:
+        return 0.0
+    matched = 0
+    for w in want:
+        if w in cand:
+            matched += 1
+        elif len(w) >= min_len and any(
+                len(c) >= min_len and close_enough(w, c, max_dist) for c in cand):
+            matched += 1
+    return matched / len(want)
+
+
 # Seuil de recouvrement (artiste+titre vs titre de la vidéo) au-dessus duquel une
 # vidéo attachée à une sortie Discogs est considérée comme étant CETTE piste.
 # Valeur d'origine de la tracklist de /search (bouton play), reprise telle

@@ -13,7 +13,7 @@ import time
 import requests
 
 from . import paths, store
-from .textmatch import overlap, toks
+from .textmatch import overlap, overlap_fuzzy, toks
 
 CACHE_PATH = os.path.join(paths.SHARED_DIR, "youtube_cache.json")
 API = "https://www.googleapis.com/youtube/v3"
@@ -438,7 +438,17 @@ def _best_match(ids, query, artist, title, label, keys):
         # la pénalité, pas les deux ensemble.
         gate_pens = []
         if t_toks and overlap(t_toks, vt_toks | desc_toks) < 0.4:
-            gate_pens.append(0.5)
+            # `_strip_parens` peut réduire le titre à 1-2 jetons : sans autre
+            # mot pour se rattraper, la moindre faute de frappe côté YouTube
+            # (apostrophe, lettre doublée) fait chuter `overlap` à 0.0 pile sur
+            # un match par ailleurs correct (diagnostic 2026-09-19, cas réel
+            # « Stepin' » vs « Steppin' »). Tolérance bornée à ce cas précis :
+            # jamais sur un titre à 3 jetons ou plus, qui a d'autres mots pour
+            # prouver le match sans avoir besoin de cette marge.
+            if len(t_toks) <= 2 and overlap_fuzzy(t_toks, vt_toks | desc_toks) >= 0.4:
+                pass
+            else:
+                gate_pens.append(0.5)
         if a_toks and overlap(a_toks, cand_wide) < 0.4:
             gate_pens.append(0.5)
         if gate_pens:

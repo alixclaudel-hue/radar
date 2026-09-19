@@ -22,6 +22,17 @@
     "kind": "adversarial"
   },
   {
+    "id": "fabiano_jose_stepin_typo",
+    "comment": "Titre réduit à un seul jeton par _strip_parens (« Stepin' » une fois « (Final Cut) » retiré) : une faute de frappe côté YouTube (« Steppin' », deux p) fait tomber le recouvrement de titre à 0.0 exactement, sans tolérance. Match confirmé correct par audit humain (observations/ytcache/2026-09-19T144936Z/audit_publies.json), déjà publié via le raccourci vidéo-Discogs qui ne passe pas par ce chemin — mais tomberait dans ce trou en recherche pure. Diagnostic : docs/diagnostics/ytcache-2026-09-19.md, finding F1.",
+    "artist": "Fabiano José",
+    "title": "Stepin' (Final Cut)",
+    "label": "",
+    "query": "Fabiano José Stepin' (Final Cut)",
+    "expect": "match",
+    "expected_video_id": "04usPwzy9Cw",
+    "kind": "adversarial"
+  },
+  {
     "id": "no_match_below_threshold",
     "comment": "Aucun résultat ne recoupe vraiment artiste+titre : mieux vaut aucune vidéo qu'une mauvaise (pt _best_match, repli permissif supprimé).",
     "artist": "Candi Staton",

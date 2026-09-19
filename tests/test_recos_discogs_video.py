@@ -65,6 +65,63 @@ class BestVideoUriTestCase(unittest.TestCase):
         self.assertEqual(textmatch.best_video_uri(vids, "Inland Knights", "12 Till 8"), "")
 
 
+class BestVideoUriDiscogsPathTestCase(unittest.TestCase):
+    """Chemin « vidéo Discogs » (`min_overlap=0`) : diagnostic VPS 2026-09-18,
+    brief `ece05850-brief-video-discogs-seuil-2026-09-18.md`. Les vidéos
+    examinées sont déjà rattachées à la bonne sortie donc au bon artiste — le
+    seuil global (qui compare artiste+titre) rejetait à tort la majorité des
+    vidéos correctes, l'uploadeur ne répétant presque jamais l'artiste dans le
+    titre. Cas réels mesurés en prod (4 premiers cas ci-dessous)."""
+
+    def test_video_qui_ne_repete_pas_l_artiste_matche(self):
+        vids = [{"uri": "https://youtu.be/right-now", "title": "Right Now"}]
+        self.assertEqual(
+            textmatch.best_video_uri(vids, "Inland Knights", "Right Now", min_overlap=0),
+            "https://youtu.be/right-now")
+
+    def test_video_avec_nom_de_label_a_la_place_de_l_artiste_matche(self):
+        vids = [{"uri": "https://youtu.be/believe",
+                 "title": "Filter Interference – Believe (DRM009)"}]
+        self.assertEqual(
+            textmatch.best_video_uri(vids, "Inland Knights", "Believe", min_overlap=0),
+            "https://youtu.be/believe")
+
+    def test_video_avec_alias_a_la_place_de_l_artiste_matche(self):
+        vids = [{"uri": "https://youtu.be/blacklands",
+                 "title": "Beats Pacific (Toka Project) - Blacklands"}]
+        self.assertEqual(
+            textmatch.best_video_uri(vids, "Inland Knights", "Blacklands", min_overlap=0),
+            "https://youtu.be/blacklands")
+
+    def test_non_regression_video_d_une_autre_piste_toujours_rejetee(self):
+        """Désactiver le seuil global ne doit pas réintroduire le défaut du pt 64 :
+        une vidéo qui ne couvre pas le TITRE de la piste demandée reste rejetée."""
+        self.assertEqual(
+            textmatch.best_video_uri(VIDEOS, "Inland Knights", "Inconnue", min_overlap=0), "")
+
+    def test_dub_ne_gagne_pas_face_a_la_version_originale(self):
+        vids = [
+            {"uri": "https://youtu.be/orig", "title": "Believe"},
+            {"uri": "https://youtu.be/dub", "title": "Believe (Dub)"},
+        ]
+        self.assertEqual(
+            textmatch.best_video_uri(vids, "Inland Knights", "Believe (Dub)", min_overlap=0),
+            "https://youtu.be/dub")
+
+    def test_dub_absent_ne_retombe_pas_sur_la_version_originale(self):
+        vids = [{"uri": "https://youtu.be/orig", "title": "Believe"}]
+        self.assertEqual(
+            textmatch.best_video_uri(vids, "Inland Knights", "Believe (Dub)", min_overlap=0), "")
+
+    def test_originale_n_herite_pas_de_la_video_dub(self):
+        """Risque inverse signalé dans le brief : `overlap` est asymétrique, une
+        piste SANS suffixe ne doit pas hériter d'une vidéo qui EN porte un que
+        son propre titre ne contient pas, même faute d'alternative."""
+        vids = [{"uri": "https://youtu.be/dub", "title": "Believe (Dub)"}]
+        self.assertEqual(
+            textmatch.best_video_uri(vids, "Inland Knights", "Believe", min_overlap=0), "")
+
+
 class YoutubeIdTestCase(unittest.TestCase):
     def test_graphies_reconnues(self):
         for url in ("https://www.youtube.com/watch?v=dQw4w9WgXcQ",

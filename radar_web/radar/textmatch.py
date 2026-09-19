@@ -40,31 +40,59 @@ def overlap(want, cand):
     return len(want & cand) / len(want)
 
 
-# Seuil de recouvrement au-dessus duquel une vidéo attachée à une sortie Discogs
-# est considérée comme étant CETTE piste. Valeur d'origine de la tracklist de
-# /search (bouton play), reprise telle quelle par la playlist RECOS RADAR : une
-# vidéo mal appariée est pire que pas de vidéo (même principe que
-# ytcache.MIN_MATCH_SCORE).
+# Seuil de recouvrement (artiste+titre vs titre de la vidéo) au-dessus duquel une
+# vidéo attachée à une sortie Discogs est considérée comme étant CETTE piste.
+# Valeur d'origine de la tracklist de /search (bouton play), reprise telle
+# quelle par la playlist RECOS RADAR : une vidéo mal appariée est pire que pas
+# de vidéo (même principe que ytcache.MIN_MATCH_SCORE). Les DEUX appelants
+# actuels de `best_video_uri` (`app.py::tracklist`, `crate_jobs.py::
+# _discogs_release_video`) passent `min_overlap=0` pour le DÉSACTIVER — cf.
+# note sous `best_video_uri` — il ne reste donc utile qu'à un futur appelant
+# qui comparerait des vidéos non garanties déjà rattachées à la bonne sortie
+# (ex. un résultat de recherche YouTube), là où l'artiste redevient le seul
+# signal qui distingue un homonyme.
 VIDEO_MATCH_MIN = 0.55
-# Le titre de la PISTE doit être couvert à lui seul, en plus du recouplement
-# global : une sortie porte une poignée de vidéos pour des pistes différentes,
-# toutes du même artiste. Sans cette seconde condition, « Inland Knights —
-# Inconnue » repassait le seuil global face à la vidéo « Inland Knights — 12
-# Till 8 » (2 jetons partagés sur 3) et héritait de la vidéo d'une AUTRE piste.
-VIDEO_TITLE_MATCH_MIN = 0.5
+# Le titre de la PISTE doit être couvert à lui seul : une sortie porte une
+# poignée de vidéos pour des pistes différentes, toutes du même artiste. Sans
+# cette condition, « Inland Knights — Inconnue » matchait la vidéo « Inland
+# Knights — 12 Till 8 » (2 jetons partagés sur 3, tous venant de l'artiste) et
+# héritait de la vidéo d'une AUTRE piste. Relevé de 0.5 à 0.6 (diagnostic VPS
+# 2026-09-18) pour compenser la désactivation de VIDEO_MATCH_MIN ci-dessus :
+# c'est désormais la SEULE barrière contre un homonyme de piste.
+VIDEO_TITLE_MATCH_MIN = 0.6
+# Jetons qui signalent une version DIFFÉRENTE de la piste demandée (remix, dub,
+# edit…). Une vidéo qui en porte un que le titre de la piste ne contient pas
+# ne doit jamais l'emporter, même si elle couvre le titre à 100% — sinon une
+# piste "Believe" hérite de la vidéo "Believe (Dub)" faute d'alternative
+# (`overlap` est asymétrique : les jetons EN TROP de la vidéo ne pénalisent pas
+# la couverture). Diagnostic VPS 2026-09-18, garde-fou explicite plutôt que de
+# compter sur le hasard d'un seuil.
+_VERSION_MARKER_TOKENS = {"dub", "remix", "instrumental", "edit", "live"}
 
 
 def best_video_uri(videos, artist, title, min_overlap=VIDEO_MATCH_MIN,
                     min_title_overlap=VIDEO_TITLE_MATCH_MIN):
     """URL de la vidéo qui correspond le mieux à `artist` + `title` parmi les
     vidéos attachées à une sortie Discogs (`release["videos"]`), ou "" si aucune
-    ne satisfait les deux seuils.
+    ne satisfait les seuils.
 
     Partagé par la tracklist de /search (bouton play) et par la playlist RECOS
     RADAR, qui cherchent la même chose : Discogs a-t-il déjà la vidéo de cette
     piste, avant de dépenser une recherche YouTube ? Les entrées sans `uri` sont
     ignorées, une liste vide ou `None` renvoie "". Un titre vide ne peut rien
-    apparier : sans titre, rien ne distingue les pistes d'une même sortie."""
+    apparier : sans titre, rien ne distingue les pistes d'une même sortie.
+
+    `min_overlap=0` désactive le seuil global (diagnostic VPS 2026-09-18) : les
+    vidéos examinées sont déjà rattachées à LA bonne sortie, donc au bon
+    artiste — l'uploadeur répète rarement le nom de l'artiste dans le titre
+    (la page Discogs le porte déjà), parfois le remplace par le label ou un
+    alias, ce qui plafonnait mécaniquement le recouvrement global bien en
+    dessous de VIDEO_MATCH_MIN pour des vidéos par ailleurs parfaites (mesuré :
+    7 sorties sur 7 rejetées à tort sur un échantillon réel). Le nom de
+    l'artiste n'apporte donc rien sur ce chemin, seule la couverture du titre
+    de la piste (`min_title_overlap`) et le garde-fou version ci-dessous
+    protègent contre un mauvais appariement."""
+    a_toks = toks(artist)
     want = toks(f"{artist or ''} {title or ''}")
     t_toks = toks(title)
     best, best_sc = "", 0.0
@@ -74,6 +102,8 @@ def best_video_uri(videos, artist, title, min_overlap=VIDEO_MATCH_MIN,
             continue
         v_toks = toks(v.get("title"))
         if overlap(t_toks, v_toks) < min_title_overlap:
+            continue
+        if (v_toks - t_toks - a_toks) & _VERSION_MARKER_TOKENS:
             continue
         sc = overlap(want, v_toks)
         if sc > best_sc:

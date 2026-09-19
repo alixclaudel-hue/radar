@@ -10,14 +10,15 @@ Un cas = tests/fixtures/ytcache/cases.json (artist/title/label/query,
 expect="match"+expected_video_id ou expect="no_match") + un dossier du même
 nom contenant les 2 réponses API brutes pour ce cas.
 
-Pour ajouter un cas depuis une vraie recherche (sur le VPS, avec un vrai
-token) : capturer les JSON bruts de /search et /videos pour la requête, les
-déposer dans un nouveau dossier, ajouter l'entrée dans cases.json.
+Pour ajouter un cas depuis une vraie recherche : scripts/capture_ytcache_fixtures.py
+(sur le VPS, avec un vrai token) les capture dans un dossier séparé — --fixtures-dir
+permet de les rejouer ici avant même de les intégrer au dépôt.
 
-Usage : python scripts/bench_ytcache.py [-v]
+Usage : python scripts/bench_ytcache.py [-v] [--fixtures-dir DIR]
 Sortie : code 0 si tous les cas passent, 1 sinon (utilisable par un agent en
 boucle pour décider si une modification de ytcache.py est une régression).
 """
+import argparse
 import json
 import os
 import sys
@@ -25,7 +26,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
-FIXTURES = os.path.join(REPO, "tests", "fixtures", "ytcache")
+FIXTURES = os.path.join(REPO, "tests", "fixtures", "ytcache")  # défaut, cf. main()
 
 # Isolé de /data réel avant tout import de radar_web (paths.py fixe DATA et
 # crée des dossiers à l'import) — un banc de mesure ne doit jamais lire ni
@@ -85,9 +86,16 @@ def run_case(case, verbose=False):
 
 
 def main():
-    verbose = "-v" in sys.argv[1:]
+    global FIXTURES
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("-v", action="store_true", help="détail de chaque cas, pas seulement les échecs")
+    ap.add_argument("--fixtures-dir", default=FIXTURES,
+                     help="dossier de fixtures à rejouer (défaut : tests/fixtures/ytcache/ du dépôt)")
+    args = ap.parse_args()
+    FIXTURES = os.path.abspath(os.path.expanduser(args.fixtures_dir))
+
     cases = json.load(open(os.path.join(FIXTURES, "cases.json"), encoding="utf-8"))
-    results = [(c["id"], run_case(c, verbose)) for c in cases]
+    results = [(c["id"], run_case(c, args.v)) for c in cases]
     n_ok = sum(1 for _, ok in results if ok)
     print(f"\n{n_ok}/{len(results)} cas passés ({100 * n_ok / len(results):.0f}%)")
     return 0 if n_ok == len(results) else 1

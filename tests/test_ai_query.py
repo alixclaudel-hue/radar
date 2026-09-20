@@ -26,11 +26,31 @@ def _fake_urlopen_cm(payload):
 
 class QueryGeminiTests(unittest.TestCase):
 
-    def test_missing_api_key_raises(self):
+    @patch("urllib.request.urlopen")
+    def test_sans_cle_locale_url_ne_contient_pas_key(self, mock_urlopen):
+        """Sans clé, la requête part quand même (sans `?key=`) : c'est la
+        session cloud (proxy réseau + identifiant `x-goog-api-key` configuré
+        côté environnement) qui s'authentifie au niveau transport, invisible
+        d'ici -- cf. `.claude/skills/ask-gemini/SKILL.md`."""
+        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
         with patch.dict("os.environ", {}, clear=True):
-            with self.assertRaises(ValueError) as ctx:
+            query_gemini("Bonjour", api_key=None)
+        req = mock_urlopen.call_args[0][0]
+        self.assertNotIn("key=", req.full_url)
+        self.assertTrue(req.full_url.endswith(":generateContent"))
+
+    @patch("urllib.request.urlopen")
+    def test_sans_cle_ni_identifiant_reseau_erreur_gemini_explicite(self, mock_urlopen):
+        body = json.dumps(
+            {"error": {"message": "API key not valid. Please pass a valid API key."}}
+        ).encode("utf-8")
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            "http://x", 400, "Bad Request", None, io.BytesIO(body))
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(RuntimeError) as ctx:
                 query_gemini("Bonjour", api_key=None)
-            self.assertIn("GEMINI_API_KEY manquante", str(ctx.exception))
+        self.assertIn("API key not valid", str(ctx.exception))
+        self.assertIn("identifiant réseau", str(ctx.exception))
 
     @patch("urllib.request.urlopen")
     def test_query_gemini_success(self, mock_urlopen):

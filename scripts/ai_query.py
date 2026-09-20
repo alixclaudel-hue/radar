@@ -13,10 +13,8 @@ import sys
 import urllib.error
 import urllib.request
 
-DEFAULT_MODEL = "gemini-2.0-flash"
-API_URL_TEMPLATE = (
-    "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-)
+DEFAULT_MODEL = "gemini-3.6-flash"
+BASE_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
 def query_gemini(
@@ -27,14 +25,19 @@ def query_gemini(
     temperature: float = 0.2,
     timeout: int = 60,
 ) -> str:
-    """Envoie une requête à l'API Gemini et renvoie le texte généré."""
-    key = api_key or os.getenv("GEMINI_API_KEY")
-    if not key:
-        raise ValueError(
-            "GEMINI_API_KEY manquante. Définis la variable d'environnement GEMINI_API_KEY."
-        )
+    """Envoie une requête à l'API Gemini et renvoie le texte généré.
 
-    url = API_URL_TEMPLATE.format(model=model, key=key)
+    Sans clé locale (`api_key`/`GEMINI_API_KEY` absents), la requête part
+    quand même sans `?key=` : une session cloud avec un identifiant réseau
+    configuré sur ce domaine (en-tête `x-goog-api-key` injecté par le proxy
+    de l'environnement) s'authentifie au niveau transport, invisible d'ici.
+    Sans clé locale ni identifiant réseau, Gemini répond avec une erreur
+    d'authentification explicite (capturée plus bas).
+    """
+    key = api_key or os.getenv("GEMINI_API_KEY")
+    url = BASE_URL_TEMPLATE.format(model=model)
+    if key:
+        url += f"?key={key}"
 
     payload: dict = {
         "contents": [
@@ -77,7 +80,11 @@ def query_gemini(
             msg = err_json.get("error", {}).get("message", err_body)
         except Exception:
             msg = err_body
-        raise RuntimeError(f"Erreur API Gemini ({e.code}) : {msg}") from e
+        hint = "" if key else (
+            " (aucune clé locale : vérifie GEMINI_API_KEY, ou l'identifiant "
+            "réseau configuré pour generativelanguage.googleapis.com)"
+        )
+        raise RuntimeError(f"Erreur API Gemini ({e.code}) : {msg}{hint}") from e
     except urllib.error.URLError as e:
         raise RuntimeError(f"Erreur réseau Gemini : {e.reason}") from e
 

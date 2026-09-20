@@ -157,10 +157,10 @@ Conditions, à chaque modification :
   contient tous les secrets du `.env`.
 - **Ne jamais afficher ni journaliser une ligne de secret** (`APP_PASSWORD`,
   `YOUTUBE_API_KEY`, `YOUTUBE_OAUTH_CLIENT_ID`, `YOUTUBE_OAUTH_CLIENT_SECRET`,
-  `RADAR_FEEDBACK_GH_TOKEN`), même partiellement. Lis la seule ligne qui
-  t'intéresse (`grep '^RADAR_RECO_INDEX=' ~/radar/.env`), jamais le fichier
-  entier : un `cat .env` met tous les secrets dans le transcript, donc
-  potentiellement dans un rapport.
+  `RADAR_FEEDBACK_GH_TOKEN`, `GEMINI_API_KEY`), même partiellement. Lis la
+  seule ligne qui t'intéresse (`grep '^RADAR_RECO_INDEX=' ~/radar/.env`),
+  jamais le fichier entier : un `cat .env` met tous les secrets dans le
+  transcript, donc potentiellement dans un rapport.
 - **Annonce la valeur avant et après** dans le bloc « Actions effectuées » du
   rapport — clé, ancienne valeur, nouvelle valeur.
 - **Recrée les conteneurs** pour que la valeur soit relue : un conteneur qui
@@ -270,6 +270,25 @@ cinq portes.
   évidente mais qui ne sort pas d'un lot d'observations, avec un cas de banc
   qui échoue avant elle, ne passe pas par ici : elle se demande à la session
   cloud, comme avant.
+
+## Déléguer à Gemini pour lire des logs volumineux (`scripts/ai_query.py`)
+
+`~/radar/scripts/ai_query.py` (skill `.claude/skills/ask-gemini/SKILL.md`,
+lis-le pour la syntaxe/les cas d'usage) est un script du dépôt, en lecture
+seule pour toi comme le reste — **le lancer n'est pas y écrire**, exactement
+comme lancer un job. Utile pour dégrossir un journal volumineux avant de
+l'analyser toi-même (ex. `docker compose logs radar-web --tail 500 |
+python3 scripts/ai_query.py "Isole les erreurs 5xx" --stdin`).
+
+Nécessite `GEMINI_API_KEY` dans `~/radar/.env`. **Ce n'est pas un drapeau
+`RADAR_*`** : l'ajouter n'entre pas dans l'exception « drapeaux
+d'environnement » ci-dessus, donc tu ne l'ajoutes pas toi-même. Si la ligne
+est absente (le script échoue avec « Erreur API Gemini » sans mention
+d'authentification, ou une erreur 401/403), dis-le à l'utilisateur et
+demande-lui de l'ajouter (même circuit que `YOUTUBE_API_KEY` : clé gratuite
+sur https://aistudio.google.com/apikey, ligne dans `.env`, puis
+`docker compose up -d --force-recreate` pour qu'elle soit relue). Une fois
+la ligne présente, le script fonctionne directement, sans autre configuration.
 
 ## Ton outillage : `~/radar-diag/`
 

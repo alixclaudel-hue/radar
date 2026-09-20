@@ -168,10 +168,14 @@ dans la PR** — c'est ce qui permet à l'utilisateur de décider en un coup d'�
 | G4 — non-régression projet | `python3 -m unittest discover -s tests` sans échec NOUVEAU |
 | G5 — CI verte | les checks requis passent sur la PR |
 
-**La boucle s'arrête à la PR.** Le merge déclenche le déploiement en production
-(`deploy.yml`) : c'est le dernier cran où un humain peut dire non, et il lui
-revient. Dis à l'utilisateur quelles portes passent, lesquelles non, et laisse-le
-trancher.
+**Le merge est un geste que tu peux exécuter, jamais une décision que tu prends.**
+Présente l'état des cinq portes à l'utilisateur et attends son instruction
+explicite pour CETTE PR — jamais une règle générale (« si tout est vert,
+merge »), jamais une validation implicite reprise d'un accord donné plus tôt
+pour autre chose dans la conversation. Redemande en cas de doute. Une fois
+l'instruction reçue sans ambiguïté, exécute le merge (`gh pr merge`) : ça
+déclenche le déploiement en production (`deploy.yml`), c'est pour ça que la
+décision reste systématiquement humaine même si le geste ne l'est plus.
 
 Ne force jamais une porte, ne l'élargis jamais pour faire passer un correctif :
 une porte contournée vaut une porte absente.

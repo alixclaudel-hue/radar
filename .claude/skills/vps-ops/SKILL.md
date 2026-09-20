@@ -175,9 +175,10 @@ Conditions, à chaque modification :
 ## Boucle d'amélioration d'un script — élargi le 19/09
 
 Tu peux désormais mener la boucle complète sur un script : observer sa
-production, diagnostiquer ses échecs, **corriger son code**, remesurer, et
-ouvrir la PR. C'est le 3ᵉ élargissement de ce contrat, demandé explicitement
-par l'utilisateur.
+production, diagnostiquer ses échecs, **corriger son code**, remesurer,
+**ouvrir la PR toi-même**, et — sur instruction explicite de l'utilisateur
+pour cette PR précise — **la merger**. C'est le 4ᵉ élargissement de ce
+contrat, demandé explicitement par l'utilisateur le 19/09.
 
 **Ce qui n'a pas bougé d'un millimètre : `~/radar` reste en lecture seule.**
 C'est le checkout que Docker fait tourner — y écrire, c'est modifier la
@@ -203,6 +204,29 @@ jamais de `/data` monté dessus. C'est un atelier, pas un déploiement.
 en lecture seule — dans ce cas `git push` échoue, et c'est à l'utilisateur
 d'ouvrir le droit, pas à toi de contourner. Dis-le en une ligne et arrête-toi.
 
+### Prérequis pour ouvrir et merger une PR toi-même : un token GitHub
+
+Ouvrir une PR (`gh pr create`) et, sur instruction, la merger (`gh pr merge`)
+demande un accès dédié, de la même famille que les clés de déploiement
+`radar-diag` (18/09) et `radar-work` (19/09) :
+
+- Un **Personal Access Token GitHub** (de préférence fine-grained, scopé au
+  seul dépôt `alixclaudel-hue/radar`), permissions *Pull requests: Read and
+  write* + *Contents: Read and write* — le contenu est nécessaire si le merge
+  se fait via l'API plutôt que `gh`.
+- Stocké sur le VPS **hors de tout dépôt git**, permissions restreintes
+  (`chmod 600`), jamais dans `~/radar/.env` (qui peut fuiter via un backup ou
+  un dump). Même famille que `~/.ssh/gh_deploy_radar_work` : par exemple
+  `~/.config/gh/radar_pat` ou une variable d'environnement chargée depuis un
+  fichier hors dépôt.
+- `gh` CLI installé sur le VPS et authentifié avec ce token
+  (`gh auth login --with-token < ~/.config/gh/radar_pat`) — plus simple à
+  documenter et à utiliser que des appels `curl` bruts à l'API REST.
+
+**Si le token est absent ou n'a pas les droits, dis-le en une ligne et
+arrête-toi, ne contourne pas.** Le provisioning de ce token est opérationnel,
+pas une tâche de code : c'est à l'utilisateur de le mettre en place.
+
 ### Le déroulé
 
 Il est écrit une seule fois, dans `.claude/skills/script-loop/SKILL.md` —
@@ -227,11 +251,21 @@ cinq portes.
   `touchable`, et réciproquement. Avant de commencer, regarde s'il existe
   déjà une PR ouverte sur ce script ; si oui, ne démarre pas une seconde
   boucle dessus.
-- **Le merge reste une décision humaine.** Merger sur `main` déclenche le
-  déploiement en production (`deploy.yml`) : c'est le dernier point où
-  quelqu'un peut encore dire non à du code écrit par un agent, et le banc ne
-  couvre qu'un chemin du script sur les cas collectés. Tu vas jusqu'à la PR,
-  tu écris l'état des cinq portes, tu t'arrêtes là et tu le dis.
+- **Tu peux ouvrir la PR toi-même** (`gh pr create`), avec la description que
+  décrit `script-loop` étape 5 (lot d'observations, findings
+  traitées/écartées, mesures avant/après verbatim, état des cinq portes).
+- **Le merge reste une décision humaine — exécutée par toi, jamais décidée
+  par toi.** Une fois la PR ouverte, présente l'état des cinq portes à
+  l'utilisateur et **attends une instruction explicite et univoque, donnée
+  pour CETTE PR précise**, avant d'exécuter `gh pr merge`. Aucune porte
+  verte, aucun enchaînement de portes, aucune formulation automatique ne
+  remplace cette instruction — un « oui » donné plus tôt dans la conversation
+  pour autre chose (lancer la boucle, ouvrir la PR) ne vaut pas accord de
+  merge. En cas de doute sur ce que l'utilisateur vient de dire, redemande
+  plutôt que de merger. Merger sur `main` déclenche le déploiement en
+  production (`deploy.yml`) : c'est le dernier point où quelqu'un peut
+  encore dire non à du code écrit par un agent — le geste passe par toi, la
+  décision reste la sienne à chaque fois, pas une fois pour toutes.
 - **Rien de tout ça ne s'applique hors boucle.** Une correction que tu juges
   évidente mais qui ne sort pas d'un lot d'observations, avec un cas de banc
   qui échoue avant elle, ne passe pas par ici : elle se demande à la session

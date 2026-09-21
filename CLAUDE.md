@@ -20,7 +20,7 @@ Outil perso crate-digging vinyle sur Discogs : ingère écoute (YouTube/Spotify/
 
 ## Règle d'économie de tokens — Délégation Gemini (Workflow v3)
 
-Répartition des rôles : **Claude reste architecte et responsable sécurité** (conception, relecture, décision, commit) ; **Gemini absorbe le volume et les premiers jets** via `scripts/ai_query.py` (gratuit). Le tier se déduit du `--mode` — `heavy` (`gemini-3.6-flash`, quota étroit) pour `code`/`test`, `fast` (`gemini-3.5-flash-lite`, quota large) pour `pr`/`diag`/`summary`/`general`. Cascade de repli automatique si un modèle est indisponible (429/404/5xx).
+Répartition des rôles : **Claude reste architecte et responsable sécurité** (conception, relecture, décision, commit) ; **Gemini absorbe le volume et les premiers jets** via `scripts/ai_query.py` (gratuit). Le tier se déduit du `--mode` — `heavy` (`gemini-3.8-flash`, quota étroit) pour `code`/`test`, `fast` (`gemini-3.5-flash-lite`, quota large) pour `pr`/`diag`/`summary`/`general`. Cascade de repli automatique si un modèle est indisponible (429/404/5xx).
 
 1. **Logs et sorties terminal (> 50 lignes)** : ne pas ingérer de log brut dans le contexte Claude. Prétraiter — `docker logs ... | python3 scripts/ai_query.py --mode diag --stdin` (ou `--mode summary` pour compresser sans diagnostiquer). Claude ne lit que la synthèse.
 2. **Scripts et tests unitaires** : premier jet délégué — `--mode code --check-syntax -o <fichier> "spec"` / `--mode test --check-syntax -f <cible> -o <test> "spec"`. Claude audite l'architecture, fait la chirurgie fine, et valide avec `py_compile` + `unittest` (une sortie qui compile n'est pas une sortie juste).

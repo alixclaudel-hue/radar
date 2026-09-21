@@ -32,6 +32,8 @@ BASE_URL_TEMPLATE = (
 TIER_CASCADES = {
     # Raisonnement : quota journalier étroit, réservé au code et aux tests.
     "heavy": [
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
         "gemini-2.5-flash",

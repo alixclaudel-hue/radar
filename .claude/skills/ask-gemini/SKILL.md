@@ -30,7 +30,7 @@ proportionnels à la capacité :
 
 | Tier     | Tête de cascade         | Quota | Pour quoi                       |
 |----------|-------------------------|-------|---------------------------------|
-| `heavy`  | `gemini-3.6-flash`      | étroit| code, tests — il faut raisonner |
+| `heavy`  | `gemini-3.8-flash`      | étroit| code, tests — il faut raisonner |
 | `fast`   | `gemini-3.5-flash-lite` | large | logs, diffs, docs — du volume   |
 
 Le tier se déduit du `--mode` : `code`/`test` → `heavy`, tout le reste →

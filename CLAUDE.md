@@ -14,6 +14,8 @@ Outil perso crate-digging vinyle sur Discogs : ingère écoute (YouTube/Spotify/
 
 **Vérif par défaut (session cloud)** : smoke test hors-ligne seulement, jamais en conditions réelles (pas de token/accès réseau/SSH VPS) — sauf mention explicite « vérifié VPS » / « conditions réelles » sur un point.
 
+**Délégation Gemini par défaut** : skill `ask-gemini` (`scripts/ai_query.py`) à utiliser automatiquement, sans attendre une demande explicite, dès qu'une tâche mécanique consommatrice de tokens Claude ne demande pas de jugement — résumer un journal volumineux, analyser un dump/une trace Docker, générer un premier jet de tests ou de docstrings. Si `GEMINI_API_KEY` et l'identifiant réseau de la session cloud sont tous deux absents : le dire et continuer sans délégation plutôt que d'inventer une réponse.
+
 **Ce fichier a été nettoyé le 19/09** (demande utilisateur : trop d'historique PR par PR pour un fichier relu à chaque session). Convention désormais : ce fichier garde les grandes lignes, fonctionnalités, pistes étudiées/écartées et l'état déployé ; le détail par PR/session part dans `claude_archive.md` dès qu'un chantier est clos ou stable en prod.
 
 ## État actuel du projet — résumé

@@ -1931,12 +1931,24 @@ def _review_ctx(c):
 
 @app.post("/univers/review/{kind}/{action}", response_class=HTMLResponse)
 def univers_review_action(request: Request, kind: str, action: str, key: str = Form("")):
-    if kind not in ("label", "artist") or action not in ("confirm", "reject"):
+    if kind not in ("label", "artist") or action not in ("confirm", "reject", "delete"):
         return HTMLResponse("", status_code=404)
     path = _pu().resolved if kind == "label" else _pu().artists_res
     data = load(path, {})
     e = data.get(key)
-    if e and e.get("status") == "approx":
+    if action == "delete":
+        # Retire l'entrée ET le label/artiste de la base (retour utilisateur issue #62,
+        # 20/09 : "si le label à vérifier ne correspond à aucune option, je supprimerais
+        # le label de la liste") -- réservé aux entrées "jamais identifiées" côté template.
+        data.pop(key, None)
+        save(path, data)
+        c = _cfg()
+        cats_key = "label_categories" if kind == "label" else "artist_categories"
+        cats = c.setdefault(cats_key, {})
+        for cid in list(cats.keys()):
+            cats[cid] = [x for x in cats.get(cid, []) if normalize_label(x) != key]
+        store.save_config(c)
+    elif e and e.get("status") == "approx":
         e["status"] = "confirmed" if action == "confirm" else "not_found"
         e["candidates"] = []
         e["reviewed_by"] = "user"

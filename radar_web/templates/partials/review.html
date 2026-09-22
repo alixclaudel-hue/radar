@@ -37,8 +37,33 @@
   {% if n_nf %}
   <p class="small muted" style="margin-top:{{ '10px' if n_approx else '0' }}">
     {{ n_nf }} jamais identifié{{ 's' if n_nf > 1 }} sur Discogs, ni dans le référentiel local ni via l'API —
-    corrige l'orthographe ou retire l'entrée si besoin :
-    {{ (review.labels_not_found + review.artists_not_found) | map(attribute='original') | join(', ') }}</p>
+    corrige l'orthographe en le retirant puis en le rajoutant, ou supprime-le :</p>
+  <div class="tbl-wrap">
+  <table class="tbl">
+    <tbody>
+      {% for r in review.labels_not_found %}
+      <tr>
+        <td>{{ r.original }}</td>
+        <td style="white-space:nowrap">
+          <button class="small" hx-post="/univers/review/label/delete" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-confirm="Supprimer « {{ r.original }} » de ta base de labels ?"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
+        </td>
+      </tr>
+      {% endfor %}
+      {% for r in review.artists_not_found %}
+      <tr>
+        <td>{{ r.original }} <span class="muted small">(artiste)</span></td>
+        <td style="white-space:nowrap">
+          <button class="small" hx-post="/univers/review/artist/delete" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-confirm="Supprimer « {{ r.original }} » de ta base d'artistes ?"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
   {% endif %}
   {% if not n_approx and not n_nf %}
   <p class="small muted">Rien à vérifier — toutes les résolutions sont fiables.</p>

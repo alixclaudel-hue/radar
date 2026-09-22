@@ -113,13 +113,8 @@
             <button type="submit" class="ic-btn" title="Ajouter à la wantlist">{{ icons.cart() }}</button>
           </form>
           {% endif %}
-          <button type="button" class="ic-btn" title="Boutiques (vérifiées en vente)"
-                  onclick="var t=document.getElementById('stores-{{ rr.id }}'); if(t.dataset.loaded==='1'){t.hidden=!t.hidden;}else{t.dataset.loaded='1';t.hidden=false;htmx.ajax('GET','/release/stores',{target:t,swap:'innerHTML',values:{artist:{{ (artist if sep else '')|tojson }},title:{{ (album if sep else rr.title)|tojson }}}});}">🛍️</button>
         </div>
         <div class="tracklist" id="tracks-{{ rr.id }}"></div>
-        {# Vérifié en vrai (pas un lien de recherche à l'aveugle) : cf. retour
-           issue #62 du 09/09, "seulement si la track est bien en vente". #}
-        <div class="chip-list" id="stores-{{ rr.id }}" hidden></div>
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>

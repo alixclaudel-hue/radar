@@ -4,11 +4,20 @@
 {% block content %}
 
 <h1>Chercher un disque</h1>
-<p class="muted small">Un label pour une recherche ciblée, ou laisse vide et filtre par style / genre / année.</p>
+<p class="muted small">Recherche normale (tout le catalogue, label optionnel), sur tes labels suivis, ou dans le stock d'un vendeur.</p>
 
 <form id="search-form" hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
-  <div class="field combo">
-    <label for="f-label">Label <span class="muted">· propositions depuis ta base</span></label>
+  <div class="field">
+    <label>Rechercher</label>
+    <div class="seg" id="search-mode">
+      <label><input type="radio" name="_mode" value="normal" {{ 'checked' if not q.seller and not q.base_metric }}>Recherche</label>
+      <label><input type="radio" name="_mode" value="labels" {{ 'checked' if q.base_metric }}>🏷️ Mes labels</label>
+      <label><input type="radio" name="_mode" value="seller" {{ 'checked' if q.seller }}>Vendeur</label>
+    </div>
+  </div>
+
+  <div class="field combo" id="mode-normal"{{ ' hidden' if q.seller or q.base_metric }}>
+    <label for="f-label">Label <span class="muted">· optionnel, propositions depuis ta base — laisse vide pour chercher sur tout le catalogue</span></label>
     <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"
            data-combo="set" autocomplete="off" role="combobox" aria-autocomplete="list"
            hx-get="/search/labels" hx-target="#label-suggest" hx-swap="innerHTML"
@@ -16,48 +25,43 @@
     <div id="label-suggest" class="lbl-suggest" hidden></div>
   </div>
 
-  <div class="field">
-    <label for="f-seller">Vendeur Discogs <span class="muted">· optionnel · cherche dans son stock en vente</span></label>
+  <div class="field" id="mode-seller"{{ ' hidden' if not q.seller }}>
+    <label for="f-seller">Vendeur Discogs <span class="muted">· cherche dans son stock en vente</span></label>
     <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
            autocomplete="off">
     <p class="small muted">Nom d'utilisateur Discogs. Les filtres ci-dessous s'appliquent alors à
-      son stock plutôt qu'au catalogue entier. Remplace le label unique et « chercher dans mes
-      labels » comme source des sorties.</p>
+      son stock plutôt qu'au catalogue entier.</p>
   </div>
 
-  <details class="acc" {{ 'open' if q.base_metric }}>
-    <summary>🏷️ ou : chercher dans mes labels {% if q.base_metric %}<span class="tag">actif</span>{% endif %}</summary>
-    <div class="acc__body">
-      <p class="small muted">Recherche sur mes labels les mieux classés (12 max). Remplace le label unique.</p>
-      <label>Classer par</label>
-      <div class="seg">
-        <label><input type="radio" name="base_metric" value="" {{ 'checked' if not q.base_metric }}>aucun</label>
-        <label><input type="radio" name="base_metric" value="aff" {{ 'checked' if q.base_metric == 'aff' }}>affinité</label>
-        <label><input type="radio" name="base_metric" value="reco" {{ 'checked' if q.base_metric == 'reco' }}>reco</label>
-        <label><input type="radio" name="base_metric" value="owned" {{ 'checked' if q.base_metric == 'owned' }}>collection</label>
-      </div>
-      <div class="field" style="max-width:180px;margin-top:10px">
-        <label>Note minimale <span class="muted">optionnel</span></label>
-        <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
-      </div>
-      <div class="field" style="margin-top:10px">
-        <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
-          <button type="button" class="small" id="mins-reset" style="float:right">↺ réinitialiser</button></label>
-        <div class="row">
-          <div class="field">
-            <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
-            <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
-                   value="{{ q.label_min or 0 }}">
-          </div>
-          <div class="field">
-            <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
-            <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
-                   value="{{ q.artist_min or 0 }}">
-          </div>
+  <div class="acc__body" id="mode-labels"{{ ' hidden' if not q.base_metric }}>
+    <p class="small muted">Recherche sur mes labels les mieux classés (12 max).</p>
+    <label>Classer par</label>
+    <div class="seg">
+      <label><input type="radio" name="base_metric" value="aff" {{ 'checked' if q.base_metric == 'aff' }}>affinité</label>
+      <label><input type="radio" name="base_metric" value="reco" {{ 'checked' if q.base_metric == 'reco' }}>reco</label>
+      <label><input type="radio" name="base_metric" value="owned" {{ 'checked' if q.base_metric == 'owned' }}>collection</label>
+    </div>
+    <div class="field" style="max-width:180px;margin-top:10px">
+      <label>Note minimale <span class="muted">optionnel</span></label>
+      <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
+        <button type="button" class="small" id="mins-reset" style="float:right">↺ réinitialiser</button></label>
+      <div class="row">
+        <div class="field">
+          <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
+          <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
+                 value="{{ q.label_min or 0 }}">
+        </div>
+        <div class="field">
+          <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
+          <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
+                 value="{{ q.artist_min or 0 }}">
         </div>
       </div>
     </div>
-  </details>
+  </div>
 
   <div class="row">
     <div class="field combo">
@@ -163,6 +167,33 @@
       if (out) out.textContent = '0';
     });
   });
+})();
+(function () {
+  // 3 modes mutuellement exclusifs (retour utilisateur issue #62, 20/09) : le
+  // backend n'a pas changé (search_run priorise déjà seller > mes labels > label
+  // seul), seule l'UI rendait ça implicite (3 champs coexistants). Vider les champs
+  // du mode quitté évite qu'une valeur oubliée influence un autre mode côté serveur.
+  var blocks = { normal: document.getElementById('mode-normal'),
+                 labels: document.getElementById('mode-labels'),
+                 seller: document.getElementById('mode-seller') };
+  var radios = document.querySelectorAll('#search-mode input[name="_mode"]');
+  if (!radios.length) return;
+  function apply(mode) {
+    Object.keys(blocks).forEach(function (k) {
+      if (blocks[k]) blocks[k].hidden = (k !== mode);
+    });
+    if (mode !== 'seller') {
+      var s = document.getElementById('f-seller');
+      if (s) s.value = '';
+    }
+    if (mode !== 'labels') {
+      document.querySelectorAll('input[name="base_metric"]').forEach(function (r) { r.checked = false; });
+    } else if (!document.querySelector('input[name="base_metric"]:checked')) {
+      var aff = document.querySelector('input[name="base_metric"][value="aff"]');
+      if (aff) aff.checked = true;
+    }
+  }
+  radios.forEach(function (r) { r.addEventListener('change', function () { apply(r.value); }); });
 })();
 </script>
 {% endblock %}

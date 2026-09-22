@@ -2176,14 +2176,24 @@ def _release_identity_key(artist, title):
 
 
 def _owned_releases():
-    """(ids, clés d'identité) des sorties déjà dans la collection Discogs, lues
-    dans collection_cache.json (job_fetch_collection). Vides tant que la
-    collection n'a pas été récupérée depuis ce correctif, ou si l'utilisateur
-    n'en a jamais lancé la synchronisation : le filtre est alors sans effet,
-    jamais bloquant."""
+    """(ids, clés d'identité) des sorties déjà possédées : collection Discogs
+    (collection_cache.json, job_fetch_collection) + achats Bandcamp (corpus,
+    job_ingest_bandcamp — retour utilisateur issue #62, 20/09 : ne pas
+    recommander non plus une piste déjà dans la collection Bandcamp). Vide
+    tant que la synchro correspondante n'a jamais tourné : le filtre est
+    alors sans effet, jamais bloquant."""
     coll = load_json(COLLECTION_CACHE_PATH, {})
     ids = {int(x) for x in coll.get("owned_release_ids", []) if str(x).isdigit()}
-    return ids, set(coll.get("owned_release_keys", []))
+    keys = set(coll.get("owned_release_keys", []))
+    for r in load_json(CORPUS_PATH, []):
+        if r.get("source") != "bandcamp":
+            continue
+        if str(r.get("release_id") or "").isdigit():
+            ids.add(int(r["release_id"]))
+        k = _release_identity_key(r.get("artist"), r.get("title"))
+        if k:
+            keys.add(k)
+    return ids, keys
 
 
 def job_scan_recos(job, params):
@@ -2218,11 +2228,11 @@ def job_scan_recos(job, params):
     job_scorestore_tracks). Ne touche ni recos_playlist.json (déjà publié) ni
     recos_history.json (vidéos déjà proposées, jamais réajoutées).
 
-    Écarte aussi les pistes des albums DÉJÀ POSSÉDÉS (collection Discogs, cf.
-    `_owned_releases` — retour utilisateur 2026-09-17 : toutes les pistes de
-    « Asakusa Light » proposées alors que l'album est en collection), par
-    release_id ET par identité artiste+titre (un autre pressage du même disque
-    porte un id différent).
+    Écarte aussi les pistes des albums DÉJÀ POSSÉDÉS (collection Discogs ET
+    achats Bandcamp, cf. `_owned_releases` — retour utilisateur 2026-09-17 :
+    toutes les pistes de « Asakusa Light » proposées alors que l'album est en
+    collection ; élargi à Bandcamp le 20/09), par release_id ET par identité
+    artiste+titre (un autre pressage du même disque porte un id différent).
 
     Écarte (diagnostic VPS 2026-09-15, décision utilisateur) les pistes sans
     artiste exploitable (`TRIM(ts.artist) <> ''`, cf. `_track_credit_artist`) —
@@ -2302,7 +2312,7 @@ def job_scan_recos(job, params):
         n_added += 1
         job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
-    owned_note = f" {n_owned} piste(s) écartée(s) (album déjà en collection)." if n_owned else ""
+    owned_note = f" {n_owned} piste(s) écartée(s) (album déjà en collection Discogs/Bandcamp)." if n_owned else ""
     job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
                f"file : {len(candidates)}.{owned_note}")
 

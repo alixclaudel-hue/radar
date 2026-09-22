@@ -42,7 +42,8 @@
         <td>
           {% if r.aff is not none %}
           <div class="progress" style="height:6px"><i style="width:{{ r.aff }}%"></i></div>
-          <span class="small muted" title="couverture : part du catalogue du label classée dans une de tes catégories de style">{{ icons.label() }} {{ r.aff }} <span style="opacity:.7">· couv. {{ r.coverage }}%</span></span>
+          <span class="small muted" title="affinité : sur le catalogue du label classé dans tes styles suivis, à quel point ces styles correspondent à ton goût (moyenne pondérée /100)">{{ icons.label() }} {{ r.aff }}</span>
+          <span class="small muted" style="opacity:.7" title="couverture : part du catalogue total du label qui a pu être classée dans un de tes styles suivis (le reste n'entre pas dans le calcul d'affinité)">· couv. {{ r.coverage }}%</span>
           {% else %}<span class="small muted" title="pas encore profilé — n'est pas forcément une mauvaise affinité">— pas profilé</span>{% endif %}
         </td>
         <td class="num small muted">{{ r._reco if r._reco is not none else '—' }}</td>

@@ -1,10 +1,12 @@
 """Retour utilisateur 2026-09-17 : RECOS RADAR proposait toutes les pistes de
 « Asakusa Light » (Soichi Terada) alors que l'album est déjà dans la collection
-Discogs de l'utilisateur.
+Discogs de l'utilisateur. Élargi le 20/09 (issue #62) à la collection Bandcamp
+(corpus, job_ingest_bandcamp) : même remarque, un achat Bandcamp n'est pas
+moins « possédé » qu'un disque en collection Discogs.
 
-Vérifie que `crate_jobs.job_scan_recos` écarte les pistes d'un album possédé,
-par release_id ET par identité artiste+titre (un autre pressage du même disque
-porte un id Discogs différent), sans écarter le reste.
+Vérifie que `crate_jobs.job_scan_recos` écarte les pistes d'un album possédé
+(Discogs OU Bandcamp), par release_id ET par identité artiste+titre (un autre
+pressage du même disque porte un id Discogs différent), sans écarter le reste.
 
 Base scorestore SQLite synthétique dans un dossier temporaire, chemins de
 `crate_jobs` patchés : aucun accès au vrai `/data`, aucun appel réseau.
@@ -36,6 +38,7 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
             "RECOS_HISTORY_PATH": os.path.join(tmp, "recos_playlist_history.json"),
             "RECOS_PLAYLIST_PATH": os.path.join(tmp, "recos_playlist.json"),
             "COLLECTION_CACHE_PATH": os.path.join(tmp, "collection_cache.json"),
+            "CORPUS_PATH": os.path.join(tmp, "taste_corpus.json"),
         }
         patchers = [mock.patch.object(crate_jobs, name, path)
                     for name, path in self.paths.items()]
@@ -71,6 +74,9 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
     def _collection(self, **kw):
         crate_jobs.save_json(self.paths["COLLECTION_CACHE_PATH"], kw)
 
+    def _corpus(self, rows):
+        crate_jobs.save_json(self.paths["CORPUS_PATH"], rows)
+
     def _run(self):
         job = FakeJob()
         crate_jobs.job_scan_recos(job, {})
@@ -99,6 +105,24 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
                              "Soichi Terada", "Asakusa Light")])
         _, candidates = self._run()
         self.assertEqual([c["release_id"] for c in candidates], [333])
+
+    def test_album_bandcamp_ecarte_par_release_id_et_par_identite(self):
+        # même logique que la collection Discogs, mais via le corpus Bandcamp
+        # (job_ingest_bandcamp) : 111 possédé sur Bandcamp, 222 est le même
+        # album sous un autre pressage/id Discogs -> écarté aussi par identité.
+        self._corpus([{"source": "bandcamp", "artist": "Soichi Terada",
+                      "title": "Asakusa Light", "release_id": 111}])
+        job, candidates = self._run()
+        self.assertEqual([c["release_id"] for c in candidates], [333])
+        self.assertIn("déjà en collection", job.finished)
+
+    def test_corpus_sans_bandcamp_n_ecarte_rien(self):
+        # une entrée corpus d'une autre source (youtube, djset...) ne doit
+        # jamais être traitée comme une possession.
+        self._corpus([{"source": "youtube", "artist": "Soichi Terada",
+                      "title": "Asakusa Light", "release_id": 111}])
+        _, candidates = self._run()
+        self.assertEqual(sorted(c["release_id"] for c in candidates), [111, 222, 333])
 
     def test_cache_collection_d_avant_le_correctif_reste_inoffensif(self):
         # collection_cache.json écrit par une version antérieure : ni

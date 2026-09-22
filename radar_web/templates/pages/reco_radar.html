@@ -2,13 +2,15 @@
 {% block title %}Reco Radar · Radar{% endblock %}
 {% block content %}
 <h1>🎯 Reco Radar</h1>
-<p class="muted small">Playlist alimentée à la demande (boutons ci-dessous) à partir des sorties de tes
-  labels suivis (score album ≥ seuil réglable dans Réglages) — {{ n_playlist }}/{{ max_tracks }} piste{{ 's' if n_playlist > 1 }}.
-  Une fois pleine, plus d'ajout tant qu'une piste n'a pas été retirée : clique sur une ligne pour la marquer
-  écoutée, elle est purgée de la playlist à minuit (heure de Paris).</p>
+<p class="muted small">Une playlist complétée à partir de tes goûts (labels suivis, score album ≥ seuil
+  réglable dans Réglages) — {{ n_playlist }}/{{ max_tracks }} piste{{ 's' if n_playlist > 1 }}. Une fois pleine,
+  plus d'ajout tant qu'une piste n'a pas été retirée : clique sur une ligne pour la marquer écoutée, elle est
+  purgée de la playlist à minuit (heure de Paris).</p>
 
 <p class="small">
-  <span class="tag">{{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} en attente{% if last_scan %} · dernier scan {{ last_scan }}{% endif %}{% if last_publish %} · dernière publication {{ last_publish }}{% endif %}</span>
+  <span class="tag">{{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} en attente</span>
+  {% if last_scan %}<span class="tag">dernier scan {{ last_scan }}</span>{% endif %}
+  {% if last_publish %}<span class="tag">dernière alimentation {{ last_publish }}</span>{% endif %}
 </p>
 <div class="btnrow">
   <button type="button" class="small" hx-post="/patte/run/scan_recos" hx-target="#job-scan_recos" hx-swap="outerHTML">🔄 Scanner maintenant</button>
@@ -21,11 +23,10 @@
     <button type="submit" class="small" title="Vide la file d'attente sans relancer de scan">🗑️ Vider la file d'attente</button>
   </form>
 </div>
-<p class="small muted">« Scanner » ajoute les nouvelles pistes déjà notées de tes labels suivis (pas
-  d'appel réseau : les scores sont précalculés en fond, cf. Réglages). « Forcer » vide la file d'attente et la
-  reconstruit depuis les scores actuels (utile en phase de test après un changement de pondération). « Alimenter »
-  reprend juste les {{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} déjà en attente pour chercher leur
-  vidéo YouTube. « Vider la file d'attente » retire ces candidats sans rien reconstruire.</p>
+<p class="small muted">« Scanner » ajoute les nouvelles pistes de tes labels suivis à la file d'attente.
+  « Forcer » vide la file d'attente et la reconstruit avec le scoring actuel (utile après un changement de
+  pondération). « Alimenter la playlist » ajoute les candidats en attente à la playlist. « Vider la file
+  d'attente » retire ces candidats sans en ajouter à la playlist.</p>
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">

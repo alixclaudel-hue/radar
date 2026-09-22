@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -320,6 +321,31 @@ def query_with_fallback(
     )
 
 
+def write_receipt(mode: str, status: str) -> None:
+    """Trace l'appel dans `.claude/gemini-receipts.jsonl` (un JSON par ligne).
+
+    C'est la preuve que lit le hook `scripts/hooks/gemini_gate.py` avant
+    d'autoriser un commit ou l'écriture d'un premier jet : sans cette trace, la
+    délégation reposerait de nouveau sur la seule vigilance du modèle. Un appel
+    RATÉ est tracé lui aussi (`status="error"`) — la règle du projet est
+    d'épuiser Gemini d'abord, donc une tentative sincère qui échoue (quota,
+    panne, 503) rend la main à Claude en toute légitimité.
+
+    N'échoue jamais : tracer est un effet de bord, pas la mission du script.
+    """
+    try:
+        root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))
+        d = os.path.join(root, ".claude")
+        os.makedirs(d, exist_ok=True)
+        line = json.dumps({"ts": time.time(), "mode": mode, "status": status},
+                          ensure_ascii=False)
+        with open(os.path.join(d, "gemini-receipts.jsonl"), "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+
+
 def resolve_tier(mode: str, explicit_tier: str | None = None) -> str:
     """Choisit le tier : le code et les tests demandent du raisonnement, le
     reste (logs, diffs, docs) n'est que du volume et part sur le quota large."""
@@ -415,6 +441,7 @@ def main() -> int:
         )
     except Exception as e:
         sys.stderr.write(f"Erreur : {e}\n")
+        write_receipt(args.mode, "error")
         return 1
 
     if args.raw_code or args.mode in CODE_MODES:
@@ -425,6 +452,7 @@ def main() -> int:
     # shell `> fichier.py`, que rien ne distinguerait du point de vue appelant.
     if not response.strip():
         sys.stderr.write(f"Erreur : réponse vide de {used_model}, rien à écrire.\n")
+        write_receipt(args.mode, "error")
         return 1
 
     if args.check_syntax:
@@ -436,6 +464,7 @@ def main() -> int:
             )
             # 3 et non 2 : argparse réserve déjà 2 aux erreurs de ligne de
             # commande, un appelant doit pouvoir distinguer les deux échecs.
+            write_receipt(args.mode, "error")
             return 3
 
     if args.output:
@@ -445,6 +474,7 @@ def main() -> int:
     else:
         print(response)
 
+    write_receipt(args.mode, "ok")
     return 0
 
 

@@ -2,6 +2,23 @@
 
 Outil perso crate-digging vinyle sur Discogs : ingère écoute (YouTube/Spotify/Bandcamp/DJ sets), profile labels/artistes, note sorties selon goût. Cible multi-utilisateur (chantier en cours) → `docs/architecture.md`.
 
+## ⛔ RÈGLE N°1 — GEMINI D'ABORD, NON NÉGOCIABLE
+
+**Gemini passe AVANT Claude sur toute tâche déléguable. Claude ne prend le relais qu'une fois Gemini épuisé (quota, panne, sortie inexploitable) — jamais l'inverse, jamais « par commodité ».** Le but est de brûler les tokens gratuits en priorité.
+
+C'est binaire, il n'y a pas à arbitrer :
+
+| Situation | Action obligatoire AVANT toute autre |
+|---|---|
+| Écrire un nouveau module/script/fonction | `ai_query.py --mode code --check-syntax -o <f> "<spec>"` |
+| Écrire des tests | `ai_query.py --mode test --check-syntax -f <cible> -o <test> "<spec>"` |
+| Commit, corps de PR, note de release | `git diff origin/main \| ai_query.py --mode pr --stdin` |
+| Log / trace / dump > 50 lignes | `… \| ai_query.py --mode diag --stdin` (ou `--mode summary`) |
+
+**« J'ai zappé » n'est pas une explication recevable** — et n'est plus possible : le hook `PreToolUse` `scripts/hooks/gemini_gate.py` **bloque** le commit, l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu Gemini de moins d'une heure n'existe (`.claude/gemini-receipts.jsonl`, écrit par `ai_query.py` à chaque appel). Une tentative Gemini **ratée** écrit aussi son reçu et débloque l'action : c'est la porte de sortie légitime « Gemini épuisé », et elle exige d'avoir réellement essayé.
+
+Restent hors délégation (et seulement ceux-là) : la lecture/compréhension de code existant, l'architecture, la sécurité, la décision produit, et la relecture finale de ce que Gemini a produit. Claude assume ce qui part en commit — `--check-syntax` prouve que ça compile, pas que c'est juste.
+
 **Reprise de contexte : ce fichier suffit** — état, TODO, pièges ci-dessous.
 
 **Historique complet + détails techniques** : `claude_archive.md` + `docs/archive/` (`.claudeignore`, non lus auto) — lire explicitement (`Read <fichier>`) si détail manquant (numéros de PR, mesures VPS précises, diagnostics croisés cloud/VPS). **Avant de lire un doc non listé ici** (nouveau fichier, `docs/archive/`, `claude_archive.md`) : demander à l'utilisateur si pertinent.
@@ -14,7 +31,7 @@ Outil perso crate-digging vinyle sur Discogs : ingère écoute (YouTube/Spotify/
 
 **Vérif par défaut (session cloud)** : smoke test hors-ligne seulement, jamais en conditions réelles (pas de token/accès réseau/SSH VPS) — sauf mention explicite « vérifié VPS » / « conditions réelles » sur un point.
 
-**Délégation Gemini par défaut** : skill `ask-gemini` (`scripts/ai_query.py`) à utiliser automatiquement, sans attendre une demande explicite — règles et modes dans la section « Règle d'économie de tokens » ci-dessous.
+**Délégation Gemini** : cf. RÈGLE N°1 en tête de fichier — obligatoire, vérifiée par hook, jamais laissée à l'appréciation du moment.
 
 **Ce fichier a été nettoyé le 19/09** (demande utilisateur : trop d'historique PR par PR pour un fichier relu à chaque session). Convention désormais : ce fichier garde les grandes lignes, fonctionnalités, pistes étudiées/écartées et l'état déployé ; le détail par PR/session part dans `claude_archive.md` dès qu'un chantier est clos ou stable en prod.
 

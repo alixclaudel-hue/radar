@@ -1,18 +1,20 @@
 ---
 name: ask-gemini
 description: >
-  Délègue à Gemini (gratuit, via `scripts/ai_query.py`) toute tâche mécanique
-  qui brûlerait des tokens Claude sans demander de jugement. À utiliser
-  systématiquement, sans attendre une demande explicite, dès qu'il s'agit de :
-  lire ou résumer un journal volumineux (>50 lignes), analyser une trace Docker
-  ou un dump, écrire un premier jet de fonction, de script ou de tests
-  unittest, ou rédiger un message de commit et un corps de PR à partir d'un
-  `git diff`. Modes disponibles : code, test, diag, summary, pr. Le tier est
-  choisi tout seul (heavy pour le code et les tests, fast pour le reste).
-  Authentification via GEMINI_API_KEY (VPS/local) OU un identifiant réseau
-  configuré côté environnement (session cloud, cf. Prérequis) — les deux
-  absents, le dire et continuer sans délégation plutôt que d'inventer une
-  réponse.
+  OBLIGATOIRE ET PRIORITAIRE — Gemini (gratuit, via `scripts/ai_query.py`)
+  passe AVANT Claude sur toute tâche déléguable ; Claude ne prend le relais
+  qu'une fois Gemini épuisé, jamais l'inverse. À lancer SANS attendre de
+  demande explicite et SANS arbitrage préalable dès qu'il s'agit de : écrire un
+  premier jet de fonction, de script ou de tests unittest ; rédiger un message
+  de commit, un corps de PR ou une note de release à partir d'un `git diff` ;
+  lire, résumer ou diagnostiquer un journal, une trace Docker ou un dump de
+  plus de 50 lignes. Modes : code, test, diag, summary, pr (tier auto — heavy
+  pour code/tests, fast pour le reste). Cette règle n'est pas laissée à la
+  vigilance du modèle : le hook `scripts/hooks/gemini_gate.py` BLOQUE le commit
+  et l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu
+  Gemini récent n'existe. Un appel Gemini qui ÉCHOUE (quota, panne) écrit son
+  reçu et débloque légitimement la suite — il faut l'avoir tenté, pas l'avoir
+  supposé indisponible.
 ---
 
 # Skill : ask-gemini
@@ -20,6 +22,21 @@ description: >
 Économiser les tokens Claude en sortant du contexte tout ce qui ne demande pas
 de jugement. Claude garde l'architecture, la sécurité et la décision finale ;
 Gemini absorbe le volume et les premiers jets.
+
+## L'ordre n'est pas négociable
+
+**Gemini d'abord, Claude ensuite.** Pas « Claude évalue si ça vaut le coup de
+déléguer » — la délégation est le défaut, et l'exception doit se justifier par
+un épuisement CONSTATÉ (quota, panne, sortie inexploitable), pas supposé.
+
+Le garde-fou `scripts/hooks/gemini_gate.py` (hook `PreToolUse`, déclaré dans
+`.claude/settings.json`) applique la règle mécaniquement : il bloque `git
+commit`, l'écriture d'un `tests/test_*.py` et la création d'un nouveau module
+`.py` tant que `.claude/gemini-receipts.jsonl` ne porte pas de reçu du bon mode
+de moins d'une heure. `ai_query.py` écrit ce reçu à chaque appel, succès
+(`status: ok`) **comme échec** (`status: error`) — d'où la porte de sortie :
+une tentative sincère qui rate rend la main à Claude, une tentative jamais
+faite non. Couverture verrouillée par `tests/test_gemini_gate.py`.
 
 ## Les deux tiers, et pourquoi il y en a deux
 

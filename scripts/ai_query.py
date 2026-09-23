@@ -147,36 +147,6 @@ def _auth_hint(status: int, message: str, key: str | None) -> str:
     )
 
 
-def _load_dotenv_fallback(var: str = "GEMINI_API_KEY", path: str | None = None) -> None:
-    """Repli sur `.env` si `var` n'est pas déjà dans l'environnement du process.
-
-    `docker compose` injecte `.env` nativement dans le conteneur, mais un
-    lancement direct du script sur l'hôte (cas documenté par le skill
-    `vps-ops`) ne le fait pas : la clé posée dans `.env` restait invisible et
-    l'appel échouait en 403 sans indice qu'elle existe, juste non exportée.
-    Ne touche jamais l'environnement si `var` y est déjà : une variable
-    exportée par l'appelant (`set -a; source .env`) reste prioritaire. Parseur
-    minimal à dessein (pas de guillemets ni de multiligne) : ce `.env` n'en a
-    pas besoin, et le projet n'a aucune dépendance à `python-dotenv`.
-    """
-    if os.environ.get(var):
-        return
-    if path is None:
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, value = line.partition("=")
-                if key.strip() == var:
-                    os.environ[var] = value.strip()
-                    return
-    except OSError:
-        pass
-
-
 def is_fallback_status(status: int) -> bool:
     """Le modèle suivant de la cascade a-t-il une chance d'aboutir ?
 
@@ -233,6 +203,39 @@ def extract_raw_code(text: str) -> str:
     return "\n\n".join(c.strip() for c in retenus).strip()
 
 
+def _key_from_dotenv(dotenv_path: str | None = None) -> str | None:
+    """Lit `GEMINI_API_KEY` dans le `.env` à la racine du dépôt, en repli.
+
+    Les conteneurs reçoivent la clé via `docker compose` (qui lit `.env`
+    nativement) ; un lancement CLI direct sur l'hôte, lui, n'a rien exporté.
+    Parseur minimal, zéro dépendance. Toute erreur (fichier absent, illisible)
+    renvoie `None` sans lever : l'absence de clé reste un cas géré plus bas.
+    `dotenv_path` n'existe que pour les tests ; en usage réel on vise le `.env`
+    voisin du dépôt.
+    """
+    if dotenv_path is None:
+        racine = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        dotenv_path = os.path.join(racine, ".env")
+    try:
+        with open(dotenv_path, "r", encoding="utf-8") as f:
+            for ligne in f:
+                ligne = ligne.strip()
+                if not ligne or ligne.startswith("#"):
+                    continue
+                if ligne.startswith("export "):
+                    ligne = ligne[7:].strip()
+                cle, sep, valeur = ligne.partition("=")
+                if not sep or cle.strip() != "GEMINI_API_KEY":
+                    continue
+                valeur = valeur.strip()
+                if len(valeur) >= 2 and valeur[0] == valeur[-1] and valeur[0] in "\"'":
+                    valeur = valeur[1:-1].strip()
+                return valeur or None
+    except Exception:
+        return None
+    return None
+
+
 def query_gemini(
     prompt: str,
     system_instruction: str = "",
@@ -246,7 +249,9 @@ def query_gemini(
     La consommation vient de `usageMetadata`, que l'API rapporte elle-même : le
     tableau de bord de délégation affiche une mesure, jamais une estimation.
 
-    Sans clé locale (`api_key`/`GEMINI_API_KEY` absents), la requête part
+    La clé locale vient de `api_key`, sinon de l'environnement, sinon du `.env`
+    du dépôt en repli (`_key_from_dotenv`, pour un lancement CLI direct sur
+    l'hôte où rien n'est exporté). Si les trois sont vides, la requête part
     quand même sans `?key=` : une session cloud avec un identifiant réseau
     configuré sur ce domaine (en-tête `x-goog-api-key` injecté par le proxy
     de l'environnement) s'authentifie au niveau transport, invisible d'ici.
@@ -254,7 +259,7 @@ def query_gemini(
     session cloud. Sans clé locale ni identifiant réseau, Gemini répond avec
     une erreur d'authentification explicite (capturée plus bas).
     """
-    key = api_key or os.getenv("GEMINI_API_KEY")
+    key = api_key or os.getenv("GEMINI_API_KEY") or _key_from_dotenv()
     url = BASE_URL_TEMPLATE.format(model=model)
     if key:
         url += f"?key={key}"
@@ -437,8 +442,6 @@ def resolve_tier(mode: str, explicit_tier: str | None = None) -> str:
 
 
 def main() -> int:
-    _load_dotenv_fallback()
-
     parser = argparse.ArgumentParser(
         description="Passerelle d'orchestration multi-modèles Gemini pour Radar."
     )

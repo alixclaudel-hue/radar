@@ -21,7 +21,7 @@ from scripts.ai_query import (  # noqa: E402
     SYSTEM_PROMPTS,
     TIER_CASCADES,
     GeminiHTTPError,
-    _load_dotenv_fallback,
+    _key_from_dotenv,
     extract_raw_code,
     is_fallback_status,
     main,
@@ -436,64 +436,6 @@ class AuthHintTests(unittest.TestCase):
         self.assertNotIn("identifiant réseau", str(ctx.exception))
 
 
-class LoadDotenvFallbackTests(unittest.TestCase):
-    """`_load_dotenv_fallback` : repli sur `.env` pour un lancement direct sur
-    l'hôte (session VPS), sans casser le cas conteneur qui exporte déjà la clé."""
-
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp_dir.cleanup)
-        self.env_path = os.path.join(self.temp_dir.name, ".env")
-
-    def _write_env(self, contenu):
-        with open(self.env_path, "w", encoding="utf-8") as f:
-            f.write(contenu)
-
-    @patch.dict("os.environ", {"GEMINI_API_KEY": "deja_exportee"}, clear=True)
-    def test_variable_deja_exportee_jamais_ecrasee(self):
-        self._write_env("GEMINI_API_KEY=valeur_du_fichier\n")
-        _load_dotenv_fallback(path=self.env_path)
-        self.assertEqual(os.environ["GEMINI_API_KEY"], "deja_exportee")
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_variable_absente_reprise_depuis_le_fichier(self):
-        self._write_env("GEMINI_API_KEY=valeur_du_fichier\n")
-        _load_dotenv_fallback(path=self.env_path)
-        self.assertEqual(os.environ.get("GEMINI_API_KEY"), "valeur_du_fichier")
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_fichier_env_absent_aucune_exception(self):
-        inexistant = os.path.join(self.temp_dir.name, "absent.env")
-        _load_dotenv_fallback(path=inexistant)
-        self.assertNotIn("GEMINI_API_KEY", os.environ)
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_commentaires_et_lignes_vides_ignores(self):
-        self._write_env(
-            "\n   \n# commentaire\nAUTRE_VAR=x\nGEMINI_API_KEY=valeur_valide\n"
-        )
-        _load_dotenv_fallback(path=self.env_path)
-        self.assertEqual(os.environ.get("GEMINI_API_KEY"), "valeur_valide")
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_cle_absente_du_fichier_laisse_la_variable_non_definie(self):
-        self._write_env("AUTRE_VAR=other_value\n")
-        _load_dotenv_fallback(path=self.env_path)
-        self.assertNotIn("GEMINI_API_KEY", os.environ)
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_espaces_autour_de_la_cle_et_de_la_valeur_retires(self):
-        self._write_env("  GEMINI_API_KEY = valeur_avec_espaces  \n")
-        _load_dotenv_fallback(path=self.env_path)
-        self.assertEqual(os.environ.get("GEMINI_API_KEY"), "valeur_avec_espaces")
-
-    @patch.dict("os.environ", {}, clear=True)
-    def test_variable_personnalisee(self):
-        self._write_env("AUTRE_CLE=une_valeur\n")
-        _load_dotenv_fallback(var="AUTRE_CLE", path=self.env_path)
-        self.assertEqual(os.environ.get("AUTRE_CLE"), "une_valeur")
-
-
 class MainTests(unittest.TestCase):
     """`main()` orchestre CLI/fichier/stdin -- `query_gemini` toujours mocké,
     aucun de ces tests ne doit pouvoir toucher le réseau."""
@@ -671,6 +613,45 @@ class MainTests(unittest.TestCase):
         """argparse réserve déjà le 2 aux erreurs de ligne de commande."""
         code, out, err = self._run(["x", "--mode", "code", "--check-syntax"])
         self.assertEqual(code, 3)
+
+
+class KeyFromDotenvTests(unittest.TestCase):
+    """Repli de lecture de GEMINI_API_KEY dans le .env (lancement CLI hôte)."""
+
+    def _dotenv(self, contenu: str) -> str:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w+", delete=False, encoding="utf-8"
+        )
+        tmp.write(contenu)
+        tmp.close()
+        self.addCleanup(lambda: os.path.exists(tmp.name) and os.remove(tmp.name))
+        return tmp.name
+
+    def test_cle_simple(self):
+        self.assertEqual(_key_from_dotenv(self._dotenv("GEMINI_API_KEY=abc123")), "abc123")
+
+    def test_guillemets_doubles(self):
+        self.assertEqual(_key_from_dotenv(self._dotenv('GEMINI_API_KEY="abc123"')), "abc123")
+
+    def test_prefixe_export(self):
+        self.assertEqual(_key_from_dotenv(self._dotenv("export GEMINI_API_KEY=abc123")), "abc123")
+
+    def test_commentaires_et_lignes_vides(self):
+        contenu = "# a\n\n# b\nGEMINI_API_KEY=abc123\n\n"
+        self.assertEqual(_key_from_dotenv(self._dotenv(contenu)), "abc123")
+
+    def test_autres_cles_ignorees(self):
+        contenu = "OTHER=12345\nFOO=bar\nGEMINI_API_KEY=abc123\nANOTHER=xyz"
+        self.assertEqual(_key_from_dotenv(self._dotenv(contenu)), "abc123")
+
+    def test_cle_absente(self):
+        self.assertIsNone(_key_from_dotenv(self._dotenv("OTHER=12345\nFOO=bar\n")))
+
+    def test_valeur_vide(self):
+        self.assertIsNone(_key_from_dotenv(self._dotenv("GEMINI_API_KEY=")))
+
+    def test_fichier_inexistant(self):
+        self.assertIsNone(_key_from_dotenv("/tmp/nexiste_pas_9999.env"))
 
 
 if __name__ == "__main__":

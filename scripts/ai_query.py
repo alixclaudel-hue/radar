@@ -205,8 +205,11 @@ def query_gemini(
     api_key: str | None = None,
     temperature: float = 0.2,
     timeout: int = 60,
-) -> str:
-    """Envoie une requête à l'API Gemini et renvoie le texte généré.
+) -> tuple[str, dict]:
+    """Envoie une requête à l'API Gemini, renvoie `(texte généré, jetons consommés)`.
+
+    La consommation vient de `usageMetadata`, que l'API rapporte elle-même : le
+    tableau de bord de délégation affiche une mesure, jamais une estimation.
 
     Sans clé locale (`api_key`/`GEMINI_API_KEY` absents), la requête part
     quand même sans `?key=` : une session cloud avec un identifiant réseau
@@ -250,11 +253,12 @@ def query_gemini(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8")
             result = json.loads(body)
+            usage = _usage(result)
             candidates = result.get("candidates", [])
             if not candidates:
-                return ""
+                return "", usage
             parts = candidates[0].get("content", {}).get("parts", [])
-            return "".join(part.get("text", "") for part in parts).strip()
+            return "".join(part.get("text", "") for part in parts).strip(), usage
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
         try:
@@ -275,29 +279,35 @@ def query_with_fallback(
     api_key: str | None = None,
     temperature: float = 0.2,
     timeout: int = 60,
-) -> tuple[str, str]:
+) -> tuple[str, str, dict]:
     """Interroge Gemini en descendant la cascade du tier jusqu'à une réponse.
 
-    Renvoie `(réponse, modèle réellement utilisé)`. Un modèle explicite
-    court-circuite la cascade : l'appelant a demandé celui-là, lui substituer
-    un autre en silence fausserait toute mesure comparative.
+    Renvoie `(réponse, modèle réellement utilisé, consommation de jetons)`.
+    La consommation est celle du SEUL appel qui a abouti : un modèle indisponible
+    répond en erreur sans rien facturer, le compter fausserait la mesure.
+
+    Un modèle explicite court-circuite la cascade : l'appelant a demandé
+    celui-là, lui substituer un autre en silence fausserait toute mesure
+    comparative.
     """
     if explicit_model:
-        return query_gemini(
+        text, usage = query_gemini(
             prompt=prompt,
             system_instruction=system_instruction,
             model=explicit_model,
             api_key=api_key,
             temperature=temperature,
             timeout=timeout,
-        ), explicit_model
+        )
+        return text, explicit_model, usage
 
     models_to_try = TIER_CASCADES.get(tier) or TIER_CASCADES["fast"]
 
     last_error: Exception | None = None
+    fallbacks = 0
     for model in models_to_try:
         try:
-            res = query_gemini(
+            text, usage = query_gemini(
                 prompt=prompt,
                 system_instruction=system_instruction,
                 model=model,
@@ -305,7 +315,8 @@ def query_with_fallback(
                 temperature=temperature,
                 timeout=timeout,
             )
-            return res, model
+            usage["fallbacks"] = fallbacks
+            return text, model, usage
         except GeminiHTTPError as err:
             if not is_fallback_status(err.status):
                 raise
@@ -314,6 +325,7 @@ def query_with_fallback(
                 f"bascule sur le modèle suivant de la cascade '{tier}'...\n"
             )
             last_error = err
+            fallbacks += 1
 
     raise RuntimeError(
         f"Tous les modèles de la cascade '{tier}' ont échoué. "
@@ -321,7 +333,24 @@ def query_with_fallback(
     )
 
 
-def write_receipt(mode: str, status: str) -> None:
+def _usage(result: dict) -> dict:
+    """Consommation de jetons telle que l'API la RAPPORTE (`usageMetadata`).
+
+    Mesure, jamais estimation : c'est ce que `radar_ops` affiche comme volume
+    réellement délégué à Gemini. Un champ absent vaut 0 plutôt que None — une
+    somme sur une colonne ne doit pas dépendre de la complétude de la réponse.
+    """
+    u = result.get("usageMetadata") or {}
+    return {
+        "prompt_tokens": int(u.get("promptTokenCount") or 0),
+        "output_tokens": int(u.get("candidatesTokenCount") or 0),
+        # `totalTokenCount` inclut aussi les jetons de raisonnement, absents des
+        # deux autres compteurs : on le garde tel quel plutôt que de le recalculer.
+        "total_tokens": int(u.get("totalTokenCount") or 0),
+    }
+
+
+def write_receipt(mode: str, status: str, **extra) -> None:
     """Trace l'appel dans `.claude/gemini-receipts.jsonl` (un JSON par ligne).
 
     C'est la preuve que lit le hook `scripts/hooks/gemini_gate.py` avant
@@ -331,6 +360,11 @@ def write_receipt(mode: str, status: str) -> None:
     d'épuiser Gemini d'abord, donc une tentative sincère qui échoue (quota,
     panne, 503) rend la main à Claude en toute légitimité.
 
+    `extra` porte la mesure lue dans `usageMetadata` (modèle, tier, jetons,
+    durée) : c'est la source du tableau de bord de délégation de `radar_ops`.
+    Le hook, lui, ne lit toujours que `ts`, `mode` et `status` — un reçu ancien
+    sans ces champs reste valide.
+
     N'échoue jamais : tracer est un effet de bord, pas la mission du script.
     """
     try:
@@ -338,8 +372,9 @@ def write_receipt(mode: str, status: str) -> None:
             os.path.dirname(os.path.abspath(__file__)))
         d = os.path.join(root, ".claude")
         os.makedirs(d, exist_ok=True)
-        line = json.dumps({"ts": time.time(), "mode": mode, "status": status},
-                          ensure_ascii=False)
+        row = {"ts": time.time(), "mode": mode, "status": status}
+        row.update({k: v for k, v in extra.items() if v is not None})
+        line = json.dumps(row, ensure_ascii=False)
         with open(os.path.join(d, "gemini-receipts.jsonl"), "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except Exception:
@@ -432,8 +467,14 @@ def main() -> int:
 
     sys_instruction = args.system or SYSTEM_PROMPTS.get(args.mode, "")
 
+    started = time.time()
+    # Taille de la demande, connue même quand l'appel échoue : c'est le volume
+    # que Claude n'a pas eu à ingérer, et donc l'information utile d'un échec.
+    meta = {"tier": chosen_tier, "prompt_chars": len(full_prompt),
+            "session": os.environ.get("CLAUDE_SESSION_ID")}
+
     try:
-        response, used_model = query_with_fallback(
+        response, used_model, usage = query_with_fallback(
             prompt=full_prompt,
             system_instruction=sys_instruction,
             tier=chosen_tier,
@@ -441,8 +482,12 @@ def main() -> int:
         )
     except Exception as e:
         sys.stderr.write(f"Erreur : {e}\n")
-        write_receipt(args.mode, "error")
+        write_receipt(args.mode, "error",
+                      elapsed_ms=round((time.time() - started) * 1000), **meta)
         return 1
+
+    meta.update(usage, model=used_model,
+                elapsed_ms=round((time.time() - started) * 1000))
 
     if args.raw_code or args.mode in CODE_MODES:
         response = extract_raw_code(response)
@@ -452,7 +497,7 @@ def main() -> int:
     # shell `> fichier.py`, que rien ne distinguerait du point de vue appelant.
     if not response.strip():
         sys.stderr.write(f"Erreur : réponse vide de {used_model}, rien à écrire.\n")
-        write_receipt(args.mode, "error")
+        write_receipt(args.mode, "error", **meta)
         return 1
 
     if args.check_syntax:
@@ -464,7 +509,7 @@ def main() -> int:
             )
             # 3 et non 2 : argparse réserve déjà 2 aux erreurs de ligne de
             # commande, un appelant doit pouvoir distinguer les deux échecs.
-            write_receipt(args.mode, "error")
+            write_receipt(args.mode, "error", **meta)
             return 3
 
     if args.output:
@@ -474,7 +519,7 @@ def main() -> int:
     else:
         print(response)
 
-    write_receipt(args.mode, "ok")
+    write_receipt(args.mode, "ok", output=args.output, **meta)
     return 0
 
 

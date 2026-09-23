@@ -80,13 +80,17 @@ prises et les points encore ouverts.
   que d'être écartée — sinon le tableau de bord ignorerait tout l'historique antérieur
   à l'instrumentation.
 
+- Branchement des hooks dans `.claude/settings.json` : `SessionStart`,
+  `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`. La capture tourne donc dans
+  toute session Claude Code sur ce dépôt, celle du VPS comprise. L'expédition, elle,
+  n'est PAS branchée sur un hook : pousser une branche à chaque fin de tour coûterait
+  un aller-retour réseau par tour, pour une donnée qu'on ne lit pas à cette cadence.
+
 ### À faire
 
-- Branchement des hooks dans `.claude/settings.json` : `SessionStart`,
-  `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`. **Bloqué** sur la décision
-  de confidentialité ci-dessous : brancher le hook, c'est commencer à enregistrer.
-- Tant que les hooks ne sont pas branchés, `telemetry.jsonl` n'existe pas : la page
-  Délégation n'affiche que les reçus Gemini, et dit quel fichier lui manque.
+- Skill `telemetry` d'orchestration (cf. section suivante) : enchaîner expédition,
+  réception et interprétation par Gemini.
+- Vérifications en conditions réelles sur le VPS (cf. `CLAUDE.md`, TODO).
 
 ### Skill `telemetry` — qui fait quoi
 
@@ -113,9 +117,14 @@ Répartition proposée :
 Claude n'intervient que pour relire ce que Gemini produit avant publication — règle du
 projet, inchangée.
 
-**Confidentialité, décision en attente.** Le hook enregistre par défaut les 200
-premiers caractères de chaque demande (`RADAR_TELEMETRY_PROMPTS=head`), et ce journal
-part sur une branche GitHub. Les autres valeurs sont `none` (longueur seule) et `full`.
+**Confidentialité, tranchée le 23/09.** Décision utilisateur : `head`, les 200 premiers
+caractères de chaque demande (valeur par défaut du hook, aucune variable à poser). Les
+autres valeurs restent disponibles sans changement de code — `RADAR_TELEMETRY_PROMPTS`
+vaut `none` pour ne garder que la longueur, `full` pour le texte entier. Les étiquettes
+d'outils sont gardées telles quelles (chemins relatifs au dépôt, motifs de recherche) :
+ce sont des chemins déjà publics dans le dépôt, et c'est ce qui rend la colonne
+« outils les plus utilisés » lisible. La commande d'un `Bash` n'est jamais journalisée,
+quelle que soit la politique.
 
 ## Lot 3 — schémas de flux
 

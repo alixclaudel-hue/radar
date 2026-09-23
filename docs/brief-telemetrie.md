@@ -51,29 +51,29 @@ prises et les points encore ouverts.
 - `scripts/telemetry_ship.py` — expédition vers la branche `telemetry` par la
   plomberie git, sans toucher à l'index ni à la branche courante. Commit sans parent
   poussé en force : la branche est une boîte aux lettres, pas un historique.
-- Instrumentation de `scripts/ai_query.py` — écrite et vérifiée par un appel réel,
-  consignée dans `docs/lot2-instrumentation-ai_query.md` faute d'avoir pu être
-  committée.
+- Instrumentation de `scripts/ai_query.py` — le reçu de chaque appel porte désormais
+  le modèle réellement utilisé, le tier, le nombre de replis de cascade, les jetons
+  rapportés par `usageMetadata` et la durée. Vérifiée par un appel réel. Le hook
+  `gemini_gate.py` ne lit toujours que `ts`, `mode` et `status` : un reçu ancien,
+  sans ces champs, reste valide.
+- `RADAR_TELEMETRY_DIR` : redirige l'écriture du journal hors du dépôt. Sur le VPS la
+  variable pointera `/data/ops/`, ce qui évite de salir le checkout de production —
+  et aucune expédition git n'y est nécessaire, `radar_ops` tourne sur la même machine
+  et lit le fichier sur place.
+- Tests (`tests/test_telemetry.py`) des deux scripts, dont la règle de sécurité
+  (`Bash` journalisé par sa description, jamais par sa commande) et la propriété de
+  boîte aux lettres de la branche `telemetry` (commit sans parent, index intact).
 
 ### À faire
 
-- **Session VPS incluse dans la télémétrie** (demande utilisateur du 23/09).
-  `.claude/settings.json` étant versionné, le hook se déclenche déjà dans toute
-  session Claude Code sur ce dépôt, celle du VPS comprise. Deux ajustements :
-  - variable `RADAR_TELEMETRY_DIR` pour rediriger l'écriture vers `/data/ops/` sur le
-    VPS, plutôt que de salir le checkout de production ;
-  - aucune expédition git depuis le VPS : `radar_ops` tourne sur la même machine et
-    lit le fichier sur place. Latence nulle, là où le besoin de temps réel est le
-    plus fort.
 - Récupérateur `scripts/telemetry_pull.sh` pour les sessions **hors** VPS : `git fetch
   origin telemetry` depuis un clone séparé, puis report dans `/data/ops/` des seuls
   événements dont l'horodatage dépasse le maximum déjà stocké.
 - Page tableau de bord de délégation dans `radar_ops` : jetons par mode, par modèle,
   taux de repli de cascade, part des tâches déléguées, durée des appels.
-- Tests de `scripts/hooks/telemetry.py` et `scripts/telemetry_ship.py`.
-- `.claude/telemetry.jsonl` dans `.gitignore`.
 - Branchement des hooks dans `.claude/settings.json` : `SessionStart`,
-  `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`.
+  `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`. **Bloqué** sur la décision
+  de confidentialité ci-dessous : brancher le hook, c'est commencer à enregistrer.
 
 ### Skill `telemetry` — qui fait quoi
 

@@ -102,6 +102,18 @@ def build_record(event, project_dir, prompt_policy="head"):
     return None
 
 
+def telemetry_path(project_dir):
+    """Fichier de journal, `RADAR_TELEMETRY_DIR` prioritaire sur le dépôt.
+
+    Sur le VPS la variable pointe `/data/ops/` : le checkout de production ne
+    doit pas se salir de fichiers non versionnés, et `radar_ops` tourne sur la
+    même machine — il lit le fichier sur place, sans transport git."""
+    override = (os.environ.get("RADAR_TELEMETRY_DIR") or "").strip()
+    if override:
+        return os.path.join(override, "telemetry.jsonl")
+    return os.path.join(project_dir, ".claude", "telemetry.jsonl")
+
+
 def write_line(path, record):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
@@ -125,7 +137,7 @@ def main():
         policy = (os.environ.get("RADAR_TELEMETRY_PROMPTS") or "head").strip().lower()
         record = build_record(event, project_dir, policy)
         if record is not None:
-            write_line(os.path.join(project_dir, ".claude", "telemetry.jsonl"), record)
+            write_line(telemetry_path(project_dir), record)
     except Exception:
         pass                                 # mesurer ne doit jamais coûter une action
     return 0

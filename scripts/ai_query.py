@@ -32,19 +32,24 @@ BASE_URL_TEMPLATE = (
 # erreur silencieuse : vérifier avant d'en ajouter un.
 TIER_CASCADES = {
     # Raisonnement : quota journalier étroit, réservé au code et aux tests.
+    # `gemini-2.5-flash` retiré (même diagnostic que `gemini-2.5-flash-lite`
+    # ci-dessous : 404 confirmé le 23/09, Google renvoie vers
+    # gemini-3.6-flash, déjà présent plus haut dans cette cascade).
     "heavy": [
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
         "gemini-3.5-flash",
-        "gemini-2.5-flash",
         "gemini-3.5-flash-lite",  # repli ultime : lent à raisonner mais disponible
     ],
     # Volume : quota large, pour tout ce qui est lecture/reformulation.
+    # `gemini-2.5-flash-lite` retiré (404 confirmé le 23/09 : "no longer
+    # available to new users", Google renvoie vers gemini-3.5-flash-lite,
+    # déjà en tête de cette cascade — le garder n'aurait fait qu'ajouter un
+    # essai voué à l'échec).
     "fast": [
         "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
-        "gemini-2.5-flash-lite",
     ],
 }
 
@@ -357,6 +362,18 @@ def query_with_fallback(
                 raise
             sys.stderr.write(
                 f"[ai_query] '{model}' indisponible ({err.status}), "
+                f"bascule sur le modèle suivant de la cascade '{tier}'...\n"
+            )
+            last_error = err
+            fallbacks += 1
+        except RuntimeError as err:
+            # Panne réseau (timeout, connexion coupée...) : `query_gemini` la
+            # remonte en `RuntimeError` nu, pas en `GeminiHTTPError`, donc elle
+            # échappait à ce repli et faisait échouer toute la cascade sur un
+            # seul aléa de transport. Même demande, modèle suivant — comme pour
+            # un 5xx.
+            sys.stderr.write(
+                f"[ai_query] '{model}' injoignable ({err}), "
                 f"bascule sur le modèle suivant de la cascade '{tier}'...\n"
             )
             last_error = err

@@ -252,9 +252,9 @@ class CascadeTests(unittest.TestCase):
     def test_modele_explicite_court_circuite_la_cascade(self, mock_q):
         mock_q.return_value = ("ok", {})
         res, model, usage = query_with_fallback(
-            "Test", tier="heavy", explicit_model="gemini-2.5-flash", api_key="fake-key")
-        self.assertEqual(model, "gemini-2.5-flash")
-        self.assertEqual(mock_q.call_args.kwargs["model"], "gemini-2.5-flash")
+            "Test", tier="heavy", explicit_model="gemini-3.6-flash", api_key="fake-key")
+        self.assertEqual(model, "gemini-3.6-flash")
+        self.assertEqual(mock_q.call_args.kwargs["model"], "gemini-3.6-flash")
 
     @patch("scripts.ai_query.query_gemini")
     def test_modele_explicite_ne_replie_pas_sur_429(self, mock_q):
@@ -291,6 +291,21 @@ class CascadeTests(unittest.TestCase):
         res, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
         self.assertEqual(res, "OK")
         self.assertEqual(model, TIER_CASCADES["heavy"][1])
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_repli_sur_panne_reseau(self, mock_q):
+        """Une panne réseau (`URLError`, remontée en `RuntimeError` nu par
+        `query_gemini`, pas en `GeminiHTTPError`) doit aussi faire basculer
+        sur le modèle suivant avec la même requête — avant ce correctif elle
+        échappait au `except GeminiHTTPError` et arrêtait toute la cascade."""
+        mock_q.side_effect = [
+            RuntimeError("Erreur réseau Gemini : timeout"),
+            ("OK", {}),
+        ]
+        res, model, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
+        self.assertEqual(res, "OK")
+        self.assertEqual(model, TIER_CASCADES["fast"][1])
+        self.assertEqual(mock_q.call_count, 2)
 
     @patch("scripts.ai_query.query_gemini")
     def test_usage_fallbacks_vaut_zero_si_premier_modele_repond(self, mock_q):

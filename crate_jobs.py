@@ -3125,8 +3125,10 @@ def job_scorestore_releases(job, params):
         ctx = Ctx(uid=RADAR_UID)
         job.st["total"] = len(rows)
         n_scored = 0
+        interrompu = False
         for i, row in enumerate(rows, 1):
             if job.stopped():
+                interrompu = True
                 break
             title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
             styles = row["styles"].split(", ") if row.get("styles") else []
@@ -3142,13 +3144,19 @@ def job_scorestore_releases(job, params):
             if i % 200 == 0:
                 con.commit()
         con.commit()
-        _stamp_scorestore_run(con, cfg)
+        # Estampiller une passe interrompue ferait dire « à jour » à radar_ops sur
+        # une base partiellement recalculée : le pire des deux mondes, des scores
+        # périmés qu'on ne sait plus reconnaître comme tels.
+        if not interrompu:
+            _stamp_scorestore_run(con, cfg)
         stats = scorestore.stats(con)
     finally:
         con.close()
     _chain_scorestore_tracks()
     job.finish(f"{n_scored} sortie(s) notée(s) sur {len(rows)} scannée(s), "
-               f"{len(label_keys)} label(s) suivi(s) — {stats['n_releases']} au total en base.")
+               f"{len(label_keys)} label(s) suivi(s) — {stats['n_releases']} au total en base."
+               + (" Passe INTERROMPUE : la base n'est pas estampillée, relancer le job."
+                  if interrompu else ""))
 
 
 def job_scorestore_tracks(job, params):

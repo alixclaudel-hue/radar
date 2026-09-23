@@ -14,6 +14,7 @@ import hashlib
 import hmac
 import os
 import secrets
+import tempfile
 import time
 
 from . import accounts, paths
@@ -32,9 +33,24 @@ def _read_or_create_secret():
         return v.encode()
     p = os.path.join(paths.DATA, ".session_secret")
     if not os.path.isfile(p):
-        with open(p, "w") as f:
-            f.write(secrets.token_hex(32))
-        os.chmod(p, 0o600)
+        # Deux conteneurs démarrent ensemble sur le même volume : une écriture
+        # en place laisserait l'autre lire un fichier vide (et signer avec une
+        # clé vide) ou en écrire une seconde, différente. Création par fichier
+        # temporaire puis lien atomique — le perdant garde la clé du gagnant.
+        fd, tmp = tempfile.mkstemp(dir=paths.DATA, prefix=".session_secret.")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write(secrets.token_hex(32))
+            os.chmod(tmp, 0o600)
+            try:
+                os.link(tmp, p)
+            except FileExistsError:
+                pass                      # l'autre processus a gagné la course
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
     with open(p) as f:
         return f.read().strip().encode()
 

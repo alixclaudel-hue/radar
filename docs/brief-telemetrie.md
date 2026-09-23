@@ -66,8 +66,13 @@ prises et les points encore ouverts.
 
 - `scripts/telemetry_pull.py` — réception sur le VPS de ce que les sessions **hors**
   VPS ont expédié : `git fetch` d'une référence dédiée (jamais un `pull`, la branche
-  est réécrite à chaque envoi), puis fusion dans `<data>/ops/` des seules lignes dont
-  le `ts` dépasse le maximum déjà stocké. Les expéditions se recouvrent largement —
+  est réécrite à chaque envoi), puis fusion dans `<data>/ops/remote/` des seules lignes
+  dont le `ts` dépasse le maximum déjà stocké. Le sous-dossier `remote/` n'est pas un
+  rangement : sur le VPS, une session locale écrit dans `<data>/ops/` à l'instant
+  présent, si bien qu'un `ts` plancher pris sur ce fichier serait toujours plus récent
+  que tout ce qui arrive de la branche — la réception rejetterait la totalité de ce
+  qu'elle rapatrie, en silence. `delegation.sources()` lit les deux origines et les
+  fusionne triées. Rotation à 5 Mo, comme `opslog` et le hook (CLAUDE.md pt 12). Les expéditions se recouvrent largement —
   chacune renvoie les 2000 dernières lignes — et sans ce filtre le fichier local se
   peuplerait de doublons. Écrit en Python et non en shell comme prévu initialement :
   la fusion suppose de lire le `ts` de chaque ligne, ce qui en shell imposerait `jq`,

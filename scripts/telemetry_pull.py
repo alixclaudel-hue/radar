@@ -25,11 +25,16 @@ import tempfile
 
 DEFAULT_BRANCH = "telemetry"
 DEFAULT_FILES = ("telemetry.jsonl", "gemini-receipts.jsonl")
+MAX_BYTES = 5 * 1024 * 1024
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Même défaut que `radar_web.radar.paths`, sans l'importer : ce script tourne
 # sur l'hôte, hors du conteneur, et ne doit pas dépendre de l'application.
 _DATA = os.environ.get("CRATE_DATA_DIR") or os.path.join(_REPO, "data")
-DEFAULT_DEST = os.path.join(_DATA, "ops")
+# Sous-dossier `remote/` et NON le dossier que le hook alimente : sur le VPS,
+# une session locale écrit dans `<ops>/telemetry.jsonl` à l'instant présent. Si
+# la réception visait ce même fichier, son `ts` maximal serait toujours plus
+# récent que les lignes expédiées, qui seraient toutes rejetées en silence.
+DEFAULT_DEST = os.path.join(_DATA, "ops", "remote")
 
 
 def run(args, repo_dir, input_text=None):
@@ -73,6 +78,21 @@ def max_ts(path):
     return latest
 
 
+def _rotate_if_needed(path, max_b=MAX_BYTES):
+    """Bascule le fichier en `.1` au-delà de `max_b`, une seule génération gardée.
+
+    Même politique que `opslog` et que le hook de capture : le VPS a déjà saturé
+    son disque deux fois sur des traces non bornées (CLAUDE.md pt 12), et ce
+    fichier-ci grossit à chaque réception sans que rien ne l'élague. Après
+    rotation, le `ts` plancher retombe à None et la réception suivante réécrit
+    la fenêtre entière depuis la branche — c'est voulu, pas une perte."""
+    try:
+        if os.path.getsize(path) > max_b:
+            os.replace(path, path + ".1")
+    except OSError:
+        pass
+
+
 def merge(local_path, incoming_text):
     """Ajoute les lignes postérieures au dernier `ts` local. Renvoie leur nombre.
 
@@ -95,6 +115,7 @@ def merge(local_path, incoming_text):
 
     dest_dir = os.path.dirname(os.path.abspath(local_path))
     os.makedirs(dest_dir, exist_ok=True)
+    _rotate_if_needed(local_path)
     fd, tmp = tempfile.mkstemp(dir=dest_dir, prefix=".telemetry_pull_")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as out:

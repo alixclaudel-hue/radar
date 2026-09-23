@@ -24,6 +24,7 @@ import os
 
 RECEIPTS_NAME = "gemini-receipts.jsonl"
 EVENTS_NAME = "telemetry.jsonl"
+REMOTE_SUBDIR = "remote"
 TOP_TOOLS = 5
 MAX_SESSIONS = 20
 
@@ -236,29 +237,50 @@ def summarize(receipts, events, now=None, days=14):
     }
 
 
+def sources(directory, name):
+    """Les deux origines d'un même journal, locale puis rapatriée.
+
+    `<dir>/<nom>` est ce qu'une session tournant sur cette machine écrit
+    directement ; `<dir>/remote/<nom>` est ce que `telemetry_pull.py` rapatrie
+    des autres sessions. Deux fichiers et non un seul parce que la réception
+    filtre sur le `ts` déjà stocké : mélangée à des écritures locales à
+    l'instant présent, elle rejetterait tout ce qu'elle rapatrie."""
+    return (os.path.join(directory, name),
+            os.path.join(directory, REMOTE_SUBDIR, name))
+
+
 def snapshot(data_root, days=14):
     """Agrégat des `days` derniers jours, plus de quoi situer ce qui est lu."""
     directory = log_dir(data_root)
-    receipts_path = os.path.join(directory, RECEIPTS_NAME)
-    events_path = os.path.join(directory, EVENTS_NAME)
-
     now_ts = datetime.datetime.now(datetime.timezone.utc).timestamp()
     since = now_ts - days * 86400
-    receipts = read_jsonl(receipts_path, since_ts=since)
-    events = read_jsonl(events_path, since_ts=since)
 
+    read = {}
+    missing = []
+    for name in (RECEIPTS_NAME, EVENTS_NAME):
+        paths = sources(directory, name)
+        rows = []
+        for p in paths:
+            rows.extend(read_jsonl(p, since_ts=since))
+        # Les deux origines sont indépendantes : sans ce tri, la page mélangerait
+        # deux suites chronologiques et les sessions s'afficheraient dans le
+        # désordre.
+        rows.sort(key=lambda r: r["ts"])
+        read[name] = rows
+        # Un journal n'est signalé absent que si AUCUNE des deux origines n'existe :
+        # n'avoir jamais rien rapatrié est normal sur une machine qui produit tout.
+        if not any(os.path.exists(p) for p in paths):
+            missing.append(name)
+
+    receipts, events = read[RECEIPTS_NAME], read[EVENTS_NAME]
     out = summarize(receipts, events, now=now_ts, days=days)
     out.update({
         "dir": directory,
-        "receipts_path": receipts_path,
-        "events_path": events_path,
         "receipts_seen": len(receipts),
         "events_seen": len(events),
         "days": days,
         # Nommer les fichiers absents permet à la page de dire « le transport
         # n'a rien déposé » plutôt que d'aligner des zéros sans explication.
-        "missing": [n for n, p in ((RECEIPTS_NAME, receipts_path),
-                                   (EVENTS_NAME, events_path))
-                    if not os.path.exists(p)],
+        "missing": missing,
     })
     return out

@@ -94,12 +94,54 @@ def derived_key(uid, cfg):
     dire si le cache disque est encore valide sans payer les ~4 s de
     chargement d'un `Ctx` (dont `producer_graph.json`, 69,3 Mo en prod).
     Une seule définition pour les deux usages -- deux copies dériveraient."""
+    return (uid, _config_scoring_sig(cfg),
+            _files_sig(*(path for _, path in _derived_inputs(uid))))
+
+
+def _derived_inputs(uid):
+    """Fichiers dont dépendent les nœuds mémoïsés de `Ctx`, NOMMÉS une seule fois.
+
+    `derived_key` et `derived_key_detail` doivent parcourir exactement la même
+    liste dans le même ordre : deux listes séparées auraient fini par diverger,
+    et la page de fraîcheur (`radar_ops`) aurait alors désigné le mauvais
+    fichier comme responsable d'une péremption."""
     from . import catalog_labelgraph as clg
     from . import discogs_dump as dd
     P = paths.user_paths(uid)
-    return (uid, _config_scoring_sig(cfg), _files_sig(
-        P.graph, P.artists_res, P.corpus, P.collection, P.profile,
-        dd.DB_PATH, clg.DB_PATH))
+    return (("producer_graph.json", P.graph),
+            ("artists_resolved.json", P.artists_res),
+            ("taste_corpus.json", P.corpus),
+            ("collection_cache.json", P.collection),
+            ("labels_profile.json", P.profile),
+            ("discogs_dump.sqlite3", dd.DB_PATH),
+            ("catalog_labelgraph.sqlite3", clg.DB_PATH))
+
+
+def derived_fingerprint(uid, cfg):
+    """Empreinte hexadécimale stable de `derived_key`, seule forme stockable.
+
+    Définie ICI et pas dans `radar_ops` : le précalcul l'écrit, le tableau de
+    bord la relit — deux implémentations auraient fini par produire deux
+    empreintes différentes pour un même état, et la page aurait annoncé une
+    péremption imaginaire."""
+    payload = json.dumps(derived_key(uid, cfg), sort_keys=True, default=str,
+                         separators=(",", ":"))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def derived_key_detail(uid, cfg):
+    """Même information que `derived_key`, mais nommée fichier par fichier.
+
+    Sert au diagnostic : quand les scores précalculés sont périmés, on veut
+    pouvoir dire CE QUI a changé (« la configuration », « producer_graph.json a
+    été réécrit ») et pas seulement que l'empreinte diffère. Les tuples sont
+    convertis en listes car cette structure est sérialisée en JSON puis relue."""
+    inputs = _derived_inputs(uid)
+    sig = _files_sig(*(path for _, path in inputs))
+    detail = {"config": _config_scoring_sig(cfg)}
+    for (name, _), value in zip(inputs, sig):
+        detail[name] = list(value) if value else None
+    return detail
 
 
 # Lot 3 (refonte scoring) : graphe explicite des nœuds de calcul de Ctx, chacun

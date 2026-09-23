@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Fraîcheur des scores précalculés</h2>
+<p class="note">La question à laquelle cette page répond : les scores affichés dans
+l'application sortent-ils de la méthode de scoring courante, ou d'une méthode
+antérieure ? Chaque précalcul estampille la base avec l'empreinte de ses entrées
+(configuration de scoring et état des fichiers dont dépend <code>Ctx</code>). Une
+empreinte différente de celle du moment signifie que les scores sont à recalculer —
+job <code>scorestore_releases</code>.</p>
+<table><thead><tr>
+  <th>Utilisateur</th><th>État</th><th>Calculé le</th><th>Code</th>
+  <th class="num">Sorties notées</th><th>Ce qui a changé</th>
+</tr></thead><tbody>
+{% for r in rows %}
+<tr>
+  <td>{{ r.uid }}</td>
+  <td>
+    {% if r.state == 'a_jour' %}<span class="tag ok">à jour</span>
+    {% elif r.state == 'perime' %}<span class="tag bad">périmé</span>
+    {% elif r.state == 'absent' %}<span class="tag warn">non estampillé</span>
+    {% else %}<span class="tag bad">erreur</span>{% endif %}
+  </td>
+  <td class="dim">{{ r.computed_at or "—" }}</td>
+  <td class="dim">{{ (r.code_sha or "")[:7] or "—" }}</td>
+  <td class="num">{{ r.rows if r.rows is not none else "—" }}</td>
+  <td class="dim">
+    {% if r.changes %}<ul style="margin:0;padding-left:1.1em">
+      {% for c in r.changes %}<li>{{ c }}</li>{% endfor %}</ul>
+    {% else %}{{ r.reason or "—" }}{% endif %}
+  </td>
+</tr>
+{% else %}<tr><td colspan="6" class="empty">Aucun utilisateur enregistré.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Ordre de calcul du scoring</h2>
+<p class="note">Ordre topologique des nœuds de <code>Ctx</code>, lu directement dans
+<code>scoring.NODE_DEPS</code> : ce n'est pas une documentation recopiée, c'est le
+graphe que le code exécute.</p>
+<p>{% for n in order %}<span class="tag">{{ loop.index }}. {{ n }}</span> {% endfor %}</p>
+{% endblock %}

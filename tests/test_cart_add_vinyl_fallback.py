@@ -40,7 +40,7 @@ class CartAddVinylFallbackTestCase(unittest.TestCase):
         patchers = [
             # pas de compte/cookie dans un test : le mode dev du middleware
             # d'authentification résout l'utilisateur par défaut.
-            mock.patch.object(appmod, "_dev_mode", return_value=True),
+            mock.patch.object(appmod.websession, "dev_mode", return_value=True),
             mock.patch.object(appmod, "_cfg", return_value={"token": "t"}),
             mock.patch.object(dd, "available", return_value=True),
             # sortie non-vinyle -> repli sur la recherche de pressages vinyle

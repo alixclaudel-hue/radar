@@ -18,7 +18,7 @@ import sqlite3
 import sys
 import time
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 import requests
@@ -3038,6 +3038,30 @@ def _chain_scorestore_tracks():
         job_queue.launch("scorestore_tracks", {}, uid=RADAR_UID)
 
 
+def _stamp_scorestore_run(con, cfg):
+    """Estampille la base de scores avec l'état des entrées AU MOMENT du calcul.
+
+    Sans cette trace, rien ne distingue des scores produits par la méthode
+    courante de scores hérités d'une configuration ou d'un graphe antérieurs :
+    la page de fraîcheur de `radar_ops` n'aurait aucune base pour répondre.
+
+    Ne fait jamais échouer le job : le précalcul est la mission, l'estampille
+    n'en est qu'un effet de bord utile au diagnostic."""
+    from radar_web.radar import codeversion, scorestore
+    from radar_web.radar import scoring as sc
+    try:
+        n = con.execute("SELECT COUNT(*) FROM release_scores").fetchone()[0]
+        scorestore.set_run_meta(con, {
+            "fingerprint": sc.derived_fingerprint(RADAR_UID, cfg),
+            "detail": json.dumps(sc.derived_key_detail(RADAR_UID, cfg), sort_keys=True),
+            "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "code_sha": codeversion.sha() or "",
+            "rows": n,
+        })
+    except Exception as e:
+        print(f"[scorestore] estampille du run impossible : {e}", file=sys.stderr)
+
+
 def job_scorestore_releases(job, params):
     """Lot 4 de la refonte scoring (cf. CLAUDE.md point 37) : précalcule le
     score de chaque sortie des labels suivis (Cœur + Aimé) dans
@@ -3101,8 +3125,10 @@ def job_scorestore_releases(job, params):
         ctx = Ctx(uid=RADAR_UID)
         job.st["total"] = len(rows)
         n_scored = 0
+        interrompu = False
         for i, row in enumerate(rows, 1):
             if job.stopped():
+                interrompu = True
                 break
             title = f"{row['artist']} - {row['title']}" if row.get("artist") else (row.get("title") or "")
             styles = row["styles"].split(", ") if row.get("styles") else []
@@ -3118,12 +3144,19 @@ def job_scorestore_releases(job, params):
             if i % 200 == 0:
                 con.commit()
         con.commit()
+        # Estampiller une passe interrompue ferait dire « à jour » à radar_ops sur
+        # une base partiellement recalculée : le pire des deux mondes, des scores
+        # périmés qu'on ne sait plus reconnaître comme tels.
+        if not interrompu:
+            _stamp_scorestore_run(con, cfg)
         stats = scorestore.stats(con)
     finally:
         con.close()
     _chain_scorestore_tracks()
     job.finish(f"{n_scored} sortie(s) notée(s) sur {len(rows)} scannée(s), "
-               f"{len(label_keys)} label(s) suivi(s) — {stats['n_releases']} au total en base.")
+               f"{len(label_keys)} label(s) suivi(s) — {stats['n_releases']} au total en base."
+               + (" Passe INTERROMPUE : la base n'est pas estampillée, relancer le job."
+                  if interrompu else ""))
 
 
 def job_scorestore_tracks(job, params):

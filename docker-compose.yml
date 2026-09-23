@@ -27,6 +27,8 @@ services:
     ports:
       - "${RADAR_WEB_BIND:-127.0.0.1}:8600:8600"
     env_file: .env
+    environment:
+      RADAR_CODE_SHA: ${RADAR_CODE_SHA:-}
     volumes:
       - ./data:/data
 
@@ -38,12 +40,40 @@ services:
     depends_on:
       - radar-web
     env_file: .env
+    environment:
+      RADAR_CODE_SHA: ${RADAR_CODE_SHA:-}
     volumes:
       - ./data:/data
     # ne sert pas HTTP : le HEALTHCHECK du Dockerfile (hérité de la même image
     # que radar-web) le marquerait "unhealthy" en permanence sans ça
     healthcheck:
       disable: true
+
+  # Tableau de bord de maintenance et de diagnostic (radar_ops).
+  # Service SÉPARÉ et non une section de radar-web : il sert précisément quand
+  # l'appli principale ne répond plus. Jamais exposé par Caddy — il montre les
+  # données de TOUS les utilisateurs, l'accès passe par RADAR_WEB_BIND
+  # (Tailscale sur le VPS, localhost ailleurs), comme l'admin de radar-web.
+  radar-ops:
+    image: radar-web:latest
+    restart: unless-stopped
+    command: uvicorn radar_ops.app:app --host 0.0.0.0 --port 8610 --forwarded-allow-ips '*'
+    depends_on:
+      - radar-web
+    ports:
+      - "${RADAR_WEB_BIND:-127.0.0.1}:8610:8610"
+    env_file: .env
+    environment:
+      RADAR_CODE_SHA: ${RADAR_CODE_SHA:-}
+    volumes:
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request as u; u.urlopen('http://localhost:8610/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
 volumes:
   caddy_data:

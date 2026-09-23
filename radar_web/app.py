@@ -7,12 +7,10 @@ Nav : 👤 Mon profil · 🔍 Chercher un disque · 🌐 Mes labels & artistes �
 📻 Nouveautés (/veille) est en pause depuis le 2026-09-17, cf. VEILLE_ENABLED.
 """
 import hashlib
-import hmac
 import html
 import io
 import os
 import re
-import secrets
 import sys
 import threading
 import time
@@ -25,6 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .radar import opslog, websession
 from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
                     learn, paths, sellers, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
@@ -88,90 +87,24 @@ if _migrated:
 app = FastAPI(title="Radar")
 app.mount("/static", StaticFiles(directory=os.path.join(HERE, "static")), name="static")
 
-AUTH_TTL = 5 * 3600
-COOKIE = "radar_auth"
+AUTH_TTL = websession.AUTH_TTL
+COOKIE = websession.COOKIE
 CURRENT_YEAR = time.gmtime().tm_year
 
 
 # --------------------------------------------------------------------- auth
-def _session_secret():
-    v = os.environ.get("APP_SESSION_SECRET")
-    if v:
-        return v.encode()
-    p = os.path.join(paths.DATA, ".session_secret")
-    if not os.path.isfile(p):
-        with open(p, "w") as f:
-            f.write(secrets.token_hex(32))
-        os.chmod(p, 0o600)
-    with open(p) as f:
-        return f.read().strip().encode()
-
-
-SESSION_SECRET = _session_secret()
+# Le mécanisme vit dans `radar/websession.py` : `radar_ops` (tableau de bord de
+# diagnostic) le partage, et une signature de session dupliquée finirait par
+# diverger. Les alias ci-dessous gardent les noms utilisés dans le reste du
+# fichier (login, logout, register).
 accounts.bootstrap()
 
-
-def _dev_mode():
-    """Authentification désactivée UNIQUEMENT sur demande explicite (CI, dev local).
-
-    `RADAR_NO_AUTH=1` est obligatoire : sans lui, un accounts.json illisible ou un
-    volume mal monté ferait passer `accounts.count()` à 0 et ouvrirait l'appli en
-    grand sur Internet avec les droits du propriétaire."""
-    return (os.environ.get("RADAR_NO_AUTH") == "1"
-            and not os.environ.get("APP_PASSWORD") and accounts.count() == 0)
-
-
-def _pw_epoch(uid):
-    """Extrait du hash du mot de passe : change à chaque changement de mot de passe,
-    ce qui invalide les sessions existantes (seule voie de révocation)."""
-    return ((accounts.get(uid) or {}).get("pw", ""))[-16:]
-
-
-def _sign(uid, exp):
-    return hmac.new(SESSION_SECRET, f"{uid}|{exp}|{_pw_epoch(uid)}".encode(),
-                    hashlib.sha256).hexdigest()[:32]
-
-
-def _make_token(uid, exp):
-    exp = int(exp)
-    return f"{uid}.{exp}.{_sign(uid, exp)}"
-
-
-def _https(request):
-    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
-
-
-def _set_session(resp, uid, request):
-    secure = os.environ.get("RADAR_SECURE_COOKIE") == "1" or _https(request)
-    resp.set_cookie(COOKIE, _make_token(uid, time.time() + AUTH_TTL), max_age=AUTH_TTL,
-                    httponly=True, samesite="lax", secure=secure)
-
-
-def _parse_token(tok):
-    try:
-        uid, exp, sig = (tok or "").split(".")
-        exp = int(exp)
-    except ValueError:
-        return None
-    if not hmac.compare_digest(sig, _sign(uid, exp)) or time.time() >= exp:
-        return None
-    return uid
-
-
-def _req_uid(request):
-    if _dev_mode():
-        return paths.DEFAULT_UID
-    uid = _parse_token(request.cookies.get(COOKIE, ""))
-    return uid if uid and accounts.get(uid) else None
-
-
-def _bad_origin(request):
-    """Défense en profondeur CSRF : le cookie est déjà SameSite=lax et toutes les
-    mutations sont des POST, mais on refuse en plus une origine étrangère."""
-    if request.method in ("GET", "HEAD", "OPTIONS"):
-        return False
-    origin = request.headers.get("origin")
-    return bool(origin) and origin.rstrip("/") != str(request.base_url).rstrip("/")
+_dev_mode = websession.dev_mode
+_make_token = websession.make_token
+_parse_token = websession.parse_token
+_set_session = websession.set_session
+_req_uid = websession.req_uid
+_bad_origin = websession.bad_origin
 
 
 @app.middleware("http")
@@ -187,7 +120,13 @@ async def _guard(request: Request, call_next):
             return HTMLResponse("Session expirée — <a href='/login'>reconnexion</a>", status_code=401)
         return RedirectResponse("/login", status_code=303)
     store.set_current_uid(uid)          # lu par load_config() / Ctx() / _pu() / jobs.launch()
+    t0 = time.time()
     resp = await call_next(request)
+    # Journal des actions, relu par `radar_ops`. Posé ICI et pas dans un second
+    # middleware : l'uid vient d'être résolu dans ce cadre d'exécution, alors
+    # qu'un middleware externe ne le verrait pas de façon garantie (Starlette
+    # exécute `call_next` dans une tâche au contexte distinct).
+    opslog.record(request.method, p, resp.status_code, uid, time.time() - t0)
     # surtout pas sur /logout : le middleware réécrirait le cookie qu'on vient d'effacer
     if not _dev_mode() and p != "/logout":
         _set_session(resp, uid, request)

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Actions de l'utilisateur, en direct</h2>
+<p class="note">Chaque requête servie par l'application principale, hors bruit de fond
+(fichiers statiques, sondage de statut, autocomplétion). Seuls la méthode, le chemin et
+le code de retour sont enregistrés : jamais la chaîne de requête ni le corps, qui
+peuvent porter un mot de passe ou un jeton Discogs.</p>
+<table><thead><tr>
+  <th>Heure</th><th>Utilisateur</th><th>Méthode</th><th>Chemin</th>
+  <th class="num">Code</th><th class="num">Durée</th>
+</tr></thead><tbody id="events"></tbody></table>
+{% endblock %}
+
+{% block script %}
+<script id="boot" type="application/json">{{ events | tojson }}</script>
+<script>
+const esc = t => { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; };
+const hhmmss = ts => new Date(ts * 1000).toLocaleTimeString("fr-FR");
+const MAX_ROWS = 300;   // borne le DOM d'une page laissée ouverte des heures
+
+function row(ev) {
+  const cls = ev.status >= 500 ? "bad" : ev.status >= 400 ? "warn" : "";
+  return `<tr>
+    <td class="dim">${hhmmss(ev.ts)}</td><td>${esc(ev.uid)}</td>
+    <td>${esc(ev.method)}</td><td>${esc(ev.path)}</td>
+    <td class="num ${cls}">${esc(ev.status)}</td>
+    <td class="num dim">${esc(ev.ms)} ms</td></tr>`;
+}
+
+const tb = document.getElementById("events");
+const boot = JSON.parse(document.getElementById("boot").textContent);
+tb.innerHTML = boot.length ? boot.map(row).join("")
+                           : '<tr><td colspan="6" class="empty">Aucune action enregistrée.</td></tr>';
+
+new EventSource("/ops/stream/actions").onmessage = e => {
+  const first = tb.querySelector(".empty");
+  if (first) tb.innerHTML = "";
+  tb.insertAdjacentHTML("afterbegin", row(JSON.parse(e.data)));
+  while (tb.rows.length > MAX_ROWS) tb.deleteRow(tb.rows.length - 1);
+};
+</script>
+{% endblock %}

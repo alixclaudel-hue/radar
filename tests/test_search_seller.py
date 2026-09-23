@@ -85,7 +85,7 @@ class SearchSellerTestCase(unittest.TestCase):
         _build_referentiel(db)
 
         patchers = [
-            mock.patch.object(appmod, "_dev_mode", return_value=True),
+            mock.patch.object(appmod.websession, "dev_mode", return_value=True),
             mock.patch.object(dd, "DB_PATH", db),
             mock.patch.object(dd, "get_meta", return_value={}),
             # snapshots vendeur et file de jobs isolés : ces tests écrivent

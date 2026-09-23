@@ -65,3 +65,8 @@ discogs_profile/
 # reçus de délégation Gemini (cf. RÈGLE N°1 de CLAUDE.md) : état de session lu par
 # le hook gemini_gate.py, régénéré à chaque appel — rien à versionner
 .claude/gemini-receipts.jsonl
+
+# télémétrie de développement (lot 2 radar_ops) : écrite par scripts/hooks/telemetry.py,
+# expédiée sur la branche `telemetry` par telemetry_ship.py — jamais sur une branche de code
+.claude/telemetry.jsonl
+.claude/telemetry.jsonl.1

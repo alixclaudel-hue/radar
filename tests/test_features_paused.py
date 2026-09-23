@@ -50,7 +50,7 @@ VEILLE_ROUTES = [
 class FeaturesPausedTestCase(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(appmod.app, raise_server_exceptions=False)
-        p = mock.patch.object(appmod, "_dev_mode", return_value=True)
+        p = mock.patch.object(appmod.websession, "dev_mode", return_value=True)
         p.start()
         self.addCleanup(p.stop)
 

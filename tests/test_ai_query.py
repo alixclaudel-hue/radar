@@ -64,7 +64,7 @@ class QueryGeminiTests(unittest.TestCase):
         mock_urlopen.return_value = _fake_urlopen_cm(
             {"candidates": [{"content": {"parts": [{"text": "PONG"}]}}]})
         with patch.dict("os.environ", {}, clear=True):
-            res, model = query_with_fallback("Bonjour", tier="fast", api_key=None)
+            res, model, usage = query_with_fallback("Bonjour", tier="fast", api_key=None)
         self.assertEqual(res, "PONG")
         self.assertEqual(model, TIER_CASCADES["fast"][0])
 
@@ -100,7 +100,7 @@ class QueryGeminiTests(unittest.TestCase):
         }
         mock_urlopen.return_value = _fake_urlopen_cm(fake_response)
 
-        res = query_gemini("Analyse ces logs", api_key="fake-key")
+        res, usage = query_gemini("Analyse ces logs", api_key="fake-key")
         self.assertEqual(res, "Résultat analysé avec succès.")
 
         req = mock_urlopen.call_args[0][0]
@@ -110,7 +110,7 @@ class QueryGeminiTests(unittest.TestCase):
     @patch("urllib.request.urlopen")
     def test_empty_candidates_returns_empty_string(self, mock_urlopen):
         mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
-        res = query_gemini("Test", api_key="fake-key")
+        res, usage = query_gemini("Test", api_key="fake-key")
         self.assertEqual(res, "")
 
     @patch("urllib.request.urlopen")
@@ -121,7 +121,8 @@ class QueryGeminiTests(unittest.TestCase):
             ]}}]
         }
         mock_urlopen.return_value = _fake_urlopen_cm(fake_response)
-        self.assertEqual(query_gemini("x", api_key="fake-key"), "Bonjour le monde")
+        text, usage = query_gemini("x", api_key="fake-key")
+        self.assertEqual(text, "Bonjour le monde")
 
     @patch("urllib.request.urlopen")
     def test_system_instruction_ajoutee_au_payload(self, mock_urlopen):
@@ -202,16 +203,16 @@ class CascadeTests(unittest.TestCase):
 
     @patch("scripts.ai_query.query_gemini")
     def test_succes_du_premier_modele_sans_repli(self, mock_q):
-        mock_q.return_value = "Synthèse réussie"
-        res, model = query_with_fallback("Analyse logs", tier="fast", api_key="fake-key")
+        mock_q.return_value = ("Synthèse réussie", {})
+        res, model, usage = query_with_fallback("Analyse logs", tier="fast", api_key="fake-key")
         self.assertEqual(res, "Synthèse réussie")
         self.assertEqual(model, TIER_CASCADES["fast"][0])
         self.assertEqual(mock_q.call_count, 1)
 
     @patch("scripts.ai_query.query_gemini")
     def test_repli_sur_429_quota_epuise(self, mock_q):
-        mock_q.side_effect = [GeminiHTTPError(429, "quota épuisé"), "Résultat secours"]
-        res, model = query_with_fallback("Test", tier="fast", api_key="fake-key")
+        mock_q.side_effect = [GeminiHTTPError(429, "quota épuisé"), ("Résultat secours", {})]
+        res, model, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
         self.assertEqual(res, "Résultat secours")
         self.assertEqual(model, TIER_CASCADES["fast"][1])
         self.assertEqual(mock_q.call_count, 2)
@@ -223,8 +224,8 @@ class CascadeTests(unittest.TestCase):
     def test_repli_sur_404_modele_retire(self, mock_q):
         """Un modèle renommé ou déprécié répond 404 (vérifié en réel sur
         `gemini-3-flash`) : la cascade doit l'enjamber, pas s'arrêter là."""
-        mock_q.side_effect = [GeminiHTTPError(404, "model not found"), "OK"]
-        res, model = query_with_fallback("Test", tier="heavy", api_key="fake-key")
+        mock_q.side_effect = [GeminiHTTPError(404, "model not found"), ("OK", {})]
+        res, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
         self.assertEqual(res, "OK")
         self.assertEqual(model, TIER_CASCADES["heavy"][1])
 
@@ -248,8 +249,8 @@ class CascadeTests(unittest.TestCase):
 
     @patch("scripts.ai_query.query_gemini")
     def test_modele_explicite_court_circuite_la_cascade(self, mock_q):
-        mock_q.return_value = "ok"
-        res, model = query_with_fallback(
+        mock_q.return_value = ("ok", {})
+        res, model, usage = query_with_fallback(
             "Test", tier="heavy", explicit_model="gemini-2.5-flash", api_key="fake-key")
         self.assertEqual(model, "gemini-2.5-flash")
         self.assertEqual(mock_q.call_args.kwargs["model"], "gemini-2.5-flash")
@@ -265,8 +266,8 @@ class CascadeTests(unittest.TestCase):
 
     @patch("scripts.ai_query.query_gemini")
     def test_tier_inconnu_retombe_sur_fast(self, mock_q):
-        mock_q.return_value = "ok"
-        _, model = query_with_fallback("Test", tier="inexistant", api_key="fake-key")
+        mock_q.return_value = ("ok", {})
+        _, model, _ = query_with_fallback("Test", tier="inexistant", api_key="fake-key")
         self.assertEqual(model, TIER_CASCADES["fast"][0])
 
     def test_statuts_de_repli_excluent_l_authentification(self):
@@ -285,10 +286,27 @@ class CascadeTests(unittest.TestCase):
     def test_repli_sur_502_aleas_amont(self, mock_q):
         """Observé en conditions réelles le 21/09/2026 : la tête de la cascade
         heavy a répondu 502 alors que les autres modèles répondaient."""
-        mock_q.side_effect = [GeminiHTTPError(502, "upstream request failed"), "OK"]
-        res, model = query_with_fallback("Test", tier="heavy", api_key="fake-key")
+        mock_q.side_effect = [GeminiHTTPError(502, "upstream request failed"), ("OK", {})]
+        res, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
         self.assertEqual(res, "OK")
         self.assertEqual(model, TIER_CASCADES["heavy"][1])
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_usage_fallbacks_vaut_zero_si_premier_modele_repond(self, mock_q):
+        mock_q.return_value = ("ok", {})
+        _, _, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
+        self.assertEqual(usage["fallbacks"], 0)
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_usage_fallbacks_vaut_deux_apres_deux_echecs_429(self, mock_q):
+        mock_q.side_effect = [
+            GeminiHTTPError(429, "quota"),
+            GeminiHTTPError(429, "quota"),
+            ("ok", {})
+        ]
+        _, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
+        self.assertEqual(usage["fallbacks"], 2)
+        self.assertEqual(model, TIER_CASCADES["heavy"][2])
 
 
 class TierRoutingTests(unittest.TestCase):
@@ -417,7 +435,7 @@ class MainTests(unittest.TestCase):
             code = main()
         return code, stdout.getvalue(), stderr.getvalue()
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_prompt_cli_simple(self, mock_query):
         code, out, err = self._run(["Résume ceci"])
         self.assertEqual(code, 0)
@@ -434,7 +452,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("introuvable", err)
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_fichier_ajoute_au_prompt(self, mock_query):
         tmp_content = "ERROR boom"
         with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as f:
@@ -447,7 +465,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn(tmp_content, mock_query.call_args.kwargs["prompt"])
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_option_file_repetable(self, mock_query):
         paths = []
         try:
@@ -467,14 +485,14 @@ class MainTests(unittest.TestCase):
         self.assertIn("PREMIER", prompt)
         self.assertIn("SECOND", prompt)
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_stdin_flag_force_la_lecture(self, mock_query):
         code, out, err = self._run(["Analyse", "--stdin"], stdin_text="ligne de log",
                                     stdin_isatty=False)
         self.assertEqual(code, 0)
         self.assertIn("ligne de log", mock_query.call_args.kwargs["prompt"])
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_stdin_lue_automatiquement_si_pipe_sans_prompt_ni_fichier(self, mock_query):
         code, out, err = self._run([], stdin_text="contenu piped", stdin_isatty=False)
         self.assertEqual(code, 0)
@@ -486,51 +504,51 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("quota", err)
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_mode_diag_utilise_le_prompt_systeme_dedie(self, mock_query):
         code, out, err = self._run(["Analyse", "--mode", "diag"])
         self.assertEqual(code, 0)
         self.assertIn("CAUSE RACINE", mock_query.call_args.kwargs["system_instruction"])
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_mode_code_part_sur_la_cascade_heavy(self, mock_query):
         code, out, err = self._run(["Écris une fonction", "--mode", "code"])
         self.assertEqual(code, 0)
         self.assertEqual(mock_query.call_args.kwargs["model"], TIER_CASCADES["heavy"][0])
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_mode_diag_part_sur_la_cascade_fast(self, mock_query):
         code, out, err = self._run(["Analyse", "--mode", "diag"])
         self.assertEqual(mock_query.call_args.kwargs["model"], TIER_CASCADES["fast"][0])
 
-    @patch("scripts.ai_query.query_gemini", return_value="ok")
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_option_system_remplace_le_prompt_du_mode(self, mock_query):
         code, out, err = self._run(["x", "--mode", "diag", "-s", "Sur mesure."])
         self.assertEqual(mock_query.call_args.kwargs["system_instruction"], "Sur mesure.")
 
-    @patch("scripts.ai_query.query_gemini", return_value="Voici :\n```python\nx = 1\n```")
+    @patch("scripts.ai_query.query_gemini", return_value=("Voici :\n```python\nx = 1\n```", {}))
     def test_mode_code_extrait_le_bloc_sans_option(self, mock_query):
         code, out, err = self._run(["Écris", "--mode", "code"])
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "x = 1")
 
-    @patch("scripts.ai_query.query_gemini", return_value="```python\nx = 1\n```")
+    @patch("scripts.ai_query.query_gemini", return_value=("```python\nx = 1\n```", {}))
     def test_raw_code_hors_mode_code(self, mock_query):
         code, out, err = self._run(["x", "--raw-code"])
         self.assertEqual(out.strip(), "x = 1")
 
-    @patch("scripts.ai_query.query_gemini", return_value="```python\ndef f(:\n```")
+    @patch("scripts.ai_query.query_gemini", return_value=("```python\ndef f(:\n```", {}))
     def test_check_syntax_refuse_un_code_casse(self, mock_query):
         code, out, err = self._run(["x", "--mode", "code", "--check-syntax"])
         self.assertEqual(code, 3)
         self.assertIn("ne compile pas", err)
 
-    @patch("scripts.ai_query.query_gemini", return_value="```python\ndef f():\n    return 1\n```")
+    @patch("scripts.ai_query.query_gemini", return_value=("```python\ndef f():\n    return 1\n```", {}))
     def test_check_syntax_laisse_passer_un_code_valide(self, mock_query):
         code, out, err = self._run(["x", "--mode", "code", "--check-syntax"])
         self.assertEqual(code, 0)
 
-    @patch("scripts.ai_query.query_gemini", return_value="```python\nx = 1\n```")
+    @patch("scripts.ai_query.query_gemini", return_value=("```python\nx = 1\n```", {}))
     def test_output_ecrit_le_fichier(self, mock_query):
         path = os.path.join(tempfile.mkdtemp(), "genere.py")
         code, out, err = self._run(["x", "--mode", "code", "-o", path])
@@ -541,7 +559,7 @@ class MainTests(unittest.TestCase):
         finally:
             os.remove(path)
 
-    @patch("scripts.ai_query.query_gemini", return_value="")
+    @patch("scripts.ai_query.query_gemini", return_value=("", {}))
     def test_output_refuse_d_ecraser_avec_une_reponse_vide(self, mock_query):
         """Écraser un fichier existant par du néant est le pire échec
         silencieux possible pour un `-o` : mieux vaut un code de retour 1."""
@@ -556,7 +574,7 @@ class MainTests(unittest.TestCase):
         finally:
             os.remove(path)
 
-    @patch("scripts.ai_query.query_gemini", return_value="")
+    @patch("scripts.ai_query.query_gemini", return_value=("", {}))
     def test_reponse_vide_echoue_aussi_sans_output(self, mock_query):
         """Une redirection shell `> fichier.py` est équivalente à `-o` du point
         de vue appelant : sortir en 0 avec stdout vide y détruirait le fichier."""
@@ -566,7 +584,7 @@ class MainTests(unittest.TestCase):
         self.assertIn("réponse vide", err)
 
     @patch("scripts.ai_query.query_gemini",
-           return_value="```python\nimport os\n```\nLancer :\n```bash\npytest -q\n```")
+           return_value=("```python\nimport os\n```\nLancer :\n```bash\npytest -q\n```", {}))
     def test_mode_code_ignore_le_bloc_bash_accompagnateur(self, mock_query):
         """Cas le plus courant de la recette n°2 du SKILL : le modèle ajoute un
         bloc shell « pour lancer les tests ». Le concaténer casse le fichier."""
@@ -574,7 +592,7 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(out.strip(), "import os")
 
-    @patch("scripts.ai_query.query_gemini", return_value="```python\ndef f(:\n```")
+    @patch("scripts.ai_query.query_gemini", return_value=("```python\ndef f(:\n```", {}))
     def test_check_syntax_sort_en_3_pas_en_2(self, mock_query):
         """argparse réserve déjà le 2 aux erreurs de ligne de commande."""
         code, out, err = self._run(["x", "--mode", "code", "--check-syntax"])

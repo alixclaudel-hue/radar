@@ -64,16 +64,29 @@ prises et les points encore ouverts.
   (`Bash` journalisé par sa description, jamais par sa commande) et la propriété de
   boîte aux lettres de la branche `telemetry` (commit sans parent, index intact).
 
+- `scripts/telemetry_pull.py` — réception sur le VPS de ce que les sessions **hors**
+  VPS ont expédié : `git fetch` d'une référence dédiée (jamais un `pull`, la branche
+  est réécrite à chaque envoi), puis fusion dans `<data>/ops/` des seules lignes dont
+  le `ts` dépasse le maximum déjà stocké. Les expéditions se recouvrent largement —
+  chacune renvoie les 2000 dernières lignes — et sans ce filtre le fichier local se
+  peuplerait de doublons. Écrit en Python et non en shell comme prévu initialement :
+  la fusion suppose de lire le `ts` de chaque ligne, ce qui en shell imposerait `jq`,
+  absent du VPS. Écriture par fichier temporaire puis `os.replace`, parce que
+  `radar_ops` lit ce fichier pendant qu'on y écrit.
+- Page **Délégation** de `radar_ops` (`radar_ops/delegation.py`, route `/delegation`) :
+  totaux, répartition par mode et par modèle, volume par jour sur une fenêtre bornée,
+  part déléguée, et une ligne par session de développement. Ajoutée au balayage de
+  routes de la CI. Une ligne ancienne, sans les champs récents, compte pour 0 plutôt
+  que d'être écartée — sinon le tableau de bord ignorerait tout l'historique antérieur
+  à l'instrumentation.
+
 ### À faire
 
-- Récupérateur `scripts/telemetry_pull.sh` pour les sessions **hors** VPS : `git fetch
-  origin telemetry` depuis un clone séparé, puis report dans `/data/ops/` des seuls
-  événements dont l'horodatage dépasse le maximum déjà stocké.
-- Page tableau de bord de délégation dans `radar_ops` : jetons par mode, par modèle,
-  taux de repli de cascade, part des tâches déléguées, durée des appels.
 - Branchement des hooks dans `.claude/settings.json` : `SessionStart`,
   `UserPromptSubmit`, `PostToolUse`, `Stop`, `SessionEnd`. **Bloqué** sur la décision
   de confidentialité ci-dessous : brancher le hook, c'est commencer à enregistrer.
+- Tant que les hooks ne sont pas branchés, `telemetry.jsonl` n'existe pas : la page
+  Délégation n'affiche que les reçus Gemini, et dit quel fichier lui manque.
 
 ### Skill `telemetry` — qui fait quoi
 

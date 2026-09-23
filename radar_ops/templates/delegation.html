@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Délégation à Gemini</h2>
+<p class="note">Les jetons affichés sont ceux que l'API Gemini rapporte elle-même, et aucune estimation d'économie côté Claude n'est calculée parce que ce serait un contrefactuel.</p>
+
+{% if d.missing %}
+<p class="empty">Le transport n'a encore rien déposé dans <code>{{ d.dir }}</code> (fichiers manquants : {{ d.missing|join(', ') }}).</p>
+{% endif %}
+
+<p>
+  <span class="tag">Appels : {{ d.totals.calls }}</span>
+  <span class="tag">Succès : {{ d.totals.ok }}</span>
+  <span class="tag">Erreurs : {{ d.totals.err }}</span>
+  <span class="tag">Jetons entrée : {{ d.totals.prompt_tokens }}</span>
+  <span class="tag">Jetons sortie : {{ d.totals.output_tokens }}</span>
+  <span class="tag">Jetons total : {{ d.totals.total_tokens }}</span>
+  <span class="tag">Médiane : {{ (d.totals.median_ms ~ " ms") if d.totals.median_ms is not none else "—" }}</span>
+  <span class="tag">Replis : {{ d.totals.fallbacks }}</span>
+</p>
+
+<h2>Par mode</h2>
+<p class="note">Comment les appels et jetons se répartissent-ils selon le mode d'appel configuré pour Gemini ?</p>
+<table><thead><tr>
+  <th>Mode</th>
+  <th class="num">Appels</th>
+  <th class="num">Erreurs</th>
+  <th class="num">Entrée</th>
+  <th class="num">Sortie</th>
+  <th class="num">Total</th>
+  <th class="num">Médiane ms</th>
+  <th class="num">Replis</th>
+</tr></thead><tbody>
+{% for r in d.by_mode %}
+<tr>
+  <td>{{ r.mode }}</td>
+  <td class="num">{{ r.calls }}</td>
+  <td class="num">{{ r.err }}</td>
+  <td class="num">{{ r.prompt_tokens }}</td>
+  <td class="num">{{ r.output_tokens }}</td>
+  <td class="num">{{ r.total_tokens }}</td>
+  <td class="num dim">{{ r.median_ms if r.median_ms is not none else "—" }}</td>
+  <td class="num">{{ r.fallbacks }}</td>
+</tr>
+{% else %}<tr><td colspan="8" class="empty">Aucune donnée par mode.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Par modèle</h2>
+<p class="note">Quels modèles Gemini reçoivent la charge et quelles sont leurs performances observées ?</p>
+<table><thead><tr>
+  <th>Modèle</th>
+  <th class="num">Appels</th>
+  <th class="num">Erreurs</th>
+  <th class="num">Entrée</th>
+  <th class="num">Sortie</th>
+  <th class="num">Total</th>
+  <th class="num">Médiane ms</th>
+  <th class="num">Replis</th>
+</tr></thead><tbody>
+{% for r in d.by_model %}
+<tr>
+  <td>{{ r.model }}</td>
+  <td class="num">{{ r.calls }}</td>
+  <td class="num">{{ r.err }}</td>
+  <td class="num">{{ r.prompt_tokens }}</td>
+  <td class="num">{{ r.output_tokens }}</td>
+  <td class="num">{{ r.total_tokens }}</td>
+  <td class="num dim">{{ r.median_ms if r.median_ms is not none else "—" }}</td>
+  <td class="num">{{ r.fallbacks }}</td>
+</tr>
+{% else %}<tr><td colspan="8" class="empty">Aucune donnée par modèle.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Volume par jour</h2>
+<p class="note">Quelle est l'évolution quotidienne du trafic délégué et de la consommation de jetons ?</p>
+{% set max_tokens = (d.by_day | map(attribute='total_tokens') | list | max) if d.by_day else 0 %}
+<table><thead><tr>
+  <th>Jour</th>
+  <th class="num">Appels</th>
+  <th class="num">Jetons</th>
+  <th></th>
+</tr></thead><tbody>
+{% for r in d.by_day %}
+<tr>
+  <td>{{ r.date }}</td>
+  <td class="num">{{ r.calls }}</td>
+  <td class="num">{{ r.total_tokens }}</td>
+  <td>
+    <div class="bar"><i style="width: {{ (r.total_tokens * 100 / max_tokens) | round(1) if max_tokens > 0 else 0 }}%"></i></div>
+  </td>
+</tr>
+{% else %}<tr><td colspan="4" class="empty">Aucune donnée journalière.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Part déléguée</h2>
+<p class="note">Quel volume de sollicitation Claude Code représente la délégation vers Gemini ?</p>
+<p>
+  <span class="tag">Appels Gemini : {{ d.delegation.gemini_calls }}</span>
+  <span class="tag">Demandes utilisateur : {{ d.delegation.user_prompts }}</span>
+  <span class="tag">Appels d'outils : {{ d.delegation.tool_calls }}</span>
+  <span class="tag">Gemini / appel d'outil : {% if d.delegation.per_tool_call is not none %}{{ d.delegation.per_tool_call }}{% else %}— <span class="dim">(aucun outil)</span>{% endif %}</span>
+</p>
+
+<h2>Sessions de développement</h2>
+<p class="note">Quelle a été l'activité détaillée au fil des sessions Claude Code et quels outils ont été déclenchés ?</p>
+<table><thead><tr>
+  <th>Session</th>
+  <th>Début</th>
+  <th>Fin</th>
+  <th class="num">Demandes</th>
+  <th class="num">Outils</th>
+  <th class="num">Échecs</th>
+  <th>Outils les plus utilisés</th>
+</tr></thead><tbody>
+{% for s in d.sessions %}
+<tr>
+  <td><code>{{ (s.session or "")[:8] }}</code></td>
+  <td class="dim">{{ s.first_at or "—" }}</td>
+  <td class="dim">{{ s.last_at or "—" }}</td>
+  <td class="num">{{ s.prompts }}</td>
+  <td class="num">{{ s.tool_calls }}</td>
+  <td class="num">{{ s.tool_errs }}</td>
+  <td>
+    {% for t in s.top_tools %}<span class="tag">{{ t.name }} &times; {{ t.count }}</span> {% endfor %}
+  </td>
+</tr>
+{% else %}<tr><td colspan="7" class="empty">Aucune session enregistrée.</td></tr>{% endfor %}
+</tbody></table>
+
+<p class="note">Dossier lu : <code>{{ d.dir }}</code> (fenêtre de {{ d.days }} jours). Lignes traitées : {{ d.receipts_seen }} reçus et {{ d.events_seen }} événements.</p>
+{% endblock %}

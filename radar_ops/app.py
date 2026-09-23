@@ -20,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 from radar_web.radar import accounts, codeversion, opslog, paths, scorestore, store, websession
 from radar_web.radar import scoring as sc
 
-from . import freshness, inventory, probe
+from . import delegation, freshness, inventory, probe
 from .sampler import Sampler
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -173,6 +173,17 @@ def page_scoring(request: Request):
     return tpl.TemplateResponse(request, "scoring.html", {
         "page": "scoring", "rows": _scoring_rows(),
         "order": sc.topological_order(), "sha": codeversion.short()})
+
+
+# ------------------------------------------------------------------ délégation
+@app.get("/delegation", response_class=HTMLResponse)
+def page_delegation(request: Request, days: int = 14):
+    # Fenêtre bornée : elle sert à cadrer une lecture, pas à parcourir tout le
+    # journal depuis une URL fabriquée à la main.
+    days = max(1, min(int(days or 14), 90))
+    return tpl.TemplateResponse(request, "delegation.html", {
+        "page": "delegation", "d": delegation.snapshot(paths.DATA, days=days),
+        "sha": codeversion.short()})
 
 
 # --------------------------------------------------------------------- actions

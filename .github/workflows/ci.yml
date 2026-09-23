@@ -98,6 +98,7 @@ jobs:
           check /         '200|303'
           check /bases    '200|303'
           check /scoring  '200|303'
+          check /delegation '200|303'
           check /actions  '200|303'
           kill $pid 2>/dev/null || true
           exit $fail

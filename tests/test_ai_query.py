@@ -21,6 +21,7 @@ from scripts.ai_query import (  # noqa: E402
     SYSTEM_PROMPTS,
     TIER_CASCADES,
     GeminiHTTPError,
+    _key_from_dotenv,
     extract_raw_code,
     is_fallback_status,
     main,
@@ -597,6 +598,45 @@ class MainTests(unittest.TestCase):
         """argparse réserve déjà le 2 aux erreurs de ligne de commande."""
         code, out, err = self._run(["x", "--mode", "code", "--check-syntax"])
         self.assertEqual(code, 3)
+
+
+class KeyFromDotenvTests(unittest.TestCase):
+    """Repli de lecture de GEMINI_API_KEY dans le .env (lancement CLI hôte)."""
+
+    def _dotenv(self, contenu: str) -> str:
+        tmp = tempfile.NamedTemporaryFile(
+            mode="w+", delete=False, encoding="utf-8"
+        )
+        tmp.write(contenu)
+        tmp.close()
+        self.addCleanup(lambda: os.path.exists(tmp.name) and os.remove(tmp.name))
+        return tmp.name
+
+    def test_cle_simple(self):
+        self.assertEqual(_key_from_dotenv(self._dotenv("GEMINI_API_KEY=abc123")), "abc123")
+
+    def test_guillemets_doubles(self):
+        self.assertEqual(_key_from_dotenv(self._dotenv('GEMINI_API_KEY="abc123"')), "abc123")
+
+    def test_prefixe_export(self):
+        self.assertEqual(_key_from_dotenv(self._dotenv("export GEMINI_API_KEY=abc123")), "abc123")
+
+    def test_commentaires_et_lignes_vides(self):
+        contenu = "# a\n\n# b\nGEMINI_API_KEY=abc123\n\n"
+        self.assertEqual(_key_from_dotenv(self._dotenv(contenu)), "abc123")
+
+    def test_autres_cles_ignorees(self):
+        contenu = "OTHER=12345\nFOO=bar\nGEMINI_API_KEY=abc123\nANOTHER=xyz"
+        self.assertEqual(_key_from_dotenv(self._dotenv(contenu)), "abc123")
+
+    def test_cle_absente(self):
+        self.assertIsNone(_key_from_dotenv(self._dotenv("OTHER=12345\nFOO=bar\n")))
+
+    def test_valeur_vide(self):
+        self.assertIsNone(_key_from_dotenv(self._dotenv("GEMINI_API_KEY=")))
+
+    def test_fichier_inexistant(self):
+        self.assertIsNone(_key_from_dotenv("/tmp/nexiste_pas_9999.env"))
 
 
 if __name__ == "__main__":

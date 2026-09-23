@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% macro octets(n) -%}
+  {%- if n >= 1073741824 -%}{{ (n / 1073741824) | round(2) }} Go
+  {%- elif n >= 1048576 -%}{{ (n / 1048576) | round(1) }} Mo
+  {%- elif n >= 1024 -%}{{ (n / 1024) | round(0) | int }} ko
+  {%- else -%}{{ n }} o{%- endif -%}
+{%- endmacro %}
+{% macro age(s) -%}
+  {%- if s < 3600 -%}{{ (s / 60) | round(0) | int }} min
+  {%- elif s < 172800 -%}{{ (s / 3600) | round(0) | int }} h
+  {%- else -%}{{ (s / 86400) | round(0) | int }} j{%- endif -%}
+{%- endmacro %}
+{% block body %}
+<h2>Bases SQLite</h2>
+<p class="note">Ouvertes en lecture seule (<code>mode=ro</code>). Les lignes ne sont pas
+comptées au-delà de 200 Mo : sur le référentiel Discogs, un <code>COUNT(*)</code> est un
+parcours complet de plusieurs millions de lignes qui bloquerait la page.</p>
+<table><thead><tr>
+  <th>Fichier</th><th class="num">Taille</th><th class="num">Modifiée</th><th>Tables</th>
+</tr></thead><tbody>
+{% for db in inv.sqlite %}
+<tr>
+  <td>{{ db.path }}</td>
+  <td class="num">{{ octets(db.size_b) }}</td>
+  <td class="num dim">il y a {{ age(db.age_s) }}</td>
+  <td>
+    {% if db.error %}<span class="bad">{{ db.error }}</span>
+    {% elif not db.tables %}<span class="dim">aucune table</span>
+    {% else %}
+      {% for t in db.tables %}<span class="tag">{{ t.name }}
+        {% if t.rows is none %}<span class="dim">non compté</span>{% else %}{{ "{:,}".format(t.rows).replace(",", " ") }}{% endif %}
+      </span> {% endfor %}
+    {% endif %}
+  </td>
+</tr>
+{% else %}<tr><td colspan="4" class="empty">Aucune base trouvée sous {{ root }}.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Fichiers JSON</h2>
+<p class="note">Un fichier de plus de 8 Mo n'est pas ouvert : sa forme reste inconnue,
+sa taille et sa date suffisent au diagnostic.</p>
+<table><thead><tr>
+  <th>Fichier</th><th class="num">Taille</th><th class="num">Modifié</th>
+  <th>Forme</th><th class="num">Entrées</th>
+</tr></thead><tbody>
+{% for f in inv.json %}
+<tr>
+  <td>{{ f.path }}</td>
+  <td class="num">{{ octets(f.size_b) }}</td>
+  <td class="num dim">il y a {{ age(f.age_s) }}</td>
+  <td class="{{ 'bad' if f.kind == 'illisible' }}">{{ f.kind }}</td>
+  <td class="num">{{ f.count if f.count is not none else "—" }}</td>
+</tr>
+{% else %}<tr><td colspan="5" class="empty">Aucun fichier JSON sous {{ root }}.</td></tr>{% endfor %}
+</tbody></table>
+<p class="note">Total sur disque : {{ octets(inv.total_size_b) }} — racine {{ root }}.</p>
+{% endblock %}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar — diagnostic</title>
+<style>
+  body { background:#11131a; color:#e6e8ef; font:14px/1.5 ui-monospace,Menlo,monospace;
+         display:grid; place-items:center; height:100vh; margin:0; }
+  form { background:#1a1d27; border:1px solid #2c3040; border-radius:6px; padding:1.5rem;
+         display:grid; gap:.6rem; min-width:min(320px, 90vw); }
+  h1 { font-size:.9rem; margin:0 0 .4rem; letter-spacing:.06em; }
+  input { font:inherit; background:#11131a; border:1px solid #2c3040; color:inherit;
+          padding:.45rem .6rem; border-radius:4px; }
+  button { font:inherit; background:#60a5fa; color:#11131a; border:0; padding:.5rem;
+           border-radius:4px; cursor:pointer; font-weight:600; }
+  .err { color:#f87171; font-size:.82rem; }
+</style></head>
+<body>
+<form method="post" action="/login">
+  <h1>RADAR · diagnostic</h1>
+  {% if err %}<p class="err">Identifiants refusés, ou compte non propriétaire.</p>{% endif %}
+  <input name="username" placeholder="identifiant" autocomplete="username" autofocus>
+  <input name="password" type="password" placeholder="mot de passe" autocomplete="current-password">
+  <button>Entrer</button>
+</form>
+</body></html>

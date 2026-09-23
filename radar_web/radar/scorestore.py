@@ -75,6 +75,15 @@ def _create_schema(con):
         )
     """)
     con.execute("CREATE INDEX IF NOT EXISTS idx_track_scores_score ON track_scores(score)")
+    # Estampille du run de précalcul : sans elle, impossible de dire si les
+    # scores stockés ont été produits par la méthode de scoring courante ou par
+    # une méthode antérieure (page « fraîcheur » de `radar_ops`).
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS scorestore_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
 
 
 def _migrate_schema(con):
@@ -213,3 +222,24 @@ def stats(con):
         "SELECT COUNT(DISTINCT release_id) FROM track_scores").fetchone()[0]
     return {"n_releases": n_releases, "n_tracks": n_tracks,
             "n_releases_with_tracks": n_releases_with_tracks}
+
+
+def set_run_meta(con, mapping):
+    """Enregistre l'estampille du run courant. Les valeurs sont TOUJOURS des
+    chaînes : une base clé/valeur qui mélangerait types bruts et JSON obligerait
+    chaque lecteur à deviner le format."""
+    con.execute("""
+        CREATE TABLE IF NOT EXISTS scorestore_meta (key TEXT PRIMARY KEY, value TEXT)
+    """)
+    con.executemany(
+        "INSERT INTO scorestore_meta(key, value) VALUES(?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [(str(k), str(v)) for k, v in mapping.items()])
+    con.commit()
+
+
+def read_run_meta(con):
+    try:
+        return {k: v for k, v in con.execute("SELECT key, value FROM scorestore_meta")}
+    except sqlite3.Error:
+        return {}

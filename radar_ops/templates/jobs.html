@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Jobs en cours et terminés</h2>
+<p class="note">Le débit n'existe dans aucun fichier de statut : il est dérivé de
+lectures successives du même compteur, sur une fenêtre de 10 minutes. Un job à
+l'arrêt n'affiche pas de temps restant plutôt qu'un temps faux.</p>
+<table><thead><tr>
+  <th>Utilisateur</th><th>Job</th><th>État</th><th>Avancement</th>
+  <th class="num">Fait / total</th><th class="num">Débit /min</th>
+  <th class="num">Restant</th><th>Message</th>
+</tr></thead><tbody id="statuses"></tbody></table>
+
+<h2>File d'attente</h2>
+<p class="note">Le worker est sériel à dessein (rate-limit Discogs partagé). Un job
+interactif (priorité 1) passe devant un job de fond (priorité 0) encore en attente.</p>
+<table><thead><tr>
+  <th class="num">#</th><th>Utilisateur</th><th>Job</th><th>Priorité</th>
+  <th>État</th><th class="num">En attente</th>
+</tr></thead><tbody id="queue"></tbody></table>
+{% endblock %}
+
+{% block script %}
+<script id="boot" type="application/json">{{ data | tojson }}</script>
+<script>
+// Un seul moteur de rendu, alimenté d'abord par la charge initiale puis par le
+// flux SSE : dupliquer le rendu côté serveur ET côté navigateur aurait garanti
+// que les deux affichages finissent par diverger.
+const fmtDur = s => {
+  if (s === null || s === undefined) return "—";
+  s = Math.round(s);
+  if (s < 60) return s + " s";
+  if (s < 3600) return Math.floor(s / 60) + " min " + String(s % 60).padStart(2, "0");
+  return Math.floor(s / 3600) + " h " + String(Math.floor(s % 3600 / 60)).padStart(2, "0");
+};
+const esc = t => { const d = document.createElement("div"); d.textContent = t ?? ""; return d.innerHTML; };
+
+function renderStatuses(rows) {
+  const tb = document.getElementById("statuses");
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">Aucun job connu.</td></tr>'; return; }
+  tb.innerHTML = rows.map(s => {
+    const pct = s.pct === null || s.pct === undefined ? null : s.pct;
+    const state = s.running ? '<span class="tag run">en cours</span>'
+                : s.error   ? '<span class="tag bad">erreur</span>'
+                            : '<span class="tag dim">arrêté</span>';
+    const bar = pct === null ? '<span class="dim">—</span>'
+              : `<div class="bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+                 <span class="dim">${pct} %</span>`;
+    return `<tr>
+      <td>${esc(s.uid)}</td><td>${esc(s.name)}</td><td>${state}</td><td>${bar}</td>
+      <td class="num">${s.done} / ${s.total || "—"}</td>
+      <td class="num">${s.rate_per_min ?? "—"}</td>
+      <td class="num">${fmtDur(s.eta_s)}</td>
+      <td class="dim">${esc(s.error || s.message || "")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function renderQueue(rows) {
+  const tb = document.getElementById("queue");
+  if (!rows.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">File vide.</td></tr>'; return; }
+  tb.innerHTML = rows.map(j => {
+    const state = j.state === "running" ? '<span class="tag run">en cours</span>'
+                                        : '<span class="tag queue">en attente</span>';
+    return `<tr>
+      <td class="num">${j.position ?? "—"}</td><td>${esc(j.uid)}</td><td>${esc(j.name)}</td>
+      <td>${j.priority === 0 ? "fond" : "interactif"}</td>
+      <td>${state}</td><td class="num">${fmtDur(j.wait_s)}</td>
+    </tr>`;
+  }).join("");
+}
+
+function render(d) { renderStatuses(d.statuses || []); renderQueue(d.queue || []); }
+render(JSON.parse(document.getElementById("boot").textContent));
+new EventSource("/ops/stream/jobs").onmessage = e => render(JSON.parse(e.data));
+</script>
+{% endblock %}

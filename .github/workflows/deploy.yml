@@ -29,6 +29,9 @@ jobs:
           git fetch -q origin
           git reset --hard origin/main -q
           target=$(git rev-parse --short HEAD)
+          # estampille le code embarqué : .git est exclu de l'image (.dockerignore),
+          # sans cette variable l'appli ne peut pas dire quelle version elle exécute
+          export RADAR_CODE_SHA=$(git rev-parse HEAD)
           sudo docker compose up -d --build --remove-orphans
 
           # health-check DANS le conteneur (indépendant du binding de port hôte)
@@ -43,6 +46,7 @@ jobs:
           if [ "$ok" != "1" ]; then
             echo "::error::health KO sur $target — rollback vers ${prev:0:7}"
             git reset --hard "$prev" -q
+            export RADAR_CODE_SHA="$prev"
             sudo docker compose up -d --build --remove-orphans
             exit 1
           fi

@@ -25,10 +25,12 @@ jobs:
       - name: Compile
         run: |
           python -m py_compile crate_jobs.py
-          find radar_web -name "*.py" -print0 | xargs -0 python -m py_compile
+          find radar_web radar_ops -name "*.py" -print0 | xargs -0 python -m py_compile
 
-      - name: Import de l'appli
-        run: python -c "import radar_web.app"
+      - name: Import des applis
+        run: |
+          python -c "import radar_web.app"
+          python -c "import radar_ops.app"
 
       - name: Balayage des routes
         env:
@@ -67,6 +69,36 @@ jobs:
           check '/univers?tab=cart'    '303'
           check /wantlist          '200|303'
           check /settings         '200|303'
+          kill $pid 2>/dev/null || true
+          exit $fail
+
+      - name: Balayage des routes — radar_ops (diagnostic)
+        env:
+          CRATE_DATA_DIR: ${{ runner.temp }}/data-ops
+          RADAR_NO_AUTH: "1"
+        run: |
+          mkdir -p "$CRATE_DATA_DIR"
+          python -m uvicorn radar_ops.app:app --port 8610 --log-level warning &
+          pid=$!
+          for i in $(seq 1 20); do
+            curl -sf -o /dev/null http://127.0.0.1:8610/health && break
+            sleep 1
+          done
+          fail=0
+          check() {
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8610$1")
+            if echo "$code" | grep -qE "$2"; then
+              echo "  OK   $1 -> $code"
+            else
+              echo "  FAIL $1 -> $code"; fail=1
+            fi
+          }
+          check /health   '200'
+          check /login    '200'
+          check /         '200|303'
+          check /bases    '200|303'
+          check /scoring  '200|303'
+          check /actions  '200|303'
           kill $pid 2>/dev/null || true
           exit $fail
 

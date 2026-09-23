@@ -309,7 +309,7 @@ class SearchTracklistTestCase(unittest.TestCase):
         from fastapi.testclient import TestClient
         from radar_web import app as appmod
         self.appmod = appmod
-        p = mock.patch.object(appmod, "_dev_mode", return_value=True)
+        p = mock.patch.object(appmod.websession, "dev_mode", return_value=True)
         p.start()
         self.addCleanup(p.stop)
         self.client = TestClient(appmod.app, raise_server_exceptions=False)

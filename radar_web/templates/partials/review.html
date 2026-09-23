@@ -15,6 +15,9 @@
                   hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
           <button class="small" hx-post="/univers/review/label/reject" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>✗ non</button>
+          <button class="small" hx-post="/univers/review/label/delete" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-confirm="Supprimer « {{ r.original }} » de ta base de labels ?"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
         </td>
       </tr>
       {% endfor %}
@@ -27,6 +30,9 @@
                   hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
           <button class="small" hx-post="/univers/review/artist/reject" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>✗ non</button>
+          <button class="small" hx-post="/univers/review/artist/delete" hx-target="#review-panel" hx-swap="outerHTML"
+                  hx-confirm="Supprimer « {{ r.original }} » de ta base d'artistes ?"
+                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
         </td>
       </tr>
       {% endfor %}

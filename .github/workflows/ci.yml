@@ -25,7 +25,7 @@ jobs:
       - name: Compile
         run: |
           python -m py_compile crate_jobs.py
-          find radar_web radar_ops -name "*.py" -print0 | xargs -0 python -m py_compile
+          find radar_web radar_ops scripts -name "*.py" -print0 | xargs -0 python -m py_compile
 
       - name: Import des applis
         run: |

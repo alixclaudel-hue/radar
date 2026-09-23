@@ -21,7 +21,9 @@ from scripts.ai_query import (  # noqa: E402
     SYSTEM_PROMPTS,
     TIER_CASCADES,
     GeminiHTTPError,
+    _base_url_template,
     _key_from_dotenv,
+    _read_gateway_marker,
     extract_raw_code,
     is_fallback_status,
     main,
@@ -434,6 +436,59 @@ class AuthHintTests(unittest.TestCase):
         with self.assertRaises(GeminiHTTPError) as ctx:
             query_gemini("x", api_key="fake-key")
         self.assertNotIn("identifiant réseau", str(ctx.exception))
+
+
+class GatewayRoutingTests(unittest.TestCase):
+    """Chemin session cloud : le mini gateway `scripts/gemini_gateway.py`
+    prend la relève. La clé Gemini part depuis lui, pas depuis ai_query.py."""
+
+    def setUp(self):
+        # Chaque test doit décider explicitement de l'état du marqueur et
+        # de RADAR_GEMINI_BASE_URL : partons d'un environnement propre.
+        self.env_patcher = patch.dict("os.environ", {}, clear=True)
+        self.env_patcher.start()
+        self.addCleanup(self.env_patcher.stop)
+        self.marker_patcher = patch("scripts.ai_query._read_gateway_marker", return_value="")
+        self.marker_patcher.start()
+        self.addCleanup(self.marker_patcher.stop)
+
+    def test_base_url_par_defaut_pointe_sur_google(self):
+        self.assertIn("generativelanguage.googleapis.com", _base_url_template())
+
+    def test_env_var_override_gagne_sur_le_defaut(self):
+        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
+        self.assertTrue(_base_url_template().startswith("http://127.0.0.1:8632/"))
+
+    def test_marqueur_pris_en_compte_quand_env_var_absente(self):
+        self.marker_patcher.stop()
+        with patch("scripts.ai_query._read_gateway_marker", return_value="http://127.0.0.1:9999/v1beta/models/"):
+            self.assertTrue(_base_url_template().startswith("http://127.0.0.1:9999/"))
+        # Rétablit le patch pour addCleanup.
+        self.marker_patcher = patch("scripts.ai_query._read_gateway_marker", return_value="")
+        self.marker_patcher.start()
+
+    @patch("urllib.request.urlopen")
+    def test_gateway_actif_pas_de_key_dans_url(self, mock_urlopen):
+        # Un gateway est vu (via env var) : ai_query.py ne doit PAS mettre
+        # ?key= dans l'URL — la vraie clé de l'env cloud est invalide sur
+        # v1beta, seule celle posée par le gateway s'authentifie.
+        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
+        os.environ["GEMINI_API_KEY"] = "cle_injectee_par_le_proxy"
+        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
+        query_gemini("Bonjour", api_key=None)
+        req = mock_urlopen.call_args[0][0]
+        self.assertNotIn("key=", req.full_url)
+        self.assertTrue(req.full_url.startswith("http://127.0.0.1:8632/"))
+
+    @patch("urllib.request.urlopen")
+    def test_api_key_explicite_prime_sur_le_gateway(self, mock_urlopen):
+        # Un usage programmatique qui passe api_key= veut vraiment cette clé
+        # dans l'URL (contrat d'appel) ; le gateway ne doit pas court-circuiter.
+        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
+        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
+        query_gemini("Bonjour", api_key="fake-key")
+        req = mock_urlopen.call_args[0][0]
+        self.assertIn("key=fake-key", req.full_url)
 
 
 class MainTests(unittest.TestCase):

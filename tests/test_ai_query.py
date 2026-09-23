@@ -21,6 +21,7 @@ from scripts.ai_query import (  # noqa: E402
     SYSTEM_PROMPTS,
     TIER_CASCADES,
     GeminiHTTPError,
+    _load_dotenv_fallback,
     extract_raw_code,
     is_fallback_status,
     main,
@@ -433,6 +434,64 @@ class AuthHintTests(unittest.TestCase):
         with self.assertRaises(GeminiHTTPError) as ctx:
             query_gemini("x", api_key="fake-key")
         self.assertNotIn("identifiant réseau", str(ctx.exception))
+
+
+class LoadDotenvFallbackTests(unittest.TestCase):
+    """`_load_dotenv_fallback` : repli sur `.env` pour un lancement direct sur
+    l'hôte (session VPS), sans casser le cas conteneur qui exporte déjà la clé."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.env_path = os.path.join(self.temp_dir.name, ".env")
+
+    def _write_env(self, contenu):
+        with open(self.env_path, "w", encoding="utf-8") as f:
+            f.write(contenu)
+
+    @patch.dict("os.environ", {"GEMINI_API_KEY": "deja_exportee"}, clear=True)
+    def test_variable_deja_exportee_jamais_ecrasee(self):
+        self._write_env("GEMINI_API_KEY=valeur_du_fichier\n")
+        _load_dotenv_fallback(path=self.env_path)
+        self.assertEqual(os.environ["GEMINI_API_KEY"], "deja_exportee")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_variable_absente_reprise_depuis_le_fichier(self):
+        self._write_env("GEMINI_API_KEY=valeur_du_fichier\n")
+        _load_dotenv_fallback(path=self.env_path)
+        self.assertEqual(os.environ.get("GEMINI_API_KEY"), "valeur_du_fichier")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_fichier_env_absent_aucune_exception(self):
+        inexistant = os.path.join(self.temp_dir.name, "absent.env")
+        _load_dotenv_fallback(path=inexistant)
+        self.assertNotIn("GEMINI_API_KEY", os.environ)
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_commentaires_et_lignes_vides_ignores(self):
+        self._write_env(
+            "\n   \n# commentaire\nAUTRE_VAR=x\nGEMINI_API_KEY=valeur_valide\n"
+        )
+        _load_dotenv_fallback(path=self.env_path)
+        self.assertEqual(os.environ.get("GEMINI_API_KEY"), "valeur_valide")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_cle_absente_du_fichier_laisse_la_variable_non_definie(self):
+        self._write_env("AUTRE_VAR=other_value\n")
+        _load_dotenv_fallback(path=self.env_path)
+        self.assertNotIn("GEMINI_API_KEY", os.environ)
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_espaces_autour_de_la_cle_et_de_la_valeur_retires(self):
+        self._write_env("  GEMINI_API_KEY = valeur_avec_espaces  \n")
+        _load_dotenv_fallback(path=self.env_path)
+        self.assertEqual(os.environ.get("GEMINI_API_KEY"), "valeur_avec_espaces")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_variable_personnalisee(self):
+        self._write_env("AUTRE_CLE=une_valeur\n")
+        _load_dotenv_fallback(var="AUTRE_CLE", path=self.env_path)
+        self.assertEqual(os.environ.get("AUTRE_CLE"), "une_valeur")
 
 
 class MainTests(unittest.TestCase):

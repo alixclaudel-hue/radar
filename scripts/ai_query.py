@@ -147,6 +147,36 @@ def _auth_hint(status: int, message: str, key: str | None) -> str:
     )
 
 
+def _load_dotenv_fallback(var: str = "GEMINI_API_KEY", path: str | None = None) -> None:
+    """Repli sur `.env` si `var` n'est pas déjà dans l'environnement du process.
+
+    `docker compose` injecte `.env` nativement dans le conteneur, mais un
+    lancement direct du script sur l'hôte (cas documenté par le skill
+    `vps-ops`) ne le fait pas : la clé posée dans `.env` restait invisible et
+    l'appel échouait en 403 sans indice qu'elle existe, juste non exportée.
+    Ne touche jamais l'environnement si `var` y est déjà : une variable
+    exportée par l'appelant (`set -a; source .env`) reste prioritaire. Parseur
+    minimal à dessein (pas de guillemets ni de multiligne) : ce `.env` n'en a
+    pas besoin, et le projet n'a aucune dépendance à `python-dotenv`.
+    """
+    if os.environ.get(var):
+        return
+    if path is None:
+        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, _, value = line.partition("=")
+                if key.strip() == var:
+                    os.environ[var] = value.strip()
+                    return
+    except OSError:
+        pass
+
+
 def is_fallback_status(status: int) -> bool:
     """Le modèle suivant de la cascade a-t-il une chance d'aboutir ?
 
@@ -407,6 +437,8 @@ def resolve_tier(mode: str, explicit_tier: str | None = None) -> str:
 
 
 def main() -> int:
+    _load_dotenv_fallback()
+
     parser = argparse.ArgumentParser(
         description="Passerelle d'orchestration multi-modèles Gemini pour Radar."
     )

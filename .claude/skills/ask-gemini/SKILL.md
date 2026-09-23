@@ -129,6 +129,10 @@ sans diagnostiquer (relevé de compteurs, balayage d'un journal sain), préfére
 
 - **VPS / local** : variable `GEMINI_API_KEY` (clé gratuite sur
   https://aistudio.google.com/apikey). Le script l'ajoute en `?key=` dans l'URL.
+  Un lancement direct sur l'hôte (hors `docker compose`, qui injecte `.env`
+  nativement) lit désormais `.env` en repli si la variable n'est pas déjà
+  exportée — plus besoin de `set -a; source ~/radar/.env; set +a` avant
+  d'appeler le script (correctif du 23/09, cf. `_load_dotenv_fallback`).
 - **Session cloud** : un « identifiant » (credential) configuré côté réglages
   de l'environnement (section « Identifiants API », pas « Variables
   d'environnement » — cette dernière est en clair et déconseillée pour un

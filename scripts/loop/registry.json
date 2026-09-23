@@ -31,5 +31,20 @@
       "replay_payloads": ["/search", "/videos"],
       "why_failures_only": "Mesuré le 19/09 : rejouer des succès ne discrimine rien (YouTube renvoie déjà la bonne vidéo en 1re position pour une requête bien formée — les 25 cas de plancher passent même avec le scoring court-circuité). Seuls les échecs disent si un changement améliore quoi que ce soit."
     }
+  },
+
+  "ai_query": {
+    "description": "Passerelle Gemini : robustesse de la cascade de modèles (repli sur erreur récupérable, arrêt sur erreur fatale) et traitement des réponses dégradées (candidates vides, filtre de sécurité).",
+    "bench": ["python3", "scripts/bench_ai_query.py"],
+    "touchable": [
+      "scripts/ai_query.py",
+      "scripts/bench_ai_query.py"
+    ],
+    "observe": {
+      "source": "reçus Gemini (.claude/gemini-receipts.jsonl) et logs stderr des sessions",
+      "what": "Les ÉCHECS de délégation : status=error dans les reçus, cascades épuisées (fallbacks >= nb modèles du tier), réponses vides (200 mais rien d'exploitable), et les cas où Gemini aurait dû être sollicité mais ne l'a pas été (décision de routage sous-optimale).",
+      "replay_payloads": [],
+      "why_failures_only": "Un appel Gemini qui réussit ne dit rien sur la robustesse de la cascade ni sur la qualité de la décision de délégation. Seuls les échecs et les occasions manquées mesurent un progrès."
+    }
   }
 }

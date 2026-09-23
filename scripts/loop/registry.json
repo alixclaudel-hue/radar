@@ -11,6 +11,10 @@
     "de cette liste n'est jamais mergé tout seul, il part en PR pour relecture humaine."
   ],
 
+  "env": {
+    "RADAR_TELEMETRY_DIR": "/home/ubuntu/radar/data/ops"
+  },
+ 
   "ytcache": {
     "description": "Matching d'une piste vers une vidéo YouTube : construction de la requête, puis scoring des 15 candidats (radar_web/radar/ytcache.py::_best_match).",
     "bench": ["python3", "scripts/bench_ytcache.py"],

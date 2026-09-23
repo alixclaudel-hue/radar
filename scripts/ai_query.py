@@ -23,9 +23,47 @@ import time
 import urllib.error
 import urllib.request
 
-BASE_URL_TEMPLATE = (
+_DEFAULT_BASE_URL_TEMPLATE = (
     "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 )
+
+
+_GATEWAY_MARKER = "/tmp/radar-gemini-gateway.url"
+
+
+def _read_gateway_marker() -> str:
+    """URL du gateway écrite par `scripts/cloud-gemini-gateway.sh` au SessionStart.
+
+    Repli quand `RADAR_GEMINI_BASE_URL` n'est pas exportée dans l'environnement
+    du process appelant (le hook shell ne peut pas exporter dans le shell parent).
+    Fichier éphémère volontairement placé sous `/tmp` — jamais commité, disparaît
+    à la fin de la session. Absent sur le VPS : chemin direct inchangé.
+    """
+    try:
+        with open(_GATEWAY_MARKER, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def _base_url_template() -> str:
+    """URL cible pour l'appel Gemini, avec override par `RADAR_GEMINI_BASE_URL`.
+
+    En session cloud (dépôt frais, sans clé Gemini exportée), un mini gateway
+    local — `scripts/gemini_gateway.py` — reçoit `RADAR_GEMINI_BASE_URL` sous la
+    forme `http://127.0.0.1:8632/v1beta/models/` et ajoute lui-même `?key=`.
+    Sur le VPS et en Docker, la variable est absente : appel direct à Google
+    inchangé.
+    """
+    override = (os.environ.get("RADAR_GEMINI_BASE_URL") or "").strip()
+    if not override:
+        override = _read_gateway_marker()
+    if not override:
+        return _DEFAULT_BASE_URL_TEMPLATE
+    return override.rstrip("/") + "/{model}:generateContent"
+
+
+BASE_URL_TEMPLATE = _DEFAULT_BASE_URL_TEMPLATE  # rétrocompat pour tests qui l'importaient
 
 # Cascades ordonnées par capacité décroissante. Les noms sont ceux renvoyés par
 # ListModels (v1beta) — un modèle absent de cette liste répond 404, pas une
@@ -259,9 +297,20 @@ def query_gemini(
     session cloud. Sans clé locale ni identifiant réseau, Gemini répond avec
     une erreur d'authentification explicite (capturée plus bas).
     """
+    # Quand un gateway local prend la relève (session cloud, via
+    # `RADAR_GEMINI_BASE_URL` ou le marqueur `/tmp/radar-gemini-gateway.url`),
+    # c'est lui qui pose la clé — la joindre ici enverrait la clé injectée par
+    # l'environnement (invalide sur cette session) et écraserait celle du
+    # gateway côté Google (premier `?key=` prime). Un `api_key` explicitement
+    # passé par l'appelant (usage programmatique, tests) court-circuite cette
+    # règle : c'est un contrat d'appel qui doit être respecté.
     key = api_key or os.getenv("GEMINI_API_KEY") or _key_from_dotenv()
-    url = BASE_URL_TEMPLATE.format(model=model)
-    if key:
+    gateway_in_charge = (not api_key) and (
+        bool((os.environ.get("RADAR_GEMINI_BASE_URL") or "").strip())
+        or bool(_read_gateway_marker())
+    )
+    url = _base_url_template().format(model=model)
+    if key and not gateway_in_charge:
         url += f"?key={key}"
 
     payload: dict = {

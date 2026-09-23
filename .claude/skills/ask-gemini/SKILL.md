@@ -133,15 +133,17 @@ sans diagnostiquer (relevé de compteurs, balayage d'un journal sain), préfére
   nativement) lit désormais `.env` en repli si la variable n'est pas déjà
   exportée — plus besoin de `set -a; source ~/radar/.env; set +a` avant
   d'appeler le script (correctif du 23/09, cf. `_key_from_dotenv`).
-- **Session cloud** : un « identifiant » (credential) configuré côté réglages
-  de l'environnement (section « Identifiants API », pas « Variables
-  d'environnement » — cette dernière est en clair et déconseillée pour un
-  secret). Concrètement : type Bearer, en-tête personnalisé renommé
-  `x-goog-api-key` (préfixe vide, valeur = la clé), site autorisé
-  `generativelanguage.googleapis.com`. Le proxy réseau de la session injecte
-  l'en-tête sans jamais exposer la clé au code — `GEMINI_API_KEY` reste absente
-  de l'environnement, c'est normal et attendu dans ce mode (vérifié en
-  conditions réelles les 20 et 21/09/2026).
+- **Session cloud (chemin actuel)** : un mini gateway local
+  `scripts/gemini_gateway.py` lit la clé Gemini posée par l'utilisateur dans
+  `~/.claude-code-router/config.sqlite` (via l'interface CCR) et l'ajoute en
+  `?key=` sur chaque appel forwardé à `generativelanguage.googleapis.com`. Le
+  hook `scripts/cloud-gemini-gateway.sh` le démarre au SessionStart et écrit
+  `/tmp/radar-gemini-gateway.url` que `ai_query.py` lit automatiquement.
+  Aucune variable à exporter, aucune action manuelle. Le gateway meurt avec la
+  session (23/09/2026 — remplace l'ancien chemin « identifiant réseau
+  `x-goog-api-key` » qui n'a jamais fonctionné en pratique : le proxy sortant
+  réécrit ce header en un ADC OAuth non accepté par v1beta, d'où les 401
+  ACCESS_TOKEN_TYPE_UNSUPPORTED).
 
 C'est pour ce second mode que le script **n'exige jamais** de clé locale :
 lever une erreur quand `GEMINI_API_KEY` est absente couperait la session cloud

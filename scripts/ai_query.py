@@ -583,6 +583,14 @@ def main() -> int:
         )
     except Exception as e:
         sys.stderr.write(f"Erreur : {e}\n")
+        err_msg = str(e)
+        if "cascade" in err_msg.lower():
+            meta["error_type"] = "cascade_exhausted"
+        elif isinstance(e, GeminiHTTPError):
+            meta["error_type"] = f"http_{e.status}"
+        else:
+            meta["error_type"] = "api_error"
+        meta["error_detail"] = err_msg[:200]
         write_receipt(args.mode, "error",
                       elapsed_ms=round((time.time() - started) * 1000), **meta)
         return 1
@@ -598,6 +606,7 @@ def main() -> int:
     # shell `> fichier.py`, que rien ne distinguerait du point de vue appelant.
     if not response.strip():
         sys.stderr.write(f"Erreur : réponse vide de {used_model}, rien à écrire.\n")
+        meta["error_type"] = "empty_response"
         write_receipt(args.mode, "error", **meta)
         return 1
 
@@ -608,8 +617,8 @@ def main() -> int:
             sys.stderr.write(
                 f"Erreur : le code généré par {used_model} ne compile pas ({syn_err}).\n"
             )
-            # 3 et non 2 : argparse réserve déjà 2 aux erreurs de ligne de
-            # commande, un appelant doit pouvoir distinguer les deux échecs.
+            meta["error_type"] = "syntax_error"
+            meta["error_detail"] = str(syn_err)[:200]
             write_receipt(args.mode, "error", **meta)
             return 3
 

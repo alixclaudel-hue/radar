@@ -1,11 +1,10 @@
 import importlib.util
 import os
-import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
-# Chargement dynamique des modules requis sans dépendre de leur emplacement en tant que paquet
+# Chargement dynamique du module requis sans dépendre de son emplacement en tant que paquet
 def _load_module(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
@@ -15,16 +14,12 @@ def _load_module(module_name, file_path):
 telemetry_path_file = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "scripts", "hooks", "telemetry.py")
 )
-ship_path_file = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "scripts", "telemetry_ship.py")
-)
 
 telemetry = _load_module("telemetry", telemetry_path_file)
-telemetry_ship = _load_module("telemetry_ship", ship_path_file)
 
 
 class TestTelemetry(unittest.TestCase):
-    """Suite de tests unitaire complète pour telemetry.py et telemetry_ship.py."""
+    """Suite de tests unitaire complète pour telemetry.py."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -148,15 +143,26 @@ class TestTelemetry(unittest.TestCase):
 
     def test_telemetry_path_environnement(self):
         """Vérifie telemetry_path par défaut et sous RADAR_TELEMETRY_DIR via patch.dict."""
-        # Cas par défaut
-        default_p = telemetry.telemetry_path(self.project_dir)
-        self.assertEqual(default_p, os.path.join(self.project_dir, ".claude", "telemetry.jsonl"))
+        # Cas par défaut (ni variable, ni data/ops) → .claude/
+        env_clean = {k: v for k, v in os.environ.items() if k != "RADAR_TELEMETRY_DIR"}
+        with patch.dict(os.environ, env_clean, clear=True):
+            default_p = telemetry.telemetry_path(self.project_dir)
+            self.assertEqual(default_p, os.path.join(self.project_dir, ".claude", "telemetry.jsonl"))
 
         # Cas avec RADAR_TELEMETRY_DIR
         custom_dir = os.path.join(self.project_dir, "custom_ops")
         with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": custom_dir}):
             custom_p = telemetry.telemetry_path(self.project_dir)
             self.assertEqual(custom_p, os.path.join(custom_dir, "telemetry.jsonl"))
+
+    def test_telemetry_path_data_ops(self):
+        """Vérifie que telemetry_path préfère data/ops quand le dossier existe."""
+        data_ops = os.path.join(self.project_dir, "data", "ops")
+        os.makedirs(data_ops)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("RADAR_TELEMETRY_DIR", None)
+            p = telemetry.telemetry_path(self.project_dir)
+            self.assertEqual(p, os.path.join(data_ops, "telemetry.jsonl"))
 
     def test_main_entree_vide_et_invalide(self):
         """Vérifie que main ne lève jamais et renvoie 0 sur entrée vide et JSON invalide."""
@@ -172,120 +178,6 @@ class TestTelemetry(unittest.TestCase):
         with patch("sys.stdin", unittest.mock.mock_open(read_data="[1, 2, 3]")):
             self.assertEqual(telemetry.main(), 0)
 
-    # --- Tests pour telemetry_ship.py ---
-
-    def test_tail_lines_cas_limites(self):
-        """Vérifie tail_lines sur fichier absent, vide, et gestion des lignes avec saut de ligne final."""
-        missing_file = os.path.join(self.project_dir, "absent.jsonl")
-        self.assertEqual(telemetry_ship.tail_lines(missing_file, 5), "")
-
-        empty_file = os.path.join(self.project_dir, "empty.jsonl")
-        with open(empty_file, "w", encoding="utf-8") as f:
-            pass
-        self.assertEqual(telemetry_ship.tail_lines(empty_file, 5), "")
-
-        # Fichier avec plusieurs lignes
-        multi_file = os.path.join(self.project_dir, "multi.jsonl")
-        with open(multi_file, "w", encoding="utf-8") as f:
-            f.write("ligne1\nligne2\nligne3\nligne4\n")
-
-        result = telemetry_ship.tail_lines(multi_file, 2)
-        self.assertEqual(result, "ligne3\nligne4\n")
-
-    def test_ship_dans_vrai_depot_git(self):
-        """Vérifie ship dans un vrai dépôt git initialisé avec la propriété boîte aux lettres."""
-        repo_dir = self.project_dir
-
-        # Initialisation du dépôt git local
-        subprocess.run(["git", "init", repo_dir], check=True, capture_output=True)
-        subprocess.run(["git", "-C", repo_dir, "config", "user.email", "test@radar.org"], check=True, capture_output=True)
-        subprocess.run(["git", "-C", repo_dir, "config", "user.name", "Test Radar"], check=True, capture_output=True)
-
-        # Commit initial obligatoire pour avoir une base
-        readme_path = os.path.join(repo_dir, "README.md")
-        with open(readme_path, "w", encoding="utf-8") as f:
-            f.write("Init")
-        subprocess.run(["git", "-C", repo_dir, "add", "README.md"], check=True, capture_output=True)
-        subprocess.run(["git", "-C", repo_dir, "commit", "-m", "Initial commit"], check=True, capture_output=True)
-
-        # Création des fichiers de télémétrie dans .claude/
-        claude_dir = os.path.join(repo_dir, ".claude")
-        os.makedirs(claude_dir, exist_ok=True)
-
-        telemetry_file = os.path.join(claude_dir, "telemetry.jsonl")
-        with open(telemetry_file, "w", encoding="utf-8") as f:
-            f.write('{"kind": "session_start"}\n')
-
-        files_map = {
-            "telemetry.jsonl": telemetry_file,
-        }
-
-        # Récupération de la branche courante avant l'opération pour vérifier qu'elle n'est pas touchée
-        current_branch_before = subprocess.run(
-            ["git", "-C", repo_dir, "branch", "--show-current"],
-            capture_output=True, text=True, check=True
-        ).stdout.strip()
-
-        # Première expédition (push=False)
-        res1 = telemetry_ship.ship(repo_dir=repo_dir, files=files_map, push=False)
-        self.assertIsNotNone(res1["commit"])
-        self.assertFalse(res1["pushed"])
-
-        # Vérification de la propriété "boîte aux lettres" : commit sans parent
-        rev_count_1 = subprocess.run(
-            ["git", "-C", repo_dir, "rev-list", "--count", "telemetry"],
-            capture_output=True, text=True, check=True
-        ).stdout.strip()
-        self.assertEqual(rev_count_1, "1")
-
-        # Deuxième expédition (écrase la branche avec un nouveau commit sans parent)
-        res2 = telemetry_ship.ship(repo_dir=repo_dir, files=files_map, push=False)
-        self.assertIsNotNone(res2["commit"])
-
-        rev_count_2 = subprocess.run(
-            ["git", "-C", repo_dir, "rev-list", "--count", "telemetry"],
-            capture_output=True, text=True, check=True
-        ).stdout.strip()
-        self.assertEqual(rev_count_2, "1")
-
-        # Vérification que la branche courante et l'index n'ont pas bougé
-        current_branch_after = subprocess.run(
-            ["git", "-C", repo_dir, "branch", "--show-current"],
-            capture_output=True, text=True, check=True
-        ).stdout.strip()
-        self.assertEqual(current_branch_before, current_branch_after)
-
-        # L'index reste vide de tout ajout : l'expédition écrit les objets
-        # directement, elle ne passe jamais par `git add` (les deux journaux
-        # sont dans .gitignore et ne doivent pas entrer dans l'historique).
-        staged = subprocess.run(
-            ["git", "-C", repo_dir, "diff", "--cached", "--name-only"],
-            capture_output=True, text=True, check=True
-        ).stdout.strip()
-        self.assertEqual(staged, "")
-
-        # Vérification du contenu de l'arbre du commit expédié
-        ls_tree = subprocess.run(
-            ["git", "-C", repo_dir, "ls-tree", "-r", "telemetry"],
-            capture_output=True, text=True, check=True
-        ).stdout.strip()
-        self.assertIn("telemetry.jsonl", ls_tree)
-
-    def test_ship_aucun_contenu(self):
-        """Vérifie que ship renvoie commit=None et pushed=False quand aucun fichier n'a de contenu."""
-        repo_dir = self.project_dir
-        subprocess.run(["git", "init", repo_dir], check=True, capture_output=True)
-
-        empty_file = os.path.join(repo_dir, "empty.jsonl")
-        with open(empty_file, "w", encoding="utf-8") as f:
-            pass
-
-        files_map = {"telemetry.jsonl": empty_file}
-        res = telemetry_ship.ship(repo_dir=repo_dir, files=files_map, push=False)
-
-        self.assertIsNone(res["commit"])
-        self.assertFalse(res["pushed"])
-        self.assertEqual(res["entries"], {})
 
 
 if __name__ == "__main__":

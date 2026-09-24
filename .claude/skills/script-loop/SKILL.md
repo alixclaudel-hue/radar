@@ -29,7 +29,7 @@ corrige jamais le code dans un checkout servi en production.
 
 | Session | Dépôt de travail | Observations |
 |---|---|---|
-| cloud | son clone habituel | lues sur `radar-diag` (l'attacher via `add_repo`) |
+| cloud (session archivée) | son clone habituel | lues sur `radar-diag` (l'attacher via `add_repo`) |
 | VPS | **`~/radar-work`**, jamais `~/radar` | déjà sur place, ou collectées par `/script-observe` |
 
 Côté VPS, le périmètre exact est celui de la section « Boucle d'amélioration
@@ -40,6 +40,7 @@ PR de boucle n'est déjà ouverte sur ce script : deux sessions qui corrigent le
 mêmes fichiers en parallèle, c'est le conflit que la séparation historique
 existait pour empêcher.
 
+Lis `.claude/skills/ask-gemini/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.
 ---
 
 ## Étape 0 — Quel script
@@ -47,7 +48,7 @@ existait pour empêcher.
 L'argument arrive après `ARGUMENTS:`. Sans argument, liste les scripts de
 `scripts/loop/registry.json` et demande lequel.
 
-Lis l'entrée du registre et retiens :
+Utilise /ask-gemini pour lire l'entrée du registre et retiens :
 
 ```
 module     = <module principal>
@@ -72,17 +73,17 @@ banc et une source d'observations. Dis-le, propose de les créer, et arrête-toi
 (`add_repo` puis clone) s'il n'est pas dans la session, sinon `git pull`. Côté
 VPS, il est déjà là (`~/radar-diag`) : `git pull`.
 
-Prends le lot le plus récent de `obs_dir`, lis son `meta.json`.
+Prends le lot le plus récent de `obs_dir`, utilise ask-gemini mode read pour lire son `meta.json`.
 
 **Branche A — aucun lot.** La boucle n'a rien à diagnostiquer.
 - Côté VPS : lance la collecte toi-même (`/script-observe <script>`), puis
   reprends ici.
-- Côté cloud : écris la demande dans
+- Côté cloud (session archivée): écris la demande dans
   `docs/diagnostics/<script>-collecte-demandee.md` (une phrase : quel script,
   quelles familles d'échecs, plafond de quota), dis à l'utilisateur de lancer
   `/script-observe <script>` sur sa session VPS, et **arrête-toi**.
 
-**Branche B — lot plus vieux que le dernier déploiement.** Compare
+**Branche B — lot plus vieux que le dernier déploiement.** Utilise ask-gemini pour comparer
 `meta.deployed_sha` au `HEAD` de `main`. Si du code du périmètre `touchable` a
 bougé depuis, le lot décrit un comportement qui n'existe plus : signale-le et
 demande une collecte fraîche avant d'aller plus loin.
@@ -111,9 +112,9 @@ résultat, dis-le en une ligne.
 
 ## Étape 3 — Transformer chaque finding en cas de banc
 
-Pour chaque finding retenue, dans l'ordre du document :
+Pour chaque finding retenue, demande une lecture à /ask-gemini en mode read et summary dans l'ordre du document :
 
-1. Écris le cas dans les fixtures du script, avec `"kind": "adversarial"` et les
+1. Écris le cas en utilise /ask-gemini mode code dans les fixtures du script, avec `"kind": "adversarial"` et les
    charges utiles du lot (`payloads`) comme fixtures de rejeu.
 2. **Lance le banc AVANT tout correctif.** Le nouveau cas DOIT échouer.
    - Il échoue → le cas prouve quelque chose, garde-le.
@@ -154,7 +155,7 @@ de tentatives non évaluées.
 
 ## Étape 5 — Les portes, puis la PR
 
-Ouvre la PR avec, dans la description : le lot d'observations utilisé, les
+Ouvre la PR en utilisant /ask-gemini mode pr, la description doit intégrer : le lot d'observations utilisé, les
 findings traitées et écartées, et les mesures avant/après **verbatim**.
 
 Vérifie les **cinq portes**, une par une, explicitement, et **écris leur état

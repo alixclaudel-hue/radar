@@ -70,23 +70,18 @@ BASE_URL_TEMPLATE = _DEFAULT_BASE_URL_TEMPLATE  # rétrocompat pour tests qui l'
 # erreur silencieuse : vérifier avant d'en ajouter un.
 TIER_CASCADES = {
     # Raisonnement : quota journalier étroit, réservé au code et aux tests.
-    # `gemini-2.5-flash` retiré (même diagnostic que `gemini-2.5-flash-lite`
-    # ci-dessous : 404 confirmé le 23/09, Google renvoie vers
-    # gemini-3.6-flash, déjà présent plus haut dans cette cascade).
     "heavy": [
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
+        "gemini-3.1-pro-preview",
         "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",  # repli ultime : lent à raisonner mais disponible
+        "gemini-3.5-flash-lite",
     ],
     # Volume : quota large, pour tout ce qui est lecture/reformulation.
-    # `gemini-2.5-flash-lite` retiré (404 confirmé le 23/09 : "no longer
-    # available to new users", Google renvoie vers gemini-3.5-flash-lite,
-    # déjà en tête de cette cascade — le garder n'aurait fait qu'ajouter un
-    # essai voué à l'échec).
     "fast": [
         "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
         "gemini-3.1-flash-lite",
     ],
 }
@@ -127,6 +122,17 @@ SYSTEM_PROMPTS = {
         "3. PISTE DE FIX : proposition de correction en 3 lignes maximum.\n"
         "Si la trace ne suffit pas à trancher, dis-le explicitement au lieu "
         "d'inventer une cause plausible."
+    ),
+    "read": (
+        "Tu es un agent expert en analyse documentaire pour le projet Radar. "
+        "Lis le document fourni et produis une analyse structurée en JSON valide "
+        "avec exactement ces clés : "
+        "'title' (sujet ou titre principal du document), "
+        "'sections' (liste d'objets {'heading', 'summary'} pour chaque section majeure), "
+        "'key_points' (liste de 5 à 10 points clés les plus importants), "
+        "'todos' (liste des actions en attente, liste vide si aucune), "
+        "'dependencies' (fichiers, modules ou systèmes externes mentionnés). "
+        "Renvoie uniquement le JSON brut, sans blocs markdown ni texte autour."
     ),
     "summary": (
         "Tu es un compresseur de journaux pour terminal. "
@@ -281,6 +287,7 @@ def query_gemini(
     api_key: str | None = None,
     temperature: float = 0.2,
     timeout: int = 60,
+    json_mode: bool = False,
 ) -> tuple[str, dict]:
     """Envoie une requête à l'API Gemini, renvoie `(texte généré, jetons consommés)`.
 
@@ -313,6 +320,10 @@ def query_gemini(
     if key and not gateway_in_charge:
         url += f"?key={key}"
 
+    gen_config: dict = {"temperature": temperature}
+    if json_mode:
+        gen_config["responseMimeType"] = "application/json"
+
     payload: dict = {
         "contents": [
             {
@@ -320,9 +331,7 @@ def query_gemini(
                 "parts": [{"text": prompt}],
             }
         ],
-        "generationConfig": {
-            "temperature": temperature,
-        },
+        "generationConfig": gen_config,
     }
 
     if system_instruction:
@@ -368,6 +377,7 @@ def query_with_fallback(
     api_key: str | None = None,
     temperature: float = 0.2,
     timeout: int = 60,
+    json_mode: bool = False,
 ) -> tuple[str, str, dict]:
     """Interroge Gemini en descendant la cascade du tier jusqu'à une réponse.
 
@@ -387,6 +397,7 @@ def query_with_fallback(
             api_key=api_key,
             temperature=temperature,
             timeout=timeout,
+            json_mode=json_mode,
         )
         return text, explicit_model, usage
 
@@ -403,6 +414,7 @@ def query_with_fallback(
                 api_key=api_key,
                 temperature=temperature,
                 timeout=timeout,
+                json_mode=json_mode,
             )
             usage["fallbacks"] = fallbacks
             return text, model, usage
@@ -538,6 +550,12 @@ def main() -> int:
         help="Lit l'entrée standard (logs, diffs, etc.).",
     )
     parser.add_argument(
+        "--json-output",
+        action="store_true",
+        dest="json_mode",
+        help="Force une sortie au format JSON structuré (implicite en --mode read).",
+    )
+    parser.add_argument(
         "-o", "--output",
         help="Écrit la réponse dans un fichier au lieu de stdout.",
     )
@@ -574,12 +592,15 @@ def main() -> int:
     meta = {"tier": chosen_tier, "prompt_chars": len(full_prompt),
             "session": os.environ.get("CLAUDE_SESSION_ID")}
 
+    is_json = args.json_mode or args.mode == "read"
+
     try:
         response, used_model, usage = query_with_fallback(
             prompt=full_prompt,
             system_instruction=sys_instruction,
             tier=chosen_tier,
             explicit_model=args.model,
+            json_mode=is_json,
         )
     except Exception as e:
         sys.stderr.write(f"Erreur : {e}\n")

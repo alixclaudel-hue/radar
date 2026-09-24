@@ -17,6 +17,8 @@ from pathlib import Path
 
 # Constante de validité d'un reçu en secondes (1 heure)
 GATE_TTL = 3600
+# Nombre minimum de caractères de prompt exigés dans un reçu
+GATE_MIN_PROMPT_CHARS = 50
 
 
 def load_receipts(path: Path) -> list[dict]:
@@ -40,7 +42,6 @@ def load_receipts(path: Path) -> list[dict]:
                     if isinstance(data, dict):
                         receipts.append(data)
                 except json.JSONDecodeError:
-                    # Ignore les lignes corrompues pour éviter les pannes
                     continue
     except OSError:
         pass
@@ -48,11 +49,21 @@ def load_receipts(path: Path) -> list[dict]:
     return receipts
 
 
-def has_recent_receipt(receipts: list[dict], modes: tuple[str, ...], now: float, ttl: float) -> bool:
+def has_recent_receipt(
+    receipts: list[dict],
+    modes: tuple[str, ...],
+    now: float,
+    ttl: float,
+    min_chars: int = 0,
+) -> bool:
     """Détermine si un reçu valide et récent existe pour l'un des modes requis.
 
     Un statut 'error' est considéré comme satisfaisant pour ne pas bloquer
     Claude si Gemini est en panne ou en rupture de quota.
+
+    Quand min_chars > 0, un reçu ok ne compte que si prompt_chars >= min_chars.
+    Les reçus anciens (sans champ prompt_chars) restent valides pour la
+    rétrocompatibilité.
     """
     for r in receipts:
         if r.get("mode") in modes:
@@ -60,7 +71,13 @@ def has_recent_receipt(receipts: list[dict], modes: tuple[str, ...], now: float,
             if ts is not None:
                 try:
                     if (now - float(ts)) <= ttl:
-                        return True
+                        if min_chars == 0 or r.get("status") == "error":
+                            return True
+                        prompt_chars = r.get("prompt_chars")
+                        if prompt_chars is None:
+                            return True
+                        if int(prompt_chars) >= min_chars:
+                            return True
                 except (TypeError, ValueError):
                     continue
     return False
@@ -100,8 +117,6 @@ def required_modes(tool_name: str, tool_input: dict) -> tuple[str, ...] | None:
             return None
         if "tests" in path_obj.parts and path_obj.name.startswith("test_"):
             return ("test", "code")
-        # Création d'un module Python : c'est un premier jet, il passe par Gemini.
-        # Un fichier déjà présent relève de l'édition, pas du premier jet.
         if tool_name == "Write" and not path_obj.exists():
             return ("code", "test")
 
@@ -120,7 +135,6 @@ def main() -> int:
             return 0
         event = json.loads(raw_input)
     except Exception:
-        # Échec de lecture ou JSON invalide : on laisse passer par sécurité
         return 0
 
     tool_name = event.get("tool_name", "")
@@ -130,23 +144,25 @@ def main() -> int:
     if not modes:
         return 0
 
-    # Résolution du chemin du fichier de reçus
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", ".")
     receipts_path = Path(project_dir) / ".claude" / "gemini-receipts.jsonl"
 
-    # Récupération de la durée de vie TTL (surchargeable via env)
     try:
         ttl = float(os.environ.get("RADAR_GEMINI_GATE_TTL", GATE_TTL))
     except ValueError:
         ttl = float(GATE_TTL)
 
+    try:
+        min_chars = int(os.environ.get("RADAR_GEMINI_GATE_MIN_CHARS", GATE_MIN_PROMPT_CHARS))
+    except ValueError:
+        min_chars = int(GATE_MIN_PROMPT_CHARS)
+
     receipts = load_receipts(receipts_path)
     now = time.time()
 
-    if has_recent_receipt(receipts, modes, now, ttl):
+    if has_recent_receipt(receipts, modes, now, ttl, min_chars):
         return 0
 
-    # Construction du message d'erreur explicite en français
     if "pr" in modes:
         dleg_desc = "le message de commit / corps de PR (mode 'pr')"
         cmd_example = "git diff origin/main | python3 scripts/ai_query.py --mode pr --stdin"
@@ -159,9 +175,10 @@ def main() -> int:
         cmd_example = ("python3 scripts/ai_query.py --mode code --check-syntax "
                        "-o <fichier_cible> '<spec>'")
 
+    chars_detail = f" et d'au moins {min_chars} caractères" if min_chars > 0 else ""
     sys.stderr.write(
         f"BLOQUÉ — délégation Gemini obligatoire avant cette action : {dleg_desc}.\n"
-        f"Aucun reçu de moins de {int(ttl)} s dans {receipts_path}.\n"
+        f"Aucun reçu valide de moins de {int(ttl)} s{chars_detail} dans {receipts_path}.\n"
         f"Lance d'abord :\n  {cmd_example}\n"
         "Si Gemini est épuisé (quota/panne), la tentative ratée écrit elle-même "
         "un reçu et débloque l'action : il faut l'AVOIR tentée, pas l'avoir supposée.\n"

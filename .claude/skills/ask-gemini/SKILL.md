@@ -8,8 +8,10 @@ description: >
   premier jet de fonction, de script ou de tests unittest ; rédiger un message
   de commit, un corps de PR ou une note de release à partir d'un `git diff` ;
   lire, résumer ou diagnostiquer un journal, une trace Docker ou un dump de
-  plus de 50 lignes. Modes : code, test, diag, summary, pr (tier auto — heavy
-  pour code/tests, fast pour le reste). Cette règle n'est pas laissée à la
+  plus de 50 lignes ; pré-digérer un document volumineux en résumé JSON
+  structuré (mode read). Modes : code, test, diag, summary, pr, read, general
+  (tier auto — heavy pour code/tests, fast pour le reste). `--json-output`
+  force la sortie JSON sur n'importe quel mode. Cette règle n'est pas laissée à la
   vigilance du modèle : le hook `scripts/hooks/gemini_gate.py` BLOQUE le commit
   et l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu
   Gemini récent n'existe. Un appel Gemini qui ÉCHOUE (quota, panne) écrit son
@@ -33,10 +35,16 @@ Le garde-fou `scripts/hooks/gemini_gate.py` (hook `PreToolUse`, déclaré dans
 `.claude/settings.json`) applique la règle mécaniquement : il bloque `git
 commit`, l'écriture d'un `tests/test_*.py` et la création d'un nouveau module
 `.py` tant que `.claude/gemini-receipts.jsonl` ne porte pas de reçu du bon mode
-de moins d'une heure. `ai_query.py` écrit ce reçu à chaque appel, succès
-(`status: ok`) **comme échec** (`status: error`) — d'où la porte de sortie :
-une tentative sincère qui rate rend la main à Claude, une tentative jamais
-faite non. Couverture verrouillée par `tests/test_gemini_gate.py`.
+de moins d'une heure **et d'au moins 50 caractères de prompt** (seuil
+`GATE_MIN_PROMPT_CHARS`, configurable via `RADAR_GEMINI_GATE_MIN_CHARS`). Ce
+seuil bloque le gate-gaming : un prompt de 3 caractères ne débloque plus rien.
+Les reçus anciens (sans champ `prompt_chars`) et les reçus `status: error`
+passent toujours — rétrocompatibilité et porte de sortie quand Gemini est en
+panne. `ai_query.py` écrit ce reçu à chaque appel, succès (`status: ok`)
+**comme échec** (`status: error`) — d'où la porte de sortie : une tentative
+sincère qui rate rend la main à Claude, une tentative jamais faite non.
+Couverture verrouillée par `tests/test_gemini_gate.py` (18 tests dont 6 sur
+`min_chars`).
 
 ## Les deux tiers, et pourquoi il y en a deux
 
@@ -108,6 +116,23 @@ docker logs radar-web --tail 200 | python3 scripts/ai_query.py --mode diag --std
 Réponse en 3 points : ORIGINE, CAUSE RACINE, PISTE DE FIX. Pour compresser
 sans diagnostiquer (relevé de compteurs, balayage d'un journal sain), préférer
 `--mode summary`.
+
+### 5. Pré-digérer un document (mode `read`)
+
+```bash
+python3 scripts/ai_query.py --mode read -f scripts/ai_query.py
+```
+
+Produit un JSON structuré avec les clés `title`, `sections`, `key_points`,
+`todos`, `dependencies`. Le flag `--json-output` est implicite en mode `read`
+(forçage de `responseMimeType: "application/json"` côté Gemini).
+
+Usage type : avant de lire un script, un CLAUDE.md ou un skill volumineux,
+déléguer la lecture à Gemini et exploiter le résumé structuré plutôt que de
+charger le fichier entier dans le contexte Claude.
+
+`--json-output` peut aussi se combiner avec n'importe quel autre mode pour
+forcer une sortie JSON (utile si le prompt demande des données structurées).
 
 ## Quand NE PAS déléguer
 

@@ -27,10 +27,12 @@ la PR, attendre la CI, merger. Historique de ce contrat (créé 02/09, élargi
 **Tes droits viennent de deux sources, et elles doivent bouger ensemble** :
 ce fichier (dans le dépôt, modifié via une PR passée par CI comme le reste
 du code depuis le 23/09) dit ce que tu as le **droit** de faire ;
-`~/.claude/settings.json` (sur le VPS, hors dépôt, modifié par l'utilisateur
-seul) dit ce que tu **peux techniquement** faire. Tu ne modifies jamais
-`settings.json` toi-même. Si une action autorisée ici t'est refusée par les
-permissions machine, dis-le à l'utilisateur en une ligne, propose lui une manière de la contourner par une question et il valide.
+`~/.claude/settings.json` (sur le VPS, hors dépôt) dit ce que tu **peux
+techniquement** faire. Tu peux proposer et appliquer une modification de
+`settings.json` — uniquement pour débloquer une action autorisée par ce
+fichier — avec l'accord explicite de l'utilisateur. Si une action autorisée
+ici t'est refusée par les permissions machine, propose la correction de
+`settings.json` nécessaire et applique-la après validation.
 
 **Tu codes et ouvres les PR en faisant appel à ask-gemini** depuis `~/radar-work`, jamais dans
 `~/radar` (le checkout que Docker fait tourner). C'est la seule limite qui
@@ -70,6 +72,37 @@ vient du répertoire, pas d'une séparation entre deux sessions.
   façon permanente. Jamais de token Discogs, de contenu de `.env`, de clé
   API, de mot de passe — même partiel. Écrire « token présent (non
   affiché) », jamais la valeur.
+
+## Délégation Gemini — RANG 2 (skill `ask-gemini`)
+
+**Après ce contrat lui-même, la RÈGLE N°1 du projet est la priorité la plus
+haute.** Gemini (gratuit, via `scripts/ai_query.py`) passe AVANT Claude sur
+toute tâche déléguable ; Claude ne prend le relais qu'une fois Gemini épuisé
+(quota, panne, sortie inexploitable) — jamais l'inverse, jamais par
+commodité. Le skill `ask-gemini` (`.claude/skills/ask-gemini/SKILL.md`)
+documente la syntaxe complète et les modes — lis-le au premier appel de la
+session.
+
+**Le hook `gemini_gate.py` applique la règle mécaniquement** : il bloque le
+commit, l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu
+Gemini récent (< 1h, ≥ 50 caractères de prompt) n'existe. Un appel raté
+écrit son reçu et débloque : c'est la porte de sortie légitime.
+
+### Quand déléguer — tableau par section
+
+| Section de ce contrat | Mode Gemini | Commande type |
+|---|---|---|
+| **Jobs** — analyser les logs d'un job | `diag` ou `summary` | `docker logs radar-web --tail 300 \| python3 scripts/ai_query.py --mode diag --stdin` |
+| **Jobs** — comprendre un statut/trace > 50 lignes | `summary` | `cat /data/jobs/*.status.json \| python3 scripts/ai_query.py --mode summary --stdin` |
+| **Boucle script** — premier jet d'un correctif | `code` | `python3 scripts/ai_query.py --mode code --check-syntax -o <fichier> "<spec>"` |
+| **Boucle script** — premier jet de tests | `test` | `python3 scripts/ai_query.py --mode test --check-syntax -f <cible> -o <test> "<spec>"` |
+| **Boucle script / PR** — message de commit et corps de PR | `pr` | `cd ~/radar-work && git diff origin/main \| python3 scripts/ai_query.py --mode pr --stdin` |
+| **Diagnostic** — pré-digérer un document avant analyse | `read` | `python3 scripts/ai_query.py --mode read -f <fichier>` |
+| **Diagnostic** — logs ou dumps volumineux | `diag` | `docker compose logs radar-web --tail 500 \| python3 scripts/ai_query.py --mode diag --stdin` |
+
+**Quand NE PAS déléguer** : le scoring (`scoring.py`), les décisions produit,
+l'architecture, la sécurité, le contenu sensible (tokens, clés, `.env`), et
+ce qui est déjà tenu en contexte (< 50 lignes).
 
 ## Jobs et conteneurs — élargi le 17/09 (demande explicite utilisateur)
 
@@ -112,6 +145,10 @@ par une PR + CI, jamais par une écriture directe dans `~/radar`**.
   lecture sur `/data` et le code de l'appli, et qu'ils ne remplacent pas un
   job existant par une réimplémentation ad hoc (relancer le vrai job, pas le
   reproduire à la main).
+
+> **🔧 Gemini ici** : avant d'analyser des logs de job (> 50 lignes), les
+> passer par `--mode diag` ou `--mode summary`. Ne jamais charger un log brut
+> volumineux dans le contexte Claude — cf. tableau Rang 2.
 
 ## Drapeaux d'environnement `~/radar/.env` — élargi le 18/09
 
@@ -206,6 +243,12 @@ jamais de `/data` monté dessus. C'est un atelier, pas un déploiement.
 en lecture seule — dans ce cas `git push` échoue, et c'est à l'utilisateur
 d'ouvrir le droit, pas à toi de contourner. Dis-le en une ligne et arrête-toi.
 
+> **🔧 Gemini ici** : dans la boucle, les premiers jets (correctif et tests)
+> passent par `--mode code` et `--mode test` avec `--check-syntax`. Le message
+> de commit et le corps de PR passent par `--mode pr`. Le diagnostic d'un lot
+> d'observations (> 50 lignes) passe par `--mode diag`. Pré-digestion du
+> script cible : `--mode read`. Cf. tableau Rang 2.
+
 ### Prérequis pour ouvrir et merger une PR toi-même : un token GitHub
 
 Ouvrir une PR (`gh pr create`) et, sur instruction, la merger (`gh pr merge`)
@@ -277,24 +320,21 @@ cinq portes.
   rôle (fusion du 23/09, pt 45 de `CLAUDE.md`) ; c'est désormais toi, avec la
   même règle.
 
-## Déléguer à Gemini pour lire des logs volumineux (`scripts/ai_query.py`)
+## Prérequis Gemini (`scripts/ai_query.py`)
 
-`~/radar/scripts/ai_query.py` (skill `.claude/skills/ask-gemini/SKILL.md`,
-lis-le pour la syntaxe/les cas d'usage) est un script du dépôt, en lecture
-seule pour toi comme le reste — **le lancer n'est pas y écrire**, exactement
-comme lancer un job. Utile pour dégrossir un journal volumineux avant de
-l'analyser toi-même (ex. `docker compose logs radar-web --tail 500 |
-python3 scripts/ai_query.py "Isole les erreurs 5xx" --stdin`).
+`~/radar/scripts/ai_query.py` est un script du dépôt, en lecture seule — **le
+lancer n'est pas y écrire**, exactement comme lancer un job. La syntaxe
+complète et les modes sont dans le skill `ask-gemini`
+(`.claude/skills/ask-gemini/SKILL.md`). L'usage opérationnel est décrit dans
+la section « Délégation Gemini — RANG 2 » ci-dessus.
 
 Nécessite `GEMINI_API_KEY` dans `~/radar/.env`. **Ce n'est pas un drapeau
 `RADAR_*`** : l'ajouter n'entre pas dans l'exception « drapeaux
 d'environnement » ci-dessus, donc tu ne l'ajoutes pas toi-même. Si la ligne
-est absente (le script échoue avec « Erreur API Gemini » sans mention
-d'authentification, ou une erreur 401/403), dis-le à l'utilisateur et
-demande-lui de l'ajouter (même circuit que `YOUTUBE_API_KEY` : clé gratuite
-sur https://aistudio.google.com/apikey, ligne dans `.env`, puis
-`docker compose up -d --force-recreate` pour qu'elle soit relue). Une fois
-la ligne présente, le script fonctionne directement, sans autre configuration.
+est absente (erreur API Gemini 401/403), dis-le à l'utilisateur et
+demande-lui de l'ajouter (clé gratuite sur https://aistudio.google.com/apikey,
+ligne dans `.env`, puis `docker compose up -d --force-recreate`). Une fois la
+ligne présente, le script fonctionne directement.
 
 ## Ton outillage : `~/radar-diag/`
 
@@ -368,6 +408,11 @@ général :**
 
 **En plus, ciblé** : ce que la demande de l'utilisateur (ou le `scope` d'un
 réveil automatique) donne comme périmètre précis.
+
+> **🔧 Gemini ici** : les logs de conteneur (> 50 lignes) et les documents
+> volumineux passent par `--mode diag`/`--mode summary`/`--mode read` AVANT
+> d'entrer dans le contexte Claude. Le diagnostic lui-même (jugement, sévérité,
+> correctif) reste du ressort de Claude — cf. tableau Rang 2.
 
 ## Format du rapport / de la réponse
 

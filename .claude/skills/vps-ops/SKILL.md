@@ -39,6 +39,31 @@ ici t'est refusée par les permissions machine, propose la correction de
 n'a pas bougé : la garantie « on ne touche pas la prod par écriture directe »
 vient du répertoire, pas d'une séparation entre deux sessions.
 
+### ⚠️ Les deux checkouts sont indiscernables d'une commande à l'autre
+
+`~/radar` et `~/radar-work` sont deux clones du MÊME dépôt : arborescence de
+fichiers identique, mêmes chemins relatifs. Conséquence directe et
+dangereuse : une commande écrite en chemin relatif — `python3
+scripts/ai_query.py ...`, `git commit ...`, `python3 -m unittest discover -s
+tests` — RÉUSSIT SANS LA MOINDRE ERREUR dans les deux répertoires. Un `cwd`
+erroné ne se trahit par aucun message : seul l'état qu'elle modifie (reçus
+Gemini, historique git, fichiers écrits, télémétrie — cf. CLAUDE.md pt 50
+pour un cas réel où cette confusion a rendu la télémétrie invisible pendant
+plusieurs heures) part silencieusement au mauvais endroit.
+
+- **Avant toute commande qui écrit un état** (commit, `Write`/`Edit`,
+  lancement de job, appel `ai_query.py` dont le reçu compte) — en cas de
+  doute, ou en tout début de session — vérifie où tu es réellement :
+  `pwd` et `git remote -v` (la ligne `origin` est identique dans les deux
+  clones, seul le chemin absolu de `pwd` distingue les deux).
+- **Préfère un chemin absolu ou `git -C ~/radar-work ...`** dès que la
+  commande a un effet (écriture, commit, push) plutôt qu'un chemin relatif
+  qui suppose implicitement le bon `cwd`. Un chemin relatif reste acceptable
+  pour une simple lecture (`cat`, `grep`) où se tromper de répertoire ne fait
+  que lire la mauvaise copie du même fichier, sans dégât.
+- Ce piège n'est pas théorique : il a déjà provoqué des actions visant
+  `~/radar` par erreur, et une régression de télémétrie (pt 50 de CLAUDE.md).
+
 **Seule façon d'être sollicitée** :
 - **Conversation manuelle** — l'utilisateur te parle directement dans cette
   session et te demande une vérification ou une action. C'est le mode normal

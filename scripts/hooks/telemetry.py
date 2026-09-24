@@ -106,7 +106,13 @@ def telemetry_path(project_dir):
     """Fichier de journal, `RADAR_TELEMETRY_DIR` prioritaire, puis `<projet>/data/ops`.
 
     Le volume de données monté sur le VPS (`<projet>/data/ops`) est le chemin
-    naturel : `radar_ops` lit le fichier sur place, sans transport."""
+    naturel : `radar_ops` lit le fichier sur place, sans transport. Le repli
+    sur `<projet>/data/ops` dépend de `project_dir` (donc du `cwd`/
+    `CLAUDE_PROJECT_DIR` de la session) : sur ce VPS, deux checkouts du même
+    dépôt coexistent (`~/radar`, le vrai volume Docker ; `~/radar-work`, un
+    clone sans `/data` monté) — d'où l'override `RADAR_TELEMETRY_DIR` posé
+    dans `.claude/settings.json`, qui rend ce chemin indépendant du
+    répertoire courant (cf. CLAUDE.md, piège confusion `~/radar`/`~/radar-work`)."""
     override = (os.environ.get("RADAR_TELEMETRY_DIR") or "").strip()
     if override:
         return os.path.join(override, "telemetry.jsonl")

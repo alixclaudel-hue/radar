@@ -62,6 +62,18 @@ Le tier se déduit du `--mode` : `code`/`test` → `heavy`, tout le reste →
 `fast`. Ne le forcer avec `-t` que pour une raison précise (par exemple un diff
 énorme qui mérite du raisonnement, ou un quota `heavy` déjà à sec).
 
+## ⚠️ Sur le VPS : lance ces commandes depuis `~/radar-work`, jamais `~/radar`
+
+Les exemples ci-dessous utilisent tous des chemins relatifs
+(`scripts/ai_query.py`). Sur le VPS, `~/radar` (checkout prod, lecture seule)
+et `~/radar-work` (clone de travail) ont la même arborescence : un chemin
+relatif « marche » identiquement dans les deux, sans aucune erreur — mais le
+reçu écrit (`.claude/gemini-receipts.jsonl`) et tout fichier produit (`-o`)
+atterrissent dans le répertoire réel de la commande, pas dans celui qu'on
+croit. Vérifier `pwd` en cas de doute avant un appel dont le reçu ou la
+sortie compte. Détail et cas réel (régression de télémétrie causée par cette
+même ambiguïté) → CLAUDE.md pt 50 et `vps-ops/SKILL.md`.
+
 ## Les 4 recettes
 
 ### 1. Écrire une fonction ou un script (mode `code`)

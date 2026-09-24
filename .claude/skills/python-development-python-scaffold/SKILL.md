@@ -28,6 +28,19 @@ The user needs automated Python project scaffolding that creates consistent, typ
 
 $ARGUMENTS
 
+## Délégation Gemini — RÈGLE N°1
+
+**Gemini passe AVANT Claude** pour la génération de code et de tests :
+
+- **Scaffolding du code** : `python3 scripts/ai_query.py --mode code --check-syntax -o <fichier> "<spec du module>"`
+- **Tests unitaires** : `--mode test --check-syntax -f <module> -o tests/test_<module>.py "<spec>"`
+- **Config (pyproject.toml, Makefile, .env)** : `--mode code --check-syntax -o <fichier> "<spec>"`
+- **README** : `--mode general -o README.md "<spec>"`
+
+Claude garde l'architecture (quel type de projet, quelle structure), relit et
+corrige ce que Gemini a produit. `--check-syntax` refuse d'écrire un fichier
+qui ne compile pas, mais ne prouve pas que c'est juste.
+
 ## Instructions
 
 ### 1. Analyze Project Type

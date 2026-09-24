@@ -200,6 +200,16 @@ Read `<doc>` into context so you have the architecture data for Step 2.
 
 ---
 
+## Délégation Gemini — RÈGLE N°1
+
+Avant de lire `<doc>` en entier (step 1c et step 2), utilise `/ask-gemini` pour
+le pré-digérer : `python3 scripts/ai_query.py --mode read -f <doc>`. Le JSON
+structuré (`sections`, `key_points`) suffit souvent pour produire le brief sans
+charger le document complet dans le contexte. Ne charge le fichier entier que si
+le résumé Gemini ne couvre pas un point nécessaire au diagramme.
+
+Pour le diff (Branch C), si >150 lignes : `git diff ... | python3 scripts/ai_query.py --mode summary --stdin` avant de décider si un incrément ou une regen est nécessaire.
+
 ## Step 2 -- Create the diagram brief
 
 Always run this step, and Step 3 after it, whatever the cache decided in Step 1.

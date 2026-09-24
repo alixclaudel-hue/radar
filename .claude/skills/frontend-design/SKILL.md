@@ -6,6 +6,18 @@ license: Complete terms in LICENSE.txt
 
 # Frontend Design
 
+## Délégation Gemini — RÈGLE N°1
+
+Le design est un travail de JUGEMENT, donc peu délégable. Mais les tâches
+mécaniques en amont le sont :
+
+- **Pré-digérer un brief ou un doc de design volumineux** : `python3 scripts/ai_query.py --mode read -f <brief>` → JSON structuré pour extraire les contraintes sans charger le document entier.
+- **Premier jet HTML/CSS** à partir d'un plan de design validé par Claude : `--mode code --check-syntax -o <fichier> "<spec détaillée du composant>"` — Claude relit, corrige la direction esthétique et assume ce qui part en commit.
+- **Audit d'accessibilité/responsive d'un template existant** : `--mode general -f <template.html> "Liste les problèmes d'accessibilité WCAG AA et de responsive"`
+
+Le plan de design (palette, typo, layout, principes) reste une décision Claude.
+Gemini exécute les premiers jets mécaniques.
+
 Approach this as the design lead at a design studio known for giving every client a distinct visual identity that is not mistaken for anyone else's. This client has already rejected proposals that felt cliché or templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take aesthetic risk if justified.
 
 ## Ground your designs in the subject matter

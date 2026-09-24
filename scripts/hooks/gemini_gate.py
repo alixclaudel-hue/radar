@@ -87,6 +87,20 @@ _QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 _GIT_COMMIT = re.compile(r"\bgit\b[^|;&]*\bcommit\b")
 
 
+def receipts_path_for(project_dir: str) -> Path:
+    """Chemin des reçus — même résolution que `ai_query.py::receipts_dir()`.
+
+    Doit rester identique à l'écriture : sinon le gate lit un fichier que
+    `write_receipt` n'alimente plus et bloque en permanence dès que l'un des
+    deux change de cible sans l'autre. `RADAR_TELEMETRY_DIR` prioritaire (VPS,
+    volume /data partagé entre les deux checkouts), repli sur le `.claude/`
+    du projet sinon (dev local, CI, session cloud)."""
+    override = (os.environ.get("RADAR_TELEMETRY_DIR") or "").strip()
+    if override:
+        return Path(override) / "gemini-receipts.jsonl"
+    return Path(project_dir) / ".claude" / "gemini-receipts.jsonl"
+
+
 def _is_real_commit(command: str) -> bool:
     """Vrai seulement pour un VRAI `git commit`, pas pour une mention du terme.
 
@@ -145,7 +159,7 @@ def main() -> int:
         return 0
 
     project_dir = os.environ.get("CLAUDE_PROJECT_DIR", ".")
-    receipts_path = Path(project_dir) / ".claude" / "gemini-receipts.jsonl"
+    receipts_path = receipts_path_for(project_dir)
 
     try:
         ttl = float(os.environ.get("RADAR_GEMINI_GATE_TTL", GATE_TTL))

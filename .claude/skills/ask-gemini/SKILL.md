@@ -124,12 +124,22 @@ python3 scripts/ai_query.py --mode read -f scripts/ai_query.py
 ```
 
 Produit un JSON structuré avec les clés `title`, `sections`, `key_points`,
-`todos`, `dependencies`. Le flag `--json-output` est implicite en mode `read`
-(forçage de `responseMimeType: "application/json"` côté Gemini).
+`todos`, `dependencies`, `uncertain`. Le flag `--json-output` est implicite en
+mode `read` (forçage de `responseMimeType: "application/json"` côté Gemini).
 
-Usage type : avant de lire un script, un CLAUDE.md ou un skill volumineux,
+Usage type : avant de lire un script, un CLAUDE.md ou un skill volumineux —
+**y compris un document d'architecture ou de sécurité, sans exception** —,
 déléguer la lecture à Gemini et exploiter le résumé structuré plutôt que de
 charger le fichier entier dans le contexte Claude.
+
+`uncertain` (liste de `{location, question}`) est le mécanisme qui rend ça sûr
+sur un document sensible : quand Gemini n'est pas certain d'un passage, il le
+signale au lieu de trancher en silence. Les fichiers injectés via `-f` sont
+numérotés en mode `read` (`numbered_lines()`), donc `location` est en général
+un numéro de ligne exact — Claude rouvre alors CET endroit précis, jamais le
+document entier par défaut. Une liste `uncertain` vide est normale sur un
+document trivial ; sur un document d'architecture ou de sécurité, une liste
+vide à répétition mérite un coup d'œil.
 
 `--json-output` peut aussi se combiner avec n'importe quel autre mode pour
 forcer une sortie JSON (utile si le prompt demande des données structurées).
@@ -174,6 +184,16 @@ C'est pour ce second mode que le script **n'exige jamais** de clé locale :
 lever une erreur quand `GEMINI_API_KEY` est absente couperait la session cloud
 de sa seule voie d'accès. Un test de non-régression le verrouille
 (`tests/test_ai_query.py`).
+
+**Les deux modes sont chaînés, pas juste sélectionnés** (24/09/2026) : quand la
+passerelle est configurée, `query_gemini()` la tente d'abord ; si CET essai
+échoue (panne réseau vers `127.0.0.1:8632`, ou erreur HTTP qu'elle relaie), un
+second essai part en appel direct vers Google avec la clé locale (`.env` ou
+environnement), pour le même modèle, avant de passer au modèle suivant de la
+cascade. Objectif : une passerelle éteinte ou en erreur ne doit plus épuiser
+toute la cascade sur un unique transport mort quand un autre chemin peut
+aboutir. Sans passerelle configurée (VPS/local), rien ne change : un seul
+essai, comme avant.
 
 Si aucun des deux n'est configuré, l'appel échoue avec un message Gemini
 explicite (400/401/403) — le dire à l'utilisateur et continuer la tâche sans

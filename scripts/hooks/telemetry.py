@@ -103,14 +103,16 @@ def build_record(event, project_dir, prompt_policy="head"):
 
 
 def telemetry_path(project_dir):
-    """Fichier de journal, `RADAR_TELEMETRY_DIR` prioritaire sur le dépôt.
+    """Fichier de journal, `RADAR_TELEMETRY_DIR` prioritaire, puis `<projet>/data/ops`.
 
-    Sur le VPS la variable pointe `/data/ops/` : le checkout de production ne
-    doit pas se salir de fichiers non versionnés, et `radar_ops` tourne sur la
-    même machine — il lit le fichier sur place, sans transport git."""
+    Le volume de données monté sur le VPS (`<projet>/data/ops`) est le chemin
+    naturel : `radar_ops` lit le fichier sur place, sans transport."""
     override = (os.environ.get("RADAR_TELEMETRY_DIR") or "").strip()
     if override:
         return os.path.join(override, "telemetry.jsonl")
+    data_ops = os.path.join(project_dir, "data", "ops")
+    if os.path.isdir(data_ops):
+        return os.path.join(data_ops, "telemetry.jsonl")
     return os.path.join(project_dir, ".claude", "telemetry.jsonl")
 
 

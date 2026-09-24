@@ -27,6 +27,7 @@ from scripts.ai_query import (  # noqa: E402
     extract_raw_code,
     is_fallback_status,
     main,
+    numbered_lines,
     query_gemini,
     query_with_fallback,
     resolve_tier,
@@ -404,6 +405,27 @@ class ExtractRawCodeTests(unittest.TestCase):
         self.assertEqual(extract_raw_code(sample), "import os\n\nprint(os)")
 
 
+class NumberedLinesTests(unittest.TestCase):
+    """Le mode `read` numérote les fichiers injectés pour que le champ
+    `uncertain` de la réponse puisse citer une ligne exacte."""
+
+    def test_trois_lignes_numerotees(self):
+        texte = "premiere\ndeuxieme\ntroisieme"
+        self.assertEqual(
+            numbered_lines(texte),
+            "1\tpremiere\n2\tdeuxieme\n3\ttroisieme",
+        )
+
+    def test_alignement_sur_plus_de_neuf_lignes(self):
+        texte = "\n".join(f"ligne{i}" for i in range(1, 12))  # 11 lignes -> largeur 2
+        resultat = numbered_lines(texte)
+        self.assertTrue(resultat.startswith(" 1\tligne1\n"))
+        self.assertIn("11\tligne11", resultat)
+
+    def test_chaine_vide(self):
+        self.assertEqual(numbered_lines(""), "")
+
+
 class AuthHintTests(unittest.TestCase):
     """L'indice « aucune clé locale » ne doit sortir que sur un vrai refus
     d'authentification : en session cloud la clé est TOUJOURS absente du code,
@@ -490,6 +512,67 @@ class GatewayRoutingTests(unittest.TestCase):
         req = mock_urlopen.call_args[0][0]
         self.assertIn("key=fake-key", req.full_url)
 
+    @patch("urllib.request.urlopen")
+    def test_pas_de_gateway_un_seul_essai(self, mock_urlopen):
+        # Chemin VPS/local inchangé : sans passerelle configurée, un seul
+        # essai (l'appel direct) -- jamais de tentative fantôme vers 127.0.0.1.
+        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
+        query_gemini("Bonjour", api_key=None)
+        self.assertEqual(mock_urlopen.call_count, 1)
+
+    @patch("urllib.request.urlopen")
+    def test_repli_direct_apres_panne_reseau_de_la_passerelle(self, mock_urlopen):
+        # La passerelle est injoignable (URLError, gateway mort ou pas démarré) :
+        # l'appel direct à Google avec la clé locale doit être tenté ensuite
+        # POUR LE MÊME MODÈLE, plutôt que d'épuiser toute la cascade sur un
+        # transport mort.
+        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
+        os.environ["GEMINI_API_KEY"] = "cle-locale"
+        mock_urlopen.side_effect = [
+            urllib.error.URLError("connexion refusée"),
+            _fake_urlopen_cm({"candidates": [{"content": {"parts": [{"text": "PONG"}]}}]}),
+        ]
+        text, usage = query_gemini("Bonjour", api_key=None)
+        self.assertEqual(text, "PONG")
+        self.assertEqual(mock_urlopen.call_count, 2)
+        second_req = mock_urlopen.call_args_list[1][0][0]
+        self.assertIn("key=cle-locale", second_req.full_url)
+        self.assertTrue(
+            second_req.full_url.startswith("https://generativelanguage.googleapis.com/")
+        )
+
+    @patch("urllib.request.urlopen")
+    def test_repli_direct_apres_erreur_http_relayee_par_la_passerelle(self, mock_urlopen):
+        # Même repli quand la passerelle répond mais relaie une erreur (500
+        # upstream, quota du projet Google derrière elle) -- pas seulement sur
+        # une panne de transport pure.
+        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
+        os.environ["GEMINI_API_KEY"] = "cle-locale"
+        mock_urlopen.side_effect = [
+            _http_error(500, b"upstream error"),
+            _fake_urlopen_cm({"candidates": [{"content": {"parts": [{"text": "PONG"}]}}]}),
+        ]
+        text, usage = query_gemini("Bonjour", api_key=None)
+        self.assertEqual(text, "PONG")
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @patch("urllib.request.urlopen")
+    def test_echec_des_deux_essais_leve_l_erreur_du_direct(self, mock_urlopen):
+        # Si la passerelle ET l'appel direct échouent, l'erreur remontée doit
+        # être celle du DERNIER essai (le direct) : c'est la plus informative
+        # pour l'appelant (cascade de modèles ou utilisateur final).
+        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
+        os.environ["GEMINI_API_KEY"] = "cle-locale"
+        mock_urlopen.side_effect = [
+            urllib.error.URLError("connexion refusée"),
+            _http_error(401, b'{"error": {"message": "cle-locale invalide"}}'),
+        ]
+        with self.assertRaises(GeminiHTTPError) as ctx:
+            query_gemini("Bonjour", api_key=None)
+        self.assertEqual(ctx.exception.status, 401)
+        self.assertIn("cle-locale invalide", str(ctx.exception))
+        self.assertEqual(mock_urlopen.call_count, 2)
+
 
 class MainTests(unittest.TestCase):
     """`main()` orchestre CLI/fichier/stdin -- `query_gemini` toujours mocké,
@@ -555,6 +638,38 @@ class MainTests(unittest.TestCase):
         prompt = mock_query.call_args.kwargs["prompt"]
         self.assertIn("PREMIER", prompt)
         self.assertIn("SECOND", prompt)
+
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
+    def test_mode_read_numerote_les_lignes_du_fichier_injecte(self, mock_query):
+        tmp_content = "premiere ligne\nseconde ligne\n"
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as f:
+            f.write(tmp_content)
+            path = f.name
+        try:
+            code, out, err = self._run(["--mode", "read", "-f", path])
+        finally:
+            os.remove(path)
+        self.assertEqual(code, 0)
+        prompt = mock_query.call_args.kwargs["prompt"]
+        self.assertIn("1\tpremiere ligne", prompt)
+        self.assertIn("2\tseconde ligne", prompt)
+
+    @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
+    def test_mode_hors_read_n_ajoute_pas_de_numeros(self, mock_query):
+        # La numérotation ne doit gonfler le prompt que pour le mode read --
+        # ailleurs (code, test, diag...), le fichier part tel quel.
+        tmp_content = "premiere ligne\nseconde ligne\n"
+        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as f:
+            f.write(tmp_content)
+            path = f.name
+        try:
+            code, out, err = self._run(["Analyse", "-f", path])
+        finally:
+            os.remove(path)
+        self.assertEqual(code, 0)
+        prompt = mock_query.call_args.kwargs["prompt"]
+        self.assertNotIn("1\tpremiere ligne", prompt)
+        self.assertIn("premiere ligne", prompt)
 
     @patch("scripts.ai_query.query_gemini", return_value=("ok", {}))
     def test_stdin_flag_force_la_lecture(self, mock_query):

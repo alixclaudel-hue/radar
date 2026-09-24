@@ -18,6 +18,9 @@ Le contrat `vps-ops` s'applique intégralement et **ce skill n'y fait aucune
 exception** : tout reste en lecture seule sur `~/radar`, rien n'est écrit ni
 commité dans ce dépôt. Tout ce que tu produis va dans `~/radar-diag`.
 
+Lis `.claude/skills/ask-gemini/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.
+Fait appel à /ask-gemini autant que de besoin notamment le mode read, le mode diag, le mode summary, le mode code.
+
 Lis `.claude/skills/vps-ops/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.
 
 ## Ce que tu collectes, et ce que tu ne collectes pas
@@ -39,7 +42,7 @@ Trois familles à chercher, dans cet ordre d'intérêt :
 
 ## Étape 0 — cadre
 
-Lis `scripts/loop/registry.json` (dans `~/radar`, en lecture) : l'entrée du
+Lis avec /ask-gemini mode read `scripts/loop/registry.json` (dans `~/radar`, en lecture) : l'entrée du
 script te donne sa source d'observations (`observe.source`), ce qu'il faut
 chercher (`observe.what`) et les charges utiles à capturer pour permettre un
 rejeu hors-ligne (`observe.replay_payloads`).
@@ -49,7 +52,7 @@ ne pourra mesurer un correctif. Dis-le plutôt que de collecter dans le vide.
 
 ## Étape 1 — garde-fous avant de collecter
 
-- Aucun job lourd en cours (`*.status.json`) — surtout si la collecte consomme
+- Aucun job lourd en cours (pour cela lis avec /ask-gemini mode read`*.status.json`) — surtout si la collecte consomme
   le même quota qu'un job de production.
 - Si la collecte fait de vrais appels API (cas de `ytcache` : recapturer les
   réponses `/search` + `/videos` d'un échec coûte ~101 unités de quota Google),
@@ -106,7 +109,7 @@ est marginal ou dominant.
 tu n'as pas pu vérifier, une hypothèse. Texte libre, court.
 
 ## Étape 3 — pousser et journaliser
-
+Utilise /ask-gemini mode code et pr pour pousser et journaliser 
 ```
 cd ~/radar-diag
 git add observations/<script>/

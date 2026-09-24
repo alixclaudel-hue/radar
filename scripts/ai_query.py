@@ -70,23 +70,18 @@ BASE_URL_TEMPLATE = _DEFAULT_BASE_URL_TEMPLATE  # rétrocompat pour tests qui l'
 # erreur silencieuse : vérifier avant d'en ajouter un.
 TIER_CASCADES = {
     # Raisonnement : quota journalier étroit, réservé au code et aux tests.
-    # `gemini-2.5-flash` retiré (même diagnostic que `gemini-2.5-flash-lite`
-    # ci-dessous : 404 confirmé le 23/09, Google renvoie vers
-    # gemini-3.6-flash, déjà présent plus haut dans cette cascade).
     "heavy": [
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.6-flash",
+        "gemini-3.1-pro-preview",
         "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",  # repli ultime : lent à raisonner mais disponible
+        "gemini-3.5-flash-lite",
     ],
     # Volume : quota large, pour tout ce qui est lecture/reformulation.
-    # `gemini-2.5-flash-lite` retiré (404 confirmé le 23/09 : "no longer
-    # available to new users", Google renvoie vers gemini-3.5-flash-lite,
-    # déjà en tête de cette cascade — le garder n'aurait fait qu'ajouter un
-    # essai voué à l'échec).
     "fast": [
         "gemini-3.5-flash-lite",
+        "gemini-3.5-flash",
         "gemini-3.1-flash-lite",
     ],
 }
@@ -127,6 +122,26 @@ SYSTEM_PROMPTS = {
         "3. PISTE DE FIX : proposition de correction en 3 lignes maximum.\n"
         "Si la trace ne suffit pas à trancher, dis-le explicitement au lieu "
         "d'inventer une cause plausible."
+    ),
+    "read": (
+        "Tu es un agent expert en analyse documentaire pour le projet Radar, "
+        "y compris sur des documents d'architecture ou de sécurité. "
+        "Lis le document fourni et produis une analyse structurée en JSON valide "
+        "avec exactement ces clés : "
+        "'title' (sujet ou titre principal du document), "
+        "'sections' (liste d'objets {'heading', 'summary'} pour chaque section majeure), "
+        "'key_points' (liste de 5 à 10 points clés les plus importants), "
+        "'todos' (liste des actions en attente, liste vide si aucune), "
+        "'dependencies' (fichiers, modules ou systèmes externes mentionnés), "
+        "'uncertain' (liste d'objets {'location', 'question'} signalant chaque "
+        "passage où TU N'ES PAS SÛR de ta lecture -- nuance de sécurité, "
+        "contrainte d'architecture, information ambiguë ou contradictoire. "
+        "'location' doit être le numéro de ligne exact si le document en fournit "
+        "un (un préfixe numéroté précède chaque ligne du texte), sinon une "
+        "citation exacte et courte du passage. Ne vide ce champ que si le "
+        "document est trivial : un doute sincère non signalé coûte plus cher "
+        "qu'un faux positif, car personne d'autre ne relira ce passage-là). "
+        "Renvoie uniquement le JSON brut, sans blocs markdown ni texte autour."
     ),
     "summary": (
         "Tu es un compresseur de journaux pour terminal. "
@@ -241,6 +256,18 @@ def extract_raw_code(text: str) -> str:
     return "\n\n".join(c.strip() for c in retenus).strip()
 
 
+def numbered_lines(text: str) -> str:
+    """Préfixe chaque ligne de son numéro (format `cat -n`).
+
+    Sert uniquement au mode `read` : sans repère de ligne dans le texte reçu,
+    le champ `uncertain` de la réponse ne pourrait citer qu'un passage
+    approximatif, pas un endroit que Claude peut rouvrir directement.
+    """
+    lignes = text.splitlines()
+    largeur = len(str(len(lignes))) if lignes else 1
+    return "\n".join(f"{i:>{largeur}}\t{l}" for i, l in enumerate(lignes, start=1))
+
+
 def _key_from_dotenv(dotenv_path: str | None = None) -> str | None:
     """Lit `GEMINI_API_KEY` dans le `.env` à la racine du dépôt, en repli.
 
@@ -274,62 +301,14 @@ def _key_from_dotenv(dotenv_path: str | None = None) -> str | None:
     return None
 
 
-def query_gemini(
-    prompt: str,
-    system_instruction: str = "",
-    model: str = DEFAULT_MODEL,
-    api_key: str | None = None,
-    temperature: float = 0.2,
-    timeout: int = 60,
+def _send_gemini_request(
+    url: str, payload: dict, timeout: int, key: str | None
 ) -> tuple[str, dict]:
-    """Envoie une requête à l'API Gemini, renvoie `(texte généré, jetons consommés)`.
-
-    La consommation vient de `usageMetadata`, que l'API rapporte elle-même : le
-    tableau de bord de délégation affiche une mesure, jamais une estimation.
-
-    La clé locale vient de `api_key`, sinon de l'environnement, sinon du `.env`
-    du dépôt en repli (`_key_from_dotenv`, pour un lancement CLI direct sur
-    l'hôte où rien n'est exporté). Si les trois sont vides, la requête part
-    quand même sans `?key=` : une session cloud avec un identifiant réseau
-    configuré sur ce domaine (en-tête `x-goog-api-key` injecté par le proxy
-    de l'environnement) s'authentifie au niveau transport, invisible d'ici.
-    Exiger la clé ici casserait ce mode, qui est le seul disponible en
-    session cloud. Sans clé locale ni identifiant réseau, Gemini répond avec
-    une erreur d'authentification explicite (capturée plus bas).
+    """Un seul essai HTTP vers `url`, isolé pour pouvoir en enchaîner plusieurs
+    (passerelle puis appel direct) sans dupliquer la construction de l'erreur.
+    `key` ne sert qu'à l'indice d'authentification du message d'erreur — la clé
+    elle-même est déjà dans `url` si elle doit y être.
     """
-    # Quand un gateway local prend la relève (session cloud, via
-    # `RADAR_GEMINI_BASE_URL` ou le marqueur `/tmp/radar-gemini-gateway.url`),
-    # c'est lui qui pose la clé — la joindre ici enverrait la clé injectée par
-    # l'environnement (invalide sur cette session) et écraserait celle du
-    # gateway côté Google (premier `?key=` prime). Un `api_key` explicitement
-    # passé par l'appelant (usage programmatique, tests) court-circuite cette
-    # règle : c'est un contrat d'appel qui doit être respecté.
-    key = api_key or os.getenv("GEMINI_API_KEY") or _key_from_dotenv()
-    gateway_in_charge = (not api_key) and (
-        bool((os.environ.get("RADAR_GEMINI_BASE_URL") or "").strip())
-        or bool(_read_gateway_marker())
-    )
-    url = _base_url_template().format(model=model)
-    if key and not gateway_in_charge:
-        url += f"?key={key}"
-
-    payload: dict = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": prompt}],
-            }
-        ],
-        "generationConfig": {
-            "temperature": temperature,
-        },
-    }
-
-    if system_instruction:
-        payload["systemInstruction"] = {
-            "parts": [{"text": system_instruction}]
-        }
-
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
@@ -360,6 +339,86 @@ def query_gemini(
         raise RuntimeError(f"Erreur réseau Gemini : {e.reason}") from e
 
 
+def query_gemini(
+    prompt: str,
+    system_instruction: str = "",
+    model: str = DEFAULT_MODEL,
+    api_key: str | None = None,
+    temperature: float = 0.2,
+    timeout: int = 60,
+    json_mode: bool = False,
+) -> tuple[str, dict]:
+    """Envoie une requête à l'API Gemini, renvoie `(texte généré, jetons consommés)`.
+
+    La consommation vient de `usageMetadata`, que l'API rapporte elle-même : le
+    tableau de bord de délégation affiche une mesure, jamais une estimation.
+
+    La clé locale vient de `api_key`, sinon de l'environnement, sinon du `.env`
+    du dépôt en repli (`_key_from_dotenv`, pour un lancement CLI direct sur
+    l'hôte où rien n'est exporté). Si les trois sont vides, la requête part
+    quand même sans `?key=` : une session cloud avec un identifiant réseau
+    configuré sur ce domaine (en-tête `x-goog-api-key` injecté par le proxy
+    de l'environnement) s'authentifie au niveau transport, invisible d'ici.
+    Exiger la clé ici casserait ce mode, qui est le seul disponible en
+    session cloud. Sans clé locale ni identifiant réseau, Gemini répond avec
+    une erreur d'authentification explicite (capturée plus bas).
+
+    Pour CE modèle, deux essais sont enchaînés quand une passerelle locale est
+    configurée (session cloud, via `RADAR_GEMINI_BASE_URL` ou le marqueur
+    `/tmp/radar-gemini-gateway.url`) : la passerelle d'abord (c'est elle qui
+    pose la clé), puis en repli l'appel direct à Google avec la clé locale —
+    sans ce second essai, une passerelle éteinte ou en erreur épuisait la
+    cascade ENTIÈRE de modèles sur un transport mort, alors qu'un appel direct
+    peut aboutir avec la clé de l'environnement. Un `api_key` explicitement
+    passé par l'appelant (usage programmatique, tests) court-circuite la
+    passerelle : c'est un contrat d'appel qui doit être respecté, un seul essai
+    est fait, avec cette clé.
+    """
+    key = api_key or os.getenv("GEMINI_API_KEY") or _key_from_dotenv()
+    gateway_configured = (not api_key) and (
+        bool((os.environ.get("RADAR_GEMINI_BASE_URL") or "").strip())
+        or bool(_read_gateway_marker())
+    )
+
+    gen_config: dict = {"temperature": temperature}
+    if json_mode:
+        gen_config["responseMimeType"] = "application/json"
+
+    payload: dict = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": prompt}],
+            }
+        ],
+        "generationConfig": gen_config,
+    }
+
+    if system_instruction:
+        payload["systemInstruction"] = {
+            "parts": [{"text": system_instruction}]
+        }
+
+    direct_url = _DEFAULT_BASE_URL_TEMPLATE.format(model=model)
+    attempts: list[tuple[str, str | None]] = []
+    if gateway_configured:
+        attempts.append((_base_url_template().format(model=model), None))
+    attempts.append((direct_url + (f"?key={key}" if key else ""), key))
+
+    last_err: Exception | None = None
+    for i, (url, url_key) in enumerate(attempts):
+        try:
+            return _send_gemini_request(url, payload, timeout, url_key)
+        except (GeminiHTTPError, RuntimeError) as e:
+            last_err = e
+            if i < len(attempts) - 1:
+                sys.stderr.write(
+                    f"[ai_query] passerelle locale en erreur ({e}), "
+                    f"repli sur l'appel direct à Google pour '{model}'...\n"
+                )
+    raise last_err
+
+
 def query_with_fallback(
     prompt: str,
     system_instruction: str = "",
@@ -368,6 +427,7 @@ def query_with_fallback(
     api_key: str | None = None,
     temperature: float = 0.2,
     timeout: int = 60,
+    json_mode: bool = False,
 ) -> tuple[str, str, dict]:
     """Interroge Gemini en descendant la cascade du tier jusqu'à une réponse.
 
@@ -387,6 +447,7 @@ def query_with_fallback(
             api_key=api_key,
             temperature=temperature,
             timeout=timeout,
+            json_mode=json_mode,
         )
         return text, explicit_model, usage
 
@@ -403,6 +464,7 @@ def query_with_fallback(
                 api_key=api_key,
                 temperature=temperature,
                 timeout=timeout,
+                json_mode=json_mode,
             )
             usage["fallbacks"] = fallbacks
             return text, model, usage
@@ -538,6 +600,12 @@ def main() -> int:
         help="Lit l'entrée standard (logs, diffs, etc.).",
     )
     parser.add_argument(
+        "--json-output",
+        action="store_true",
+        dest="json_mode",
+        help="Force une sortie au format JSON structuré (implicite en --mode read).",
+    )
+    parser.add_argument(
         "-o", "--output",
         help="Écrit la réponse dans un fichier au lieu de stdout.",
     )
@@ -554,7 +622,12 @@ def main() -> int:
             sys.stderr.write(f"Erreur : fichier introuvable '{filepath}'\n")
             return 1
         with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-            parts.append(f"\n--- Fichier : {filepath} ---\n" + f.read())
+            contenu = f.read()
+        if args.mode == "read":
+            # Numéroté pour que le champ `uncertain` de la réponse puisse citer
+            # une ligne exacte plutôt qu'une citation approximative.
+            contenu = numbered_lines(contenu)
+        parts.append(f"\n--- Fichier : {filepath} ---\n" + contenu)
 
     if args.stdin or (not sys.stdin.isatty() and not args.prompt and not args.file):
         stdin_content = sys.stdin.read().strip()
@@ -574,15 +647,26 @@ def main() -> int:
     meta = {"tier": chosen_tier, "prompt_chars": len(full_prompt),
             "session": os.environ.get("CLAUDE_SESSION_ID")}
 
+    is_json = args.json_mode or args.mode == "read"
+
     try:
         response, used_model, usage = query_with_fallback(
             prompt=full_prompt,
             system_instruction=sys_instruction,
             tier=chosen_tier,
             explicit_model=args.model,
+            json_mode=is_json,
         )
     except Exception as e:
         sys.stderr.write(f"Erreur : {e}\n")
+        err_msg = str(e)
+        if "cascade" in err_msg.lower():
+            meta["error_type"] = "cascade_exhausted"
+        elif isinstance(e, GeminiHTTPError):
+            meta["error_type"] = f"http_{e.status}"
+        else:
+            meta["error_type"] = "api_error"
+        meta["error_detail"] = err_msg[:200]
         write_receipt(args.mode, "error",
                       elapsed_ms=round((time.time() - started) * 1000), **meta)
         return 1
@@ -598,6 +682,7 @@ def main() -> int:
     # shell `> fichier.py`, que rien ne distinguerait du point de vue appelant.
     if not response.strip():
         sys.stderr.write(f"Erreur : réponse vide de {used_model}, rien à écrire.\n")
+        meta["error_type"] = "empty_response"
         write_receipt(args.mode, "error", **meta)
         return 1
 
@@ -608,8 +693,8 @@ def main() -> int:
             sys.stderr.write(
                 f"Erreur : le code généré par {used_model} ne compile pas ({syn_err}).\n"
             )
-            # 3 et non 2 : argparse réserve déjà 2 aux erreurs de ligne de
-            # commande, un appelant doit pouvoir distinguer les deux échecs.
+            meta["error_type"] = "syntax_error"
+            meta["error_detail"] = str(syn_err)[:200]
             write_receipt(args.mode, "error", **meta)
             return 3
 

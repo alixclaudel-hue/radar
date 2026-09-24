@@ -8,8 +8,10 @@ description: >
   premier jet de fonction, de script ou de tests unittest ; rédiger un message
   de commit, un corps de PR ou une note de release à partir d'un `git diff` ;
   lire, résumer ou diagnostiquer un journal, une trace Docker ou un dump de
-  plus de 50 lignes. Modes : code, test, diag, summary, pr (tier auto — heavy
-  pour code/tests, fast pour le reste). Cette règle n'est pas laissée à la
+  plus de 50 lignes ; pré-digérer un document volumineux en résumé JSON
+  structuré (mode read). Modes : code, test, diag, summary, pr, read, general
+  (tier auto — heavy pour code/tests, fast pour le reste). `--json-output`
+  force la sortie JSON sur n'importe quel mode. Cette règle n'est pas laissée à la
   vigilance du modèle : le hook `scripts/hooks/gemini_gate.py` BLOQUE le commit
   et l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu
   Gemini récent n'existe. Un appel Gemini qui ÉCHOUE (quota, panne) écrit son
@@ -33,10 +35,16 @@ Le garde-fou `scripts/hooks/gemini_gate.py` (hook `PreToolUse`, déclaré dans
 `.claude/settings.json`) applique la règle mécaniquement : il bloque `git
 commit`, l'écriture d'un `tests/test_*.py` et la création d'un nouveau module
 `.py` tant que `.claude/gemini-receipts.jsonl` ne porte pas de reçu du bon mode
-de moins d'une heure. `ai_query.py` écrit ce reçu à chaque appel, succès
-(`status: ok`) **comme échec** (`status: error`) — d'où la porte de sortie :
-une tentative sincère qui rate rend la main à Claude, une tentative jamais
-faite non. Couverture verrouillée par `tests/test_gemini_gate.py`.
+de moins d'une heure **et d'au moins 50 caractères de prompt** (seuil
+`GATE_MIN_PROMPT_CHARS`, configurable via `RADAR_GEMINI_GATE_MIN_CHARS`). Ce
+seuil bloque le gate-gaming : un prompt de 3 caractères ne débloque plus rien.
+Les reçus anciens (sans champ `prompt_chars`) et les reçus `status: error`
+passent toujours — rétrocompatibilité et porte de sortie quand Gemini est en
+panne. `ai_query.py` écrit ce reçu à chaque appel, succès (`status: ok`)
+**comme échec** (`status: error`) — d'où la porte de sortie : une tentative
+sincère qui rate rend la main à Claude, une tentative jamais faite non.
+Couverture verrouillée par `tests/test_gemini_gate.py` (18 tests dont 6 sur
+`min_chars`).
 
 ## Les deux tiers, et pourquoi il y en a deux
 
@@ -48,7 +56,7 @@ proportionnels à la capacité :
 | Tier     | Tête de cascade         | Quota | Pour quoi                       |
 |----------|-------------------------|-------|---------------------------------|
 | `heavy`  | `gemini-3.8-flash`      | étroit| code, tests — il faut raisonner |
-| `fast`   | `gemini-3.5-flash-lite` | large | logs, diffs, docs — du volume   |
+| `fast`   | `gemini-3.5-flash-lite` | large | logs, diffs, docs, read — du volume   |
 
 Le tier se déduit du `--mode` : `code`/`test` → `heavy`, tout le reste →
 `fast`. Ne le forcer avec `-t` que pour une raison précise (par exemple un diff
@@ -109,6 +117,33 @@ Réponse en 3 points : ORIGINE, CAUSE RACINE, PISTE DE FIX. Pour compresser
 sans diagnostiquer (relevé de compteurs, balayage d'un journal sain), préférer
 `--mode summary`.
 
+### 5. Pré-digérer un document (mode `read`)
+
+```bash
+python3 scripts/ai_query.py --mode read -f scripts/ai_query.py
+```
+
+Produit un JSON structuré avec les clés `title`, `sections`, `key_points`,
+`todos`, `dependencies`, `uncertain`. Le flag `--json-output` est implicite en
+mode `read` (forçage de `responseMimeType: "application/json"` côté Gemini).
+
+Usage type : avant de lire un script, un CLAUDE.md ou un skill volumineux —
+**y compris un document d'architecture ou de sécurité, sans exception** —,
+déléguer la lecture à Gemini et exploiter le résumé structuré plutôt que de
+charger le fichier entier dans le contexte Claude.
+
+`uncertain` (liste de `{location, question}`) est le mécanisme qui rend ça sûr
+sur un document sensible : quand Gemini n'est pas certain d'un passage, il le
+signale au lieu de trancher en silence. Les fichiers injectés via `-f` sont
+numérotés en mode `read` (`numbered_lines()`), donc `location` est en général
+un numéro de ligne exact — Claude rouvre alors CET endroit précis, jamais le
+document entier par défaut. Une liste `uncertain` vide est normale sur un
+document trivial ; sur un document d'architecture ou de sécurité, une liste
+vide à répétition mérite un coup d'œil.
+
+`--json-output` peut aussi se combiner avec n'importe quel autre mode pour
+forcer une sortie JSON (utile si le prompt demande des données structurées).
+
 ## Quand NE PAS déléguer
 
 - **Le code qui part en commit.** Gemini dégrossit, Claude relit, corrige et
@@ -127,13 +162,13 @@ sans diagnostiquer (relevé de compteurs, balayage d'un journal sain), préfére
 
 `scripts/ai_query.py` gère les deux sans configuration :
 
-- **VPS / local** : variable `GEMINI_API_KEY` (clé gratuite sur
+- **VPS / local (à utiliser dans cette session)** : variable `GEMINI_API_KEY` (clé gratuite sur
   https://aistudio.google.com/apikey). Le script l'ajoute en `?key=` dans l'URL.
   Un lancement direct sur l'hôte (hors `docker compose`, qui injecte `.env`
   nativement) lit désormais `.env` en repli si la variable n'est pas déjà
   exportée — plus besoin de `set -a; source ~/radar/.env; set +a` avant
   d'appeler le script (correctif du 23/09, cf. `_key_from_dotenv`).
-- **Session cloud (chemin actuel)** : un mini gateway local
+- **Session cloud (chemin de l'ancienne session cloud, à ne plus utiliser)** : un mini gateway local
   `scripts/gemini_gateway.py` lit la clé Gemini posée par l'utilisateur dans
   `~/.claude-code-router/config.sqlite` (via l'interface CCR) et l'ajoute en
   `?key=` sur chaque appel forwardé à `generativelanguage.googleapis.com`. Le
@@ -149,6 +184,15 @@ C'est pour ce second mode que le script **n'exige jamais** de clé locale :
 lever une erreur quand `GEMINI_API_KEY` est absente couperait la session cloud
 de sa seule voie d'accès. Un test de non-régression le verrouille
 (`tests/test_ai_query.py`).
+
+**Les deux modes sont chaînés, pas juste sélectionnés** (24/09/2026) : essai part en appel direct 
+vers Google avec la clé locale (`.env` ou environnement) si CET essai
+échoue quand la passerelle est configurée, pour un même modèle gemini `query_gemini()` la tente; si CET essai
+échoue (panne réseau vers `127.0.0.1:8632`, ou erreur HTTP qu'elle relaie), avant de passer au modèle suivant de la
+cascade. Objectif : une passerelle éteinte ou en erreur ne doit plus épuiser
+toute la cascade sur un unique transport mort quand un autre chemin peut
+aboutir. Sans passerelle configurée (VPS/local), rien ne change : un seul
+essai, comme avant.
 
 Si aucun des deux n'est configuré, l'appel échoue avec un message Gemini
 explicite (400/401/403) — le dire à l'utilisateur et continuer la tâche sans

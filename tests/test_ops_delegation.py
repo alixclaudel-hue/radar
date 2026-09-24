@@ -229,5 +229,44 @@ class TestOpsDelegation(unittest.TestCase):
             self.assertEqual(len(res["missing"]), 2)
 
 
+class ReceiptsPathTests(unittest.TestCase):
+    """`_receipts_path()` -- depuis la suppression du transport git (commit
+    e35af25), ce chemin doit toujours pointer directement sous `<ops>/`,
+    jamais vers un repli `CLAUDE_PROJECT_DIR` mort en conteneur ni vers une
+    copie figée qu'un `os.path.exists()` préférerait indéfiniment."""
+
+    def test_pointe_toujours_sous_data_root_ops(self):
+        data_root = "/fake/data/root"
+        with patch.dict(os.environ, {}, clear=True):
+            attendu = os.path.join(data_root, "ops", delegation.RECEIPTS_NAME)
+            self.assertEqual(delegation._receipts_path(data_root), attendu)
+
+    def test_ignore_claude_project_dir_meme_avec_un_vrai_fichier(self):
+        """Un `CLAUDE_PROJECT_DIR` défini, pointant vers un `.claude/` qui
+        contient un vrai fichier de reçus, ne doit PAS être choisi -- c'est
+        exactement le repli mort que ce correctif retire."""
+        data_root = "/fake/data/root"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            claude_dir = os.path.join(tmpdir, ".claude")
+            os.makedirs(claude_dir, exist_ok=True)
+            leurre = os.path.join(claude_dir, delegation.RECEIPTS_NAME)
+            with open(leurre, "w", encoding="utf-8") as f:
+                f.write('{"mode": "code", "status": "ok", "ts": 1}\n')
+
+            with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": tmpdir}, clear=True):
+                resultat = delegation._receipts_path(data_root)
+                self.assertNotEqual(resultat, leurre)
+                self.assertEqual(
+                    resultat, os.path.join(data_root, "ops", delegation.RECEIPTS_NAME))
+
+    def test_respecte_radar_ops_telemetry_dir_comme_les_evenements(self):
+        """Même override que `log_dir()` pour les événements : les deux
+        journaux doivent rester sous le même dossier ops."""
+        with patch.dict(os.environ, {"RADAR_OPS_TELEMETRY_DIR": "/custom/ops"}, clear=True):
+            self.assertEqual(
+                delegation._receipts_path("/fake/data/root"),
+                os.path.join("/custom/ops", delegation.RECEIPTS_NAME))
+
+
 if __name__ == "__main__":
     unittest.main()

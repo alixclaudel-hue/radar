@@ -32,7 +32,9 @@ from scripts.ai_query import (  # noqa: E402
     numbered_lines,
     query_gemini,
     query_with_fallback,
+    receipts_dir,
     resolve_tier,
+    write_receipt,
 )
 
 
@@ -938,6 +940,57 @@ class KeyFromDotenvTests(unittest.TestCase):
 
     def test_fichier_inexistant(self):
         self.assertIsNone(_key_from_dotenv("/tmp/nexiste_pas_9999.env"))
+
+
+class ReceiptsDirTests(unittest.TestCase):
+    """`receipts_dir()` -- résolution du dossier des reçus (piège checkouts VPS,
+    cf. CLAUDE.md pt 50/52 : sans RADAR_TELEMETRY_DIR, radar_ops ne peut lire
+    que ce que ce dossier contient, jamais un `.claude/` de checkout git."""
+
+    def test_radar_telemetry_dir_prioritaire(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": tmpdir}, clear=True):
+                self.assertEqual(receipts_dir(), tmpdir)
+
+    def test_repli_claude_project_dir_si_variable_absente(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": tmpdir}, clear=True):
+                self.assertEqual(receipts_dir(), os.path.join(tmpdir, ".claude"))
+
+    def test_radar_telemetry_dir_vide_ou_blanc_ignoree(self):
+        """Une variable définie mais vide ou faite d'espaces ne doit pas
+        court-circuiter le repli -- sinon un `.env` mal formé écrirait les
+        reçus à la racine du système de fichiers."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for valeur in ("", "   ", "\t"):
+                env = {"RADAR_TELEMETRY_DIR": valeur, "CLAUDE_PROJECT_DIR": tmpdir}
+                with patch.dict(os.environ, env, clear=True):
+                    self.assertEqual(receipts_dir(), os.path.join(tmpdir, ".claude"))
+
+    def test_write_receipt_ecrit_dans_radar_telemetry_dir(self):
+        """Le reçu atterrit bien dans le dossier partagé quand la variable est
+        posée -- c'est tout le sens du correctif : `radar_ops` et l'écriture
+        doivent viser le même fichier."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": tmpdir}, clear=True):
+                write_receipt("code", "ok", prompt_chars=100)
+
+            chemin = os.path.join(tmpdir, "gemini-receipts.jsonl")
+            self.assertTrue(os.path.isfile(chemin))
+            with open(chemin, "r", encoding="utf-8") as f:
+                ligne = json.loads(f.readline())
+            self.assertEqual(ligne["mode"], "code")
+            self.assertEqual(ligne["status"], "ok")
+            self.assertIn("ts", ligne)
+
+    def test_write_receipt_naleve_jamais_meme_sans_permission(self):
+        """Tracer est un effet de bord : un dossier inaccessible ne doit
+        jamais faire remonter d'exception à l'appelant."""
+        with patch("os.makedirs", side_effect=PermissionError("refusé")):
+            try:
+                write_receipt("code", "ok")
+            except Exception as e:  # noqa: BLE001 -- exactement ce qu'on vérifie
+                self.fail(f"write_receipt a laissé fuir une exception : {e}")
 
 
 if __name__ == "__main__":

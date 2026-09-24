@@ -38,20 +38,16 @@ def log_dir(data_root):
 
 
 def _receipts_path(data_root):
-    """Chemin des reçus Gemini — dans `.claude/` du projet ou dans le dossier ops.
+    """Chemin des reçus Gemini — directement dans le dossier ops.
 
-    Les reçus sont écrits par `ai_query.py` dans `<projet>/.claude/` et lus par
-    `gemini_gate.py` au même endroit. En mode conteneur, le volume de données
-    peut contenir une copie fusionnée — on lit le premier qui existe."""
-    ops = os.path.join(log_dir(data_root), RECEIPTS_NAME)
-    if os.path.exists(ops):
-        return ops
-    project = os.environ.get("CLAUDE_PROJECT_DIR") or ""
-    if project:
-        p = os.path.join(project, ".claude", RECEIPTS_NAME)
-        if os.path.exists(p):
-            return p
-    return ops
+    Depuis la suppression du transport git (commit e35af25), `ai_query.py`
+    écrit ici en direct via `RADAR_TELEMETRY_DIR` (même override que les
+    événements de `log_dir()`) : plus de copie fusionnée à attendre, plus de
+    repli `CLAUDE_PROJECT_DIR` — cette variable n'est jamais définie dans ce
+    conteneur, qui ne voit que le volume de données, jamais un checkout git.
+    Un ancien repli qui préférait une copie figée existante avait fini par
+    masquer indéfiniment les reçus réels une fois le transport supprimé."""
+    return os.path.join(log_dir(data_root), RECEIPTS_NAME)
 
 
 def _num(value):

@@ -584,8 +584,26 @@ def _usage(result: dict) -> dict:
     }
 
 
+def receipts_dir() -> str:
+    """Dossier des reçus — `RADAR_TELEMETRY_DIR` prioritaire, sinon `.claude/` du projet.
+
+    Même override que `scripts/hooks/telemetry.py::telemetry_path()` : sur le
+    VPS, deux checkouts du même dépôt coexistent (~/radar, volume /data monté ;
+    ~/radar-work, un clone sans /data) et chacun a son propre `.claude/` — sans
+    cet override, les reçus d'un checkout ne rejoignent jamais ceux de l'autre,
+    et `radar_ops` (qui ne voit que le volume /data, jamais un checkout git)
+    ne peut lire QUE ce que cette variable pointe. Repli sur `.claude/` du
+    projet quand la variable est absente (dev local, CI, session cloud)."""
+    override = (os.environ.get("RADAR_TELEMETRY_DIR") or "").strip()
+    if override:
+        return override
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, ".claude")
+
+
 def write_receipt(mode: str, status: str, **extra) -> None:
-    """Trace l'appel dans `.claude/gemini-receipts.jsonl` (un JSON par ligne).
+    """Trace l'appel dans `gemini-receipts.jsonl` (un JSON par ligne), via `receipts_dir()`.
 
     C'est la preuve que lit le hook `scripts/hooks/gemini_gate.py` avant
     d'autoriser un commit ou l'écriture d'un premier jet : sans cette trace, la
@@ -602,9 +620,7 @@ def write_receipt(mode: str, status: str, **extra) -> None:
     N'échoue jamais : tracer est un effet de bord, pas la mission du script.
     """
     try:
-        root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__)))
-        d = os.path.join(root, ".claude")
+        d = receipts_dir()
         os.makedirs(d, exist_ok=True)
         row = {"ts": time.time(), "mode": mode, "status": status}
         row.update({k: v for k, v in extra.items() if v is not None})

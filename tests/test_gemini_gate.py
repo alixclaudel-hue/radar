@@ -15,6 +15,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 # Chargement dynamique du module scripts/hooks/gemini_gate.py
 _RACINE_PROJET = Path(__file__).resolve().parent.parent
@@ -170,6 +171,43 @@ class TestGardeFouGemini(unittest.TestCase):
         """La constante GATE_MIN_PROMPT_CHARS existe et vaut au moins 10."""
         self.assertTrue(hasattr(gemini_gate, "GATE_MIN_PROMPT_CHARS"))
         self.assertGreaterEqual(gemini_gate.GATE_MIN_PROMPT_CHARS, 10)
+
+
+class ResolutionCheminRecuTests(unittest.TestCase):
+    """`receipts_path_for()` doit résoudre exactement comme `ai_query.py::
+    receipts_dir()` -- un écart entre les deux bloquerait le gate en
+    permanence dès que l'écriture change de cible sans que la lecture suive
+    (piège corrigé : cf. CLAUDE.md, régression du 24/09 sur la télémétrie)."""
+
+    def test_radar_telemetry_dir_prioritaire_sur_project_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": tmpdir}, clear=True):
+                chemin = gemini_gate.receipts_path_for("/autre/projet/sans/rapport")
+                self.assertEqual(chemin, Path(tmpdir) / "gemini-receipts.jsonl")
+
+    def test_repli_project_dir_si_variable_absente(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {}, clear=True):
+                chemin = gemini_gate.receipts_path_for(tmpdir)
+                self.assertEqual(chemin, Path(tmpdir) / ".claude" / "gemini-receipts.jsonl")
+
+    def test_gate_lit_le_recu_ecrit_via_radar_telemetry_dir(self):
+        """Bout en bout : un reçu déposé dans RADAR_TELEMETRY_DIR (comme le
+        ferait `ai_query.py::write_receipt`) est bien vu par le gate."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": tmpdir}, clear=True):
+                recu = {"ts": time.time(), "mode": "code", "status": "ok",
+                        "prompt_chars": 100}
+                chemin = gemini_gate.receipts_path_for(os.environ.get("CLAUDE_PROJECT_DIR", "."))
+                chemin.parent.mkdir(parents=True, exist_ok=True)
+                with chemin.open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(recu) + "\n")
+
+                recus = gemini_gate.load_receipts(chemin)
+                self.assertTrue(
+                    gemini_gate.has_recent_receipt(
+                        recus, ("code", "test"), time.time(), 3600.0, min_chars=50)
+                )
 
 
 if __name__ == "__main__":

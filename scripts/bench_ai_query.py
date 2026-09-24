@@ -31,6 +31,8 @@ from scripts.ai_query import (
     GeminiHTTPError,
     TIER_CASCADES,
     query_with_fallback,
+    write_receipt,
+    main as ai_query_main,
 )
 
 
@@ -154,6 +156,22 @@ CASES = [
         "id": "filtre_securite",
         "kind": "adversarial",
         "description": "200 OK avec finishReason=SAFETY → texte vide remonté",
+    },
+    # --- ADVERSARIAL : reçus d'erreur enrichis (finding 1 du diagnostic 23/09) ---
+    {
+        "id": "recu_cascade_epuisee_error_type",
+        "kind": "adversarial",
+        "description": "Cascade épuisée → le reçu contient error_type='cascade_exhausted'",
+    },
+    {
+        "id": "recu_reponse_vide_error_type",
+        "kind": "adversarial",
+        "description": "Réponse vide → le reçu contient error_type='empty_response'",
+    },
+    {
+        "id": "recu_syntax_error_type",
+        "kind": "adversarial",
+        "description": "Code invalide → le reçu contient error_type='syntax_error'",
     },
 ]
 
@@ -289,6 +307,67 @@ def run_case(case):
             )
             ok = text == ""
             return ok, f"texte={'vide' if not text else repr(text)}"
+
+    if cid == "recu_cascade_epuisee_error_type":
+        receipt_calls = []
+        orig_write = write_receipt.__wrapped__ if hasattr(write_receipt, "__wrapped__") else None
+
+        def _capture_receipt(mode, status, **extra):
+            receipt_calls.append({"mode": mode, "status": status, **extra})
+
+        n_models = len(TIER_CASCADES["heavy"])
+        call_count = {"n": 0}
+
+        def side_effect(req, timeout=60):
+            call_count["n"] += 1
+            raise _http_error(429, "Resource has been exhausted")
+
+        with (patch("urllib.request.urlopen", side_effect=side_effect),
+              patch("scripts.ai_query.write_receipt", side_effect=_capture_receipt),
+              patch("sys.argv", ["ai_query.py", "--mode", "code", "test prompt"])):
+            ai_query_main()
+
+        err_receipts = [r for r in receipt_calls if r.get("status") == "error"]
+        if not err_receipts:
+            return False, "aucun reçu d'erreur capturé"
+        has_type = any(r.get("error_type") == "cascade_exhausted" for r in err_receipts)
+        return has_type, f"error_type={'présent' if has_type else 'ABSENT'} dans le reçu"
+
+    if cid == "recu_reponse_vide_error_type":
+        receipt_calls = []
+
+        def _capture_receipt(mode, status, **extra):
+            receipt_calls.append({"mode": mode, "status": status, **extra})
+
+        with (patch("urllib.request.urlopen", return_value=_empty_candidates_response()),
+              patch("scripts.ai_query.write_receipt", side_effect=_capture_receipt),
+              patch("sys.argv", ["ai_query.py", "--mode", "code", "test prompt"])):
+            ai_query_main()
+
+        err_receipts = [r for r in receipt_calls if r.get("status") == "error"]
+        if not err_receipts:
+            return False, "aucun reçu d'erreur capturé"
+        has_type = any(r.get("error_type") == "empty_response" for r in err_receipts)
+        return has_type, f"error_type={'présent' if has_type else 'ABSENT'} dans le reçu"
+
+    if cid == "recu_syntax_error_type":
+        receipt_calls = []
+
+        def _capture_receipt(mode, status, **extra):
+            receipt_calls.append({"mode": mode, "status": status, **extra})
+
+        bad_code = "def f(\n  pass  # syntax error"
+        with (patch("urllib.request.urlopen", return_value=_ok_response(text=bad_code)),
+              patch("scripts.ai_query.write_receipt", side_effect=_capture_receipt),
+              patch("sys.argv", ["ai_query.py", "--mode", "code", "--check-syntax",
+                                 "test prompt"])):
+            ai_query_main()
+
+        err_receipts = [r for r in receipt_calls if r.get("status") == "error"]
+        if not err_receipts:
+            return False, "aucun reçu d'erreur capturé"
+        has_type = any(r.get("error_type") == "syntax_error" for r in err_receipts)
+        return has_type, f"error_type={'présent' if has_type else 'ABSENT'} dans le reçu"
 
     return False, f"cas inconnu : {cid}"
 

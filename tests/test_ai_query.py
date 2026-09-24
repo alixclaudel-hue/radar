@@ -696,6 +696,18 @@ class MainTests(unittest.TestCase):
     """`main()` orchestre CLI/fichier/stdin -- `query_gemini` toujours mocké,
     aucun de ces tests ne doit pouvoir toucher le réseau."""
 
+    def setUp(self):
+        self._tmpdir = tempfile.mkdtemp()
+        self._env_patch = patch.dict(
+            os.environ, {"RADAR_TELEMETRY_DIR": self._tmpdir}, clear=False
+        )
+        self._env_patch.start()
+
+    def tearDown(self):
+        self._env_patch.stop()
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
     def _run(self, argv, stdin_text=None, stdin_isatty=True):
         stdin = io.StringIO(stdin_text or "")
         stdin.isatty = lambda: stdin_isatty

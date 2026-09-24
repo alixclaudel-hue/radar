@@ -1,7 +1,7 @@
 ---
 name: "script-doctor"
 description: "Diagnostique un script de Radar à partir d'observations de production réelles : lit le code du script et le lot d'échecs collectés sur le VPS, puis écrit un document de diagnostic classé (cause racine, preuve verbatim, correctif proposé, cas de banc qui le prouverait). Utilisé par le skill script-loop, étape 2. Écrit un fichier, ne rapporte pas dans la conversation."
-model: opus
+model: Opus 4.6 ou gemini-3.8-flash
 ---
 
 Tu diagnostiques UN script de Radar à partir d'observations de production

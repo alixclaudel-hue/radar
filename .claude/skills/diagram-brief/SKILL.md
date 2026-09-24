@@ -9,9 +9,17 @@ Read existing documentation and produce a `.md` file containing ordered, plain-E
 
 ---
 
+## Délégation Gemini — RÈGLE N°1
+
+Si le document source est volumineux (>200 lignes), utilise `/ask-gemini` pour
+le pré-digérer avant de le lire en entier :
+`python3 scripts/ai_query.py --mode read -f <doc>`. Le JSON structuré
+(`sections`, `key_points`) fournit les éléments et relations nécessaires au
+brief. Ne charge le document complet que si le résumé ne suffit pas.
+
 ## Workflow
 
-1. **Read the doc** — if not already in context, read it with `view`.
+1. **Read the doc** — si volumineux, pré-digérer via `/ask-gemini mode read` d'abord. Sinon, lire directement.
 2. **Identify what matters** — extract the elements worth drawing (see categories below). Ignore implementation details that don't affect the visual structure.
 3. **Decide the layout** — pick a flow direction and grouping before writing any instructions (see Layout section below).
 4. **Write the brief** — produce ordered instructions following the format below.

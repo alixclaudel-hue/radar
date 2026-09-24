@@ -173,6 +173,27 @@ CASES = [
         "kind": "adversarial",
         "description": "Code invalide → le reçu contient error_type='syntax_error'",
     },
+    # --- ADVERSARIAL : findings 24/09 (delegation process) ---
+    {
+        "id": "json_mode_response_mime",
+        "kind": "adversarial",
+        "description": "json_mode=True → responseMimeType dans le payload envoyé",
+    },
+    {
+        "id": "cascade_heavy_pro_preview",
+        "kind": "floor",
+        "description": "La cascade heavy contient gemini-3.1-pro-preview",
+    },
+    {
+        "id": "cascade_fast_flash_non_lite",
+        "kind": "floor",
+        "description": "La cascade fast contient gemini-3.5-flash (non-lite)",
+    },
+    {
+        "id": "mode_read_existe",
+        "kind": "adversarial",
+        "description": "Le mode 'read' existe dans SYSTEM_PROMPTS et route vers fast",
+    },
 ]
 
 
@@ -368,6 +389,39 @@ def run_case(case):
             return False, "aucun reçu d'erreur capturé"
         has_type = any(r.get("error_type") == "syntax_error" for r in err_receipts)
         return has_type, f"error_type={'présent' if has_type else 'ABSENT'} dans le reçu"
+
+    if cid == "json_mode_response_mime":
+        sent_payloads = []
+
+        def _capture_urlopen(req, timeout=60):
+            sent_payloads.append(json.loads(req.data.decode("utf-8")))
+            return _ok_response(text='{"result": "ok"}')
+
+        with patch("urllib.request.urlopen", side_effect=_capture_urlopen):
+            text, model, usage = query_with_fallback(
+                "test json", tier="fast", api_key="fake-key", json_mode=True,
+            )
+        if not sent_payloads:
+            return False, "aucun payload capturé"
+        gen_config = sent_payloads[0].get("generationConfig", {})
+        has_mime = gen_config.get("responseMimeType") == "application/json"
+        return has_mime, f"responseMimeType={'présent' if has_mime else 'ABSENT'}"
+
+    if cid == "cascade_heavy_pro_preview":
+        ok = "gemini-3.1-pro-preview" in TIER_CASCADES["heavy"]
+        return ok, f"{'présent' if ok else 'ABSENT'} dans heavy"
+
+    if cid == "cascade_fast_flash_non_lite":
+        ok = "gemini-3.5-flash" in TIER_CASCADES["fast"]
+        return ok, f"{'présent' if ok else 'ABSENT'} dans fast"
+
+    if cid == "mode_read_existe":
+        from scripts.ai_query import SYSTEM_PROMPTS, resolve_tier
+        has_mode = "read" in SYSTEM_PROMPTS
+        is_fast = resolve_tier("read") == "fast"
+        ok = has_mode and is_fast
+        detail = f"mode={'présent' if has_mode else 'ABSENT'}, tier={'fast' if is_fast else resolve_tier('read')}"
+        return ok, detail
 
     return False, f"cas inconnu : {cid}"
 

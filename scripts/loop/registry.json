@@ -38,7 +38,9 @@
     "bench": ["python3", "scripts/bench_ai_query.py"],
     "touchable": [
       "scripts/ai_query.py",
-      "scripts/bench_ai_query.py"
+      "scripts/bench_ai_query.py",
+      "scripts/hooks/gemini_gate.py",
+      "tests/test_gemini_gate.py"
     ],
     "observe": {
       "source": "reçus Gemini (.claude/gemini-receipts.jsonl) et logs stderr des sessions",

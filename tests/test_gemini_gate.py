@@ -129,5 +129,48 @@ class TestGardeFouGemini(unittest.TestCase):
         self.assertTrue(resultat)
 
 
+    # --- Tests F1 : seuil min_chars ---
+
+    def test_recu_ok_sous_seuil_min_chars_rejete(self):
+        """Un reçu ok récent avec prompt_chars < min_chars est ignoré."""
+        maintenant = 10000.0
+        recus = [{"mode": "code", "ts": maintenant - 100.0, "status": "ok", "prompt_chars": 5}]
+        resultat = gemini_gate.has_recent_receipt(recus, ("code",), maintenant, 3600.0, min_chars=50)
+        self.assertFalse(resultat)
+
+    def test_recu_ok_au_dessus_seuil_accepte(self):
+        """Un reçu ok récent avec prompt_chars >= min_chars passe."""
+        maintenant = 10000.0
+        recus = [{"mode": "code", "ts": maintenant - 100.0, "status": "ok", "prompt_chars": 500}]
+        resultat = gemini_gate.has_recent_receipt(recus, ("code",), maintenant, 3600.0, min_chars=50)
+        self.assertTrue(resultat)
+
+    def test_recu_error_sous_seuil_accepte(self):
+        """Un reçu error (Gemini down) passe même avec prompt_chars < min_chars."""
+        maintenant = 10000.0
+        recus = [{"mode": "code", "ts": maintenant - 100.0, "status": "error", "prompt_chars": 3}]
+        resultat = gemini_gate.has_recent_receipt(recus, ("code",), maintenant, 3600.0, min_chars=50)
+        self.assertTrue(resultat)
+
+    def test_recu_ancien_sans_prompt_chars_accepte(self):
+        """Un reçu ancien (sans champ prompt_chars) passe pour la rétrocompatibilité."""
+        maintenant = 10000.0
+        recus = [{"mode": "code", "ts": maintenant - 100.0, "status": "ok"}]
+        resultat = gemini_gate.has_recent_receipt(recus, ("code",), maintenant, 3600.0, min_chars=50)
+        self.assertTrue(resultat)
+
+    def test_min_chars_zero_desactive_le_seuil(self):
+        """Quand min_chars=0, même un prompt de 1 char passe (seuil désactivé)."""
+        maintenant = 10000.0
+        recus = [{"mode": "code", "ts": maintenant - 100.0, "status": "ok", "prompt_chars": 1}]
+        resultat = gemini_gate.has_recent_receipt(recus, ("code",), maintenant, 3600.0, min_chars=0)
+        self.assertTrue(resultat)
+
+    def test_constante_gate_min_prompt_chars_existe(self):
+        """La constante GATE_MIN_PROMPT_CHARS existe et vaut au moins 10."""
+        self.assertTrue(hasattr(gemini_gate, "GATE_MIN_PROMPT_CHARS"))
+        self.assertGreaterEqual(gemini_gate.GATE_MIN_PROMPT_CHARS, 10)
+
+
 if __name__ == "__main__":
     unittest.main()

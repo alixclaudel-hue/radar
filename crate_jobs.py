@@ -2954,9 +2954,13 @@ def job_import_discogs_dump(job, params):
     # Un nouveau dump doit rafraîchir toute la chaîne dérivée sans intervention :
     # la résolution canonique (bien meilleure avec les namevariations du nouveau
     # dump artistes) puis le profilage des labels.
+    # priority=0 explicite : ce chaînage automatique n'est pas un clic
+    # utilisateur — sans ça il hérite du défaut interactif de jobs.launch()
+    # et double à tort les jobs de fond d'autres utilisateurs déjà en file
+    # (cf. CLAUDE.md, correctif famine scorestore du 24/09).
     from radar_web.radar import jobs as job_queue
-    job_queue.launch("canonicalize", {"scope": "corpus"}, uid="owner")
-    job_queue.launch("profile_labels", {"limit": 150}, uid="owner")
+    job_queue.launch("canonicalize", {"scope": "corpus"}, uid="owner", priority=0)
+    job_queue.launch("profile_labels", {"limit": 150}, uid="owner", priority=0)
 
     job.finish(f"Dump {latest} importé : {n_total} sortie(s) tous formats "
                f"(dont {n_vinyl} vinyle 12\"/LP), {n_labels} label(s), {n_artists} artiste(s), "
@@ -3026,16 +3030,27 @@ SCORESTORE_FETCHES_PER_RUN = 1000  # repli si scoring.scorestore.fetches_per_run
 # pour une sortie absente du dump), tout en restant borné pour qu'un run garde une
 # durée raisonnable (le job se rechaîne lui-même si le lot était plein, cf. plus bas).
 SCORESTORE_LOCAL_BATCH_PER_RUN = 20000
+SCORESTORE_RELEASES_BATCH_PER_RUN = 100  # labels traités par lancement — repli si
+# scoring.scorestore.releases_batch_per_run absent. Correctif famine scorestore du
+# 24/09 (cf. CLAUDE.md) : un utilisateur avec beaucoup de labels suivis (ex. 561)
+# monopolisait le worker ~17-20 min d'affilée en scorant tous ses labels d'un coup,
+# empêchant scan_recos/publish_recos de tourner à l'heure. Voir job_scorestore_releases
+# pour la reprise par rotation (label_cursor persisté dans scorestore_meta).
 
 
 def _chain_scorestore_tracks():
     """Enfile scorestore_tracks après scorestore_releases, que le scan release
     ait bougé quelque chose ou non : une passe piste par piste laissée en plan
     par un précédent quota API épuisé doit continuer à progresser aux scans
-    suivants."""
+    suivants.
+
+    priority=0 explicite (correctif famine scorestore du 24/09) : sans lui,
+    ce chaînage héritait du défaut interactif de jobs.launch() et doublait à
+    tort les scorestore_releases des AUTRES utilisateurs déjà en file,
+    cassant le round-robin de worker._pick()."""
     from radar_web.radar import jobs as job_queue
     if not any(j["name"] == "scorestore_tracks" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
-        job_queue.launch("scorestore_tracks", {}, uid=RADAR_UID)
+        job_queue.launch("scorestore_tracks", {}, uid=RADAR_UID, priority=0)
 
 
 def _stamp_scorestore_run(con, cfg):
@@ -3062,6 +3077,18 @@ def _stamp_scorestore_run(con, cfg):
         print(f"[scorestore] estampille du run impossible : {e}", file=sys.stderr)
 
 
+def _chain_scorestore_releases():
+    """Enfile la suite de job_scorestore_releases quand le tour de labels a
+    été tronqué par SCORESTORE_RELEASES_BATCH_PER_RUN (reprise via
+    label_cursor persisté dans scorestore_meta), sans attendre le prochain
+    déclenchement à cadence fixe de worker._maybe_scorestore_build.
+
+    priority=0 explicite, même raison que _chain_scorestore_tracks ci-dessus."""
+    from radar_web.radar import jobs as job_queue
+    if not any(j["name"] == "scorestore_releases" and j["uid"] == RADAR_UID for j in job_queue.load_queue()):
+        job_queue.launch("scorestore_releases", {}, uid=RADAR_UID, priority=0)
+
+
 def job_scorestore_releases(job, params):
     """Lot 4 de la refonte scoring (cf. CLAUDE.md point 37) : précalcule le
     score de chaque sortie des labels suivis (Cœur + Aimé) dans
@@ -3077,9 +3104,19 @@ def job_scorestore_releases(job, params):
     Calcul purement local (aucun appel réseau) : contrairement à RECOS,
     chaque lancement REFAIT le score de toutes les sorties suivies plutôt que
     de sauter celles déjà vues, pour rester automatiquement à jour après un
-    changement de goût sans bookkeeping de fraîcheur séparé — le volume
-    (sorties des labels suivis, plafonné par label comme RECOS) reste assez
-    petit pour que ce soit bon marché.
+    changement de goût sans bookkeeping de fraîcheur séparé.
+
+    Traite les labels suivis PAR LOT DE SCORESTORE_RELEASES_BATCH_PER_RUN
+    (correctif famine scorestore du 24/09, cf. CLAUDE.md) : l'hypothèse
+    d'origine (« le volume reste assez petit pour que ce soit bon marché »)
+    ne tenait plus à l'échelle d'un utilisateur avec des centaines de labels
+    suivis — un lancement scorait alors tout d'un coup et monopolisait le
+    worker minute après minute. La reprise se fait par rotation sur
+    label_keys (triée, donc stable d'un lancement à l'autre), avec un
+    curseur persisté dans scorestore_meta (`label_cursor`, via
+    scorestore.set_run_meta/read_run_meta, déjà utilisé pour l'estampille de
+    fraîcheur) : chaque lot reprend exactement où le précédent s'est arrêté,
+    jamais depuis le début.
 
     Tous formats depuis le 15/09 (`search_local(vinyl_only=False)`, décision
     utilisateur : « exhaustif à la découverte, vinyle à l'achat ») — le
@@ -3089,10 +3126,10 @@ def job_scorestore_releases(job, params):
     à l'ajout wantlist (`app.py::cart_add`), jamais ici : `release_scores`/
     `track_scores` grossissent en conséquence (~4x, cf. CLAUDE.md).
 
-    Chaîne toujours job_scorestore_tracks en fin de course (comme
-    job_scan_recos chaîne job_publish_recos) : la passe piste par piste
-    (coûteuse — appel API pour la tracklist réelle) tourne dans un job
-    séparé, avec son propre budget."""
+    Chaîne job_scorestore_tracks (comme job_scan_recos chaîne
+    job_publish_recos) SEULEMENT quand le tour de labels est complet — un lot
+    tronqué se rechaîne lui-même à la place (_chain_scorestore_releases) pour
+    continuer le tour, sans relancer scorestore_tracks à chaque lot."""
     from radar_web.radar import discogs_dump as dd
     from radar_web.radar import scorestore
     from radar_web.radar.scoring import Ctx
@@ -3112,8 +3149,35 @@ def job_scorestore_releases(job, params):
             _chain_scorestore_tracks()
             return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à noter.")
 
+        # Reprise par rotation (cf. docstring) : un lancement ne traite qu'un
+        # lot de labels, jamais l'intégralité. Le curseur persisté est CUMULATIF
+        # (jamais remis à zéro en stockage, seulement à l'INDEXAGE via `% n_labels`)
+        # — un label ajouté/retiré entre deux tours ne fait donc jamais planter la
+        # reprise, juste légèrement dériver le point de départ. Un tour est jugé
+        # complet dès que ce lot fait franchir un multiple de n_labels au curseur
+        # cumulé (`next_cursor // n_labels > cursor // n_labels`) : ça couvre aussi
+        # bien le cas courant (lot >= tous les labels suivis, tour complet à chaque
+        # lancement, comme avant ce correctif) que le cas d'un total non multiple du
+        # lot (le dernier lot d'un tour peut re-couvrir un label déjà vu ce tour-ci,
+        # mais n'en saute jamais un).
+        sc_cfg = cfg.get("scoring", {}).get("scorestore", {})
+        batch_limit = int(params.get("releases_batch_per_run",
+                                      sc_cfg.get("releases_batch_per_run",
+                                                 SCORESTORE_RELEASES_BATCH_PER_RUN)))
+        n_labels = len(label_keys)
+        meta = scorestore.read_run_meta(con)
+        try:
+            cursor = int(meta.get("label_cursor", 0))
+        except (TypeError, ValueError):
+            cursor = 0
+        start = cursor % n_labels
+        batch_keys = (label_keys[start:] + label_keys[:start])[:batch_limit]
+        next_cursor = cursor + len(batch_keys)
+        sweep_complete = next_cursor // n_labels > cursor // n_labels
+        truncated = not sweep_complete
+
         rows, row_ids = [], set()
-        for lk in label_keys:
+        for lk in batch_keys:
             # découverte exhaustive tous formats (décision utilisateur 2026-09-15,
             # cf. CLAUDE.md) : le filtre vinyle ne s'applique plus ici, seulement à
             # l'ajout wantlist (app.py::cart_add) — voir docstring de search_local.
@@ -3144,19 +3208,32 @@ def job_scorestore_releases(job, params):
             if i % 200 == 0:
                 con.commit()
         con.commit()
-        # Estampiller une passe interrompue ferait dire « à jour » à radar_ops sur
-        # une base partiellement recalculée : le pire des deux mondes, des scores
-        # périmés qu'on ne sait plus reconnaître comme tels.
-        if not interrompu:
+        # Le curseur avance quel que soit le sort du lot (interrompu ou non) : la
+        # DÉCOUVERTE (coûteuse, cf. docstring) a déjà eu lieu pour tout le lot avant
+        # ce point. Un curseur figé sur interruption referait scorer deux fois de
+        # suite le même lot ; un curseur qui avance revoit au pire un label une fois
+        # de trop au tour suivant, jamais deux fois d'affilée par accident.
+        scorestore.set_run_meta(con, {"label_cursor": str(next_cursor)})
+        # Estampiller un tour incomplet (tronqué OU interrompu) ferait dire « à jour »
+        # à radar_ops alors que seule une fraction des labels suivis vient d'être
+        # recalculée — le pire des deux mondes, des scores périmés qu'on ne sait
+        # plus reconnaître comme tels.
+        if not interrompu and sweep_complete:
             _stamp_scorestore_run(con, cfg)
         stats = scorestore.stats(con)
     finally:
         con.close()
-    _chain_scorestore_tracks()
+    if truncated:
+        _chain_scorestore_releases()
+    else:
+        _chain_scorestore_tracks()
     job.finish(f"{n_scored} sortie(s) notée(s) sur {len(rows)} scannée(s), "
-               f"{len(label_keys)} label(s) suivi(s) — {stats['n_releases']} au total en base."
+               f"{len(batch_keys)}/{n_labels} label(s) suivi(s) traité(s) ce lancement"
+               f" — {stats['n_releases']} au total en base."
                + (" Passe INTERROMPUE : la base n'est pas estampillée, relancer le job."
-                  if interrompu else ""))
+                  if interrompu else "")
+               + (" Lot partiel : reprise automatique au prochain lancement."
+                  if truncated and not interrompu else ""))
 
 
 def job_scorestore_tracks(job, params):

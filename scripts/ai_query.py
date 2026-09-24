@@ -91,6 +91,15 @@ DEFAULT_MODEL = TIER_CASCADES["heavy"][0]
 # Statuts qui condamnent le modèle courant mais pas la requête.
 FALLBACK_STATUSES = frozenset({404, 429})
 
+# Statuts transitoires : on retente le MÊME modèle avec backoff avant de passer
+# au suivant dans la cascade. Un 429 (RPM/TPM dépassé) ou un 503 (surcharge
+# Google) se résorbent en quelques secondes — les brûler en cascade gaspille
+# tous les modèles sur un aléa qui ne dure pas.
+RETRYABLE_STATUSES = frozenset({429, 503})
+MAX_RETRIES_PER_MODEL = 2
+RETRY_BASE_DELAY = 4.0   # secondes — calé sur RPM=5, soit ~12s entre requêtes
+RETRY_MAX_DELAY = 30.0
+
 # Prompts système adaptés aux conventions Radar (cf. CLAUDE.md).
 SYSTEM_PROMPTS = {
     "general": "",
@@ -419,6 +428,69 @@ def query_gemini(
     raise last_err
 
 
+def _retry_delay(attempt: int) -> float:
+    """Backoff exponentiel plafonné : 4s → 8s → 16s → … → 30s max."""
+    return min(RETRY_BASE_DELAY * (2 ** (attempt - 1)), RETRY_MAX_DELAY)
+
+
+def _is_retryable(err: Exception) -> bool:
+    """L'erreur est-elle transitoire (retry sur le même modèle avant fallback) ?
+
+    Un 429 (RPM/TPM) et un 503 (surcharge Google) se résorbent en secondes.
+    Les autres 5xx sont traités pareil — un 502 a déjà été observé sur un seul
+    modèle alors que le reste de la cascade répondait normalement.
+    Un RuntimeError nu (timeout, connexion coupée) est aussi transitoire.
+    Un 404 ne l'est pas : le modèle n'existe pas, retenter est inutile.
+    """
+    if isinstance(err, GeminiHTTPError):
+        return err.status in RETRYABLE_STATUSES or 500 <= err.status <= 599
+    return isinstance(err, RuntimeError)
+
+
+def _try_with_retries(
+    model: str,
+    prompt: str,
+    system_instruction: str,
+    api_key: str | None,
+    temperature: float,
+    timeout: int,
+    json_mode: bool,
+) -> tuple[str, dict]:
+    """Appelle `query_gemini` avec retry+backoff sur les erreurs transitoires.
+
+    Lève l'exception du dernier essai si tous échouent.
+    """
+    last_err: Exception | None = None
+    for attempt in range(1 + MAX_RETRIES_PER_MODEL):
+        try:
+            return query_gemini(
+                prompt=prompt,
+                system_instruction=system_instruction,
+                model=model,
+                api_key=api_key,
+                temperature=temperature,
+                timeout=timeout,
+                json_mode=json_mode,
+            )
+        except (GeminiHTTPError, RuntimeError) as err:
+            last_err = err
+            remaining = MAX_RETRIES_PER_MODEL - attempt
+            if remaining > 0 and _is_retryable(err):
+                delay = _retry_delay(attempt + 1)
+                status_hint = (
+                    f"{err.status}" if isinstance(err, GeminiHTTPError) else "réseau"
+                )
+                sys.stderr.write(
+                    f"[ai_query] '{model}' en erreur ({status_hint}), "
+                    f"nouvel essai ({attempt + 1}/{MAX_RETRIES_PER_MODEL}) "
+                    f"dans {delay:.0f}s...\n"
+                )
+                time.sleep(delay)
+                continue
+            raise
+    raise last_err  # pragma: no cover — la boucle lève toujours avant
+
+
 def query_with_fallback(
     prompt: str,
     system_instruction: str = "",
@@ -431,19 +503,23 @@ def query_with_fallback(
 ) -> tuple[str, str, dict]:
     """Interroge Gemini en descendant la cascade du tier jusqu'à une réponse.
 
+    Chaque modèle bénéficie d'un retry avec backoff exponentiel sur les erreurs
+    transitoires (429, 503, 5xx, panne réseau) AVANT de passer au suivant.
+    Un 404 (modèle inexistant) déclenche le fallback immédiat.
+
     Renvoie `(réponse, modèle réellement utilisé, consommation de jetons)`.
     La consommation est celle du SEUL appel qui a abouti : un modèle indisponible
     répond en erreur sans rien facturer, le compter fausserait la mesure.
 
     Un modèle explicite court-circuite la cascade : l'appelant a demandé
     celui-là, lui substituer un autre en silence fausserait toute mesure
-    comparative.
+    comparative. Le retry avec backoff s'applique quand même.
     """
     if explicit_model:
-        text, usage = query_gemini(
+        text, usage = _try_with_retries(
+            model=explicit_model,
             prompt=prompt,
             system_instruction=system_instruction,
-            model=explicit_model,
             api_key=api_key,
             temperature=temperature,
             timeout=timeout,
@@ -457,10 +533,10 @@ def query_with_fallback(
     fallbacks = 0
     for model in models_to_try:
         try:
-            text, usage = query_gemini(
+            text, usage = _try_with_retries(
+                model=model,
                 prompt=prompt,
                 system_instruction=system_instruction,
-                model=model,
                 api_key=api_key,
                 temperature=temperature,
                 timeout=timeout,
@@ -472,19 +548,14 @@ def query_with_fallback(
             if not is_fallback_status(err.status):
                 raise
             sys.stderr.write(
-                f"[ai_query] '{model}' indisponible ({err.status}), "
+                f"[ai_query] '{model}' indisponible ({err.status}), retries épuisés — "
                 f"bascule sur le modèle suivant de la cascade '{tier}'...\n"
             )
             last_error = err
             fallbacks += 1
         except RuntimeError as err:
-            # Panne réseau (timeout, connexion coupée...) : `query_gemini` la
-            # remonte en `RuntimeError` nu, pas en `GeminiHTTPError`, donc elle
-            # échappait à ce repli et faisait échouer toute la cascade sur un
-            # seul aléa de transport. Même demande, modèle suivant — comme pour
-            # un 5xx.
             sys.stderr.write(
-                f"[ai_query] '{model}' injoignable ({err}), "
+                f"[ai_query] '{model}' injoignable ({err}), retries épuisés — "
                 f"bascule sur le modèle suivant de la cascade '{tier}'...\n"
             )
             last_error = err

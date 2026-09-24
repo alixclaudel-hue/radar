@@ -18,6 +18,8 @@ from scripts.ai_query import (  # noqa: E402
     CODE_MODES,
     DEFAULT_MODEL,
     FALLBACK_STATUSES,
+    MAX_RETRIES_PER_MODEL,
+    RETRYABLE_STATUSES,
     SYSTEM_PROMPTS,
     TIER_CASCADES,
     GeminiHTTPError,
@@ -195,6 +197,11 @@ class CascadeTests(unittest.TestCase):
         patcheur = patch.object(sys, "stderr", io.StringIO())
         self.stderr = patcheur.start()
         self.addCleanup(patcheur.stop)
+        # le retry avec backoff appelle time.sleep : sans mock les tests
+        # attendraient réellement 4-8s par modèle
+        sleep_patcher = patch("scripts.ai_query.time.sleep")
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
 
     def test_cascades_sans_doublon_interne(self):
         for tier, models in TIER_CASCADES.items():
@@ -215,14 +222,18 @@ class CascadeTests(unittest.TestCase):
 
     @patch("scripts.ai_query.query_gemini")
     def test_repli_sur_429_quota_epuise(self, mock_q):
-        mock_q.side_effect = [GeminiHTTPError(429, "quota épuisé"), ("Résultat secours", {})]
+        # 3 tentatives (1 + 2 retries) sur le 1er modèle, puis succès sur le 2ᵉ
+        attempts_per_model = 1 + MAX_RETRIES_PER_MODEL
+        mock_q.side_effect = (
+            [GeminiHTTPError(429, "quota épuisé")] * attempts_per_model
+            + [("Résultat secours", {})]
+        )
         res, model, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
         self.assertEqual(res, "Résultat secours")
         self.assertEqual(model, TIER_CASCADES["fast"][1])
-        self.assertEqual(mock_q.call_count, 2)
-        # la bascule doit rester visible : une dégradation silencieuse de
-        # modèle fausserait l'interprétation d'une réponse de moindre qualité
+        self.assertEqual(mock_q.call_count, attempts_per_model + 1)
         self.assertIn("429", self.stderr.getvalue())
+        self.assertTrue(self.mock_sleep.called)
 
     @patch("scripts.ai_query.query_gemini")
     def test_repli_sur_404_modele_retire(self, mock_q):
@@ -249,7 +260,9 @@ class CascadeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             query_with_fallback("Test", tier="fast", api_key="fake-key")
         self.assertIn("cascade 'fast'", str(ctx.exception))
-        self.assertEqual(mock_q.call_count, len(TIER_CASCADES["fast"]))
+        attempts_per_model = 1 + MAX_RETRIES_PER_MODEL
+        self.assertEqual(mock_q.call_count,
+                         len(TIER_CASCADES["fast"]) * attempts_per_model)
 
     @patch("scripts.ai_query.query_gemini")
     def test_modele_explicite_court_circuite_la_cascade(self, mock_q):
@@ -262,11 +275,12 @@ class CascadeTests(unittest.TestCase):
     @patch("scripts.ai_query.query_gemini")
     def test_modele_explicite_ne_replie_pas_sur_429(self, mock_q):
         """L'appelant a demandé CE modèle : lui en substituer un autre en
-        silence fausserait toute mesure comparative."""
+        silence fausserait toute mesure comparative. Le retry avec backoff
+        s'applique quand même (3 tentatives), mais pas de fallback."""
         mock_q.side_effect = GeminiHTTPError(429, "quota")
         with self.assertRaises(GeminiHTTPError):
             query_with_fallback("Test", explicit_model="gemini-3.6-flash", api_key="k")
-        self.assertEqual(mock_q.call_count, 1)
+        self.assertEqual(mock_q.call_count, 1 + MAX_RETRIES_PER_MODEL)
 
     @patch("scripts.ai_query.query_gemini")
     def test_tier_inconnu_retombe_sur_fast(self, mock_q):
@@ -290,7 +304,11 @@ class CascadeTests(unittest.TestCase):
     def test_repli_sur_502_aleas_amont(self, mock_q):
         """Observé en conditions réelles le 21/09/2026 : la tête de la cascade
         heavy a répondu 502 alors que les autres modèles répondaient."""
-        mock_q.side_effect = [GeminiHTTPError(502, "upstream request failed"), ("OK", {})]
+        attempts_per_model = 1 + MAX_RETRIES_PER_MODEL
+        mock_q.side_effect = (
+            [GeminiHTTPError(502, "upstream request failed")] * attempts_per_model
+            + [("OK", {})]
+        )
         res, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
         self.assertEqual(res, "OK")
         self.assertEqual(model, TIER_CASCADES["heavy"][1])
@@ -299,16 +317,17 @@ class CascadeTests(unittest.TestCase):
     def test_repli_sur_panne_reseau(self, mock_q):
         """Une panne réseau (`URLError`, remontée en `RuntimeError` nu par
         `query_gemini`, pas en `GeminiHTTPError`) doit aussi faire basculer
-        sur le modèle suivant avec la même requête — avant ce correctif elle
-        échappait au `except GeminiHTTPError` et arrêtait toute la cascade."""
-        mock_q.side_effect = [
-            RuntimeError("Erreur réseau Gemini : timeout"),
-            ("OK", {}),
-        ]
+        sur le modèle suivant avec la même requête — après épuisement des
+        retries sur le premier modèle."""
+        attempts_per_model = 1 + MAX_RETRIES_PER_MODEL
+        mock_q.side_effect = (
+            [RuntimeError("Erreur réseau Gemini : timeout")] * attempts_per_model
+            + [("OK", {})]
+        )
         res, model, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
         self.assertEqual(res, "OK")
         self.assertEqual(model, TIER_CASCADES["fast"][1])
-        self.assertEqual(mock_q.call_count, 2)
+        self.assertEqual(mock_q.call_count, attempts_per_model + 1)
 
     @patch("scripts.ai_query.query_gemini")
     def test_usage_fallbacks_vaut_zero_si_premier_modele_repond(self, mock_q):
@@ -318,14 +337,111 @@ class CascadeTests(unittest.TestCase):
 
     @patch("scripts.ai_query.query_gemini")
     def test_usage_fallbacks_vaut_deux_apres_deux_echecs_429(self, mock_q):
-        mock_q.side_effect = [
-            GeminiHTTPError(429, "quota"),
-            GeminiHTTPError(429, "quota"),
-            ("ok", {})
-        ]
+        # Chaque modèle fait 3 tentatives (1 + 2 retries) avant fallback
+        attempts_per_model = 1 + MAX_RETRIES_PER_MODEL
+        mock_q.side_effect = (
+            [GeminiHTTPError(429, "quota")] * (attempts_per_model * 2)
+            + [("ok", {})]
+        )
         _, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
         self.assertEqual(usage["fallbacks"], 2)
         self.assertEqual(model, TIER_CASCADES["heavy"][2])
+
+
+class RetryTests(unittest.TestCase):
+    """Retry avec backoff exponentiel sur les erreurs transitoires (429, 503, 5xx)."""
+
+    def setUp(self):
+        patcheur = patch.object(sys, "stderr", io.StringIO())
+        self.stderr = patcheur.start()
+        self.addCleanup(patcheur.stop)
+        sleep_patcher = patch("scripts.ai_query.time.sleep")
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_429_reussi_au_premier_retry(self, mock_q):
+        """Un 429 transitoire (RPM dépassé) se résorbe après un court backoff :
+        le même modèle doit être retenté avant de tomber sur le suivant."""
+        mock_q.side_effect = [GeminiHTTPError(429, "quota"), ("OK", {})]
+        res, model, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
+        self.assertEqual(res, "OK")
+        self.assertEqual(model, TIER_CASCADES["fast"][0])
+        self.assertEqual(mock_q.call_count, 2)
+        self.assertEqual(usage["fallbacks"], 0)
+        self.mock_sleep.assert_called_once()
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_503_reussi_au_deuxieme_retry(self, mock_q):
+        """503 (surcharge Google) : le même modèle réussit après 2 retries."""
+        mock_q.side_effect = [
+            GeminiHTTPError(503, "overloaded"),
+            GeminiHTTPError(503, "overloaded"),
+            ("OK", {}),
+        ]
+        res, model, usage = query_with_fallback("Test", tier="fast", api_key="fake-key")
+        self.assertEqual(res, "OK")
+        self.assertEqual(model, TIER_CASCADES["fast"][0])
+        self.assertEqual(mock_q.call_count, 3)
+        self.assertEqual(self.mock_sleep.call_count, 2)
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_backoff_exponentiel(self, mock_q):
+        """Le délai double entre chaque retry : 4s puis 8s."""
+        mock_q.side_effect = [
+            GeminiHTTPError(503, "x"),
+            GeminiHTTPError(503, "x"),
+            ("OK", {}),
+        ]
+        query_with_fallback("Test", tier="fast", api_key="fake-key")
+        delays = [c.args[0] for c in self.mock_sleep.call_args_list]
+        self.assertEqual(delays, [4.0, 8.0])
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_404_pas_de_retry(self, mock_q):
+        """404 = modèle inexistant, retenter est inutile : fallback immédiat."""
+        mock_q.side_effect = [GeminiHTTPError(404, "not found"), ("OK", {})]
+        res, model, usage = query_with_fallback("Test", tier="heavy", api_key="fake-key")
+        self.assertEqual(res, "OK")
+        self.assertEqual(model, TIER_CASCADES["heavy"][1])
+        self.assertEqual(mock_q.call_count, 2)
+        self.mock_sleep.assert_not_called()
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_panne_reseau_retentee_avant_fallback(self, mock_q):
+        """Un timeout réseau est transitoire : retry avant de changer de modèle."""
+        mock_q.side_effect = [
+            RuntimeError("timeout"),
+            ("OK", {}),
+        ]
+        res, model, _ = query_with_fallback("Test", tier="fast", api_key="fake-key")
+        self.assertEqual(res, "OK")
+        self.assertEqual(model, TIER_CASCADES["fast"][0])
+        self.mock_sleep.assert_called_once()
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_modele_explicite_retry_puis_echec(self, mock_q):
+        """Modèle explicite : retry avec backoff, mais jamais de fallback."""
+        mock_q.side_effect = GeminiHTTPError(503, "overloaded")
+        with self.assertRaises(GeminiHTTPError):
+            query_with_fallback("Test", explicit_model="gemini-3.6-flash", api_key="k")
+        self.assertEqual(mock_q.call_count, 1 + MAX_RETRIES_PER_MODEL)
+        self.assertEqual(self.mock_sleep.call_count, MAX_RETRIES_PER_MODEL)
+
+    @patch("scripts.ai_query.query_gemini")
+    def test_400_pas_de_retry(self, mock_q):
+        """400 (requête invalide) n'est pas retryable : échoue immédiatement."""
+        mock_q.side_effect = GeminiHTTPError(400, "bad request")
+        with self.assertRaises(GeminiHTTPError):
+            query_with_fallback("Test", tier="fast", api_key="fake-key")
+        self.assertEqual(mock_q.call_count, 1)
+        self.mock_sleep.assert_not_called()
+
+    def test_retryable_statuses_contient_429_et_503(self):
+        self.assertIn(429, RETRYABLE_STATUSES)
+        self.assertIn(503, RETRYABLE_STATUSES)
+        self.assertNotIn(404, RETRYABLE_STATUSES)
+        self.assertNotIn(400, RETRYABLE_STATUSES)
 
 
 class TierRoutingTests(unittest.TestCase):

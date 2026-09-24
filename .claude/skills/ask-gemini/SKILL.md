@@ -56,7 +56,7 @@ proportionnels à la capacité :
 | Tier     | Tête de cascade         | Quota | Pour quoi                       |
 |----------|-------------------------|-------|---------------------------------|
 | `heavy`  | `gemini-3.8-flash`      | étroit| code, tests — il faut raisonner |
-| `fast`   | `gemini-3.5-flash-lite` | large | logs, diffs, docs — du volume   |
+| `fast`   | `gemini-3.5-flash-lite` | large | logs, diffs, docs, read — du volume   |
 
 Le tier se déduit du `--mode` : `code`/`test` → `heavy`, tout le reste →
 `fast`. Ne le forcer avec `-t` que pour une raison précise (par exemple un diff
@@ -162,13 +162,13 @@ forcer une sortie JSON (utile si le prompt demande des données structurées).
 
 `scripts/ai_query.py` gère les deux sans configuration :
 
-- **VPS / local** : variable `GEMINI_API_KEY` (clé gratuite sur
+- **VPS / local (à utiliser dans cette session)** : variable `GEMINI_API_KEY` (clé gratuite sur
   https://aistudio.google.com/apikey). Le script l'ajoute en `?key=` dans l'URL.
   Un lancement direct sur l'hôte (hors `docker compose`, qui injecte `.env`
   nativement) lit désormais `.env` en repli si la variable n'est pas déjà
   exportée — plus besoin de `set -a; source ~/radar/.env; set +a` avant
   d'appeler le script (correctif du 23/09, cf. `_key_from_dotenv`).
-- **Session cloud (chemin actuel)** : un mini gateway local
+- **Session cloud (chemin de l'ancienne session cloud, à ne plus utiliser)** : un mini gateway local
   `scripts/gemini_gateway.py` lit la clé Gemini posée par l'utilisateur dans
   `~/.claude-code-router/config.sqlite` (via l'interface CCR) et l'ajoute en
   `?key=` sur chaque appel forwardé à `generativelanguage.googleapis.com`. Le
@@ -185,11 +185,10 @@ lever une erreur quand `GEMINI_API_KEY` est absente couperait la session cloud
 de sa seule voie d'accès. Un test de non-régression le verrouille
 (`tests/test_ai_query.py`).
 
-**Les deux modes sont chaînés, pas juste sélectionnés** (24/09/2026) : quand la
-passerelle est configurée, `query_gemini()` la tente d'abord ; si CET essai
-échoue (panne réseau vers `127.0.0.1:8632`, ou erreur HTTP qu'elle relaie), un
-second essai part en appel direct vers Google avec la clé locale (`.env` ou
-environnement), pour le même modèle, avant de passer au modèle suivant de la
+**Les deux modes sont chaînés, pas juste sélectionnés** (24/09/2026) : essai part en appel direct 
+vers Google avec la clé locale (`.env` ou environnement) si CET essai
+échoue quand la passerelle est configurée, pour un même modèle gemini `query_gemini()` la tente; si CET essai
+échoue (panne réseau vers `127.0.0.1:8632`, ou erreur HTTP qu'elle relaie), avant de passer au modèle suivant de la
 cascade. Objectif : une passerelle éteinte ou en erreur ne doit plus épuiser
 toute la cascade sur un unique transport mort quand un autre chemin peut
 aboutir. Sans passerelle configurée (VPS/local), rien ne change : un seul

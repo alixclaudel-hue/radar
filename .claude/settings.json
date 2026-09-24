@@ -1,4 +1,7 @@
 {
+  "env": {
+    "RADAR_TELEMETRY_DIR": "/home/ubuntu/radar/data/ops"
+  },
   "hooks": {
     "SessionStart": [
       {

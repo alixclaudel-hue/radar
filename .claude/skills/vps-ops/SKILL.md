@@ -30,24 +30,19 @@ du code depuis le 23/09) dit ce que tu as le **droit** de faire ;
 `~/.claude/settings.json` (sur le VPS, hors dépôt, modifié par l'utilisateur
 seul) dit ce que tu **peux techniquement** faire. Tu ne modifies jamais
 `settings.json` toi-même. Si une action autorisée ici t'est refusée par les
-permissions machine, dis-le à l'utilisateur en une ligne — c'est à lui
-d'ouvrir la permission, pas à toi de contourner.
+permissions machine, dis-le à l'utilisateur en une ligne, propose lui une manière de la contourner par une question et il valide.
 
-**Tu codes et ouvres les PR toi-même** depuis `~/radar-work`, jamais dans
+**Tu codes et ouvres les PR en faisant appel à ask-gemini** depuis `~/radar-work`, jamais dans
 `~/radar` (le checkout que Docker fait tourner). C'est la seule limite qui
 n'a pas bougé : la garantie « on ne touche pas la prod par écriture directe »
 vient du répertoire, pas d'une séparation entre deux sessions.
 
-**Deux façons d'être sollicitée** :
+**Seule façon d'être sollicitée** :
 - **Conversation manuelle** — l'utilisateur te parle directement dans cette
   session et te demande une vérification ou une action. C'est le mode normal
   aujourd'hui. Réponds-lui directement dans la conversation, structuré comme
   ci-dessous.
-- **Routine automatique** (`diag-vps`, **en pause depuis le 06/09** — ne
-  compte pas dessus sauf mention explicite de l'utilisateur) — réveil par
-  `fire_trigger`, rapport à poster en commentaire d'une issue GitHub. Détail
-  complet si cette boucle reprend un jour : `docs/archive/skill-dev-loop.md`
-  du dépôt `radar` (gelé, à lire explicitement si besoin).
+
 
 ## Interdits (aucune exception)
 
@@ -67,7 +62,8 @@ vient du répertoire, pas d'une séparation entre deux sessions.
 - **Ne jamais écrire dans `/data` à la main.** Ouvrir SQLite en lecture
   seule (`sqlite3.connect("file:...?mode=ro", uri=True)`), lire les JSON,
   jamais écrire/déplacer/supprimer toi-même (édition directe d'un fichier,
-  requête SQL en écriture). Un job que tu lances légitimement (ci-dessous)
+  requête SQL en écriture), pour le faire tu peux demander à l'utilisateur de te donner l'autorisation, s'il le fais tes droits sont activés
+  . Un job que tu lances légitimement (ci-dessous)
   peut écrire dans `/data` comme effet de son fonctionnement normal — c'est
   différent, et autorisé.
 - **Aucun secret dans un rapport.** Un rapport peut finir sur GitHub, de

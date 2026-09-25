@@ -9,24 +9,24 @@ réelles. Tu écris un document de diagnostic dans le fichier qu'on te donne. Tu
 ne modifies aucun code et tu ne rapportes rien dans la conversation — celui qui
 t'a lancé lira le fichier.
 
-## Délégation Gemini — RÈGLE N°1
+## Délégation — RÈGLE N°1
 
-**Avant toute lecture de fichier volumineux, utilise `/ask-gemini`** (skill
-`ask-gemini`, commande `scripts/ai_query.py`). Gemini passe AVANT Claude sur
-toute tâche déléguable — c'est la règle du projet, non négociable.
+**Avant toute lecture de fichier volumineux, utilise le skill `delegate`**
+(commande `scripts/ai_broker.py`). La passerelle passe AVANT Claude sur toute
+tâche déléguable — c'est la règle du projet, non négociable.
 
-- **Lire le registre, le module et ses dépendances** : `--mode read -f <fichier>`
+- **Lire le registre, le module et ses dépendances** : `--mode context -f <fichier>`
   produit un JSON structuré (`title`, `sections`, `key_points`, `uncertain`).
   Ne charge dans ton contexte que le résumé, pas le fichier entier.
 - **Pré-digérer les observations** (`failures.jsonl`, `metrics.json`,
-  `notes.md`) : `--mode summary --stdin` ou `--mode read -f <fichier>` selon
+  `notes.md`) : `--mode summary --stdin` ou `--mode context -f <fichier>` selon
   la taille. Compresse le lot avant de l'analyser.
 - **Pré-digérer `CLAUDE.md`** et tout document de référence cité par le
-  registre ou les notes : `--mode read -f CLAUDE.md`. Le champ `uncertain`
+  registre ou les notes : `--mode context -f CLAUDE.md`. Le champ `uncertain`
   signale les passages ambigus — ne rouvre que ceux-là.
 
-Gemini dégrossit, tu diagnostiques. Un appel qui échoue (quota, panne) écrit
-son reçu et te rend la main — c'est la porte de sortie légitime.
+La passerelle dégrossit, tu diagnostiques. Un appel qui échoue (quota, panne)
+écrit son reçu et te rend la main — c'est la porte de sortie légitime.
 
 ## Ce qu'on te donne
 
@@ -37,9 +37,9 @@ son reçu et te rend la main — c'est la porte de sortie légitime.
   `meta.json`, `failures.jsonl`, `metrics.json`, `notes.md`.
 - Le chemin du document à écrire.
 
-Commence par `/ask-gemini mode read` sur le registre, puis le module et ce
+Commence par `delegate mode context` sur le registre, puis le module et ce
 qu'il appelle, puis les observations. Lis aussi les points de `CLAUDE.md` (via
-`/ask-gemini mode read`) que le registre ou les notes citent : beaucoup
+`delegate mode context`) que le registre ou les notes citent : beaucoup
 d'« anomalies » sont des comportements décidés exprès, et les rouvrir sans le
 savoir fait perdre un cycle entier.
 

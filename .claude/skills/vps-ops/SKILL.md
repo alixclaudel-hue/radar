@@ -28,7 +28,7 @@ fichier — avec l'accord explicite de l'utilisateur. Si une action autorisée
 ici t'est refusée par les permissions machine, propose la correction de
 `settings.json` nécessaire et applique-la après validation.
 
-**Tu lis les documents, fait des diagnostics, des résumés, du code et ouvres les PR en faisant appel à ask-gemini** depuis `~/radar-work`, jamais dans
+**Tu lis les documents, fait des diagnostics, des résumés, du code et ouvres les PR en faisant appel au skill `delegate`** (`scripts/ai_broker.py`) depuis `~/radar-work`, jamais dans
 `~/radar` (le checkout que Docker fait tourner). C'est la seule garantie « on ne touche pas la prod par écriture directe »
 vient du répertoire, pas d'une séparation entre deux sessions.
 
@@ -37,15 +37,15 @@ vient du répertoire, pas d'une séparation entre deux sessions.
 `~/radar` et `~/radar-work` sont deux clones du MÊME dépôt : arborescence de
 fichiers identique, mêmes chemins relatifs. Conséquence directe et
 dangereuse : une commande écrite en chemin relatif — `python3
-scripts/ai_query.py ...`, `git commit ...`, `python3 -m unittest discover -s
+scripts/ai_broker.py ...`, `git commit ...`, `python3 -m unittest discover -s
 tests` — RÉUSSIT SANS LA MOINDRE ERREUR dans les deux répertoires. Un `cwd`
 erroné ne se trahit par aucun message : seul l'état qu'elle modifie (reçus
-Gemini, historique git, fichiers écrits, télémétrie — cf. CLAUDE.md pt 50
+de délégation, historique git, fichiers écrits, télémétrie — cf. CLAUDE.md pt 50
 pour un cas réel où cette confusion a rendu la télémétrie invisible pendant
 plusieurs heures) part silencieusement au mauvais endroit.
 
 - **Avant toute commande qui écrit un état** (commit, `Write`/`Edit`,
-  lancement de job, appel `ai_query.py` dont le reçu compte) — en cas de
+  lancement de job, appel `ai_broker.py` dont le reçu compte) — en cas de
   doute, ou en tout début de session — vérifie où tu es réellement :
   `pwd` et `git remote -v` (la ligne `origin` est identique dans les deux
   clones, seul le chemin absolu de `pwd` distingue les deux).
@@ -90,33 +90,49 @@ plusieurs heures) part silencieusement au mauvais endroit.
   façon permanente. Jamais de token Discogs, de contenu de `.env`, de clé
   API, de mot de passe — même partiel. Écrire « token présent (non
   affiché) », jamais la valeur.
+- **Ne jamais appeler un fournisseur payant sans le déclarer.** L'escalade payante
+  (DeepSeek, xAI) suppose que l'utilisateur a déjà fait deux choses : poser la clé
+  payante dans `~/radar/.env`, et déclarer un plafond journalier
+  `RADAR_AI_DAILY_PAID_CAP_USD` non vide (vide = 0,00 $ = aucun appel payant
+  possible). Tu ne poses ni l'une ni l'autre — une clé n'est pas un drapeau
+  `RADAR_*` (hors de l'exception du 18/09) et le plafond engage une dépense. Un
+  appel payant part uniquement sur `--allow-paid` ; un reçu payant non justifié est
+  signalé par `delegation_gate.py`.
 
-## Délégation Gemini — RANG 2 (skill `ask-gemini`)
+## Délégation multi-fournisseurs — RANG 2 (skill `delegate`)
 
 **Après ce contrat lui-même, la RÈGLE N°1 du projet est la priorité la plus
-haute.** Gemini (gratuit, via `scripts/ai_query.py`) passe AVANT Claude sur
-toute tâche déléguable ; Claude ne prend le relais qu'une fois Gemini épuisé
-(quota, panne, sortie inexploitable) — jamais l'inverse, jamais par
-commodité. Le skill `ask-gemini` (`.claude/skills/ask-gemini/SKILL.md`)
-documente la syntaxe complète et les modes — lis-le au premier appel de la
-session.
+haute.** La passerelle (`scripts/ai_broker.py`) passe AVANT Claude sur toute
+tâche déléguable, **gratuit d'abord** (OpenRouter/Gemini), payant (DeepSeek)
+seulement sur critère explicite et sous plafond ; Claude ne prend le relais
+qu'une fois le gratuit épuisé (quota, panne, sortie inexploitable) — jamais
+l'inverse, jamais par commodité. Le skill `delegate`
+(`.claude/skills/delegate/SKILL.md`) documente la syntaxe complète et les
+modes — lis-le au premier appel de la session. Le skill `ask-gemini` n'est
+plus qu'un **alias** qui pointe dessus.
 
-**Le hook `gemini_gate.py` applique la règle mécaniquement** : il bloque le
+**Le hook `delegation_gate.py` applique la règle mécaniquement** : il bloque le
 commit, l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu
-Gemini récent (< 1h, ≥ 50 caractères de prompt) n'existe. Un appel raté
+de délégation récent (< 1h, ≥ 50 caractères de prompt) n'existe. Un appel raté
 écrit son reçu et débloque : c'est la porte de sortie légitime.
+
+**Payant = sur critère explicite, jamais par défaut.** Le routage part toujours du
+gratuit ; l'escalade payante exige `--allow-paid` ET un plafond journalier déclaré.
+Si les deux ne sont pas réunis, le courtier refuse l'appel — c'est le comportement
+attendu, pas une panne. Dis-le en une ligne et continue avec Claude, sans chercher à
+contourner le plafond.
 
 ### Quand déléguer — tableau par section
 
-| Section de ce contrat | Mode Gemini | Commande type |
+| Section de ce contrat | Mode | Commande type |
 |---|---|---|
-| **Jobs** — lecture de documents pour compléter le contexte en début de session: claude.md, scripts, sortie de commande,fichier .jso. pré-digérer un document avant analyse | `read` | `python3 scripts/ai_query.py --mode read -f <fichier>` |
-| **Jobs** — analyser les logs d'un job | `diag` ou `summary` | `docker logs radar-web --tail 300 \| python3 scripts/ai_query.py --mode diag --stdin` |
-| **Jobs** — comprendre un statut/trace > 50 lignes | `summary` | `cat /data/jobs/*.status.json \| python3 scripts/ai_query.py --mode summary --stdin` |
-| **Boucle script** — premier jet d'un correctif | `code` | `python3 scripts/ai_query.py --mode code --check-syntax -o <fichier> "<spec>"` |
-| **Boucle script** — premier jet de tests | `test` | `python3 scripts/ai_query.py --mode test --check-syntax -f <cible> -o <test> "<spec>"` |
-| **Boucle script / PR** — message de commit et corps de PR | `pr` | `cd ~/radar-work && git diff origin/main \| python3 scripts/ai_query.py --mode pr --stdin` |
-| **Diagnostic** — logs ou dumps volumineux | `diag` | `docker compose logs radar-web --tail 500 \| python3 scripts/ai_query.py --mode diag --stdin` |
+| **Jobs** — lecture de documents pour compléter le contexte en début de session: claude.md, scripts, sortie de commande,fichier .jso. pré-digérer un document avant analyse | `context` | `python3 scripts/ai_broker.py --mode context -f <fichier>` |
+| **Jobs** — analyser les logs d'un job | `diag` ou `summary` | `docker logs radar-web --tail 300 \| python3 scripts/ai_broker.py --mode diag --stdin` |
+| **Jobs** — comprendre un statut/trace > 50 lignes | `summary` | `cat /data/jobs/*.status.json \| python3 scripts/ai_broker.py --mode summary --stdin` |
+| **Boucle script** — premier jet d'un correctif | `code` | `python3 scripts/ai_broker.py --mode code --check-syntax -o <fichier> "<spec>"` |
+| **Boucle script** — premier jet de tests | `test` | `python3 scripts/ai_broker.py --mode test --check-syntax -f <cible> -o <test> "<spec>"` |
+| **Boucle script / PR** — message de commit et corps de PR | `pr` | `cd ~/radar-work && git diff origin/main \| python3 scripts/ai_broker.py --mode pr --stdin` |
+| **Diagnostic** — logs ou dumps volumineux | `diag` | `docker compose logs radar-web --tail 500 \| python3 scripts/ai_broker.py --mode diag --stdin` |
 
 **Quand NE PAS déléguer** : le scoring (`scoring.py`),
 l'architecture, la sécurité, le contenu sensible (tokens, clés, `.env`), et
@@ -257,12 +273,12 @@ jamais de `/data` monté dessus. C'est un atelier, pas un déploiement.
 en lecture seule — dans ce cas `git push` échoue, et c'est à l'utilisateur
 d'ouvrir le droit, pas à toi de contourner. Dis-le en une ligne et arrête-toi.
 
-> **🔧 Gemini ici** : dans la boucle, les premiers jets (correctif et tests)
+> **🔧 Délégation ici** : dans la boucle, les premiers jets (correctif et tests)
 > passent par `--mode code` et `--mode test` avec `--check-syntax`. 
-> la lecture de document pour récupérer le contexte en début de session passe par  `--mode read`
+> la lecture de document pour récupérer le contexte en début de session passe par  `--mode context`
 >  Le message de commit et le corps de PR passent par `--mode pr`.
 > Le diagnostic d'un lot d'observations (> 50 lignes) passe par `--mode diag`.
-> Pré-digestion du script cible : `--mode read`. Cf. tableau Rang 2.
+> Pré-digestion du script cible : `--mode context`. Cf. tableau Rang 2.
 
 ### Prérequis pour ouvrir et merger une PR toi-même : un token GitHub
 
@@ -335,21 +351,30 @@ cinq portes.
   rôle (fusion du 23/09, pt 45 de `CLAUDE.md`) ; c'est désormais toi, avec la
   même règle.
 
-## Prérequis Gemini (`scripts/ai_query.py`)
+## Prérequis de la délégation (`scripts/ai_broker.py`)
 
-`~/radar/scripts/ai_query.py` est un script du dépôt, en lecture seule — **le
+`~/radar/scripts/ai_broker.py` est un script du dépôt, en lecture seule — **le
 lancer n'est pas y écrire**, exactement comme lancer un job. La syntaxe
-complète et les modes sont dans le skill `ask-gemini`
-(`.claude/skills/ask-gemini/SKILL.md`). L'usage opérationnel est décrit dans
-la section « Délégation Gemini — RANG 2 » ci-dessus.
+complète et les modes sont dans le skill `delegate`
+(`.claude/skills/delegate/SKILL.md`) ; `ask-gemini` n'en est que l'alias.
+L'usage opérationnel est décrit dans la section « Délégation
+multi-fournisseurs — RANG 2 » ci-dessus.
 
-Nécessite `GEMINI_API_KEY` dans `~/radar/.env`. **Ce n'est pas un drapeau
-`RADAR_*`** : l'ajouter n'entre pas dans l'exception « drapeaux
-d'environnement » ci-dessus, donc tu ne l'ajoutes pas toi-même. Si la ligne
-est absente (erreur API Gemini 401/403), dis-le à l'utilisateur et
-demande-lui de l'ajouter (clé gratuite sur https://aistudio.google.com/apikey,
-ligne dans `.env`, puis `docker compose up -d --force-recreate`). Une fois la
-ligne présente, le script fonctionne directement.
+Nécessite une clé Gemini dans `~/radar/.env` : `GEMINI_API_KEY`, ou
+`GEMINI_API_KEY_1` / `GEMINI_API_KEY_2` pour la rotation (première définie de la
+liste). Les autres fournisseurs gratuits suivent exactement la même règle —
+`OPENROUTER_API_KEY` (`_1`, `_2`) pour OpenRouter. **Aucune de ces clés n'est un
+drapeau `RADAR_*`** : les ajouter n'entre pas dans l'exception « drapeaux
+d'environnement » ci-dessus, donc tu ne les ajoutes pas toi-même. Si la ligne est
+absente (erreur API Gemini 401/403, ou fournisseur ignoré faute de clé), dis-le à
+l'utilisateur et demande-lui de l'ajouter (clé gratuite sur
+https://aistudio.google.com/apikey, ligne dans `.env`, puis
+`docker compose up -d --force-recreate`). Une fois la ligne présente, le script
+fonctionne directement.
+
+Les clés **payantes** (`DEEPSEEK_API_KEY`, `XAI_API_KEY`) sont de la même famille —
+hors exception, jamais posées par toi — et demandent en plus le plafond
+`RADAR_AI_DAILY_PAID_CAP_USD` avant qu'un seul appel payant puisse partir.
 
 ## Ton outillage : `~/radar-diag/`
 
@@ -424,8 +449,8 @@ général :**
 **En plus, ciblé** : ce que la demande de l'utilisateur (ou le `scope` d'un
 réveil automatique) donne comme périmètre précis.
 
-> **🔧 Gemini ici** : les logs de conteneur (> 50 lignes) et les documents
-> volumineux passent par `--mode diag`/`--mode summary`/`--mode read` AVANT
+> **🔧 Délégation ici** : les logs de conteneur (> 50 lignes) et les documents
+> volumineux passent par `--mode diag`/`--mode summary`/`--mode context` AVANT
 > d'entrer dans le contexte Claude. Le diagnostic lui-même (jugement, sévérité,
 > correctif) reste du ressort de Claude — cf. tableau Rang 2.
 

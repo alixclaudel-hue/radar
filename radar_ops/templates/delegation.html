@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block body %}
-<h2>Délégation à Gemini</h2>
-<p class="note">Les jetons affichés sont ceux que l'API Gemini rapporte elle-même, et aucune estimation d'économie côté Claude n'est calculée parce que ce serait un contrefactuel.</p>
+<h2>Délégation</h2>
+<p class="note">Les jetons affichés sont ceux que l'API du fournisseur rapporte elle-même, et aucune estimation d'économie côté Claude n'est calculée parce que ce serait un contrefactuel.</p>
 
 {% if d.missing %}
 <p class="empty">Le transport n'a encore rien déposé dans <code>{{ d.dir }}</code> (fichiers manquants : {{ d.missing|join(', ') }}).</p>
@@ -70,6 +70,85 @@
 {% else %}<tr><td colspan="8" class="empty">Aucune donnée par modèle.</td></tr>{% endfor %}
 </tbody></table>
 
+<h2>Quota du jour</h2>
+<p class="note">Où en est la consommation du jour, d'après le dernier reçu qui a déclaré un quota ? Un plafond que le fournisseur ne publie pas reste affiché « non publié » plutôt que deviné.</p>
+<table><thead><tr>
+  <th>Fournisseur</th>
+  <th>Fenêtre</th>
+  <th class="num">Plafond</th>
+  <th class="num">Utilisés</th>
+  <th class="num">Restants</th>
+  <th class="num">Payant dépensé ($)</th>
+  <th class="num">Plafond payant ($)</th>
+</tr></thead><tbody>
+{% for q in d.quota_du_jour %}
+<tr>
+  <td>{{ q.provider }}</td>
+  <td>{{ q.window or "—" }}</td>
+  <td class="num">{{ q.limit if q.limit is not none else "non publié" }}</td>
+  <td class="num">{{ q.used if q.used is not none else "—" }}</td>
+  <td class="num">{{ q.remaining if q.remaining is not none else "non publié" }}</td>
+  <td class="num dim">{{ "%.6f"|format(q.paid_spent_usd) if q.paid_spent_usd is not none else "—" }}</td>
+  <td class="num dim">{{ "%.2f"|format(q.paid_cap_usd) if q.paid_cap_usd is not none else "—" }}</td>
+</tr>
+{% else %}<tr><td colspan="7" class="empty">Aucun reçu n'a encore déclaré de quota.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Part gratuite contre payante</h2>
+<p class="note">Parmi les appels qui déclarent leur nature, quelle part est passée par un modèle gratuit ? Les reçus antérieurs à l'enrichissement ne déclarent rien : ils sont comptés à part, jamais fondus dans le ratio.</p>
+<p>
+  <span class="tag">Appels : {{ d.part_gratuite.calls }}</span>
+  <span class="tag">Gratuits : {{ d.part_gratuite.free }}</span>
+  <span class="tag">Payants : {{ d.part_gratuite.paid }}</span>
+  <span class="tag">Non déclarés : {{ d.part_gratuite.undeclared }}</span>
+  <span class="tag">Part gratuite : {% if d.part_gratuite.free_share is not none %}{{ d.part_gratuite.free_share }}{% else %}— <span class="dim">(aucun appel déclaré)</span>{% endif %}</span>
+  <span class="tag">Coût estimé cumulé ($) : {{ "%.6f"|format(d.part_gratuite.cost_usd) }}</span>
+</p>
+
+<h2>Modèles écartés</h2>
+<p class="note">Pourquoi un modèle du catalogue n'est-il pas proposable en ce moment ? Le disjoncteur écarte un modèle après un échec durable, et un 404 le retire jusqu'au prochain rafraîchissement.</p>
+<table><thead><tr>
+  <th>Fournisseur</th>
+  <th>Modèle</th>
+  <th class="num">Restant (s)</th>
+  <th>Raison</th>
+</tr></thead><tbody>
+{% for c in d.cooldowns %}
+<tr>
+  <td>{{ c.provider }}</td>
+  <td>{{ c.model }}</td>
+  <td class="num">{{ c.seconds_left if c.seconds_left is not none else "—" }}</td>
+  <td class="dim">{{ c.reason }}</td>
+</tr>
+{% else %}<tr><td colspan="4" class="empty">Aucun modèle écarté.</td></tr>{% endfor %}
+</tbody></table>
+
+<h2>Occasions manquées</h2>
+<p class="note">Ce que la règle « déléguer d'abord » n'a pas attrapé dans la fenêtre : une session où l'utilisateur a écrit sans qu'aucun reçu ne tombe, un prompt dont le vocabulaire appelle une lecture ou un résumé et qui reste sans reçu dans les {{ d.occasions_manquees.fenetre_s }} secondes, et les lectures natives que <code>context</code> paverait en un seul appel. Tout est décompté des journaux, jamais jugé : un marqueur est un mot qui peut tomber dans une phrase qui ne demandait rien.</p>
+<p>
+  <span class="tag">Sessions actives : {{ d.occasions_manquees.sessions_actives }}</span>
+  <span class="tag">Sans aucune délégation : {{ d.occasions_manquees.sessions_sans_delegation }}</span>
+  <span class="tag">Demandes : {{ d.occasions_manquees.prompts }}</span>
+  <span class="tag">Demandes signalées : {{ d.occasions_manquees.prompts_signales }}</span>
+  <span class="tag">Lectures natives : {{ d.occasions_manquees.lectures_natives.total }} <span class="dim">(Read {{ d.occasions_manquees.lectures_natives.read }} · Grep {{ d.occasions_manquees.lectures_natives.grep }} · Glob {{ d.occasions_manquees.lectures_natives.glob }})</span></span>
+</p>
+<table><thead><tr>
+  <th>Quand</th>
+  <th>Marqueur</th>
+  <th>Session</th>
+  <th>Demande</th>
+</tr></thead><tbody>
+{% for o in d.occasions_manquees.exemples %}
+<tr>
+  <td class="dim">{{ o.at or "—" }}</td>
+  <td><span class="tag">{{ o.marqueur }}</span></td>
+  <td><code>{{ (o.session or "")[:8] }}</code></td>
+  <td class="dim">{{ o.head }}</td>
+</tr>
+{% else %}<tr><td colspan="4" class="empty">Aucune occasion manquée sur la fenêtre.</td></tr>{% endfor %}
+</tbody></table>
+<p class="note">Marqueurs cherchés dans la tête de chaque demande : <span class="dim">{{ d.occasions_manquees.marqueurs | join(', ') }}</span>. Les notifications de tâche de fond sont écartées : ce ne sont pas des demandes.</p>
+
 <h2>Volume par jour</h2>
 <p class="note">Quelle est l'évolution quotidienne du trafic délégué et de la consommation de jetons ?</p>
 {% set max_tokens = (d.by_day | map(attribute='total_tokens') | list | max) if d.by_day else 0 %}
@@ -126,5 +205,5 @@
 {% else %}<tr><td colspan="7" class="empty">Aucune session enregistrée.</td></tr>{% endfor %}
 </tbody></table>
 
-<p class="note">Dossier lu : <code>{{ d.dir }}</code> (fenêtre de {{ d.days }} jours). Lignes traitées : {{ d.receipts_seen }} reçus et {{ d.events_seen }} événements.</p>
+<p class="note">Dossier lu : <code>{{ d.dir }}</code> (fenêtre de {{ d.days }} jours). Lignes traitées : {{ d.receipts_seen }} reçus, {{ d.events_seen }} événements et {{ d.health_seen }} entrées de disjoncteur.</p>
 {% endblock %}

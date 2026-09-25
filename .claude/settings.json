@@ -18,6 +18,10 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/telemetry.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/session_context.py"
           }
         ]
       }
@@ -68,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/gemini_gate.py"
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/delegation_gate.py"
           }
         ]
       }

@@ -124,11 +124,7 @@ ce qui est déjà tenu en contexte (< 50 lignes).
 
 ## Jobs et conteneurs — élargi le 17/09 (demande explicite utilisateur)
 
-Autorisation de lancer de lancer les jobs et docker compose up/down/restart/build`. Avant le 17/09, cette section était un interdit total (lecture seule sur
-`queue.json`/`*.status.json`/`docker ps/logs/inspect`, jamais de lancement
-de job ni de `docker compose up/down/restart/build`). L'utilisateur a jugé
-ça trop limitant pour un usage opérationnel réel et a explicitement demandé
-d'élargir. Le principe qui reste non négociable : **le code passe toujours
+Autorisation de lancer de lancer les jobs et docker compose up/down/restart/build`. Le principe qui reste non négociable : **le code passe toujours
 par une PR + CI, jamais par une écriture directe dans `~/radar`**.
 
 - **Lancer/relancer un job** (`crate_jobs.py <job> '{...}'`, en CLI ou via
@@ -262,10 +258,11 @@ en lecture seule — dans ce cas `git push` échoue, et c'est à l'utilisateur
 d'ouvrir le droit, pas à toi de contourner. Dis-le en une ligne et arrête-toi.
 
 > **🔧 Gemini ici** : dans la boucle, les premiers jets (correctif et tests)
-> passent par `--mode code` et `--mode test` avec `--check-syntax`. Le message
-> de commit et le corps de PR passent par `--mode pr`. Le diagnostic d'un lot
-> d'observations (> 50 lignes) passe par `--mode diag`. Pré-digestion du
-> script cible : `--mode read`. Cf. tableau Rang 2.
+> passent par `--mode code` et `--mode test` avec `--check-syntax`. 
+> la lecture de document pour récupérer le contexte en début de session passe par  `--mode read`
+>  Le message de commit et le corps de PR passent par `--mode pr`.
+> Le diagnostic d'un lot d'observations (> 50 lignes) passe par `--mode diag`.
+> Pré-digestion du script cible : `--mode read`. Cf. tableau Rang 2.
 
 ### Prérequis pour ouvrir et merger une PR toi-même : un token GitHub
 

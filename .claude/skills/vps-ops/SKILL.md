@@ -9,24 +9,18 @@ description: >
   interdits, garde-fous jobs/Docker, format de rapport. Ne s'applique
   JAMAIS à la session de dev cloud (dépôt frais, sans accès VPS/données
   réelles) — celle-là ne doit pas suivre ce contrat, elle code et ouvre des
-  PR. Déclencheurs : "diagnostic VPS", "vérifie en prod", "lance ce job sur
-  le VPS", "redémarre le conteneur", "active ce drapeau", "ajoute la variable
-  au .env", ou toute demande d'action/vérification qui suppose un accès réel
-  au serveur.
+  PR. Déclencheur : n’importe quel prompt executé sur une session qui contient VPS
 ---
 
 # Opérations VPS — contrat
 
 Tu es une session Claude Code qui tourne directement sur le VPS de
 production : la base réelle, les conteneurs, les jobs en cours, les logs,
-les données. Depuis le 23/09 (pt 45 de `CLAUDE.md`), tu cumules aussi le
-rôle que tenait la session de dev cloud avant sa fermeture : coder, ouvrir
-la PR, attendre la CI, merger. Historique de ce contrat (créé 02/09, élargi
-17/09, 18/09, 19/09, fusionné 23/09) → `CLAUDE.md` pt 5/45.
+les données. Depuis le 23/09 (pt 45 de `CLAUDE.md`), tu cumules aussi les
+rôles suivants: coder, ouvrir la PR, attendre la CI, merger. 
 
 **Tes droits viennent de deux sources, et elles doivent bouger ensemble** :
-ce fichier (dans le dépôt, modifié via une PR passée par CI comme le reste
-du code depuis le 23/09) dit ce que tu as le **droit** de faire ;
+ce fichier (dans le dépôt, modifié via une PR passée par CI) dit ce que tu as le **droit** de faire ;
 `~/.claude/settings.json` (sur le VPS, hors dépôt) dit ce que tu **peux
 techniquement** faire. Tu peux proposer et appliquer une modification de
 `settings.json` — uniquement pour débloquer une action autorisée par ce
@@ -34,9 +28,8 @@ fichier — avec l'accord explicite de l'utilisateur. Si une action autorisée
 ici t'est refusée par les permissions machine, propose la correction de
 `settings.json` nécessaire et applique-la après validation.
 
-**Tu codes et ouvres les PR en faisant appel à ask-gemini** depuis `~/radar-work`, jamais dans
-`~/radar` (le checkout que Docker fait tourner). C'est la seule limite qui
-n'a pas bougé : la garantie « on ne touche pas la prod par écriture directe »
+**Tu lis les documents, fait des diagnostics, des résumés, du code et ouvres les PR en faisant appel à ask-gemini** depuis `~/radar-work`, jamais dans
+`~/radar` (le checkout que Docker fait tourner). C'est la seule garantie « on ne touche pas la prod par écriture directe »
 vient du répertoire, pas d'une séparation entre deux sessions.
 
 ### ⚠️ Les deux checkouts sont indiscernables d'une commande à l'autre
@@ -79,9 +72,9 @@ plusieurs heures) part silencieusement au mauvais endroit.
   branche, édition d'un fichier : non. **Deux exceptions, chacune avec sa
   section plus bas, et aucune ne porte sur ce répertoire au-delà de ce qu'elle
   dit** :
-    1. les drapeaux `RADAR_*` du `.env` (18/09) — le seul fichier de `~/radar`
+    1. les drapeaux `RADAR_*` du `.env`  — le seul fichier de `~/radar`
        que tu modifies jamais ;
-    2. la boucle d'amélioration d'un script (19/09) — et elle travaille dans
+    2. la boucle d'amélioration d'un script — et elle travaille dans
        un clone SÉPARÉ, `~/radar-work`, précisément pour ne pas toucher à
        celui-ci.
   Hors de ces deux cas, tout changement de code passe par une PR ouverte
@@ -117,21 +110,21 @@ Gemini récent (< 1h, ≥ 50 caractères de prompt) n'existe. Un appel raté
 
 | Section de ce contrat | Mode Gemini | Commande type |
 |---|---|---|
+| **Jobs** — lecture de documents pour compléter le contexte en début de session: claude.md, scripts, sortie de commande,fichier .jso. pré-digérer un document avant analyse | `read` | `python3 scripts/ai_query.py --mode read -f <fichier>` |
 | **Jobs** — analyser les logs d'un job | `diag` ou `summary` | `docker logs radar-web --tail 300 \| python3 scripts/ai_query.py --mode diag --stdin` |
 | **Jobs** — comprendre un statut/trace > 50 lignes | `summary` | `cat /data/jobs/*.status.json \| python3 scripts/ai_query.py --mode summary --stdin` |
 | **Boucle script** — premier jet d'un correctif | `code` | `python3 scripts/ai_query.py --mode code --check-syntax -o <fichier> "<spec>"` |
 | **Boucle script** — premier jet de tests | `test` | `python3 scripts/ai_query.py --mode test --check-syntax -f <cible> -o <test> "<spec>"` |
 | **Boucle script / PR** — message de commit et corps de PR | `pr` | `cd ~/radar-work && git diff origin/main \| python3 scripts/ai_query.py --mode pr --stdin` |
-| **Diagnostic** — pré-digérer un document avant analyse | `read` | `python3 scripts/ai_query.py --mode read -f <fichier>` |
 | **Diagnostic** — logs ou dumps volumineux | `diag` | `docker compose logs radar-web --tail 500 \| python3 scripts/ai_query.py --mode diag --stdin` |
 
-**Quand NE PAS déléguer** : le scoring (`scoring.py`), les décisions produit,
+**Quand NE PAS déléguer** : le scoring (`scoring.py`),
 l'architecture, la sécurité, le contenu sensible (tokens, clés, `.env`), et
 ce qui est déjà tenu en contexte (< 50 lignes).
 
 ## Jobs et conteneurs — élargi le 17/09 (demande explicite utilisateur)
 
-Avant le 17/09, cette section était un interdit total (lecture seule sur
+Autorisation de lancer de lancer les jobs et docker compose up/down/restart/build`. Avant le 17/09, cette section était un interdit total (lecture seule sur
 `queue.json`/`*.status.json`/`docker ps/logs/inspect`, jamais de lancement
 de job ni de `docker compose up/down/restart/build`). L'utilisateur a jugé
 ça trop limitant pour un usage opérationnel réel et a explicitement demandé

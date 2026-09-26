@@ -22,8 +22,8 @@ d'ingérer des logs Docker bruts dans le contexte :
 - **Fichiers de config volumineux** (Dockerfile, compose, etc.) : `--mode context -f <fichier>` si >200 lignes.
 
 Ne charge dans le contexte Claude que la synthèse déléguée, jamais le log brut.
-Un appel Gemini qui échoue écrit son reçu et rend la main — continue sans
-délégation.
+Un appel de la passerelle qui échoue écrit son reçu et rend la main — continue
+sans délégation.
 
 ### When invoked:
 

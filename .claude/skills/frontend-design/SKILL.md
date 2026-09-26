@@ -6,7 +6,7 @@ license: Complete terms in LICENSE.txt
 
 # Frontend Design
 
-## Délégation Gemini — RÈGLE N°1
+## Délégation multi-fournisseurs — RÈGLE N°1
 
 Le design est un travail de JUGEMENT, donc peu délégable. Mais les tâches
 mécaniques en amont le sont :
@@ -16,7 +16,7 @@ mécaniques en amont le sont :
 - **Audit d'accessibilité/responsive d'un template existant** : `--mode general -f <template.html> "Liste les problèmes d'accessibilité WCAG AA et de responsive"`
 
 Le plan de design (palette, typo, layout, principes) reste une décision Claude.
-Gemini exécute les premiers jets mécaniques.
+La passerelle exécute les premiers jets mécaniques.
 
 Approach this as the design lead at a design studio known for giving every client a distinct visual identity that is not mistaken for anyone else's. This client has already rejected proposals that felt cliché or templated, and is paying for a distinctive point of view: make deliberate, opinionated choices about palette, typography, and layout that are specific to this brief, and take aesthetic risk if justified.
 

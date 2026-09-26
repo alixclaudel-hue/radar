@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": 1790401301.4690058,
+  "generated_at": 1790404174.5012372,
   "generated_by": "scripts/ai/refresh_models.py",
   "policy": {
     "free_first": true,
@@ -11,7 +11,7 @@
       "deepseek-flash",
       "deepseek-v4-pro"
     ],
-    "daily_paid_cap_usd": 2.0,
+    "daily_paid_cap_usd": 1.0,
     "max_candidates": 6,
     "retry": {
       "per_model": 2,
@@ -30,7 +30,7 @@
       ],
       "quota": {
         "window": "daily",
-        "limit": 50
+        "limit": 1000
       },
       "reasoning_style": "reasoning_effort",
       "reasoning_map": {},
@@ -805,6 +805,7 @@
         "limit": null
       },
       "reasoning_style": "effort",
+      "reasoning_map": {},
       "headers": {},
       "models": []
     }

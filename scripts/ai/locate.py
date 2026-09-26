@@ -18,11 +18,19 @@ Deux bornes protègent l'appelant : le nombre de fichiers visités et le nombre 
 correspondances conservées. Quand une borne mord, `truncated` est vrai — la
 réponse reste exploitable, mais l'appelant sait qu'il regarde une fenêtre et non
 l'arbre entier.
+
+Le contrat littéral ci-dessus échoue net sur une question en langage naturel ou
+une requête avec alternatives ('a OR b', 'a|b') : la requête entière doit être
+une sous-chaîne. Un repli tokenisé (`extraire_termes` + `_score_repli`) prend le
+relais UNIQUEMENT quand ce premier passage rend zéro résultat — `chercher`
+relance alors un second parcours en OR sur les termes significatifs et le
+signale via `resultat["fallback"]`.
 """
 
 from __future__ import annotations
 
 import os
+import re
 
 # Dossiers jamais parcourus : ils ne portent pas de source du projet et
 # représentent l'essentiel du volume (dépôt git, dépendances, caches de tout
@@ -55,6 +63,17 @@ SCORE_NOM_SANS_EXTENSION = 90
 SCORE_NOM_CONTIENT = 70
 SCORE_CHEMIN_CONTIENT = 50
 SCORE_CONTENU = 30
+
+# Repli tokenisé (mode OR) : ne s'active que si la requête littérale ci-dessus
+# n'a RIEN trouvé — une question en langage naturel ou une requête avec
+# alternatives ('a OR b', 'a|b') échoue sinon systématiquement à zéro résultat,
+# puisque le contrat littéral exige la requête entière comme sous-chaîne. Score
+# par terme distinct touché, toujours plus faible que le moindre étage
+# littéral : un repli ne doit jamais l'emporter sur une vraie correspondance
+# exacte si les deux coexistaient (elles ne coexistent pas ici : le repli ne
+# s'exécute que sur un premier passage vide).
+SCORE_OR_NOM_PAR_TERME = 12
+SCORE_OR_CONTENU_PAR_TERME = 4
 
 MAX_FICHIERS_DEFAUT = 20000
 MAX_HITS_DEFAUT = 20
@@ -118,6 +137,86 @@ def _ligne_contenu(chemin: str, requete: str) -> tuple[int, str] | None:
     except OSError:
         return None
     return None
+
+
+# Mots vides français/anglais courants : sans ce filtre, une question en
+# langage naturel repli-cherche autant sur "où"/"the" que sur les termes qui
+# comptent, et noie le classement du repli sous du bruit grammatical.
+MOTS_VIDES = frozenset({
+    "le", "la", "les", "un", "une", "des", "de", "du",
+    "et", "ou", "est", "où", "qui", "que", "dans", "sur",
+    "avec", "pour", "the", "is", "are", "and", "or", "of",
+    "in", "on", "for", "a", "an",
+})
+
+_PONCTUATION_BORD = re.compile(r"^[\W_]+|[\W_]+$", re.UNICODE)
+_SEPARATEURS_TERMES = re.compile(r"\s+OR\s+|[|,]", re.IGNORECASE)
+
+
+def extraire_termes(requete: str) -> list[str]:
+    """Termes significatifs de `requete`, pour le repli OR de `chercher`.
+
+    Découpe sur ' OR ' (insensible à la casse), '|' et ',', puis sur les
+    espaces ; nettoie la ponctuation de bordure ; écarte les mots vides et les
+    termes de moins de 3 caractères ; déduplique en conservant l'ordre de
+    première apparition. Une requête déjà littérale à un seul mot rend un
+    terme identique à elle-même — le repli n'apporte alors rien de plus que
+    l'essai principal, ce qui est le comportement voulu (`chercher` s'en sert
+    pour ne pas relancer un parcours inutile).
+    """
+    if not requete:
+        return []
+    morceaux = _SEPARATEURS_TERMES.split(requete)
+    vus: set[str] = set()
+    termes: list[str] = []
+    for morceau in morceaux:
+        for mot in morceau.split():
+            nettoye = _PONCTUATION_BORD.sub("", mot)
+            cle = nettoye.lower()
+            if len(nettoye) < 3 or cle in MOTS_VIDES or cle in vus:
+                continue
+            vus.add(cle)
+            termes.append(nettoye)
+    return termes
+
+
+def _score_repli(chemin: str, termes: list[str], contenu: bool) -> tuple[int, str, int | None, str | None] | None:
+    """Score de repli OR : combien de termes distincts touchent nom/contenu.
+
+    Une seule ligne de contenu est citée, celle du premier terme rencontré —
+    le repli reste un classement grossier, pas un concordancier.
+    """
+    bas_chemin = chemin.lower()
+    nb_nom = sum(1 for terme in termes if terme.lower() in bas_chemin)
+    numero: int | None = None
+    texte: str | None = None
+    nb_contenu = 0
+    if contenu:
+        try:
+            trop_gros = os.path.getsize(chemin) > MAX_OCTETS_FICHIER
+        except OSError:
+            trop_gros = True
+        if not trop_gros:
+            try:
+                with open(chemin, "r", encoding="utf-8", errors="replace") as handle:
+                    termes_vus: set[str] = set()
+                    for numero_ligne, ligne in enumerate(handle, 1):
+                        ligne_bas = ligne.lower()
+                        for terme in termes:
+                            terme_bas = terme.lower()
+                            if terme_bas in termes_vus or terme_bas not in ligne_bas:
+                                continue
+                            termes_vus.add(terme_bas)
+                            if texte is None:
+                                numero, texte = numero_ligne, ligne.strip()[:MAX_TEXTE_LIGNE]
+                    nb_contenu = len(termes_vus)
+            except OSError:
+                pass
+    if nb_nom == 0 and nb_contenu == 0:
+        return None
+    score = SCORE_OR_NOM_PAR_TERME * nb_nom + SCORE_OR_CONTENU_PAR_TERME * nb_contenu
+    genre = "repli-nom" if nb_nom >= nb_contenu else "repli-contenu"
+    return score, genre, numero, texte
 
 
 def chercher(
@@ -196,6 +295,52 @@ def chercher(
         if resultat["truncated"]:
             break
 
+    # Repli tokenisé : seulement si la requête littérale n'a RIEN trouvé (pas
+    # de mélange de tiers, cf. SCORE_OR_*) et que la borne de fichiers n'a pas
+    # déjà tronché le parcours (retronquer davantage n'aiderait pas). Un second
+    # parcours de l'arbre, coûteux, mais réservé à ce cas déjà exceptionnel —
+    # c'est précisément le scénario qui rendait le mode `search` inutilisable
+    # sur une question en langage naturel ou une requête 'a OR b'/'a|b'.
+    if not trouves and not resultat["truncated"]:
+        termes = extraire_termes(requete)
+        deja_tente = len(termes) == 1 and termes[0].lower() == requete.strip().lower()
+        if termes and not deja_tente:
+            repli: dict[str, dict] = {}
+            scanne_repli = 0
+            for racine in racines:
+                if not os.path.isdir(racine):
+                    continue
+                for dossier, sous_dossiers, fichiers in os.walk(racine, followlinks=False):
+                    sous_dossiers[:] = sorted(
+                        nom for nom in sous_dossiers if nom not in DOSSIERS_IGNORES
+                    )
+                    for nom in sorted(fichiers):
+                        if scanne_repli >= max_fichiers:
+                            resultat["truncated"] = True
+                            break
+                        scanne_repli += 1
+                        chemin = _nettoyer(os.path.join(dossier, nom))
+                        trouve = _score_repli(chemin, termes, contenu)
+                        if trouve is None or chemin in repli:
+                            continue
+                        score, genre, numero, texte = trouve
+                        repli[chemin] = {
+                            "path": chemin,
+                            "score": score,
+                            "kind": genre,
+                            "line": numero,
+                            "text": texte,
+                        }
+                    if resultat["truncated"]:
+                        break
+                if resultat["truncated"]:
+                    break
+            resultat["scanned"] += scanne_repli
+            if repli:
+                trouves = repli
+                resultat["fallback"] = True
+                resultat["fallback_terms"] = termes
+
     resultat["hits"] = sorted(
         trouves.values(),
         key=lambda hit: (-hit["score"], hit["path"], hit["line"] or 0),
@@ -269,13 +414,17 @@ __all__ = [
     "MAX_CANDIDATS_DEFAUT",
     "MAX_FICHIERS_DEFAUT",
     "MAX_HITS_DEFAUT",
+    "MOTS_VIDES",
     "SCORE_CHEMIN_CONTIENT",
     "SCORE_CONTENU",
     "SCORE_NOM_CONTIENT",
     "SCORE_NOM_EXACT",
     "SCORE_NOM_SANS_EXTENSION",
+    "SCORE_OR_CONTENU_PAR_TERME",
+    "SCORE_OR_NOM_PAR_TERME",
     "ambigue",
     "chercher",
+    "extraire_termes",
     "meilleur",
     "prompt_desambiguisation",
 ]

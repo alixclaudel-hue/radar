@@ -120,6 +120,8 @@ def has_recent_receipt(
 
 _QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 _GIT_COMMIT = re.compile(r"\bgit\b[^|;&]*\bcommit\b")
+_GIT_DIFF = re.compile(r"\bgit\b[^|;&]*\bdiff\b")
+_COURTIER = re.compile(r"\bai_(?:broker|query)\.py\b", re.IGNORECASE)
 
 
 def receipts_path_for(project_dir: str) -> Path:
@@ -144,6 +146,23 @@ def _is_real_commit(command: str) -> bool:
     constaté dès le premier essai du garde-fou sur sa propre commande de test.
     """
     return bool(_GIT_COMMIT.search(_QUOTED.sub(" ", command)))
+
+
+def _is_real_diff(command: str) -> bool:
+    """Vrai seulement pour un VRAI `git diff`, même principe que `_is_real_commit`."""
+    return bool(_GIT_DIFF.search(_QUOTED.sub(" ", command)))
+
+
+def _relaie_au_courtier(command: str) -> bool:
+    """Vrai si la commande mentionne `ai_broker.py`/`ai_query.py` hors guillemets.
+
+    Un `git diff ... | python3 scripts/ai_broker.py --mode pr --stdin` relaie
+    déjà sa sortie vers la passerelle : c'est la forme conforme elle-même, pas
+    besoin d'un reçu préalable pour l'autoriser. Sans cette exception, gater
+    `git diff` bloquerait exactement la commande que la RÈGLE N°1 demande
+    d'utiliser (cf. table du haut de CLAUDE.md).
+    """
+    return bool(_COURTIER.search(_QUOTED.sub(" ", command)))
 
 
 def compte_lignes_seuil(chemin: str, seuil: int) -> int | None:
@@ -177,8 +196,17 @@ def required_modes(tool_name: str, tool_input: dict) -> tuple[str, ...] | None:
     dans du code déjà écrit et déjà en contexte.
     """
     if tool_name == "Bash":
-        if _is_real_commit(tool_input.get("command", "")):
+        command = tool_input.get("command", "")
+        if _is_real_commit(command):
             return ("pr",)
+        # Un `git diff` brut, jamais relayé vers la passerelle, finit lu
+        # directement par Claude — exactement le contournement observé (diff
+        # de plusieurs fichiers passé à `tail`/au terminal plutôt qu'à
+        # `ai_broker.py --mode pr/diag --stdin`). `diag`/`context` couvrent
+        # aussi l'exploration hors-commit (comprendre un diff sans rédiger de
+        # PR) ; seul un vrai relais vers le courtier échappe au gate.
+        if _is_real_diff(command) and not _relaie_au_courtier(command):
+            return ("pr", "diag", "context")
 
     elif tool_name in ("Write", "Edit"):
         path_obj = Path(tool_input.get("file_path", ""))
@@ -450,7 +478,13 @@ def main() -> int:
     if has_recent_receipt(receipts, modes, now, ttl, min_chars):
         return 0
 
-    if "pr" in modes:
+    if modes == ("pr", "diag", "context"):
+        dleg_desc = "cette lecture d'un `git diff` brut, jamais relayée vers la passerelle"
+        cmd_example = (
+            "git diff ... | python3 scripts/ai_broker.py --mode diag --stdin   "
+            "(ou --mode pr avant un commit)"
+        )
+    elif "pr" in modes:
         dleg_desc = "le message de commit / corps de PR (mode 'pr')"
         cmd_example = "git diff origin/main | python3 scripts/ai_broker.py --mode pr --stdin"
     elif modes[0] == "test":

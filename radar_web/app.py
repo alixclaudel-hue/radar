@@ -1579,7 +1579,7 @@ _release_meta_lock = threading.Lock()
 
 def _release_meta_ensure(rids):
     """Complète et renvoie le cache partagé release_meta pour `rids` (note, prix,
-    nombre en vente, pochette) — ne demande à l'API que les ids manquants ou
+    nombre en vente, nombre de possesseurs Discogs, pochette) — ne demande à l'API que les ids manquants ou
     périmés (plafonné), écrit le cache UNE SEULE fois, sous verrou, en relisant
     juste avant d'écrire pour fusionner ce qu'un autre process aurait ajouté
     entretemps. Partagé par `/release/meta` (grilles de résultats) et
@@ -1600,11 +1600,13 @@ def _release_meta_ensure(rids):
         token = _cfg().get("token", "")
         fetched = {}
         for rid in missing[:RELEASE_META_MAX_FETCH]:
-            rating = rcount = nfs = low = thumb = None
+            rating = rcount = nfs = low = thumb = have = None
             try:
                 d = discogs.release(int(rid), token=token)
-                rt = (d.get("community") or {}).get("rating") or {}
+                comm = d.get("community") or {}
+                rt = comm.get("rating") or {}
                 rating, rcount = rt.get("average"), rt.get("count")
+                have = comm.get("have")
                 nfs, low = d.get("num_for_sale"), d.get("lowest_price")
                 thumb = d.get("thumb") or ""
             except discogs.DiscogsError:
@@ -1613,8 +1615,8 @@ def _release_meta_ensure(rids):
                 # pas de nouvelle pochette cette fois (erreur, ou Discogs n'en a
                 # toujours pas) : ne jamais effacer une pochette déjà connue.
                 thumb = (cache.get(rid) or {}).get("thumb") or ""
-            fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "nfs": nfs, "low": low,
-                            "thumb": thumb}
+            fetched[rid] = {"ts": now, "rating": rating, "rcount": rcount, "have": have, "nfs": nfs,
+                            "low": low, "thumb": thumb}
             time.sleep(1.1)
         with _release_meta_lock:
             cache = load(_pu().release_meta, {})   # relu sous le verrou : fusionne un accès concurrent

@@ -1,85 +1,285 @@
 {% extends "base.html" %}
 {% block body %}
-<h2>Délégation</h2>
-<p class="note">Les jetons affichés sont ceux que l'API du fournisseur rapporte elle-même, et aucune estimation d'économie côté Claude n'est calculée parce que ce serait un contrefactuel.</p>
+<style>
+  .toolbar { background: var(--panel); border: 1px solid var(--line);
+             border-radius: 6px; padding: .8rem; margin-bottom: 1rem; }
+  .presets { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .5rem; }
+  .preset { border: 1px solid var(--line); color: var(--dim); background: none;
+            padding: .3rem .7rem; border-radius: 999px; cursor: pointer;
+            font: inherit; font-size: .8rem; }
+  .preset.active { background: var(--accent); color: var(--bg);
+                   border-color: var(--accent); }
+  .preset:hover { color: var(--fg); }
+  .custom { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+            padding-top: .5rem; border-top: 1px dashed var(--line); }
+  .custom label { color: var(--dim); font-size: .8rem; }
+  .custom input[type="datetime-local"] {
+    font: inherit; background: var(--bg); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 4px; padding: .2rem .4rem; }
+  .custom select { font: inherit; background: var(--bg); color: var(--fg);
+                   border: 1px solid var(--line); border-radius: 4px;
+                   padding: .2rem .4rem; }
+  .custom button[type="submit"] {
+    background: var(--accent); color: var(--bg); border-color: var(--accent); }
+  .toolbar-summary { color: var(--dim); font-size: .82rem; margin-top: .4rem; }
 
-{% if d.missing %}
-<p class="empty">Le transport n'a encore rien déposé dans <code>{{ d.dir }}</code> (fichiers manquants : {{ d.missing|join(', ') }}).</p>
-{% endif %}
+  .kpis { display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: .6rem; margin-bottom: 1.4rem; }
+  .kpi { background: var(--panel); border: 1px solid var(--line);
+         border-radius: 6px; padding: .8rem; position: relative; }
+  .kpi .label { color: var(--dim); font-size: .72rem; text-transform: uppercase;
+                letter-spacing: .05em; }
+  .kpi .big { font-size: 1.6rem; margin: .3rem 0 .1rem;
+              font-variant-numeric: tabular-nums; }
+  .kpi .sub { color: var(--dim); font-size: .78rem; }
+  .kpi .export, .section-title .export-btn {
+    background: none; border: 1px solid var(--line); color: var(--dim);
+    padding: .1rem .5rem; border-radius: 4px; cursor: pointer;
+    font: inherit; font-size: .72rem; }
+  .kpi .export { position: absolute; top: .45rem; right: .45rem;
+                 padding: .1rem .3rem; border: none; }
+  .kpi .export:hover, .section-title .export-btn:hover { color: var(--fg); }
 
-<p>
-  <span class="tag">Appels : {{ d.totals.calls }}</span>
-  <span class="tag">Succès : {{ d.totals.ok }}</span>
-  <span class="tag">Erreurs : {{ d.totals.err }}</span>
-  <span class="tag">Jetons entrée : {{ d.totals.prompt_tokens }}</span>
-  <span class="tag">Jetons sortie : {{ d.totals.output_tokens }}</span>
-  <span class="tag">Jetons total : {{ d.totals.total_tokens }}</span>
-  <span class="tag">Médiane : {{ (d.totals.median_ms ~ " ms") if d.totals.median_ms is not none else "—" }}</span>
-  <span class="tag">Replis : {{ d.totals.fallbacks }}</span>
-</p>
+  .tops { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+          margin-bottom: 1.4rem; }
+  @media (max-width: 720px) { .tops { grid-template-columns: 1fr; } }
 
-<h2>Par mode</h2>
-<p class="note">Comment les appels et jetons se répartissent-ils selon le mode d'appel configuré pour Gemini ?</p>
+  .chart-wrap { background: var(--panel); border: 1px solid var(--line);
+                border-radius: 6px; padding: .8rem; height: 320px;
+                margin-bottom: .5rem; position: relative; }
+  .section-title { display: flex; align-items: baseline;
+                   justify-content: space-between; margin: 1.6rem 0 .5rem;
+                   gap: .5rem; flex-wrap: wrap; }
+  .section-title h2 { margin: 0; }
+
+  .day-card { background: var(--panel); border: 1px solid var(--line);
+              border-radius: 6px; padding: .8rem; margin-bottom: .8rem; }
+  .day-head { display: flex; align-items: center; gap: .8rem;
+              margin-bottom: .5rem; flex-wrap: wrap; }
+  .day-date { font-size: 1.1rem; font-weight: 600; }
+  .day-body { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+  @media (max-width: 720px) { .day-body { grid-template-columns: 1fr; } }
+  .day-body h3 { font-size: .74rem; text-transform: uppercase;
+                 letter-spacing: .05em; color: var(--dim);
+                 margin: .4rem 0 .3rem; font-weight: 600; }
+  .day-body table { margin-bottom: 0; }
+  .quota-line, .err-line { padding: .15rem 0; font-size: .82rem; }
+  .quota-line code, .err-line code { color: var(--fg); }
+
+  .footer-blocks { margin-top: 2rem; padding-top: 1rem;
+                   border-top: 1px dashed var(--line); }
+</style>
+
+<form class="toolbar" method="get" action="/delegation" id="filtres">
+  <input type="hidden" name="period" id="period" value="{{ d.period.preset }}">
+  <div class="presets">
+    {% set presets = [
+      ("today", "Aujourd'hui"),
+      ("yesterday", "Hier"),
+      ("7d", "7 derniers jours"),
+      ("30d", "30 derniers jours"),
+      ("all", "Depuis toujours"),
+      ("custom", "Personnalisée")
+    ] %}
+    {% for key, label in presets %}
+      <button type="button" class="preset {% if d.period.preset == key %}active{% endif %}"
+              data-preset="{{ key }}">{{ label }}</button>
+    {% endfor %}
+  </div>
+  <div class="custom" id="custom" {% if d.period.preset != "custom" %}hidden{% endif %}>
+    <label>Du <input type="datetime-local" id="from_local"></label>
+    <label>Au <input type="datetime-local" id="to_local"></label>
+    <label>Granularité
+      <select name="granularity" id="granularity">
+        <option value="">auto ({{ d.period.granularity }})</option>
+        <option value="hour" {% if d.period.granularity == "hour" %}selected{% endif %}>heure</option>
+        <option value="day"  {% if d.period.granularity == "day"  %}selected{% endif %}>jour</option>
+      </select>
+    </label>
+    <input type="hidden" name="from_ts" id="from_ts" value="">
+    <input type="hidden" name="to_ts"   id="to_ts"   value="">
+    <button type="submit">Appliquer</button>
+    <a href="/delegation" style="color: var(--dim); text-decoration: none;">Réinitialiser</a>
+  </div>
+  <div class="toolbar-summary">
+    Période&nbsp;: <strong>{{ d.period.label }}</strong>
+    · granularité&nbsp;: {{ d.period.granularity }}
+    · {{ d.receipts_seen }} reçus lus, {{ d.events_seen }} événements
+    {% if d.missing %}
+      · <span class="bad">fichiers manquants&nbsp;: {{ d.missing|join(', ') }}</span>
+    {% endif %}
+  </div>
+</form>
+
+<h2>Vue d'ensemble</h2>
+<p class="note">Ce que le courtier multi-fournisseurs a délégué sur la période. Les jetons viennent de <code>usageMetadata</code>, rapporté par l'API elle-même — aucune estimation d'économie n'est calculée ici.</p>
+<div class="kpis">
+  <div class="kpi">
+    <button class="export" data-bloc="totals" title="Exporter en JSON">💾</button>
+    <div class="label">Jetons entrée</div>
+    <div class="big">{{ "{:,}".format(d.totals.prompt_tokens).replace(",", " ") }}</div>
+    <div class="sub">envoyés aux modèles</div>
+  </div>
+  <div class="kpi">
+    <button class="export" data-bloc="totals" title="Exporter en JSON">💾</button>
+    <div class="label">Jetons sortie</div>
+    <div class="big">{{ "{:,}".format(d.totals.output_tokens).replace(",", " ") }}</div>
+    <div class="sub">reçus des modèles</div>
+  </div>
+  <div class="kpi">
+    <button class="export" data-bloc="totals" title="Exporter en JSON">💾</button>
+    <div class="label">Appels</div>
+    <div class="big">{{ d.totals.calls }}</div>
+    <div class="sub"><span class="ok">{{ d.totals.ok }} succès</span> · <span class="bad">{{ d.totals.err }} erreurs</span></div>
+  </div>
+  <div class="kpi">
+    <button class="export" data-bloc="part_gratuite" title="Exporter en JSON">💾</button>
+    <div class="label">Coût cumulé</div>
+    <div class="big">${{ "%.4f"|format(d.part_gratuite.cost_usd) }}</div>
+    <div class="sub">{{ d.part_gratuite.free }} gratuits · {{ d.part_gratuite.paid }} payants</div>
+  </div>
+  <div class="kpi">
+    <button class="export" data-bloc="top_models" title="Exporter en JSON">💾</button>
+    <div class="label">Modèle #1</div>
+    <div class="big" style="font-size: 1rem;">{{ d.top_models[0].name if d.top_models else "—" }}</div>
+    <div class="sub">{{ d.top_models[0].calls if d.top_models else 0 }} appels</div>
+  </div>
+  <div class="kpi">
+    <button class="export" data-bloc="top_modes" title="Exporter en JSON">💾</button>
+    <div class="label">Mode #1</div>
+    <div class="big" style="font-size: 1rem;">{{ d.top_modes[0].name if d.top_modes else "—" }}</div>
+    <div class="sub">{{ d.top_modes[0].calls if d.top_modes else 0 }} appels</div>
+  </div>
+</div>
+
+<div class="tops">
+  <div>
+    <div class="section-title">
+      <h2>Top modèles</h2>
+      <button class="export-btn" data-bloc="top_models">💾 exporter</button>
+    </div>
+    <table><thead><tr>
+      <th>Modèle</th><th class="num">Appels</th><th class="num">Jetons</th>
+      <th class="num">Part</th>
+    </tr></thead><tbody>
+    {% for r in d.top_models %}
+    <tr>
+      <td><span style="display:inline-block; width:.7rem; height:.7rem; border-radius:2px; background: {{ d.model_colors.get(r.name, '#94a3b8') }}; margin-right:.4rem;"></span>{{ r.name }}</td>
+      <td class="num">{{ r.calls }}</td>
+      <td class="num">{{ r.total_tokens }}</td>
+      <td class="num">
+        <div class="bar"><i style="width: {{ (r.share * 100) | round(1) }}%"></i></div>
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="4" class="empty">Aucun modèle.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+  <div>
+    <div class="section-title">
+      <h2>Top modes</h2>
+      <button class="export-btn" data-bloc="top_modes">💾 exporter</button>
+    </div>
+    <table><thead><tr>
+      <th>Mode</th><th class="num">Appels</th><th class="num">Jetons</th>
+      <th class="num">Part</th>
+    </tr></thead><tbody>
+    {% for r in d.top_modes %}
+    <tr>
+      <td>{{ r.name }}</td>
+      <td class="num">{{ r.calls }}</td>
+      <td class="num">{{ r.total_tokens }}</td>
+      <td class="num">
+        <div class="bar"><i style="width: {{ (r.share * 100) | round(1) }}%"></i></div>
+      </td>
+    </tr>
+    {% else %}<tr><td colspan="4" class="empty">Aucun mode.</td></tr>{% endfor %}
+    </tbody></table>
+  </div>
+</div>
+
+<div class="section-title">
+  <h2>Activité déléguée par bucket</h2>
+  <button class="export-btn" data-bloc="buckets">💾 exporter</button>
+</div>
+<p class="note">Barres (échelle droite) : nombre d'appels par bucket. Courbes (échelle gauche) : jetons totaux entrée + sortie, une couleur par modèle.</p>
+<div class="chart-wrap"><canvas id="chartActivite"></canvas></div>
+
+<div class="section-title">
+  <h2>Détail par jour</h2>
+  <button class="export-btn" data-bloc="per_day">💾 exporter tout</button>
+</div>
+<p class="note">Chaque jour de la fenêtre avec ses appels par modèle, ses quotas observés (dernière valeur déclarée par le fournisseur), ses erreurs par type et la part d'appels courts (soupçon de gate-gaming).</p>
+{% for jour in d.per_day %}
+<div class="day-card">
+  <div class="day-head">
+    <span class="day-date">{{ jour.label }}</span>
+    <span class="tag">{{ jour.calls }} appels</span>
+    <span class="tag ok">{{ jour.ok }} succès</span>
+    <span class="tag {% if jour.err > 0 %}bad{% endif %}">{{ jour.err }} erreurs</span>
+    <span class="tag">{{ jour.prompt_tokens }} → {{ jour.output_tokens }} jetons</span>
+    <span class="tag" title="Part de prompts &lt; {{ jour.small_prompts.threshold }} caractères, mesure de gate-gaming">
+      courts : {{ jour.small_prompts.small }} / {{ jour.small_prompts.measured }}
+      {% if jour.small_prompts.share is not none %}
+        ({{ (jour.small_prompts.share * 100) | round(1) }}%)
+      {% endif %}
+    </span>
+  </div>
+  <div class="day-body">
+    <div>
+      <h3>Par modèle</h3>
+      <table><thead><tr>
+        <th>Modèle</th><th class="num">Appels</th>
+        <th class="num">Entrée</th><th class="num">Sortie</th>
+        <th class="num">Total</th>
+      </tr></thead><tbody>
+      {% for m in jour.by_model %}
+      <tr>
+        <td><span style="display:inline-block; width:.6rem; height:.6rem; border-radius:2px; background: {{ d.model_colors.get(m.model, '#94a3b8') }}; margin-right:.35rem;"></span>{{ m.model }}</td>
+        <td class="num">{{ m.calls }}</td>
+        <td class="num">{{ m.prompt_tokens }}</td>
+        <td class="num">{{ m.output_tokens }}</td>
+        <td class="num">{{ m.total_tokens }}</td>
+      </tr>
+      {% endfor %}
+      </tbody></table>
+    </div>
+    <div>
+      <h3>Quotas observés</h3>
+      {% for q in jour.quota_snapshot %}
+      <div class="quota-line">
+        <code>{{ q.provider }}</code> · {{ q.model }} — {{ q.window or "fenêtre inconnue" }} :
+        {{ q.used if q.used is not none else "?" }} / {{ q.limit if q.limit is not none else "non publié" }}
+        <span class="dim">({{ q.at }})</span>
+      </div>
+      {% else %}<div class="empty">Aucun quota déclaré ce jour.</div>{% endfor %}
+
+      <h3 style="margin-top:.8rem;">Erreurs par type</h3>
+      {% for e in jour.errors %}
+      <div class="err-line">
+        <span class="tag bad">{{ e.error_type }}</span> × {{ e.count }}
+        {% if e.last_at %}<span class="dim">— dernière : {{ e.last_at }}</span>{% endif %}
+        {% if e.last_detail %}<div class="dim" style="margin-left:1rem;">{{ e.last_detail }}</div>{% endif %}
+      </div>
+      {% else %}<div class="empty">Aucune erreur.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<p class="empty">Aucun jour d'activité sur la fenêtre.</p>
+{% endfor %}
+
+<div class="footer-blocks">
+
+<div class="section-title">
+  <h2>Quota du jour (dernier reçu)</h2>
+  <button class="export-btn" data-bloc="quota_du_jour">💾 exporter</button>
+</div>
+<p class="note">Où en est la consommation, d'après le dernier reçu qui a déclaré un quota ? Un plafond que le fournisseur ne publie pas reste « non publié » plutôt que deviné.</p>
 <table><thead><tr>
-  <th>Mode</th>
-  <th class="num">Appels</th>
-  <th class="num">Erreurs</th>
-  <th class="num">Entrée</th>
-  <th class="num">Sortie</th>
-  <th class="num">Total</th>
-  <th class="num">Médiane ms</th>
-  <th class="num">Replis</th>
-</tr></thead><tbody>
-{% for r in d.by_mode %}
-<tr>
-  <td>{{ r.mode }}</td>
-  <td class="num">{{ r.calls }}</td>
-  <td class="num">{{ r.err }}</td>
-  <td class="num">{{ r.prompt_tokens }}</td>
-  <td class="num">{{ r.output_tokens }}</td>
-  <td class="num">{{ r.total_tokens }}</td>
-  <td class="num dim">{{ r.median_ms if r.median_ms is not none else "—" }}</td>
-  <td class="num">{{ r.fallbacks }}</td>
-</tr>
-{% else %}<tr><td colspan="8" class="empty">Aucune donnée par mode.</td></tr>{% endfor %}
-</tbody></table>
-
-<h2>Par modèle</h2>
-<p class="note">Quels modèles Gemini reçoivent la charge et quelles sont leurs performances observées ?</p>
-<table><thead><tr>
-  <th>Modèle</th>
-  <th class="num">Appels</th>
-  <th class="num">Erreurs</th>
-  <th class="num">Entrée</th>
-  <th class="num">Sortie</th>
-  <th class="num">Total</th>
-  <th class="num">Médiane ms</th>
-  <th class="num">Replis</th>
-</tr></thead><tbody>
-{% for r in d.by_model %}
-<tr>
-  <td>{{ r.model }}</td>
-  <td class="num">{{ r.calls }}</td>
-  <td class="num">{{ r.err }}</td>
-  <td class="num">{{ r.prompt_tokens }}</td>
-  <td class="num">{{ r.output_tokens }}</td>
-  <td class="num">{{ r.total_tokens }}</td>
-  <td class="num dim">{{ r.median_ms if r.median_ms is not none else "—" }}</td>
-  <td class="num">{{ r.fallbacks }}</td>
-</tr>
-{% else %}<tr><td colspan="8" class="empty">Aucune donnée par modèle.</td></tr>{% endfor %}
-</tbody></table>
-
-<h2>Quota du jour</h2>
-<p class="note">Où en est la consommation du jour, d'après le dernier reçu qui a déclaré un quota ? Un plafond que le fournisseur ne publie pas reste affiché « non publié » plutôt que deviné.</p>
-<table><thead><tr>
-  <th>Fournisseur</th>
-  <th>Fenêtre</th>
-  <th class="num">Plafond</th>
-  <th class="num">Utilisés</th>
-  <th class="num">Restants</th>
-  <th class="num">Payant dépensé ($)</th>
-  <th class="num">Plafond payant ($)</th>
+  <th>Fournisseur</th><th>Fenêtre</th>
+  <th class="num">Plafond</th><th class="num">Utilisés</th><th class="num">Restants</th>
+  <th class="num">Payant dépensé ($)</th><th class="num">Plafond payant ($)</th>
 </tr></thead><tbody>
 {% for q in d.quota_du_jour %}
 <tr>
@@ -94,24 +294,14 @@
 {% else %}<tr><td colspan="7" class="empty">Aucun reçu n'a encore déclaré de quota.</td></tr>{% endfor %}
 </tbody></table>
 
-<h2>Part gratuite contre payante</h2>
-<p class="note">Parmi les appels qui déclarent leur nature, quelle part est passée par un modèle gratuit ? Les reçus antérieurs à l'enrichissement ne déclarent rien : ils sont comptés à part, jamais fondus dans le ratio.</p>
-<p>
-  <span class="tag">Appels : {{ d.part_gratuite.calls }}</span>
-  <span class="tag">Gratuits : {{ d.part_gratuite.free }}</span>
-  <span class="tag">Payants : {{ d.part_gratuite.paid }}</span>
-  <span class="tag">Non déclarés : {{ d.part_gratuite.undeclared }}</span>
-  <span class="tag">Part gratuite : {% if d.part_gratuite.free_share is not none %}{{ d.part_gratuite.free_share }}{% else %}— <span class="dim">(aucun appel déclaré)</span>{% endif %}</span>
-  <span class="tag">Coût estimé cumulé ($) : {{ "%.6f"|format(d.part_gratuite.cost_usd) }}</span>
-</p>
-
-<h2>Modèles écartés</h2>
-<p class="note">Pourquoi un modèle du catalogue n'est-il pas proposable en ce moment ? Le disjoncteur écarte un modèle après un échec durable, et un 404 le retire jusqu'au prochain rafraîchissement.</p>
+<div class="section-title">
+  <h2>Modèles écartés</h2>
+  <button class="export-btn" data-bloc="cooldowns">💾 exporter</button>
+</div>
+<p class="note">Le disjoncteur nomme les modèles que le routage évite en ce moment.</p>
 <table><thead><tr>
-  <th>Fournisseur</th>
-  <th>Modèle</th>
-  <th class="num">Restant (s)</th>
-  <th>Raison</th>
+  <th>Fournisseur</th><th>Modèle</th>
+  <th class="num">Restant (s)</th><th>Raison</th>
 </tr></thead><tbody>
 {% for c in d.cooldowns %}
 <tr>
@@ -123,8 +313,11 @@
 {% else %}<tr><td colspan="4" class="empty">Aucun modèle écarté.</td></tr>{% endfor %}
 </tbody></table>
 
-<h2>Occasions manquées</h2>
-<p class="note">Ce que la règle « déléguer d'abord » n'a pas attrapé dans la fenêtre : une session où l'utilisateur a écrit sans qu'aucun reçu ne tombe, un prompt dont le vocabulaire appelle une lecture ou un résumé et qui reste sans reçu dans les {{ d.occasions_manquees.fenetre_s }} secondes, et les lectures natives que <code>context</code> paverait en un seul appel. Tout est décompté des journaux, jamais jugé : un marqueur est un mot qui peut tomber dans une phrase qui ne demandait rien.</p>
+<div class="section-title">
+  <h2>Occasions manquées</h2>
+  <button class="export-btn" data-bloc="occasions_manquees">💾 exporter</button>
+</div>
+<p class="note">Ce que la règle « déléguer d'abord » n'a pas attrapé dans la fenêtre : une session où l'utilisateur a écrit sans qu'aucun reçu ne tombe, un prompt dont le vocabulaire appelle une lecture ou un résumé et qui reste sans reçu dans les {{ d.occasions_manquees.fenetre_s }} secondes, et les lectures natives que <code>context</code> paverait en un seul appel. Tout est décompté des journaux, jamais jugé.</p>
 <p>
   <span class="tag">Sessions actives : {{ d.occasions_manquees.sessions_actives }}</span>
   <span class="tag">Sans aucune délégation : {{ d.occasions_manquees.sessions_sans_delegation }}</span>
@@ -133,10 +326,7 @@
   <span class="tag">Lectures natives : {{ d.occasions_manquees.lectures_natives.total }} <span class="dim">(Read {{ d.occasions_manquees.lectures_natives.read }} · Grep {{ d.occasions_manquees.lectures_natives.grep }} · Glob {{ d.occasions_manquees.lectures_natives.glob }})</span></span>
 </p>
 <table><thead><tr>
-  <th>Quand</th>
-  <th>Marqueur</th>
-  <th>Session</th>
-  <th>Demande</th>
+  <th>Quand</th><th>Marqueur</th><th>Session</th><th>Demande</th>
 </tr></thead><tbody>
 {% for o in d.occasions_manquees.exemples %}
 <tr>
@@ -147,47 +337,14 @@
 </tr>
 {% else %}<tr><td colspan="4" class="empty">Aucune occasion manquée sur la fenêtre.</td></tr>{% endfor %}
 </tbody></table>
-<p class="note">Marqueurs cherchés dans la tête de chaque demande : <span class="dim">{{ d.occasions_manquees.marqueurs | join(', ') }}</span>. Les notifications de tâche de fond sont écartées : ce ne sont pas des demandes.</p>
 
-<h2>Volume par jour</h2>
-<p class="note">Quelle est l'évolution quotidienne du trafic délégué et de la consommation de jetons ?</p>
-{% set max_tokens = (d.by_day | map(attribute='total_tokens') | list | max) if d.by_day else 0 %}
+<div class="section-title">
+  <h2>Sessions de développement</h2>
+  <button class="export-btn" data-bloc="sessions">💾 exporter</button>
+</div>
 <table><thead><tr>
-  <th>Jour</th>
-  <th class="num">Appels</th>
-  <th class="num">Jetons</th>
-  <th></th>
-</tr></thead><tbody>
-{% for r in d.by_day %}
-<tr>
-  <td>{{ r.date }}</td>
-  <td class="num">{{ r.calls }}</td>
-  <td class="num">{{ r.total_tokens }}</td>
-  <td>
-    <div class="bar"><i style="width: {{ (r.total_tokens * 100 / max_tokens) | round(1) if max_tokens > 0 else 0 }}%"></i></div>
-  </td>
-</tr>
-{% else %}<tr><td colspan="4" class="empty">Aucune donnée journalière.</td></tr>{% endfor %}
-</tbody></table>
-
-<h2>Part déléguée</h2>
-<p class="note">Quel volume de sollicitation Claude Code représente la délégation vers Gemini ?</p>
-<p>
-  <span class="tag">Appels Gemini : {{ d.delegation.gemini_calls }}</span>
-  <span class="tag">Demandes utilisateur : {{ d.delegation.user_prompts }}</span>
-  <span class="tag">Appels d'outils : {{ d.delegation.tool_calls }}</span>
-  <span class="tag">Gemini / appel d'outil : {% if d.delegation.per_tool_call is not none %}{{ d.delegation.per_tool_call }}{% else %}— <span class="dim">(aucun outil)</span>{% endif %}</span>
-</p>
-
-<h2>Sessions de développement</h2>
-<p class="note">Quelle a été l'activité détaillée au fil des sessions Claude Code et quels outils ont été déclenchés ?</p>
-<table><thead><tr>
-  <th>Session</th>
-  <th>Début</th>
-  <th>Fin</th>
-  <th class="num">Demandes</th>
-  <th class="num">Outils</th>
-  <th class="num">Échecs</th>
+  <th>Session</th><th>Début</th><th>Fin</th>
+  <th class="num">Demandes</th><th class="num">Outils</th><th class="num">Échecs</th>
   <th>Outils les plus utilisés</th>
 </tr></thead><tbody>
 {% for s in d.sessions %}
@@ -205,5 +362,137 @@
 {% else %}<tr><td colspan="7" class="empty">Aucune session enregistrée.</td></tr>{% endfor %}
 </tbody></table>
 
-<p class="note">Dossier lu : <code>{{ d.dir }}</code> (fenêtre de {{ d.days }} jours). Lignes traitées : {{ d.receipts_seen }} reçus, {{ d.events_seen }} événements et {{ d.health_seen }} entrées de disjoncteur.</p>
+<p class="note" style="margin-top:1.5rem;">
+  Dossier lu&nbsp;: <code>{{ d.dir }}</code>.
+  Nom de fichier historique&nbsp;: <code>gemini-receipts.jsonl</code> — porte aujourd'hui les reçus de tous les fournisseurs du courtier (OpenRouter, Gemini, DeepSeek…), avec un champ <code>provider</code>.
+  <button class="export-btn" data-bloc="all">💾 tout exporter</button>
+</p>
+
+</div>{# footer-blocks #}
+
+{% endblock %}
+
+{% block script %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.js"></script>
+<script id="deleg-data" type="application/json">
+{
+  "buckets": {{ d.buckets | tojson }},
+  "colors":  {{ d.model_colors | tojson }},
+  "period":  {{ d.period | tojson }}
+}
+</script>
+<script>
+(function () {
+  const raw = document.getElementById("deleg-data").textContent;
+  const data = JSON.parse(raw);
+  const labels = data.buckets.map(b => b.label);
+  const calls  = data.buckets.map(b => b.calls);
+
+  // Un dataset ligne par modèle observé au moins une fois dans un bucket.
+  const modelesVus = new Set();
+  data.buckets.forEach(b => Object.keys(b.by_model).forEach(m => modelesVus.add(m)));
+  const modeles = Array.from(modelesVus);
+
+  const datasets = [
+    {
+      type: "bar", label: "Appels", data: calls,
+      backgroundColor: "rgba(96,165,250,0.35)",
+      borderColor: "#60a5fa", borderWidth: 1,
+      yAxisID: "y1", order: 2
+    }
+  ];
+  modeles.forEach(m => {
+    const c = data.colors[m] || "#94a3b8";
+    datasets.push({
+      type: "line", label: m,
+      data: data.buckets.map(b => (b.by_model[m] || {}).total_tokens || 0),
+      borderColor: c, backgroundColor: c + "22",
+      tension: 0.25, fill: false, yAxisID: "y0", order: 1,
+      pointRadius: 2, pointHoverRadius: 4
+    });
+  });
+
+  const styles = getComputedStyle(document.documentElement);
+  const dim = styles.getPropertyValue("--dim").trim() || "#9aa0b4";
+  const grid = styles.getPropertyValue("--line").trim() || "#2c3040";
+
+  const ctx = document.getElementById("chartActivite").getContext("2d");
+  new Chart(ctx, {
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { labels: { color: dim, boxWidth: 10, font: { size: 11 } } },
+        tooltip: { mode: "index" }
+      },
+      scales: {
+        x: { ticks: { color: dim, maxRotation: 0, autoSkip: true },
+             grid: { color: grid } },
+        y0: { type: "linear", position: "left",
+              title: { display: true, text: "Jetons", color: dim },
+              ticks: { color: dim }, grid: { color: grid } },
+        y1: { type: "linear", position: "right",
+              title: { display: true, text: "Appels", color: dim },
+              ticks: { color: dim, precision: 0 }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Sélecteur de période : bouton actif -> hidden input `period`.
+  const hiddenPeriod = document.getElementById("period");
+  const customBlock = document.getElementById("custom");
+  const form = document.getElementById("filtres");
+  document.querySelectorAll(".preset").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".preset").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      hiddenPeriod.value = btn.dataset.preset;
+      if (btn.dataset.preset === "custom") {
+        customBlock.hidden = false;
+      } else {
+        customBlock.hidden = true;
+        form.submit();
+      }
+    });
+  });
+
+  // Préremplir les datetime-local depuis la période active si custom.
+  if (data.period && data.period.since_ts && data.period.preset === "custom") {
+    const fmt = ts => {
+      const d = new Date(ts * 1000);
+      const pad = n => n.toString().padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    document.getElementById("from_local").value = fmt(data.period.since_ts);
+    document.getElementById("to_local").value = fmt(data.period.until_ts);
+  }
+
+  // À la soumission : convertir datetime-local en epoch (secondes).
+  form.addEventListener("submit", () => {
+    const from = document.getElementById("from_local").value;
+    const to = document.getElementById("to_local").value;
+    document.getElementById("from_ts").value = from ? Math.floor(new Date(from).getTime() / 1000) : "";
+    document.getElementById("to_ts").value = to ? Math.floor(new Date(to).getTime() / 1000) : "";
+  });
+
+  // Export JSON : chaque bouton porte son bloc, on garde les filtres courants.
+  function exporter(bloc) {
+    const params = new URLSearchParams(window.location.search);
+    const p = new URLSearchParams();
+    p.set("period", params.get("period") || {{ d.period.preset | tojson }});
+    ["from_ts", "to_ts", "granularity"].forEach(k => {
+      const v = params.get(k);
+      if (v) p.set(k, v);
+    });
+    window.location.href = `/delegation/export/${bloc}.json?` + p.toString();
+  }
+  document.querySelectorAll("[data-bloc]").forEach(btn => {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      exporter(btn.dataset.bloc);
+    });
+  });
+})();
+</script>
 {% endblock %}

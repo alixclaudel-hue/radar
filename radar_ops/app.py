@@ -14,7 +14,7 @@ import os
 import time
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
 from radar_web.radar import accounts, codeversion, opslog, paths, scorestore, store, websession
@@ -176,14 +176,72 @@ def page_scoring(request: Request):
 
 
 # ------------------------------------------------------------------ délégation
+_PERIODES_AUTORISEES = {"today", "yesterday", "7d", "30d", "all", "custom"}
+_GRANULARITES_AUTORISEES = {"hour", "day"}
+# Blocs exportables : la clé de l'URL (`table`) doit rester stable, elle sert
+# de nom de fichier téléchargé côté navigateur.
+_BLOCS_EXPORTABLES = {"totals", "by_mode", "by_model", "top_models", "top_modes",
+                       "buckets", "sessions", "quota_du_jour", "part_gratuite",
+                       "cooldowns", "occasions_manquees", "delegation",
+                       "small_prompts", "errors", "per_day", "model_colors",
+                       "period", "all"}
+
+
+def _to_float(value):
+    """Chaîne de query -> float, ou None si vide ou illisible."""
+    if value is None:
+        return None
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return v if v > 0 else None
+
+
+def _delegation_snapshot(period, from_ts, to_ts, granularity):
+    """Snapshot bornée aux valeurs de l'API — un unique point d'entrée pour la
+    page et pour les exports, sinon les deux se mettraient à diverger."""
+    if period not in _PERIODES_AUTORISEES:
+        period = "7d"
+    if granularity is not None and granularity not in _GRANULARITES_AUTORISEES:
+        granularity = None
+    return delegation.snapshot_windowed(
+        paths.DATA,
+        preset=period,
+        from_ts=_to_float(from_ts),
+        to_ts=_to_float(to_ts),
+        granularity=granularity,
+    )
+
+
 @app.get("/delegation", response_class=HTMLResponse)
-def page_delegation(request: Request, days: int = 14):
-    # Fenêtre bornée : elle sert à cadrer une lecture, pas à parcourir tout le
-    # journal depuis une URL fabriquée à la main.
-    days = max(1, min(int(days or 14), 90))
+def page_delegation(request: Request,
+                    period: str = "7d",
+                    from_ts: str | None = None,
+                    to_ts: str | None = None,
+                    granularity: str | None = None):
+    d = _delegation_snapshot(period, from_ts, to_ts, granularity)
     return tpl.TemplateResponse(request, "delegation.html", {
-        "page": "delegation", "d": delegation.snapshot(paths.DATA, days=days),
-        "sha": codeversion.short()})
+        "page": "delegation", "d": d, "sha": codeversion.short()})
+
+
+@app.get("/delegation/export/{table}.json")
+def export_delegation(table: str,
+                      period: str = "7d",
+                      from_ts: str | None = None,
+                      to_ts: str | None = None,
+                      granularity: str | None = None):
+    """Télécharge le contenu d'un bloc, ou tout, aux mêmes filtres que la page.
+
+    Un bloc inconnu renvoie 404 plutôt qu'un fichier vide : un JSON de zéro
+    clé, ouvert plus tard, laisserait croire à un bug de collecte."""
+    if table not in _BLOCS_EXPORTABLES:
+        return JSONResponse({"error": f"bloc inconnu: {table}"}, status_code=404)
+    d = _delegation_snapshot(period, from_ts, to_ts, granularity)
+    payload = d if table == "all" else {table: d.get(table), "period": d.get("period")}
+    filename = f"delegation-{table}-{period}.json"
+    return JSONResponse(payload, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 # --------------------------------------------------------------------- actions

@@ -419,6 +419,251 @@ class TestOpsDelegation(unittest.TestCase):
             self.assertEqual(len(res["missing"]), 3)
 
 
+class FenetrageTemporelTests(unittest.TestCase):
+    """Nouvelles fonctions de fenêtrage temporel : `resolve_period`,
+    `bucket_by_time`, `error_breakdown`, `small_prompts`, `top_items`,
+    `per_day_breakdown`. Les tests ne s'appuient jamais sur `datetime.now()`
+    en direct — la fenêtre du test doit rester stable quel que soit le moment
+    où la CI l'exécute."""
+
+    def test_resolve_period_today_utilise_minuit_local(self):
+        # Un « today » stable : minuit local de la date de now_ts jusqu'à now_ts.
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Europe/Paris")
+        # Reference : 26/09/2026 14:00 Paris.
+        ref = __import__("datetime").datetime(2026, 9, 26, 14, 0, tzinfo=tz)
+        now_ts = ref.timestamp()
+        since, until, gran, label = delegation.resolve_period(
+            "today", None, None, now_ts)
+        # Minuit du 26/09 Paris.
+        minuit = __import__("datetime").datetime(2026, 9, 26, 0, 0, tzinfo=tz)
+        self.assertAlmostEqual(since, minuit.timestamp(), places=1)
+        self.assertEqual(until, now_ts)
+        self.assertEqual(gran, "hour")
+        self.assertEqual(label, "Aujourd'hui")
+
+    def test_resolve_period_yesterday_exclut_aujourd_hui(self):
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Europe/Paris")
+        ref = __import__("datetime").datetime(2026, 9, 26, 14, 0, tzinfo=tz)
+        now_ts = ref.timestamp()
+        since, until, gran, label = delegation.resolve_period(
+            "yesterday", None, None, now_ts)
+        minuit_hier = __import__("datetime").datetime(2026, 9, 25, 0, 0, tzinfo=tz)
+        minuit_aujourdhui = __import__("datetime").datetime(2026, 9, 26, 0, 0, tzinfo=tz)
+        self.assertAlmostEqual(since, minuit_hier.timestamp(), places=1)
+        self.assertAlmostEqual(until, minuit_aujourdhui.timestamp(), places=1)
+        self.assertEqual(gran, "hour")
+
+    def test_resolve_period_all_sans_borne_basse(self):
+        since, until, gran, label = delegation.resolve_period(
+            "all", None, None, 1_000_000.0)
+        self.assertIsNone(since)
+        self.assertEqual(until, 1_000_000.0)
+        self.assertEqual(gran, "day")
+
+    def test_resolve_period_custom_choisit_granularite_selon_ecart(self):
+        # <=3 jours → heure, >3 jours → jour.
+        now = 1_000_000.0
+        _, _, gran_court, _ = delegation.resolve_period(
+            "custom", now - 86400, now, now)
+        self.assertEqual(gran_court, "hour")
+        _, _, gran_long, _ = delegation.resolve_period(
+            "custom", now - 10 * 86400, now, now)
+        self.assertEqual(gran_long, "day")
+
+    def test_resolve_period_inconnu_retombe_sur_7d(self):
+        since, until, gran, label = delegation.resolve_period(
+            "wat", None, None, 1_000_000.0)
+        self.assertEqual(gran, "hour")
+        self.assertIn("7 derniers jours", label)
+
+    def test_bucket_by_time_buckets_vides_presents(self):
+        # 3 heures de fenêtre, un seul reçu → 3 ou 4 buckets, dont un rempli.
+        now = 1_759_000_000.0  # 2025-09-27 (peu importe)
+        receipts = [{"ts": now - 3600, "model": "m1",
+                     "prompt_tokens": 10, "output_tokens": 5,
+                     "total_tokens": 15, "status": "ok"}]
+        buckets = delegation.bucket_by_time(
+            receipts, now - 3 * 3600, now, "hour")
+        # Au moins 3 buckets et exactement un avec des appels.
+        self.assertGreaterEqual(len(buckets), 3)
+        pleins = [b for b in buckets if b["calls"] > 0]
+        self.assertEqual(len(pleins), 1)
+        self.assertEqual(pleins[0]["calls"], 1)
+        self.assertEqual(pleins[0]["by_model"]["m1"]["total_tokens"], 15)
+
+    def test_bucket_by_time_recu_hors_fenetre_ignore(self):
+        now = 1_759_000_000.0
+        receipts = [{"ts": now - 10 * 3600, "model": "m1", "total_tokens": 5}]
+        buckets = delegation.bucket_by_time(
+            receipts, now - 3600, now, "hour")
+        # Tous les buckets à zéro.
+        self.assertTrue(all(b["calls"] == 0 for b in buckets))
+
+    def test_bucket_by_time_liste_vide_sans_borne_retourne_vide(self):
+        self.assertEqual(delegation.bucket_by_time([], None, 1000.0, "hour"), [])
+
+    def test_bucket_by_time_modele_absent_regroupe_sous_inconnu(self):
+        now = 1_759_000_000.0
+        receipts = [{"ts": now - 60, "total_tokens": 3}]
+        buckets = delegation.bucket_by_time(
+            receipts, now - 3600, now, "hour")
+        pleins = [b for b in buckets if b["calls"] > 0]
+        self.assertEqual(list(pleins[0]["by_model"].keys()), ["inconnu"])
+
+    def test_error_breakdown_groupe_par_type_et_ordonne_par_count(self):
+        recs = [
+            {"ts": 100.0, "status": "error", "error_type": "http_429"},
+            {"ts": 200.0, "status": "error", "error_type": "http_429",
+             "error_detail": "rate limit atteint"},
+            {"ts": 150.0, "status": "error", "error_type": "empty_response"},
+            {"ts": 300.0, "status": "ok"},  # ignoré
+        ]
+        out = delegation.error_breakdown(recs)
+        self.assertEqual(len(out), 2)
+        self.assertEqual(out[0]["error_type"], "http_429")
+        self.assertEqual(out[0]["count"], 2)
+        self.assertEqual(out[0]["last_detail"], "rate limit atteint")
+
+    def test_error_breakdown_error_type_absent_devient_inconnu(self):
+        recs = [{"ts": 100.0, "status": "error"}]
+        out = delegation.error_breakdown(recs)
+        self.assertEqual(out[0]["error_type"], "inconnu")
+
+    def test_small_prompts_ne_compte_que_les_recus_avec_prompt_chars(self):
+        recs = [
+            {"ts": 1.0, "prompt_chars": 5},
+            {"ts": 2.0, "prompt_chars": 50},
+            {"ts": 3.0},  # sans mesure → ignoré
+        ]
+        sp = delegation.small_prompts(recs, threshold=10)
+        self.assertEqual(sp["measured"], 2)
+        self.assertEqual(sp["small"], 1)
+        self.assertEqual(sp["share"], 0.5)
+
+    def test_small_prompts_aucune_mesure_share_none(self):
+        sp = delegation.small_prompts([{"ts": 1.0}], threshold=10)
+        self.assertEqual(sp["measured"], 0)
+        self.assertIsNone(sp["share"])
+
+    def test_top_items_trie_par_calls_desc_et_plafonne(self):
+        recs = [
+            {"ts": 1.0, "model": "a", "total_tokens": 100},
+            {"ts": 2.0, "model": "a", "total_tokens": 50},
+            {"ts": 3.0, "model": "b", "total_tokens": 200},
+            {"ts": 4.0, "model": "c", "total_tokens": 5},
+        ]
+        top = delegation.top_items(recs, "model", n=2)
+        self.assertEqual(len(top), 2)
+        self.assertEqual(top[0]["name"], "a")
+        self.assertEqual(top[0]["calls"], 2)
+        self.assertEqual(top[0]["share"], 0.5)
+
+    def test_top_items_champ_absent_regroupe_sous_inconnu(self):
+        top = delegation.top_items([{"ts": 1.0}], "model")
+        self.assertEqual(top[0]["name"], "inconnu")
+
+    def test_top_items_liste_vide_retourne_vide(self):
+        self.assertEqual(delegation.top_items([], "model"), [])
+
+    def test_per_day_breakdown_omet_jours_vides(self):
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Europe/Paris")
+        # Deux reçus le même jour, aucune activité les autres jours.
+        j0 = __import__("datetime").datetime(2026, 9, 26, 10, 0, tzinfo=tz).timestamp()
+        j1 = __import__("datetime").datetime(2026, 9, 26, 20, 0, tzinfo=tz).timestamp()
+        since = __import__("datetime").datetime(2026, 9, 20, 0, 0, tzinfo=tz).timestamp()
+        until = __import__("datetime").datetime(2026, 9, 26, 23, 59, tzinfo=tz).timestamp()
+        recs = [
+            {"ts": j0, "model": "m1", "status": "ok", "total_tokens": 100},
+            {"ts": j1, "model": "m1", "status": "error",
+             "error_type": "http_429", "total_tokens": 20, "prompt_chars": 3},
+        ]
+        pd = delegation.per_day_breakdown(recs, since, until, tz="Europe/Paris")
+        self.assertEqual(len(pd), 1)  # Un seul jour non vide.
+        self.assertEqual(pd[0]["date"], "2026-09-26")
+        self.assertEqual(pd[0]["calls"], 2)
+        self.assertEqual(pd[0]["ok"], 1)
+        self.assertEqual(pd[0]["err"], 1)
+        self.assertEqual(pd[0]["errors"][0]["error_type"], "http_429")
+        self.assertEqual(pd[0]["small_prompts"]["small"], 1)
+        self.assertEqual(pd[0]["by_model"][0]["model"], "m1")
+
+    def test_per_day_breakdown_conserve_quota_le_plus_recent_par_couple(self):
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("Europe/Paris")
+        j0 = __import__("datetime").datetime(2026, 9, 26, 10, 0, tzinfo=tz).timestamp()
+        j1 = __import__("datetime").datetime(2026, 9, 26, 20, 0, tzinfo=tz).timestamp()
+        since = j0 - 86400
+        until = j1 + 3600
+        recs = [
+            {"ts": j0, "model": "m1", "provider": "openrouter", "status": "ok",
+             "quota": {"window": "day", "limit": 1000, "used": 100, "remaining": 900}},
+            {"ts": j1, "model": "m1", "provider": "openrouter", "status": "ok",
+             "quota": {"window": "day", "limit": 1000, "used": 200, "remaining": 800}},
+        ]
+        pd = delegation.per_day_breakdown(recs, since, until, tz="Europe/Paris")
+        self.assertEqual(len(pd), 1)
+        quotas = pd[0]["quota_snapshot"]
+        self.assertEqual(len(quotas), 1)
+        self.assertEqual(quotas[0]["used"], 200)  # Le plus récent.
+
+    def test_snapshot_windowed_expose_toutes_les_cles_attendues(self):
+        with tempfile.TemporaryDirectory() as tmpdir, \
+                patch.dict(os.environ, {}, clear=True):
+            snap = delegation.snapshot_windowed(tmpdir, preset="7d")
+        for cle in ("period", "totals", "by_model", "by_mode", "top_models",
+                    "top_modes", "buckets", "sessions", "quota_du_jour",
+                    "part_gratuite", "cooldowns", "occasions_manquees",
+                    "delegation", "small_prompts", "errors", "per_day",
+                    "model_colors", "receipts_seen", "events_seen",
+                    "health_seen", "missing", "dir"):
+            self.assertIn(cle, snap, f"clé manquante : {cle}")
+        # Rien à voir mais tout doit être présent et cohérent.
+        self.assertEqual(snap["period"]["preset"], "7d")
+        self.assertEqual(snap["totals"]["calls"], 0)
+
+    def test_snapshot_windowed_assigne_une_couleur_par_modele(self):
+        with tempfile.TemporaryDirectory() as tmpdir, \
+                patch.dict(os.environ, {}, clear=True):
+            ops = os.path.join(tmpdir, "ops")
+            os.makedirs(ops)
+            now = time.time()
+            with open(os.path.join(ops, delegation.RECEIPTS_NAME),
+                      "w", encoding="utf-8") as f:
+                for m in ("m1", "m2", "m3"):
+                    f.write(json.dumps({"ts": now - 60, "model": m,
+                                         "status": "ok"}) + "\n")
+            snap = delegation.snapshot_windowed(tmpdir, preset="7d")
+        # Une couleur distincte par modèle (au moins 3 assignées).
+        self.assertEqual(len(snap["model_colors"]), 3)
+        for m in ("m1", "m2", "m3"):
+            self.assertIn(m, snap["model_colors"])
+            self.assertTrue(snap["model_colors"][m].startswith("#"))
+
+    def test_snapshot_windowed_preset_inconnu_retombe_sur_7d(self):
+        with tempfile.TemporaryDirectory() as tmpdir, \
+                patch.dict(os.environ, {}, clear=True):
+            snap = delegation.snapshot_windowed(tmpdir, preset="bizarre")
+        # Le champ preset garde la valeur passée (traçabilité) mais la
+        # granularité et le label suivent le repli.
+        self.assertIn("7 derniers jours", snap["period"]["label"])
+
+    def test_snapshot_ancien_signature_inchangee(self):
+        """La fonction historique `snapshot(data_root, days)` reste utilisée
+        par les tests existants — sa signature et ses clés ne bougent pas."""
+        with tempfile.TemporaryDirectory() as tmpdir, \
+                patch.dict(os.environ, {}, clear=True):
+            snap = delegation.snapshot(tmpdir, days=14)
+        # Les vieilles clés propres à la fonction historique restent là.
+        self.assertIn("by_day", snap)
+        self.assertIn("days", snap)
+        # Les nouvelles clés spécifiques à snapshot_windowed n'y sont PAS.
+        self.assertNotIn("period", snap)
+        self.assertNotIn("buckets", snap)
+
+
 class ReceiptsPathTests(unittest.TestCase):
     """`_receipts_path()` -- depuis la suppression du transport git (commit
     e35af25), ce chemin doit toujours pointer directement sous `<ops>/`,
@@ -473,13 +718,14 @@ class DelegationTemplateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir, \
                 patch.dict(os.environ, {}, clear=True):
             html = self.template.render(
-                d=delegation.snapshot(tmpdir, days=1), sha="abcdef0")
+                d=delegation.snapshot_windowed(tmpdir, preset="7d"),
+                sha="abcdef0")
         self.assertIn("Occasions manquées", html)
         self.assertIn("Aucune occasion manquée sur la fenêtre.", html)
 
     def test_rendu_avec_une_occasion_signalee(self):
         """Bout en bout : un prompt marqué dans le journal d'événements
-        traverse `snapshot()` puis s'affiche dans la ligne d'exemple."""
+        traverse `snapshot_windowed()` puis s'affiche dans la ligne d'exemple."""
         moment = time.time()
         with tempfile.TemporaryDirectory() as tmpdir, \
                 patch.dict(os.environ, {}, clear=True):
@@ -491,10 +737,37 @@ class DelegationTemplateTests(unittest.TestCase):
                     "session": "s1", "ts": moment, "kind": "prompt",
                     "head": "résume la page delegation"}) + "\n")
             html = self.template.render(
-                d=delegation.snapshot(tmpdir, days=1), sha="abcdef0")
+                d=delegation.snapshot_windowed(tmpdir, preset="7d"),
+                sha="abcdef0")
         self.assertIn("Occasions manquées", html)
         self.assertIn("résume la page delegation", html)
         self.assertNotIn("Aucune occasion manquée sur la fenêtre.", html)
+
+    def test_rendu_kpi_et_selecteur_de_periode(self):
+        """Nouveau template : cartes KPI, sélecteur de période et boutons
+        d'export doivent être présents même sur un dossier vide."""
+        with tempfile.TemporaryDirectory() as tmpdir, \
+                patch.dict(os.environ, {}, clear=True):
+            html = self.template.render(
+                d=delegation.snapshot_windowed(tmpdir, preset="7d"),
+                sha="abcdef0")
+        # Le sélecteur de période propose les préréglages nommés dans la spec.
+        # Jinja2 échappe les apostrophes en `&#39;` — on cherche la valeur brute
+        # côté `data-preset="…"`, pas le libellé rendu.
+        for preset in ("today", "yesterday", "7d", "30d", "all", "custom"):
+            self.assertIn(f'data-preset="{preset}"', html)
+        # Les libellés des préréglages sont bien là — vérifier ceux sans
+        # caractère spécial (les autres apparaissent quand même via l'attr).
+        for etiquette in ("Hier", "7 derniers jours", "30 derniers jours",
+                          "Depuis toujours"):
+            self.assertIn(etiquette, html)
+        # Les KPI cardinaux sont là.
+        for etiquette in ("Jetons entrée", "Jetons sortie", "Appels"):
+            self.assertIn(etiquette, html)
+        # Chart.js chargé une seule fois depuis cdnjs.
+        self.assertIn("cdnjs.cloudflare.com/ajax/libs/Chart.js", html)
+        # Boutons d'export : au moins un `data-bloc="…"` pour un des blocs.
+        self.assertIn("data-bloc=", html)
 
 
 if __name__ == "__main__":

@@ -562,6 +562,41 @@ def _claude_usage_rows(events):
     return rows
 
 
+def _claude_totals(claude_rows, since_ts, until_ts):
+    """Jetons Claude mesurés sur la même fenêtre que les totaux délégués.
+
+    `since_ts` est déjà appliqué en amont (lecture du fichier events), mais
+    `until_ts` ne l'est jamais : sans ce filtre, une période 'custom' bornée
+    dans le passé compterait à tort de l'activité Claude survenue après la
+    borne haute demandée."""
+    rows = [r for r in claude_rows
+            if (since_ts is None or r["ts"] >= since_ts) and r["ts"] <= until_ts]
+    return {
+        "calls": len(rows),
+        "prompt_tokens": sum(_int(r, "prompt_tokens") for r in rows),
+        "output_tokens": sum(_int(r, "output_tokens") for r in rows),
+        "total_tokens": sum(_int(r, "total_tokens") for r in rows),
+    }
+
+
+def _sous_traitance(delegated_totals, claude_totals):
+    """Part des jetons traités par le courtier plutôt que par Claude en local.
+
+    `share_delegated` vaut `None` seulement quand aucun jeton n'est mesuré ni
+    d'un côté ni de l'autre (absence de mesure) — jamais confondu avec une
+    part mesurée à 0. Volume brut des deux côtés, pas une économie estimée
+    (cf. la légende du graphique, même réserve)."""
+    delegated = _int(delegated_totals, "total_tokens")
+    claude = _int(claude_totals, "total_tokens")
+    combined = delegated + claude
+    return {
+        "delegated_tokens": delegated,
+        "claude_tokens": claude,
+        "total_tokens": combined,
+        "share_delegated": (round(delegated / combined, 3) if combined else None),
+    }
+
+
 def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris", claude_rows=None):
     """Groupe les reçus par intervalle temporel, buckets vides inclus.
 
@@ -923,6 +958,10 @@ def snapshot_windowed(data_root, preset="7d", from_ts=None, to_ts=None,
     buckets = bucket_by_time(receipts, since_ts, until_ts, resolved_granularity, tz,
                              claude_rows=claude_rows)
 
+    # Claude sur la même fenêtre que les totaux délégués, et part sous-traitée
+    claude_totals = _claude_totals(claude_rows, since_ts, until_ts)
+    sous_traitance = _sous_traitance(base["totals"], claude_totals)
+
     # Top models / modes
     top_models = top_items(receipts, "model", n=5)
     top_modes = top_items(receipts, "mode", n=5)
@@ -974,6 +1013,8 @@ def snapshot_windowed(data_root, preset="7d", from_ts=None, to_ts=None,
         "sessions": base["sessions"],
         "quota_du_jour": base["quota_du_jour"],
         "part_gratuite": base["part_gratuite"],
+        "claude_totals": claude_totals,
+        "sous_traitance": sous_traitance,
         "cooldowns": base["cooldowns"],
         "occasions_manquees": base["occasions_manquees"],
         "delegation": base["delegation"],

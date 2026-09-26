@@ -182,6 +182,7 @@ _GRANULARITES_AUTORISEES = {"hour", "day"}
 # de nom de fichier téléchargé côté navigateur.
 _BLOCS_EXPORTABLES = {"totals", "by_mode", "by_model", "top_models", "top_modes",
                        "buckets", "sessions", "quota_du_jour", "part_gratuite",
+                       "claude_totals", "sous_traitance",
                        "cooldowns", "occasions_manquees", "delegation",
                        "small_prompts", "errors", "per_day", "model_colors",
                        "period", "all"}

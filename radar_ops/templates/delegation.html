@@ -158,6 +158,18 @@
     <div class="big" style="font-size: 1rem;">{{ d.top_modes[0].name if d.top_modes else "—" }}</div>
     <div class="sub">{{ d.top_modes[0].calls if d.top_modes else 0 }} appels</div>
   </div>
+  <div class="kpi">
+    <button class="export" data-bloc="claude_totals" title="Exporter en JSON">💾</button>
+    <div class="label">Jetons Claude (période)</div>
+    <div class="big">{{ "{:,}".format(d.claude_totals.total_tokens).replace(",", " ") }}</div>
+    <div class="sub">mesurés depuis le transcript, pas délégués</div>
+  </div>
+  <div class="kpi">
+    <button class="export" data-bloc="sous_traitance" title="Exporter en JSON">💾</button>
+    <div class="label">Part sous-traitée</div>
+    <div class="big">{{ "%.0f%%"|format(d.sous_traitance.share_delegated * 100) if d.sous_traitance.share_delegated is not none else "—" }}</div>
+    <div class="sub">{{ "{:,}".format(d.sous_traitance.delegated_tokens).replace(",", " ") }} délégués / {{ "{:,}".format(d.sous_traitance.total_tokens).replace(",", " ") }} jetons</div>
+  </div>
 </div>
 
 <div class="tops">

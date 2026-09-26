@@ -8,7 +8,7 @@ date_added: 2026-02-27
 
 # Browser Automation
 
-## Délégation Gemini — RÈGLE N°1
+## Délégation multi-fournisseurs — RÈGLE N°1
 
 - **Logs de console et traces réseau volumineux** (>50 lignes) capturés pendant l'automatisation : `python3 scripts/ai_broker.py --mode diag --stdin` avant de les analyser dans le contexte Claude.
 - **Premier jet de script de test Playwright/Selenium** : `--mode code --check-syntax -o <fichier> "<spec du test>"` — Claude relit la logique de sélecteurs et d'attente.

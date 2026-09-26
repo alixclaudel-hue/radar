@@ -349,6 +349,7 @@ def order_candidates(
     tier: str | None = None,
     prompt_tokens: int = 0,
     explicit_model: str | None = None,
+    provider: str | None = None,
     allow_paid: bool = False,
     escalate: bool = False,
     quota_state: dict | None = None,
@@ -358,6 +359,12 @@ def order_candidates(
     max_candidates: int | None = None,
 ) -> list[Candidate]:
     """Candidats retenus, dans l'ordre où il faut les essayer.
+
+    `provider` restreint la liste à un fournisseur. Le filtre est appliqué **avant**
+    le plafond `max_candidates` : tronquer d'abord ferait disparaître un
+    fournisseur dont les entrées arrivent après le plafond, et l'appel rendrait
+    « aucun candidat utilisable » alors que le modèle existe (défaut constaté en
+    production le 26/09 : `--provider deepseek` face à 23 modèles gratuits).
 
     `key_lookup` est injectable pour que le banc reste hors ligne : il reçoit un
     **nom de variable** et rend sa valeur, ou `None`. Le routeur ne manipule donc
@@ -394,6 +401,12 @@ def order_candidates(
         explicit_model=explicit_model,
     )
     retenus = [(c, i) for c, i in paires if c is not None]
+    if provider:
+        # Filtre **avant** la troncature. `_evaluate` laisse volontairement les
+        # autres fournisseurs dans `paires` : `explain()` doit continuer de tout
+        # montrer, un modèle qui disparaît en silence étant un défaut de
+        # diagnostic — mais la liste des candidats, elle, se restreint ici.
+        retenus = [(c, i) for c, i in retenus if c.provider == provider]
 
     def cle(item: tuple[Candidate, dict]):
         candidat, info = item

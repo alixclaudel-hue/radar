@@ -882,7 +882,9 @@ def _parse_args(argv: list[str] | None = None):
     )
     parser.add_argument(
         "--provider",
-        help="Restreint le routage à un seul fournisseur du catalogue.",
+        help="Restreint le routage à un seul fournisseur du catalogue. Le filtre "
+             "s'applique avant le plafond `--max-candidates` : un fournisseur dont "
+             "les modèles sont mal classés reste joignable.",
     )
     parser.add_argument(
         "--max-candidates",
@@ -894,7 +896,8 @@ def _parse_args(argv: list[str] | None = None):
         action="store_true",
         dest="list_candidates",
         help="Affiche le routage — retenus et écartés, avec le motif de chaque "
-             "écart — puis s'arrête sans appeler personne ni écrire de reçu.",
+             "écart — puis s'arrête sans appeler personne ni écrire de reçu. "
+             "Montre tout le catalogue : `--provider` ne s'y applique pas.",
     )
     parser.add_argument(
         "--source",
@@ -1070,14 +1073,17 @@ def main(argv: list[str] | None = None) -> int:
         tier=tier,
         prompt_tokens=max(1, len(full_prompt) // 4),
         explicit_model=args.model,
+        # Filtre passé au routeur, qui l'applique **avant** `max_candidates`.
+        # Filtrer ici, après coup, revenait à tronquer d'abord : `--provider X`
+        # pouvait rendre « aucun candidat utilisable » quand X n'était pas dans
+        # les `max_candidates` premiers candidats gratuits (défaut du 26/09).
+        provider=args.provider,
         allow_paid=args.allow_paid,
         escalate=args.escalate,
         quota_state=quota_state,
         health_state=health_state,
         max_candidates=args.max_candidates,
     )
-    if args.provider:
-        candidats = [c for c in candidats if c.provider == args.provider]
     if not candidats:
         raisons = router.explain(
             catalogue,
@@ -1089,6 +1095,12 @@ def main(argv: list[str] | None = None) -> int:
             health_state=health_state,
         )
         sys.stderr.write("Erreur : aucun candidat utilisable.\n")
+        if args.provider:
+            sys.stderr.write(
+                f"    (filtre fournisseur « {args.provider} » : aucun de ses "
+                "candidats n'est proposable ; la table ci-dessous montre l'état "
+                "de tout le catalogue)\n"
+            )
         detail = router.format_explain(raisons)
         if detail:
             sys.stderr.write(detail + "\n")

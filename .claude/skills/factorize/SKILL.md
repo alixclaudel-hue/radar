@@ -10,9 +10,11 @@ description: >
 
 # Instructions de Développement - Refactoring & DRY
 
-## Délégation Gemini — RÈGLE N°1
+## Délégation multi-fournisseurs — RÈGLE N°1
 
-**La délégation passe AVANT Claude** pour le gros du travail de refactoring :
+**La délégation passe AVANT Claude** pour le gros du travail de refactoring. La
+passerelle (`scripts/ai_broker.py`, gratuit d'abord, payant sur critère)
+absorbe le volume :
 
 - **Scanner les duplications** : `python3 scripts/ai_broker.py --mode code -f <module1> -f <module2> "Identifie les blocs de code dupliqués entre ces modules et propose une factorisation"`
 - **Premier jet de la fonction factorisée** : `--mode code --check-syntax -o <fichier> "Extrais la logique commune en une fonction utilitaire : <spec>"`

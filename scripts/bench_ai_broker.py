@@ -1936,6 +1936,97 @@ def _cas_mode_raisonnement_payant():
     return True, "un mode déclaré payant ouvre le payant sans drapeau"
 
 
+def _cas_provider_filtre_avant_troncature():
+    """`--provider X` filtre **avant** le plafond, et reste strict.
+
+    Défaut constaté en production le 26/09 sur le chemin payant de l'ouvrier
+    (`ai_worker._decider_paye` → `--provider deepseek --mode reasoning`) : 23
+    modèles gratuits remplissaient les `max_candidates` places, la troncature
+    s'appliquait d'abord, et le filtre fournisseur — appliqué ensuite — ne
+    trouvait plus rien. Le courtier répondait « aucun candidat utilisable » alors
+    que la table de diagnostic montrait l'entrée DeepSeek « payant autorisé ».
+
+    Trois temps, sur **le même catalogue** (plafond à 3, huit gratuits mieux
+    classés que le payant) :
+
+    1. le chemin sans filtre sert un gratuit et n'atteint jamais le payant —
+       c'est la pré-condition du défaut ;
+    2. `--provider ds` atteint le payant malgré la troncature ;
+    3. `--provider gm`, absent du catalogue, refuse au lieu de retomber
+       silencieusement sur un autre fournisseur.
+    """
+    cat = _catalogue(
+        {
+            "or": _provider(
+                "or",
+                keys_env=["OPENROUTER_API_KEY"],
+                models=[_model(f"or-free-{i}", rank=10 + i) for i in range(8)],
+            ),
+            "ds": _provider(
+                "ds",
+                base_url="https://api.deepseek.test/v1",
+                keys_env=["DEEPSEEK_API_KEY"],
+                models=[
+                    _model(
+                        "ds-paid",
+                        free=False,
+                        rank=900,
+                        prompt_per_1m=10.0,
+                        completion_per_1m=10.0,
+                        paid_ok=True,
+                    )
+                ],
+            ),
+        },
+        policy={"max_candidates": 3},
+    )
+    options = {
+        "keys": {**_CLES_STD, **_CLES_PAYANTES},
+        "env": {"RADAR_AI_DAILY_PAID_CAP_USD": "5.0"},
+    }
+
+    # 1. Contrôle : sans filtre, la troncature à 3 écarte le payant.
+    defaut = _run_broker(
+        ["--mode", "reasoning", "--allow-paid"], catalogue=cat, plan=[None], **options
+    )
+    if defaut["code"] != 0 or len(defaut["appels"]) != 1:
+        return False, (
+            f"contrôle : code={defaut['code']} appels={len(defaut['appels'])} "
+            f"stderr={defaut['stderr'].strip()!r}"
+        )
+    if defaut["appels"][0]["provider"] != "or":
+        return False, f"contrôle : le payant a été servi sans filtre ({defaut['appels'][0]})"
+
+    # 2. Le filtre rattrape ce que la troncature avait écarté.
+    res = _run_broker(
+        ["--mode", "reasoning", "--provider", "ds", "--allow-paid"],
+        catalogue=cat,
+        plan=[None],
+        **options,
+    )
+    if res["code"] != 0 or len(res["appels"]) != 1:
+        return False, (
+            f"code={res['code']} appels={len(res['appels'])} "
+            f"stderr={res['stderr'].strip()!r}"
+        )
+    servi = res["appels"][0]
+    if servi["provider"] != "ds" or servi["model"] != "ds-paid":
+        return False, f"candidat servi = {servi['provider']}:{servi['model']}"
+
+    # 3. Le filtre reste un filtre : un fournisseur absent ne retombe sur rien.
+    vide = _run_broker(
+        ["--mode", "reasoning", "--provider", "gm"],
+        catalogue=cat,
+        plan=[None],
+        **options,
+    )
+    if vide["code"] != 1 or vide["appels"]:
+        return False, f"fournisseur absent : code={vide['code']} appels={len(vide['appels'])}"
+    if "gm" not in vide["stderr"]:
+        return False, f"le refus ne nomme pas le fournisseur demandé : {vide['stderr']!r}"
+    return True, "filtre fournisseur appliqué avant la troncature, et toujours strict"
+
+
 def _cas_masquage_secret():
     """Le prompt doit être nettoyé **avant** la sérialisation du corps HTTP."""
     secret = "sk-or-v1-abcdefghijklmnopqrstuvwxyz0123456789"
@@ -2731,6 +2822,11 @@ CASES = [
         "kind": "adversarial",
         "description": "Deux appels sur le même état → le quota du reçu passe de 49 à 48 restants",
     },
+    {
+        "id": "provider_filtre_avant_troncature",
+        "kind": "adversarial",
+        "description": "`--provider X` filtre avant `max_candidates`, et refuse un fournisseur absent",
+    },
 ]
 
 _CHECKS = {
@@ -2775,6 +2871,7 @@ _CHECKS = {
     "plafond_depasse": _cas_plafond_depasse,
     "escalade_autorise_payant": _cas_escalade_autorise_payant,
     "mode_raisonnement_payant": _cas_mode_raisonnement_payant,
+    "provider_filtre_avant_troncature": _cas_provider_filtre_avant_troncature,
     "masquage_secret": _cas_masquage_secret,
     "json_mode_transmis": _cas_json_mode_transmis,
     "response_format_capacites": _cas_response_format_capacites,

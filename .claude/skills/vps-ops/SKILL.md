@@ -176,7 +176,7 @@ par une PR + CI, jamais par une écriture directe dans `~/radar`**.
   job existant par une réimplémentation ad hoc (relancer le vrai job, pas le
   reproduire à la main).
 
-> **🔧 Gemini ici** : avant d'analyser des logs de job (> 50 lignes), les
+> **🔧 Délégation ici** : avant d'analyser des logs de job (> 50 lignes), les
 > passer par `--mode diag` ou `--mode summary`. Ne jamais charger un log brut
 > volumineux dans le contexte Claude — cf. tableau Rang 2.
 

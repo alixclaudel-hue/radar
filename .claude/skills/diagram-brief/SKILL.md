@@ -9,7 +9,7 @@ Read existing documentation and produce a `.md` file containing ordered, plain-E
 
 ---
 
-## Délégation Gemini — RÈGLE N°1
+## Délégation multi-fournisseurs — RÈGLE N°1
 
 Si le document source est volumineux (>200 lignes), utilise le skill `delegate` pour
 le pré-digérer avant de le lire en entier :

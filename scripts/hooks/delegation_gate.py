@@ -35,6 +35,16 @@ from pathlib import Path
 GATE_TTL = 3600
 # Nombre minimum de caractères de prompt exigés dans un reçu
 GATE_MIN_PROMPT_CHARS = 50
+# Nombre de lignes au-delà duquel un `Read` direct doit être précédé d'une
+# délégation (mode `context`) : en dessous, l'aller-retour coûterait plus que
+# la lecture directe. Configurable via `RADAR_READ_GATE_MIN_LINES`.
+READ_GATE_MIN_LINES = 80
+# Une lecture bornée à `limit` lignes ou moins n'est jamais bloquée, quelle que
+# soit la taille du fichier : c'est la relecture ciblée d'un passage signalé
+# `uncertain` par un résumé déjà obtenu, ou l'extrait nécessaire juste avant une
+# `Edit` précise — pas une lecture exploratoire. Configurable via
+# `RADAR_READ_GATE_SURGICAL_LINES`.
+READ_GATE_SURGICAL_LINES = 30
 # Modes qui justifient d'emblée une dépense payante (escalade décidée, tracée).
 PAID_JUSTIFICATION_MODES = ("reasoning",)
 # Valeurs de `tier` qui signifient « appel payant » quand `paid` est absent
@@ -136,6 +146,26 @@ def _is_real_commit(command: str) -> bool:
     return bool(_GIT_COMMIT.search(_QUOTED.sub(" ", command)))
 
 
+def compte_lignes_seuil(chemin: str, seuil: int) -> int | None:
+    """Nombre de lignes du fichier, arrêté dès `seuil` dépassé (`seuil + 1`).
+
+    None si le fichier est introuvable ou illisible en texte — jamais
+    d'exception qui remonte, même règle que le reste du hook. Le calcul
+    n'ouvre jamais tout un gros fichier : ça éviterait de payer en lecture ce
+    que le hook cherche justement à éviter.
+    """
+    try:
+        with open(chemin, "r", encoding="utf-8", errors="replace") as f:
+            n = 0
+            for _ in f:
+                n += 1
+                if n > seuil:
+                    return seuil + 1
+            return n
+    except OSError:
+        return None
+
+
 def required_modes(tool_name: str, tool_input: dict) -> tuple[str, ...] | None:
     """Détermine les modes exigés selon l'outil et son contenu.
 
@@ -159,7 +189,49 @@ def required_modes(tool_name: str, tool_input: dict) -> tuple[str, ...] | None:
         if tool_name == "Write" and not path_obj.exists():
             return ("code", "test")
 
+    elif tool_name == "Read":
+        limit = tool_input.get("limit")
+        try:
+            surgical = int(os.environ.get("RADAR_READ_GATE_SURGICAL_LINES", READ_GATE_SURGICAL_LINES))
+        except ValueError:
+            surgical = READ_GATE_SURGICAL_LINES
+        # `0 < limit` exclut 0 et le négatif : sans ça, `limit<=surgical` les
+        # laisserait passer alors qu'ils ne bornent rien (relecture large).
+        if isinstance(limit, int) and 0 < limit <= surgical:
+            return None
+        try:
+            seuil = int(os.environ.get("RADAR_READ_GATE_MIN_LINES", READ_GATE_MIN_LINES))
+        except ValueError:
+            seuil = READ_GATE_MIN_LINES
+        lignes = compte_lignes_seuil(_chemin_projet(tool_input.get("file_path", "")), seuil)
+        if lignes is None or lignes <= seuil:
+            return None
+        return ("context",)
+
+    elif tool_name == "Grep":
+        # Pas de seuil de taille ici : contrairement à `Read`, l'outil peut
+        # reconstruire un gros fichier en plusieurs petits appels — un seuil
+        # par appel ne verrait jamais l'accumulation. Le mode `search` du
+        # courtier ne remplace pas un vrai grep (pas de regex, pas de
+        # multi-match) : ce n'est pas grave ici, un reçu récent en mode
+        # `context` (déjà obtenu pour lire un fichier) satisfait la même
+        # condition — le gate n'exige qu'une tentative de délégation récente,
+        # pas que `search` ait réellement remplacé ce Grep précis.
+        return ("context", "search")
+
     return None
+
+
+def _chemin_projet(chemin: str) -> str:
+    """Résout un chemin relatif contre `CLAUDE_PROJECT_DIR`.
+
+    Sans ça, un chemin relatif compte les lignes du mauvais fichier si le
+    `cwd` du processus diffère du projet — piège déjà rencontré sur ce dépôt
+    entre `~/radar` et `~/radar-work` (même arborescence, deux checkouts)."""
+    if os.path.isabs(chemin):
+        return chemin
+    project_dir = os.environ.get("CLAUDE_PROJECT_DIR")
+    return os.path.join(project_dir, chemin) if project_dir else chemin
 
 
 # --- Signalement non bloquant du paiement non justifié -----------------------
@@ -385,16 +457,32 @@ def main() -> int:
         dleg_desc = "le premier jet des tests (mode 'test')"
         cmd_example = ("python3 scripts/ai_broker.py --mode test --check-syntax "
                        "-f <module_cible> -o <fichier_test> '<spec>'")
+    elif tool_name == "Grep":
+        dleg_desc = "une tentative de délégation récente avant cette recherche native (mode 'search' ou 'context')"
+        cmd_example = ('python3 scripts/ai_broker.py --mode search --root <dossier> '
+                        f'"{tool_input.get("pattern", "<motif>")}"')
+    elif modes[0] == "context":
+        cible = tool_input.get("file_path", "<fichier>")
+        dleg_desc = "la pré-digestion de ce fichier avant lecture directe (mode 'context')"
+        cmd_example = f'python3 scripts/ai_broker.py --mode context -f {cible} "<ce que tu cherches>"'
     else:
         dleg_desc = "le premier jet du module (mode 'code')"
         cmd_example = ("python3 scripts/ai_broker.py --mode code --check-syntax "
                        "-o <fichier_cible> '<spec>'")
 
+    surgical_hint = (
+        "\nSi le résumé signale un passage incertain (`uncertain`), relis "
+        "seulement cette zone (`limit` <= "
+        f"{os.environ.get('RADAR_READ_GATE_SURGICAL_LINES', READ_GATE_SURGICAL_LINES)} "
+        "lignes) — jamais bloqué.\n"
+        if tool_name == "Read" else ""
+    )
     chars_detail = f" et d'au moins {min_chars} caractères" if min_chars > 0 else ""
     sys.stderr.write(
         f"BLOQUÉ — délégation obligatoire avant cette action : {dleg_desc}.\n"
         f"Aucun reçu valide de moins de {int(ttl)} s{chars_detail} dans {receipts_path}.\n"
         f"Lance d'abord :\n  {cmd_example}\n"
+        f"{surgical_hint}"
         "Si tous les fournisseurs gratuits sont épuisés (quota/panne), la tentative "
         "ratée écrit elle-même un reçu et débloque l'action : il faut l'AVOIR "
         "tentée, pas l'avoir supposée.\n"

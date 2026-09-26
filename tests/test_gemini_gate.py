@@ -295,5 +295,85 @@ class SignalementPaiementNonJustifieTests(unittest.TestCase):
         self.assertTrue(hasattr(gemini_gate, "required_modes"))
 
 
+class RequiredModesLectureTests(unittest.TestCase):
+    """`required_modes()` sur `Read`/`Grep` — gate de pré-digestion (mode `context`)."""
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+
+    def _write_file(self, name: str, lines: int) -> str:
+        path = Path(self.tmpdir.name) / name
+        path.write_text("\n".join(f"ligne {i}" for i in range(1, lines + 1)), encoding="utf-8")
+        return str(path)
+
+    def test_read_petit_fichier_sous_seuil_retourne_none(self):
+        f = self._write_file("petit.txt", 50)
+        self.assertIsNone(gemini_gate.required_modes("Read", {"file_path": f}))
+
+    def test_read_gros_fichier_au_dela_seuil_retourne_context(self):
+        f = self._write_file("gros.txt", 100)
+        self.assertEqual(gemini_gate.required_modes("Read", {"file_path": f}), ("context",))
+
+    def test_read_limit_chirurgical_sur_gros_fichier_retourne_none(self):
+        f = self._write_file("gros.txt", 100)
+        modes = gemini_gate.required_modes("Read", {"file_path": f, "limit": 20})
+        self.assertIsNone(modes)
+
+    def test_read_limit_trop_large_sur_gros_fichier_retourne_context(self):
+        f = self._write_file("gros.txt", 100)
+        modes = gemini_gate.required_modes("Read", {"file_path": f, "limit": 50})
+        self.assertEqual(modes, ("context",))
+
+    def test_read_limit_zero_ne_borne_rien_retourne_context(self):
+        """0 n'est pas une lecture chirurgicale : ça ne borne rien."""
+        f = self._write_file("gros.txt", 100)
+        modes = gemini_gate.required_modes("Read", {"file_path": f, "limit": 0})
+        self.assertEqual(modes, ("context",))
+
+    def test_read_limit_negatif_ne_borne_rien_retourne_context(self):
+        f = self._write_file("gros.txt", 100)
+        modes = gemini_gate.required_modes("Read", {"file_path": f, "limit": -5})
+        self.assertEqual(modes, ("context",))
+
+    def test_read_fichier_introuvable_retourne_none(self):
+        """Jamais de blocage sur une erreur : `compte_lignes_seuil` rend None."""
+        modes = gemini_gate.required_modes("Read", {"file_path": "/chemin/inexistant/foo.txt"})
+        self.assertIsNone(modes)
+
+    def test_grep_toujours_gate_quelle_que_soit_la_taille(self):
+        self.assertEqual(gemini_gate.required_modes("Grep", {"pattern": "foo"}),
+                         ("context", "search"))
+        self.assertEqual(gemini_gate.required_modes("Grep", {"pattern": "bar", "path": "/tmp"}),
+                         ("context", "search"))
+
+    def test_read_seuils_personnalises_via_env(self):
+        f = self._write_file("moyen.txt", 50)
+        with patch.dict(os.environ, {"RADAR_READ_GATE_MIN_LINES": "40",
+                                     "RADAR_READ_GATE_SURGICAL_LINES": "10"}):
+            self.assertEqual(gemini_gate.required_modes("Read", {"file_path": f}), ("context",))
+            self.assertIsNone(gemini_gate.required_modes("Read", {"file_path": f, "limit": 5}))
+            self.assertEqual(
+                gemini_gate.required_modes("Read", {"file_path": f, "limit": 15}), ("context",))
+
+    def test_read_chemin_relatif_resolu_contre_project_dir(self):
+        """Un chemin relatif compte les lignes du bon fichier via `CLAUDE_PROJECT_DIR`."""
+        self._write_file("relatif.txt", 100)
+        with patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": self.tmpdir.name}):
+            modes = gemini_gate.required_modes("Read", {"file_path": "relatif.txt"})
+        self.assertEqual(modes, ("context",))
+
+    def test_compte_lignes_seuil_compte_exact_sous_seuil(self):
+        f = self._write_file("cinq.txt", 5)
+        self.assertEqual(gemini_gate.compte_lignes_seuil(f, 80), 5)
+
+    def test_compte_lignes_seuil_sentinelle_au_dela_du_seuil(self):
+        f = self._write_file("cent.txt", 100)
+        self.assertEqual(gemini_gate.compte_lignes_seuil(f, 80), 81)
+
+    def test_compte_lignes_seuil_chemin_inexistant_retourne_none(self):
+        self.assertIsNone(gemini_gate.compte_lignes_seuil("/inexistant.txt", 80))
+
+
 if __name__ == "__main__":
     unittest.main()

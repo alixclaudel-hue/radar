@@ -30,6 +30,8 @@ _spec.loader.exec_module(_module)
 # API publique réexportée (blocage historique + signalement non bloquant).
 GATE_TTL = _module.GATE_TTL
 GATE_MIN_PROMPT_CHARS = _module.GATE_MIN_PROMPT_CHARS
+READ_GATE_MIN_LINES = _module.READ_GATE_MIN_LINES
+READ_GATE_SURGICAL_LINES = _module.READ_GATE_SURGICAL_LINES
 PAID_JUSTIFICATION_MODES = _module.PAID_JUSTIFICATION_MODES
 PAID_TIERS = _module.PAID_TIERS
 SIGNAL_KIND = _module.SIGNAL_KIND
@@ -37,6 +39,7 @@ SEEN_FILE = _module.SEEN_FILE
 load_receipts = _module.load_receipts
 has_recent_receipt = _module.has_recent_receipt
 receipts_path_for = _module.receipts_path_for
+compte_lignes_seuil = _module.compte_lignes_seuil
 required_modes = _module.required_modes
 paid_without_reason = _module.paid_without_reason
 signal_unjustified_paid = _module.signal_unjustified_paid

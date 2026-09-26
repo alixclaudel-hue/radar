@@ -40,7 +40,7 @@ PR de boucle n'est déjà ouverte sur ce script : deux sessions qui corrigent le
 mêmes fichiers en parallèle, c'est le conflit que la séparation historique
 existait pour empêcher.
 
-Lis `.claude/skills/ask-gemini/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.
+Lis `.claude/skills/delegate/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire (alias `ask-gemini`).
 ---
 
 ## Étape 0 — Quel script
@@ -48,7 +48,7 @@ Lis `.claude/skills/ask-gemini/SKILL.md` d'abord si tu ne l'as pas déjà en mé
 L'argument arrive après `ARGUMENTS:`. Sans argument, liste les scripts de
 `scripts/loop/registry.json` et demande lequel.
 
-Utilise /ask-gemini pour lire l'entrée du registre et retiens :
+Utilise delegate (mode context) pour lire l'entrée du registre et retiens :
 
 ```
 module     = <module principal>
@@ -73,7 +73,7 @@ banc et une source d'observations. Dis-le, propose de les créer, et arrête-toi
 (`add_repo` puis clone) s'il n'est pas dans la session, sinon `git pull`. Côté
 VPS, il est déjà là (`~/radar-diag`) : `git pull`.
 
-Prends le lot le plus récent de `obs_dir`, utilise ask-gemini mode read pour lire son `meta.json`.
+Prends le lot le plus récent de `obs_dir`, utilise `delegate` (mode context) pour lire son `meta.json`.
 
 **Branche A — aucun lot.** La boucle n'a rien à diagnostiquer.
 - Côté VPS : lance la collecte toi-même (`/script-observe <script>`), puis
@@ -83,7 +83,7 @@ Prends le lot le plus récent de `obs_dir`, utilise ask-gemini mode read pour li
   quelles familles d'échecs, plafond de quota), dis à l'utilisateur de lancer
   `/script-observe <script>` sur sa session VPS, et **arrête-toi**.
 
-**Branche B — lot plus vieux que le dernier déploiement.** Utilise ask-gemini pour comparer
+**Branche B — lot plus vieux que le dernier déploiement.** Utilise `delegate` (mode context) pour comparer
 `meta.deployed_sha` au `HEAD` de `main`. Si du code du périmètre `touchable` a
 bougé depuis, le lot décrit un comportement qui n'existe plus : signale-le et
 demande une collecte fraîche avant d'aller plus loin.
@@ -112,9 +112,9 @@ résultat, dis-le en une ligne.
 
 ## Étape 3 — Transformer chaque finding en cas de banc
 
-Pour chaque finding retenue, demande une lecture à /ask-gemini en mode read et summary dans l'ordre du document :
+Pour chaque finding retenue, demande une lecture à `delegate` en mode context puis summary, dans l'ordre du document :
 
-1. Écris le cas en utilise /ask-gemini mode code dans les fixtures du script, avec `"kind": "adversarial"` et les
+1. Écris le cas en utilisant `delegate` (mode code) dans les fixtures du script, avec `"kind": "adversarial"` et les
    charges utiles du lot (`payloads`) comme fixtures de rejeu.
 2. **Lance le banc AVANT tout correctif.** Le nouveau cas DOIT échouer.
    - Il échoue → le cas prouve quelque chose, garde-le.
@@ -155,7 +155,7 @@ de tentatives non évaluées.
 
 ## Étape 5 — Les portes, puis la PR
 
-Ouvre la PR en utilisant /ask-gemini mode pr, la description doit intégrer : le lot d'observations utilisé, les
+Ouvre la PR en utilisant `delegate` (mode pr), la description doit intégrer : le lot d'observations utilisé, les
 findings traitées et écartées, et les mesures avant/après **verbatim**.
 
 Vérifie les **cinq portes**, une par une, explicitement, et **écris leur état

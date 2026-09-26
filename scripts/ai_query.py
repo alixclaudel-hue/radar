@@ -356,11 +356,27 @@ def query_gemini(
     temperature: float = 0.2,
     timeout: int = 60,
     json_mode: bool = False,
+    thinking_config: dict | None = None,
+    response_schema: dict | None = None,
 ) -> tuple[str, dict]:
     """Envoie une requête à l'API Gemini, renvoie `(texte généré, jetons consommés)`.
 
     La consommation vient de `usageMetadata`, que l'API rapporte elle-même : le
     tableau de bord de délégation affiche une mesure, jamais une estimation.
+
+    `thinking_config` est posé tel quel dans `generationConfig.thinkingConfig`.
+    Le transport ne connaît pas notre vocabulaire d'effort et ne l'invente donc
+    pas : la forme (`thinkingLevel` symbolique pour un modèle Gemini 3,
+    `thinkingBudget` en jetons pour un 2.5) est un fait d'API déclaré au
+    catalogue. `None`, ou un dictionnaire vide, n'envoie rien — un
+    `thinkingConfig` vide est refusé, et pire qu'un champ absent.
+
+    `response_schema` est posé tel quel dans `generationConfig.responseSchema` et
+    **force** `responseMimeType` : Gemini refuse un schéma sans type MIME, et ce
+    refus est un 400 sur un appel qui vient de consommer son quota. Le schéma
+    arrive déjà traduit pour le proto par l'appelant
+    ([`schema.pour_gemini()`](scripts/ai/schema.py:1)) : comme pour l'effort, le
+    transport ne connaît pas le vocabulaire de son appelant et ne l'invente pas.
 
     La clé locale vient de `api_key`, sinon de l'environnement, sinon du `.env`
     du dépôt en repli (`_key_from_dotenv`, pour un lancement CLI direct sur
@@ -392,6 +408,14 @@ def query_gemini(
     gen_config: dict = {"temperature": temperature}
     if json_mode:
         gen_config["responseMimeType"] = "application/json"
+    if response_schema:
+        # Les deux champs vont ensemble : `responseSchema` sans `responseMimeType`
+        # est refusé par l'API. Les poser ici évite d'exiger de chaque appelant
+        # qu'il pense aux deux — une erreur de moins à refaire partout.
+        gen_config["responseMimeType"] = "application/json"
+        gen_config["responseSchema"] = dict(response_schema)
+    if thinking_config:
+        gen_config["thinkingConfig"] = dict(thinking_config)
 
     payload: dict = {
         "contents": [

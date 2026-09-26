@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "note": "Documents de contexte lus automatiquement au SessionStart (scripts/hooks/session_context.py, plan delegation-multimodel-v1.md §8). La liste est un fichier, pas une décision du modèle : c'est ce qui fait exister le mode `context`. Chaque résumé complet est mis en cache disque (scripts/ai/context_cache.py) et n'est analysé qu'une fois ; seul un digest compact est injecté dans la session. Aucun secret ici.",
+  "documents": [
+    {
+      "path": "CLAUDE.md",
+      "why": "Règles projet non négociables (RÈGLE N°1 : déléguer d'abord) et état courant du dépôt."
+    },
+    {
+      "path": "plans/delegation-multimodel-v1.md",
+      "why": "Plan de la délégation multi-modèles : architecture cible, composants A–F, phasage 0 → 5."
+    },
+    {
+      "path": "docs/architecture.md",
+      "why": "Architecture des données : collecte, scoring, stockage, interfaces web et ops."
+    },
+    {
+      "path": "HANDOVER.md",
+      "why": "Passation de session : ce qui est fait, ce qui reste, et les pièges déjà payés."
+    },
+    {
+      "path": "docs/ROADMAP.txt",
+      "why": "Feuille de route produit, pour situer un chantier dans l'ordre des priorités."
+    },
+    {
+      "path": "docs/diagnostics/phase0-base-de-mesure-2026-09-25.md",
+      "why": "Base de mesure Phase 0 : distribution des appels, taux d'échec et replis de cascade."
+    },
+    {
+      "path": "docs/acces-mobile-et-interfaces.md",
+      "why": "Accès PC et iPhone à la même session tmux : faits VPS mesurés, procédures d'attache et points restant à vérifier."
+    }
+  ]
+}

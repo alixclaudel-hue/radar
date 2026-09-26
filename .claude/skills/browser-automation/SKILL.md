@@ -10,7 +10,7 @@ date_added: 2026-02-27
 
 ## Délégation Gemini — RÈGLE N°1
 
-- **Logs de console et traces réseau volumineux** (>50 lignes) capturés pendant l'automatisation : `python3 scripts/ai_query.py --mode diag --stdin` avant de les analyser dans le contexte Claude.
+- **Logs de console et traces réseau volumineux** (>50 lignes) capturés pendant l'automatisation : `python3 scripts/ai_broker.py --mode diag --stdin` avant de les analyser dans le contexte Claude.
 - **Premier jet de script de test Playwright/Selenium** : `--mode code --check-syntax -o <fichier> "<spec du test>"` — Claude relit la logique de sélecteurs et d'attente.
 
 Use the browser tool already selected by the user or installed in the project. Playwright, Puppeteer and Selenium have different integrations; choose from actual requirements rather than unsupported success-rate claims. Modified by AAS maintainers on 2026-09-05: removed unverified comparisons and bypass defaults, clarified waiting and evidence limits.

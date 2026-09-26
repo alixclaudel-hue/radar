@@ -11,7 +11,7 @@ license: Complete terms in LICENSE.txt
 Le design est un travail de JUGEMENT, donc peu délégable. Mais les tâches
 mécaniques en amont le sont :
 
-- **Pré-digérer un brief ou un doc de design volumineux** : `python3 scripts/ai_query.py --mode read -f <brief>` → JSON structuré pour extraire les contraintes sans charger le document entier.
+- **Pré-digérer un brief ou un doc de design volumineux** : `python3 scripts/ai_broker.py --mode context -f <brief>` → JSON structuré pour extraire les contraintes sans charger le document entier.
 - **Premier jet HTML/CSS** à partir d'un plan de design validé par Claude : `--mode code --check-syntax -o <fichier> "<spec détaillée du composant>"` — Claude relit, corrige la direction esthétique et assume ce qui part en commit.
 - **Audit d'accessibilité/responsive d'un template existant** : `--mode general -f <template.html> "Liste les problèmes d'accessibilité WCAG AA et de responsive"`
 

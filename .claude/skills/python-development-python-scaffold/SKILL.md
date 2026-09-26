@@ -32,7 +32,7 @@ $ARGUMENTS
 
 **Gemini passe AVANT Claude** pour la génération de code et de tests :
 
-- **Scaffolding du code** : `python3 scripts/ai_query.py --mode code --check-syntax -o <fichier> "<spec du module>"`
+- **Scaffolding du code** : `python3 scripts/ai_broker.py --mode code --check-syntax -o <fichier> "<spec du module>"`
 - **Tests unitaires** : `--mode test --check-syntax -f <module> -o tests/test_<module>.py "<spec>"`
 - **Config (pyproject.toml, Makefile, .env)** : `--mode code --check-syntax -o <fichier> "<spec>"`
 - **README** : `--mode general -o README.md "<spec>"`

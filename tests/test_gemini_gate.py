@@ -210,5 +210,90 @@ class ResolutionCheminRecuTests(unittest.TestCase):
                 )
 
 
+class SignalementPaiementNonJustifieTests(unittest.TestCase):
+    """Le signalement du paiement non justifié doit être exact — aucun faux
+    positif sur un appel gratuit, un mode `reasoning` ou une escalade déclarée —
+    et IDEMPOTENT : un hook PreToolUse reçoit un événement à chaque appel d'outil,
+    donc réécrire la même ligne à chaque passage noierait la télémétrie et
+    rendrait le compteur du tableau de bord inexploitable."""
+
+    def _recu(self, **champs):
+        base = {"ts": 1000.0, "mode": "code", "status": "ok", "prompt_chars": 500}
+        base.update(champs)
+        return base
+
+    def test_recu_payant_hors_reasoning_est_signale(self):
+        recus = [self._recu(paid=True, provider="deepseek", model="deepseek-chat")]
+        trouves = gemini_gate.paid_without_reason(recus, 1100.0, 3600.0)
+        self.assertEqual(len(trouves), 1)
+        self.assertEqual(trouves[0]["provider"], "deepseek")
+
+    def test_recu_payant_en_reasoning_justifie(self):
+        recus = [self._recu(paid=True, mode="reasoning")]
+        self.assertEqual(gemini_gate.paid_without_reason(recus, 1100.0, 3600.0), [])
+
+    def test_recu_payant_avec_justification_explicite_ignore(self):
+        recus = [self._recu(paid=True, justified=True)]
+        self.assertEqual(gemini_gate.paid_without_reason(recus, 1100.0, 3600.0), [])
+
+    def test_recu_escalade_tracee_ignore(self):
+        recus = [self._recu(paid=True, escalated=True)]
+        self.assertEqual(gemini_gate.paid_without_reason(recus, 1100.0, 3600.0), [])
+
+    def test_recu_tier_payant_sans_champ_paid_est_signale(self):
+        """Rétrocompatibilité : `tier: paid` vaut paiement même sans `paid`."""
+        recus = [self._recu(tier="paid")]
+        self.assertEqual(len(gemini_gate.paid_without_reason(recus, 1100.0, 3600.0)), 1)
+
+    def test_recu_gratuit_jamais_signale(self):
+        recus = [self._recu(paid=False), self._recu(paid=False, tier="free")]
+        self.assertEqual(gemini_gate.paid_without_reason(recus, 1100.0, 3600.0), [])
+
+    def test_recu_payant_expire_ignore(self):
+        recus = [self._recu(paid=True, ts=1000.0)]
+        self.assertEqual(gemini_gate.paid_without_reason(recus, 9000.0, 3600.0), [])
+
+    def test_signal_ecrit_une_ligne_et_une_seule(self):
+        recus = [self._recu(paid=True, provider="deepseek", model="deepseek-chat")]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tel = os.path.join(tmpdir, "telemetry.jsonl")
+            vu = os.path.join(tmpdir, "vu.json")
+
+            premiers = gemini_gate.signal_unjustified_paid(
+                recus, 1100.0, 3600.0, telemetry_path=tel, seen_path=vu)
+            self.assertEqual(len(premiers), 1)
+
+            seconds = gemini_gate.signal_unjustified_paid(
+                recus, 1100.0, 3600.0, telemetry_path=tel, seen_path=vu)
+            self.assertEqual(seconds, [])
+
+            with open(tel, "r", encoding="utf-8") as f:
+                lignes = [json.loads(ligne) for ligne in f if ligne.strip()]
+            self.assertEqual(len(lignes), 1)
+            self.assertEqual(lignes[0]["kind"], gemini_gate.SIGNAL_KIND)
+            self.assertEqual(lignes[0]["subkind"], "paid_unjustified")
+            self.assertEqual(lignes[0]["provider"], "deepseek")
+
+    def test_signal_ne_fait_rien_sans_paiement_suspect(self):
+        recus = [self._recu(paid=False)]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tel = os.path.join(tmpdir, "telemetry.jsonl")
+            self.assertEqual(
+                gemini_gate.signal_unjustified_paid(
+                    recus, 1100.0, 3600.0,
+                    telemetry_path=tel, seen_path=os.path.join(tmpdir, "vu.json")),
+                [],
+            )
+            self.assertFalse(os.path.exists(tel))
+
+    def test_delegation_gate_existe_et_alias_complet(self):
+        """Le hook vit dans `delegation_gate.py` ; `gemini_gate` reste la façade."""
+        chemin = _RACINE_PROJET / "scripts" / "hooks" / "delegation_gate.py"
+        self.assertTrue(chemin.is_file())
+        self.assertTrue(hasattr(gemini_gate, "paid_without_reason"))
+        self.assertTrue(hasattr(gemini_gate, "signal_unjustified_paid"))
+        self.assertTrue(hasattr(gemini_gate, "required_modes"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,812 @@
+{
+  "version": 1,
+  "generated_at": 1790401301.4690058,
+  "generated_by": "scripts/ai/refresh_models.py",
+  "policy": {
+    "free_first": true,
+    "paid_modes": [
+      "reasoning"
+    ],
+    "paid_allowlist": [
+      "deepseek-flash",
+      "deepseek-v4-pro"
+    ],
+    "daily_paid_cap_usd": 2.0,
+    "max_candidates": 6,
+    "retry": {
+      "per_model": 2,
+      "base_delay": 4.0,
+      "max_delay": 30.0
+    }
+  },
+  "providers": {
+    "openrouter": {
+      "kind": "openai",
+      "base_url": "https://openrouter.ai/api/v1",
+      "keys_env": [
+        "OPENROUTER_API_KEY_1",
+        "OPENROUTER_API_KEY_2",
+        "OPENROUTER_API_KEY"
+      ],
+      "quota": {
+        "window": "daily",
+        "limit": 50
+      },
+      "reasoning_style": "reasoning_effort",
+      "reasoning_map": {},
+      "headers": {
+        "HTTP-Referer": "https://github.com/radar",
+        "X-Title": "radar"
+      },
+      "models": [
+        {
+          "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+          "free": true,
+          "label": "NVIDIA: Nemotron 3 Ultra (free)",
+          "context_length": 1000000,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 100,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "seed",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "nvidia/nemotron-3.5-lightning:free",
+          "free": true,
+          "label": "NVIDIA: Nemotron 3.5 Lightning (free)",
+          "context_length": 1000000,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 100,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "seed",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "stealth/space-bunny-alpha",
+          "free": true,
+          "label": "Space Bunny Alpha",
+          "context_length": 1000000,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 100,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "thinkingmachines/inkling-small:free",
+          "free": true,
+          "label": "Thinking Machines: Inkling Small (free)",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 100,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "seed",
+            "stop",
+            "temperature",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "thinkingmachines/inkling:free",
+          "free": true,
+          "label": "Thinking Machines: Inkling (free)",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 100,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "seed",
+            "stop",
+            "temperature",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "dots-studio/dots-3-note-preview:free",
+          "free": true,
+          "label": "Dots Studio: Dots3-Note Preview (free)",
+          "context_length": 512000,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 488,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "google/gemma-4-26b-a4b-it:free",
+          "free": true,
+          "label": "Google: Gemma 4 26B A4B  (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "seed",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "google/gemma-4-31b-it:free",
+          "free": true,
+          "label": "Google: Gemma 4 31B (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "response_format",
+            "seed",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "inclusionai/ling-3.0-flash-fin:free",
+          "free": true,
+          "label": "inclusionAI: Ling 3.0 Flash Fin (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ]
+        },
+        {
+          "id": "inclusionai/ling-3.0-flash-sante:free",
+          "free": true,
+          "label": "inclusionAI: Ling 3.0 Flash Sante (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ]
+        },
+        {
+          "id": "nvidia/nemotron-3-super-120b-a12b:free",
+          "free": true,
+          "label": "NVIDIA: Nemotron 3 Super (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "reasoning_effort",
+            "response_format",
+            "seed",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "poolside/laguna-s-2.1:free",
+          "free": true,
+          "label": "Poolside: Laguna S 2.1 (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "temperature",
+            "tool_choice",
+            "tools"
+          ]
+        },
+        {
+          "id": "poolside/laguna-xs-2.1:free",
+          "free": true,
+          "label": "Poolside: Laguna XS 2.1 (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "temperature",
+            "tool_choice",
+            "tools"
+          ]
+        },
+        {
+          "id": "qwen/qwen3.8-27b:free",
+          "free": true,
+          "label": "Qwen: Qwen3.8 27B (free)",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 738,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "reasoning_effort",
+            "repetition_penalty",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "cohere/north-mini-code:free",
+          "free": true,
+          "label": "Cohere: North Mini Code (free)",
+          "context_length": 256000,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 744,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "max_tokens",
+            "presence_penalty",
+            "reasoning",
+            "seed",
+            "stop",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_p"
+          ]
+        },
+        {
+          "id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+          "free": true,
+          "label": "NVIDIA: Nemotron 3 Nano Omni (free)",
+          "context_length": 256000,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 744,
+          "supports": [
+            "include_reasoning",
+            "max_tokens",
+            "reasoning",
+            "seed",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_p"
+          ]
+        },
+        {
+          "id": "liquid/lfm-2.5-2.6b:free",
+          "free": true,
+          "label": "LiquidAI: LFM2.5-2.6B (free)",
+          "context_length": 65536,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 935,
+          "supports": [
+            "frequency_penalty",
+            "include_reasoning",
+            "logprobs",
+            "max_completion_tokens",
+            "max_tokens",
+            "min_p",
+            "presence_penalty",
+            "reasoning",
+            "repetition_penalty",
+            "response_format",
+            "seed",
+            "stop",
+            "structured_outputs",
+            "temperature",
+            "tool_choice",
+            "tools",
+            "top_k",
+            "top_logprobs",
+            "top_p"
+          ]
+        }
+      ]
+    },
+    "gemini": {
+      "kind": "gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "keys_env": [
+        "GEMINI_API_KEY_1",
+        "GEMINI_API_KEY_2",
+        "GEMINI_API_KEY"
+      ],
+      "quota": {
+        "window": "daily",
+        "limit": null
+      },
+      "reasoning_style": "thinking_level",
+      "reasoning_map": {
+        "low": "low",
+        "high": "high"
+      },
+      "headers": {},
+      "models": [
+        {
+          "id": "gemma-4-26b-a4b-it",
+          "free": true,
+          "label": "Gemma 4 26B A4B IT",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 960
+        },
+        {
+          "id": "gemma-4-31b-it",
+          "free": true,
+          "label": "Gemma 4 31B IT",
+          "context_length": 262144,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 960
+        },
+        {
+          "id": "gemini-3.8-flash",
+          "free": true,
+          "label": "Gemini 3.8 Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 962,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.7-flash",
+          "free": true,
+          "label": "Gemini 3.7 Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 963,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.6-flash",
+          "free": true,
+          "label": "Gemini 3.6 Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 964,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.5-flash",
+          "free": true,
+          "label": "Gemini 3.5 Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 965,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.5-flash-lite",
+          "free": true,
+          "label": "Gemini 3.5 Flash Lite",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 965,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.1-flash-lite",
+          "free": true,
+          "label": "Gemini 3.1 Flash Lite",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 969,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.1-flash-lite-preview",
+          "free": true,
+          "label": "Gemini 3.1 Flash Lite Preview",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 969,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.1-pro-preview",
+          "free": true,
+          "label": "Gemini 3.1 Pro Preview",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 969,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3.1-pro-preview-customtools",
+          "free": true,
+          "label": "Gemini 3.1 Pro Preview Custom Tools",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 969,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-3-flash-preview",
+          "free": true,
+          "label": "Gemini 3 Flash Preview",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 970,
+          "supports": [
+            "thinking"
+          ]
+        },
+        {
+          "id": "gemini-2.5-computer-use-preview-10-2025",
+          "free": true,
+          "label": "Gemini 2.5 Computer Use Preview 10-2025",
+          "context_length": 131072,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 975
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "free": true,
+          "label": "Gemini 2.5 Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 975
+        },
+        {
+          "id": "gemini-2.5-flash-lite",
+          "free": true,
+          "label": "Gemini 2.5 Flash-Lite",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 975
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "free": true,
+          "label": "Gemini 2.5 Pro",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 975
+        },
+        {
+          "id": "gemini-robotics-er-2-preview",
+          "free": true,
+          "label": "Gemini Robotics-ER 2 Preview",
+          "context_length": 131072,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 980
+        },
+        {
+          "id": "gemini-omni-1.1-flash",
+          "free": true,
+          "label": "Gemini Omni 1.1 Flash",
+          "context_length": 131072,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 989
+        },
+        {
+          "id": "gemini-flash-latest",
+          "free": true,
+          "label": "Gemini Flash Latest",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 1000
+        },
+        {
+          "id": "gemini-flash-lite-latest",
+          "free": true,
+          "label": "Gemini Flash-Lite Latest",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 1000
+        },
+        {
+          "id": "gemini-omni-flash-preview",
+          "free": true,
+          "label": "Gemini Omni Flash Preview",
+          "context_length": 131072,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 1000
+        },
+        {
+          "id": "gemini-pro-latest",
+          "free": true,
+          "label": "Gemini Pro Latest",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 1000
+        },
+        {
+          "id": "nano-banana-pro-preview",
+          "free": true,
+          "label": "Nano Banana Pro",
+          "context_length": 131072,
+          "pricing": {
+            "prompt_per_1m": 0.0,
+            "completion_per_1m": 0.0
+          },
+          "rank": 1000
+        }
+      ]
+    },
+    "deepseek": {
+      "kind": "openai",
+      "base_url": "https://api.deepseek.com/v1",
+      "keys_env": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "quota": {
+        "window": "daily",
+        "limit": null
+      },
+      "reasoning_style": "reasoning_effort",
+      "reasoning_map": {},
+      "headers": {},
+      "models": [
+        {
+          "id": "deepseek-flash",
+          "free": false,
+          "label": "DeepSeek-V4.1-Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 0.3,
+            "completion_per_1m": 1.2,
+            "cache_hit_per_1m": 0.006,
+            "prompt_hors_pointe_per_1m": 0.15,
+            "completion_hors_pointe_per_1m": 0.6,
+            "note": "grille opérateur du 26/09/2026. Les deux champs retenus sont le majorant — entrée au tarif cache miss, heure de pointe — pour que le plafond ne sous-estime jamais un appel. cache_hit_per_1m est lui aussi la valeur de pointe."
+          },
+          "rank": 1000,
+          "provider_family": "deepseek"
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "free": false,
+          "label": "DeepSeek-V4-Pro",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": 1.32,
+            "completion_per_1m": 3.96,
+            "cache_hit_per_1m": 0.044,
+            "prompt_hors_pointe_per_1m": 0.66,
+            "completion_hors_pointe_per_1m": 1.98,
+            "note": "grille opérateur du 26/09/2026. Les deux champs retenus sont le majorant — entrée au tarif cache miss, heure de pointe — pour que le plafond ne sous-estime jamais un appel. cache_hit_per_1m est lui aussi la valeur de pointe."
+          },
+          "rank": 1000,
+          "provider_family": "deepseek"
+        }
+      ]
+    },
+    "xai": {
+      "kind": "openai",
+      "base_url": "https://api.x.ai/v1",
+      "keys_env": [
+        "XAI_API_KEY"
+      ],
+      "quota": {
+        "window": "daily",
+        "limit": null
+      },
+      "reasoning_style": "effort",
+      "headers": {},
+      "models": []
+    }
+  }
+}

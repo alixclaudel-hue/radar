@@ -380,7 +380,7 @@
 {% endblock %}
 
 {% block script %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.js"></script>
 <script id="deleg-data" type="application/json">
 {
   "buckets": {{ d.buckets | tojson }},
@@ -392,59 +392,66 @@
 (function () {
   const raw = document.getElementById("deleg-data").textContent;
   const data = JSON.parse(raw);
-  const labels = data.buckets.map(b => b.label);
-  const calls  = data.buckets.map(b => b.calls);
 
-  // Un dataset ligne par modèle observé au moins une fois dans un bucket.
-  const modelesVus = new Set();
-  data.buckets.forEach(b => Object.keys(b.by_model).forEach(m => modelesVus.add(m)));
-  const modeles = Array.from(modelesVus);
+  // Isolé : un pépin ici (lib CDN indisponible, forme de données inattendue)
+  // ne doit jamais empêcher les boutons de la page (presets, export) de marcher.
+  try {
+    const labels = data.buckets.map(b => b.label);
+    const calls  = data.buckets.map(b => b.calls);
 
-  const datasets = [
-    {
-      type: "bar", label: "Appels", data: calls,
-      backgroundColor: "rgba(96,165,250,0.35)",
-      borderColor: "#60a5fa", borderWidth: 1,
-      yAxisID: "y1", order: 2
-    }
-  ];
-  modeles.forEach(m => {
-    const c = data.colors[m] || "#94a3b8";
-    datasets.push({
-      type: "line", label: m,
-      data: data.buckets.map(b => (b.by_model[m] || {}).total_tokens || 0),
-      borderColor: c, backgroundColor: c + "22",
-      tension: 0.25, fill: false, yAxisID: "y0", order: 1,
-      pointRadius: 2, pointHoverRadius: 4
-    });
-  });
+    // Un dataset ligne par modèle observé au moins une fois dans un bucket.
+    const modelesVus = new Set();
+    data.buckets.forEach(b => Object.keys(b.by_model).forEach(m => modelesVus.add(m)));
+    const modeles = Array.from(modelesVus);
 
-  const styles = getComputedStyle(document.documentElement);
-  const dim = styles.getPropertyValue("--dim").trim() || "#9aa0b4";
-  const grid = styles.getPropertyValue("--line").trim() || "#2c3040";
-
-  const ctx = document.getElementById("chartActivite").getContext("2d");
-  new Chart(ctx, {
-    data: { labels: labels, datasets: datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      plugins: {
-        legend: { labels: { color: dim, boxWidth: 10, font: { size: 11 } } },
-        tooltip: { mode: "index" }
-      },
-      scales: {
-        x: { ticks: { color: dim, maxRotation: 0, autoSkip: true },
-             grid: { color: grid } },
-        y0: { type: "linear", position: "left",
-              title: { display: true, text: "Jetons", color: dim },
-              ticks: { color: dim }, grid: { color: grid } },
-        y1: { type: "linear", position: "right",
-              title: { display: true, text: "Appels", color: dim },
-              ticks: { color: dim, precision: 0 }, grid: { display: false } }
+    const datasets = [
+      {
+        type: "bar", label: "Appels", data: calls,
+        backgroundColor: "rgba(96,165,250,0.35)",
+        borderColor: "#60a5fa", borderWidth: 1,
+        yAxisID: "y1", order: 2
       }
-    }
-  });
+    ];
+    modeles.forEach(m => {
+      const c = data.colors[m] || "#94a3b8";
+      datasets.push({
+        type: "line", label: m,
+        data: data.buckets.map(b => (b.by_model[m] || {}).total_tokens || 0),
+        borderColor: c, backgroundColor: c + "22",
+        tension: 0.25, fill: false, yAxisID: "y0", order: 1,
+        pointRadius: 2, pointHoverRadius: 4
+      });
+    });
+
+    const styles = getComputedStyle(document.documentElement);
+    const dim = styles.getPropertyValue("--dim").trim() || "#9aa0b4";
+    const grid = styles.getPropertyValue("--line").trim() || "#2c3040";
+
+    const ctx = document.getElementById("chartActivite").getContext("2d");
+    new Chart(ctx, {
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { labels: { color: dim, boxWidth: 10, font: { size: 11 } } },
+          tooltip: { mode: "index" }
+        },
+        scales: {
+          x: { ticks: { color: dim, maxRotation: 0, autoSkip: true },
+               grid: { color: grid } },
+          y0: { type: "linear", position: "left",
+                title: { display: true, text: "Jetons", color: dim },
+                ticks: { color: dim }, grid: { color: grid } },
+          y1: { type: "linear", position: "right",
+                title: { display: true, text: "Appels", color: dim },
+                ticks: { color: dim, precision: 0 }, grid: { display: false } }
+        }
+      }
+    });
+  } catch (e) {
+    console.error("Graphique d'activité indisponible :", e);
+  }
 
   // Sélecteur de période : bouton actif -> hidden input `period`.
   const hiddenPeriod = document.getElementById("period");

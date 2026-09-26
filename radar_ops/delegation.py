@@ -11,14 +11,20 @@ ignorent tout de cette page :
   Gemini seul) — le fichier porte aujourd'hui les reçus de tous les
   fournisseurs, avec un champ `provider` qui les distingue ;
 - `telemetry.jsonl`, une ligne par événement de session, écrite par
-  `scripts/hooks/telemetry.py` ;
+  `scripts/hooks/telemetry.py` — dont un type `claude_usage` (un par appel API
+  Claude, cf. `_claude_usage_rows`) ;
 - `ai_health.json`, l'état du disjoncteur par (fournisseur, modèle), écrit par
   `scripts/ai/health.py`.
 
-Les jetons affichés viennent de `usageMetadata`, rapporté par l'API — une
-mesure. Aucune estimation d'économie côté Claude n'est calculée ici : ce
-serait un contrefactuel, et le publier à côté de vraies mesures le ferait
-passer pour l'une d'elles.
+Les jetons affichés viennent de `usageMetadata`/`message.usage`, rapportés par
+l'API — une mesure, jamais un comptage par caractères, y compris côté Claude
+(lu dans le transcript de session par le hook, cf. `_claude_usage_rows`).
+Aucune estimation d'ÉCONOMIE côté Claude n'est calculée ici : ce serait un
+contrefactuel, et le publier à côté de vraies mesures le ferait passer pour
+l'une d'elles — mais le VOLUME mesuré de Claude a sa place à côté de celui du
+courtier, sur le graphique par bucket seulement (`bucket_by_time`) : les autres
+agrégats (`by_model`, `per_day`, quotas...) restent réservés au courtier, dont
+c'est la seule question que cette page répond par ailleurs.
 
 Les reçus récents déclarent, en clair, le quota du jour au moment de l'appel :
 c'est la seule source du « reste-t-il des appels gratuits ? » affiché plus bas,
@@ -528,8 +534,41 @@ def resolve_period(preset, from_ts, to_ts, now_ts, tz="Europe/Paris"):
     return since_ts, until_ts, granularity, label
 
 
-def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris"):
-    """Groupe les reçus par intervalle temporel, buckets vides inclus."""
+def _claude_usage_rows(events):
+    """Jetons Claude mesurés (transcript de session), un par tour assistant.
+
+    Vient de `scripts/hooks/telemetry.py::log_claude_usage` — une mesure de
+    l'API (le même `usage` que `/cost`), jamais un comptage par caractères.
+    `prompt_tokens` agrège tout ce qui est côté requête (jetons frais et jetons
+    de cache, écriture et lecture) : la même convention que les reçus du
+    courtier, pour que les deux courbes s'additionnent au même sens."""
+    rows = []
+    for ev in events:
+        if ev.get("kind") != "claude_usage":
+            continue
+        ts = _num(ev.get("ts"))
+        if ts is None:
+            continue
+        prompt_tokens = (_int(ev, "input_tokens") + _int(ev, "cache_creation_input_tokens")
+                         + _int(ev, "cache_read_input_tokens"))
+        output_tokens = _int(ev, "output_tokens")
+        rows.append({
+            "ts": ts,
+            "model": str(ev.get("model") or "inconnu"),
+            "prompt_tokens": prompt_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": prompt_tokens + output_tokens,
+        })
+    return rows
+
+
+def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris", claude_rows=None):
+    """Groupe les reçus par intervalle temporel, buckets vides inclus.
+
+    `claude_rows` (optionnel, cf. `_claude_usage_rows`) n'alimente que
+    `by_model` de chaque bucket — jamais `calls` ni les totaux du haut, qui
+    restent le compte des appels délégués : les courbes par modèle du gabarit
+    lisent `by_model` seul, la barre "Appels" garde son sens."""
     tzinfo = ZoneInfo(tz)
 
     # Sans borne inférieure ET sans reçu, il n'y a pas de fenêtre à peindre.
@@ -600,6 +639,21 @@ def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris")
             m["prompt_tokens"] += _int(r, "prompt_tokens")
             m["output_tokens"] += _int(r, "output_tokens")
             m["total_tokens"] += _int(r, "total_tokens")
+
+    if claude_rows:
+        for row in claude_rows:
+            ts = row["ts"]
+            if ts < since_ts or ts > until_ts:
+                continue
+            idx = int((ts - since_aligned_ts) // bucket_secs)
+            if 0 <= idx < len(buckets):
+                m = buckets[idx]["by_model"].setdefault(
+                    row["model"], {"calls": 0, "prompt_tokens": 0,
+                                   "output_tokens": 0, "total_tokens": 0})
+                m["calls"] += 1
+                m["prompt_tokens"] += row["prompt_tokens"]
+                m["output_tokens"] += row["output_tokens"]
+                m["total_tokens"] += row["total_tokens"]
 
     return buckets
 
@@ -864,8 +918,10 @@ def snapshot_windowed(data_root, preset="7d", from_ts=None, to_ts=None,
     base = summarize(receipts, events, now=now_ts, days=14,
                      health_state=health_state)
 
-    # Buckets
-    buckets = bucket_by_time(receipts, since_ts, until_ts, resolved_granularity, tz)
+    # Buckets — jetons Claude mesurés en plus des reçus délégués (cf. _claude_usage_rows)
+    claude_rows = _claude_usage_rows(events)
+    buckets = bucket_by_time(receipts, since_ts, until_ts, resolved_granularity, tz,
+                             claude_rows=claude_rows)
 
     # Top models / modes
     top_models = top_items(receipts, "model", n=5)
@@ -887,6 +943,13 @@ def snapshot_windowed(data_root, preset="7d", from_ts=None, to_ts=None,
     model_colors = {}
     for i, m in enumerate(by_model_sorted):
         model_colors[m["model"]] = PALETTE[i % len(PALETTE)]
+    # Modèles Claude vus dans les buckets mais absents de by_model (ce ne sont
+    # pas des reçus du courtier) : couleur assignée dans l'ordre de première
+    # apparition, en continuant la même palette.
+    for b in buckets:
+        for m in b["by_model"]:
+            if m not in model_colors:
+                model_colors[m] = PALETTE[len(model_colors) % len(PALETTE)]
 
     return {
         "dir": directory,

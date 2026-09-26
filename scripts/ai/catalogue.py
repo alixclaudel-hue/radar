@@ -181,17 +181,36 @@ def is_free(entry: dict) -> bool:
     Les deux critères sont acceptés parce que les fournisseurs ne sont pas
     cohérents : OpenRouter marque `:free` en suffixe **et** met un prix nul,
     l'API Gemini ne publie aucun prix (tout est dans le palier gratuit).
+
+    Le zéro doit être **écrit** : une grille absente, vide ou dont un champ vaut
+    `None` ne prouve rien. L'ancien test (`float(pricing.get(...) or 0)`) lisait
+    cette absence comme deux zéros, donc comme une gratuité — un payant dont le
+    fournisseur ne publie aucun prix partait alors sans `paid_allowlist`, hors
+    plafond, et était imputé à 0 $. Le routeur, lui, refuse un prix qu'il ne
+    sait pas chiffrer ; encore faut-il qu'il soit consulté.
     """
     if entry.get("free") is True:
         return True
     if str(entry.get("id", "")).endswith(":free"):
         return True
-    pricing = entry.get("pricing") or {}
+    if entry.get("free") is False:
+        # Deux zéros sur un payant **déclaré** ne sont pas une gratuité mais le
+        # prix non publié encodé en zéro. Le rafraîchissement n'écrit plus cette
+        # forme (il pose la sentinelle `"n/a"`), mais une entrée héritée d'une
+        # version antérieure — ou saisie à la main — passerait sinon sans
+        # `paid_allowlist` et hors plafond. Refus : le routeur tranchera.
+        return False
+    pricing = entry.get("pricing")
+    if not isinstance(pricing, dict):
+        return False
+    tarifs = []
+    for champ in ("prompt_per_1m", "completion_per_1m"):
+        valeur = pricing.get(champ)
+        if valeur is None or (isinstance(valeur, str) and not valeur.strip()):
+            return False
+        tarifs.append(valeur)
     try:
-        return (
-            float(pricing.get("prompt_per_1m") or 0) == 0.0
-            and float(pricing.get("completion_per_1m") or 0) == 0.0
-        )
+        return all(float(valeur) == 0.0 for valeur in tarifs)
     except (TypeError, ValueError):
         return False
 

@@ -156,12 +156,67 @@ def _dev_version(model_id: str) -> float:
     return 0.0
 
 
-def _price_per_1m(value) -> float:
-    """Prix par million de jetons, à partir d'un prix par jeton (OpenRouter)."""
+PRIX_INCONNU = "n/a"
+"""Valeur écrite quand le fournisseur ne publie **aucun** prix pour un modèle.
+
+« Non publié » n'est pas « gratuit » : [`catalogue.is_free()`](catalogue.py:178)
+ne reconnaît gratuit que deux zéros **explicites**, et le routeur refuse un
+modèle payant qu'il ne sait pas chiffrer. Encoder l'absence en `0.0` faisait
+donc passer ce payant pour un gratuit — facturé hors plafond et hors allowlist.
+"""
+
+
+def _price_per_1m(value):
+    """Prix par million de jetons, à partir d'un prix par jeton (OpenRouter).
+
+    Rend [`PRIX_INCONNU`](refresh_models.py:1) — jamais `0.0` — quand le
+    fournisseur est muet : confondre l'absence et le zéro rendait un modèle
+    payant indétectable par le plafond.
+    """
+    if value is None or not str(value).strip():
+        return PRIX_INCONNU
     try:
         return float(str(value)) * 1_000_000.0
     except (TypeError, ValueError):
-        return 0.0
+        return PRIX_INCONNU
+
+
+def _prix_non_publie(pricing) -> bool:
+    """Vrai si la grille ne porte aucun prix exploitable.
+
+    Sert au report des décisions de l'opérateur : une grille saisie à la main
+    doit survivre à un rafraîchissement, mais seulement face à une grille
+    muette — jamais à la place d'un prix que l'API vient de publier.
+    """
+    if not isinstance(pricing, dict):
+        return True
+    for champ in ("prompt_per_1m", "completion_per_1m"):
+        valeur = pricing.get(champ)
+        if valeur is None:
+            return True
+        if isinstance(valeur, str) and valeur.strip() in ("", PRIX_INCONNU):
+            return True
+    return False
+
+
+def _zero_explicite(pricing) -> bool:
+    """Vrai si la grille porte **deux zéros écrits**, et rien d'exploitable d'autre.
+
+    Sert à distinguer une gratuité déclarée (deux zéros, légitime et à reporter
+    pour un modèle gratuit) de l'**empreinte de l'ancien défaut** : un modèle
+    *payant* dont la grille vaut `{0.0, 0.0}` ne peut pas venir d'un opérateur
+    — il vient du temps où l'absence de prix était encodée en zéro. Reporter
+    cette grille perpétuerait le bug.
+    """
+    if _prix_non_publie(pricing):
+        return False
+    for champ in ("prompt_per_1m", "completion_per_1m"):
+        try:
+            if float(pricing.get(champ)) != 0.0:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
 
 
 def _text_capable(raw: dict, ident: str) -> bool:
@@ -283,9 +338,11 @@ def _entry_openai_paid(raw: dict, provider: str) -> dict | None:
 
     Aucun filtre de version : c'est `paid_allowlist` qui décide, pas ce script.
     Le prix est repris quand le fournisseur le publie (OpenRouter le fait, xAI et
-    DeepSeek non) — sans prix, le routeur refusera l'appel, ce qui est le
-    comportement voulu : un plafond qu'on ne sait pas chiffrer n'est pas un
-    plafond.
+    DeepSeek non). Sans prix publié, la grille porte [`PRIX_INCONNU`](refresh_models.py:1) :
+    le routeur refuse alors l'appel, ce qui est le comportement voulu — un
+    plafond qu'on ne sait pas chiffrer n'est pas un plafond. Écrire `0.0` à la
+    place faisait au contraire passer ce payant pour un gratuit, hors plafond et
+    hors `paid_allowlist`.
     """
     ident = str(raw.get("id") or "").strip()
     if not ident or not _text_capable(raw, ident):
@@ -363,10 +420,25 @@ def _merge_entry(
             continue
         if champ == "pricing":
             # Une grille déclarée à la main survit à une API muette sur les prix.
-            if not (neuf.get("pricing") or {}).get("prompt_per_1m") and not (
-                neuf.get("pricing") or {}
-            ).get("completion_per_1m"):
-                neuf["pricing"] = ancien["pricing"]
+            # Le test porte sur l'absence *de la nouvelle* grille : juger la
+            # valeur par sa véracité laissait `"n/a"` passer pour un prix, et la
+            # grille de l'opérateur était perdue à chaque rafraîchissement.
+            #
+            # Sauf une : deux zéros sur un modèle **payant**. Ce n'est pas une
+            # décision d'opérateur mais l'empreinte de l'ancien défaut (l'absence
+            # de prix encodée en `0.0`) ; la reporter rendrait le payant
+            # indétectable par le plafond. On laisse la sentinelle gagner, ce qui
+            # répare le catalogue au passage.
+            grille_ancienne = ancien.get("pricing")
+            heritage_du_bug = neuf.get("free") is False and _zero_explicite(
+                grille_ancienne
+            )
+            if (
+                _prix_non_publie(neuf.get("pricing"))
+                and not _prix_non_publie(grille_ancienne)
+                and not heritage_du_bug
+            ):
+                neuf["pricing"] = grille_ancienne
             continue
         neuf[champ] = ancien[champ]
     return neuf

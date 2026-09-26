@@ -1811,6 +1811,61 @@ def _cas_payant_prix_inconnu():
     return True, "prix illisible traité comme un refus, jamais comme du gratuit"
 
 
+def _cas_payant_prix_absent():
+    """Un prix **absent** ne vaut jamais gratuit — les trois formes, d'un coup.
+
+    Le cas précédent couvre un prix *illisible* (`"n/a"`, qui lève à la
+    conversion). Celui-ci couvre l'**absence** de prix, que `is_free()` lisait
+    comme deux zéros — donc comme une gratuité — et le payant partait sans
+    `paid_allowlist` et hors plafond. Trois formes, dont celle que le
+    rafraîchissement produisait avant la sentinelle :
+
+    1. clé `pricing` absente ;
+    2. deux zéros écrits sur un payant déclaré (`free: false`) ;
+    3. champs de prix explicitement nuls.
+
+    Si une seule de ces formes repasse pour du gratuit, un appel part et le cas
+    échoue : c'est le seul juge qui compte.
+    """
+    cat = _catalogue(
+        {
+            "or": _provider(
+                "or",
+                keys_env=["OPENROUTER_API_KEY"],
+                models=[
+                    {"id": "or-prix-manquant", "rank": 10, "free": False, "paid_ok": True},
+                    {
+                        "id": "or-zeros-fantomes",
+                        "rank": 11,
+                        "free": False,
+                        "paid_ok": True,
+                        "pricing": {"prompt_per_1m": 0.0, "completion_per_1m": 0.0},
+                    },
+                    {
+                        "id": "or-prix-nul-declare",
+                        "rank": 12,
+                        "free": False,
+                        "paid_ok": True,
+                        "pricing": {"prompt_per_1m": None, "completion_per_1m": None},
+                    },
+                ],
+            )
+        }
+    )
+    res = _run_broker(
+        ["--allow-paid"],
+        catalogue=cat,
+        keys=_CLES_STD,
+        env={"RADAR_AI_DAILY_PAID_CAP_USD": "5.0"},
+        plan=[None],
+    )
+    if res["code"] != 1 or res["appels"]:
+        return False, f"code={res['code']}, appels={len(res['appels'])}"
+    if "prix inconnu" not in res["stderr"]:
+        return False, f"motif absent : {res['stderr']!r}"
+    return True, "prix absent (clé manquante, zéros fantômes ou champs nuls) refusé"
+
+
 def _cas_plafond_zero():
     res = _run_broker(
         ["--allow-paid"],
@@ -2552,6 +2607,11 @@ CASES = [
         "description": "Prix illisible → refus, jamais traité comme gratuit",
     },
     {
+        "id": "payant_prix_absent",
+        "kind": "adversarial",
+        "description": "Prix absent (clé manquante, zéros fantômes, champs nuls) → refus",
+    },
+    {
         "id": "plafond_zero",
         "kind": "adversarial",
         "description": "Plafond non déclaré (0 $) → aucun appel payant possible",
@@ -2710,6 +2770,7 @@ _CHECKS = {
     "payant_refuse_sans_autorisation": _cas_payant_refuse_sans_autorisation,
     "payant_non_valide": _cas_payant_non_valide,
     "payant_prix_inconnu": _cas_payant_prix_inconnu,
+    "payant_prix_absent": _cas_payant_prix_absent,
     "plafond_zero": _cas_plafond_zero,
     "plafond_depasse": _cas_plafond_depasse,
     "escalade_autorise_payant": _cas_escalade_autorise_payant,

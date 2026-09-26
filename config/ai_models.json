@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated_at": 1790344636.6391993,
+  "generated_at": 1790401301.4690058,
   "generated_by": "scripts/ai/refresh_models.py",
   "policy": {
     "free_first": true,
@@ -30,6 +30,7 @@
         "limit": 50
       },
       "reasoning_style": "reasoning_effort",
+      "reasoning_map": {},
       "headers": {
         "HTTP-Referer": "https://github.com/radar",
         "X-Title": "radar"
@@ -435,32 +436,6 @@
             "top_logprobs",
             "top_p"
           ]
-        },
-        {
-          "id": "z-ai/glm-5.2:free",
-          "free": true,
-          "label": "Z.ai: GLM 5.2 (free)",
-          "context_length": 32768,
-          "pricing": {
-            "prompt_per_1m": 0.0,
-            "completion_per_1m": 0.0
-          },
-          "rank": 968,
-          "supports": [
-            "frequency_penalty",
-            "include_reasoning",
-            "max_tokens",
-            "min_p",
-            "presence_penalty",
-            "reasoning",
-            "reasoning_effort",
-            "repetition_penalty",
-            "seed",
-            "stop",
-            "temperature",
-            "top_k",
-            "top_p"
-          ]
         }
       ]
     },
@@ -779,8 +754,34 @@
         "limit": null
       },
       "reasoning_style": "reasoning_effort",
+      "reasoning_map": {},
       "headers": {},
-      "models": []
+      "models": [
+        {
+          "id": "deepseek-flash",
+          "free": false,
+          "label": "DeepSeek-V4.1-Flash",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": "n/a",
+            "completion_per_1m": "n/a"
+          },
+          "rank": 1000,
+          "provider_family": "deepseek"
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "free": false,
+          "label": "DeepSeek-V4-Pro",
+          "context_length": 1048576,
+          "pricing": {
+            "prompt_per_1m": "n/a",
+            "completion_per_1m": "n/a"
+          },
+          "rank": 1000,
+          "provider_family": "deepseek"
+        }
+      ]
     },
     "xai": {
       "kind": "openai",

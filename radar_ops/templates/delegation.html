@@ -6,10 +6,13 @@
   .presets { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .5rem; }
   .preset { border: 1px solid var(--line); color: var(--dim); background: none;
             padding: .3rem .7rem; border-radius: 999px; cursor: pointer;
-            font: inherit; font-size: .8rem; }
+            font: inherit; font-size: .8rem; touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent; transition: background .1s, color .1s, border-color .1s; }
   .preset.active { background: var(--accent); color: var(--bg);
                    border-color: var(--accent); }
   .preset:hover { color: var(--fg); }
+  .preset:active { background: var(--accent); color: var(--bg);
+                   border-color: var(--accent); opacity: .75; }
   .custom { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
             padding-top: .5rem; border-top: 1px dashed var(--line); }
   .custom label { color: var(--dim); font-size: .8rem; }
@@ -20,7 +23,9 @@
                    border: 1px solid var(--line); border-radius: 4px;
                    padding: .2rem .4rem; }
   .custom button[type="submit"] {
-    background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    background: var(--accent); color: var(--bg); border-color: var(--accent);
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  .custom button[type="submit"]:active { opacity: .7; }
   .toolbar-summary { color: var(--dim); font-size: .82rem; margin-top: .4rem; }
 
   .kpis { display: grid;
@@ -36,10 +41,12 @@
   .kpi .export, .section-title .export-btn {
     background: none; border: 1px solid var(--line); color: var(--dim);
     padding: .1rem .5rem; border-radius: 4px; cursor: pointer;
-    font: inherit; font-size: .72rem; }
+    font: inherit; font-size: .72rem;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .kpi .export { position: absolute; top: .45rem; right: .45rem;
                  padding: .1rem .3rem; border: none; }
   .kpi .export:hover, .section-title .export-btn:hover { color: var(--fg); }
+  .kpi .export:active, .section-title .export-btn:active { color: var(--fg); opacity: .6; }
 
   .tops { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
           margin-bottom: 1.4rem; }

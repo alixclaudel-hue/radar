@@ -948,6 +948,58 @@ def _cas_enveloppe_reparation_epuisee():
     return True, "réparation tentée une fois, puis échec explicite en 3"
 
 
+def _cas_syntaxe_cascade_vers_modele_suivant():
+    """Code cassé sur le premier modèle → réparation échoue → cascade vers le
+    deuxième modèle qui renvoie du code sain → succès final en 0."""
+    res = _run_broker(
+        ["--mode", "code"],
+        catalogue=_std_catalogue(),
+        keys=_CLES_STD,
+        # appel 0 : premier jet modèle 1 → code cassé
+        # appel 1 : réparation modèle 1 → encore cassé (max_reparations=1 épuisé)
+        # appel 2 : premier jet modèle 2 → code sain
+        plan=[
+            _enveloppe_json(_CODE_CASSE),
+            _enveloppe_json(_CODE_CASSE),
+            _enveloppe_json(_CODE_SAIN),
+        ],
+        output_name="genere.py",
+    )
+    if res["code"] != 0:
+        return False, f"code={res['code']} stderr={res['stderr'].strip()!r}"
+    if len(res["appels"]) != 3:
+        return False, (
+            f"{len(res['appels'])} appels : attendu 3 "
+            "(2 sur modèle 1 cassé + 1 sur modèle 2 sain)"
+        )
+    erreurs = [l for l in res["ledger"] if l.get("status") == "error"]
+    if len(erreurs) != 2:
+        return False, f"{len(erreurs)} erreurs au journal (attendu 2 : jet + réparation)"
+    recu = res["recus"][0] if res["recus"] else {}
+    if recu.get("status") != "ok":
+        return False, f"reçu={recu}"
+    return True, "syntaxe cassée sur modèle 1 → cascade → succès sur modèle 2"
+
+
+def _cas_syntaxe_cascade_tous_epuises():
+    """Tous les modèles génèrent du code cassé → code de retour 3, pas 1."""
+    res = _run_broker(
+        ["--mode", "code"],
+        catalogue=_seul_gratuit(),
+        keys=_CLES_STD,
+        plan=[_enveloppe_json(_CODE_CASSE)],
+    )
+    if res["code"] != 3:
+        return False, (
+            f"code={res['code']} (attendu 3 : sortie inexploitable, "
+            "distinct d'un échec de transport en 1)"
+        )
+    recu = res["recus"][0] if res["recus"] else {}
+    if recu.get("error_type") != "syntax_error":
+        return False, f"reçu={recu}"
+    return True, "cascade épuisée sur syntaxe cassée → code 3 propagé"
+
+
 def _cas_enveloppe_absente_repli():
     """Modèle qui ignore le format → bloc markdown classique, comportement d'hier."""
     res = _run_broker(
@@ -2648,6 +2700,16 @@ CASES = [
         "description": "Réparation insuffisante → échec explicite en 3, jamais une boucle",
     },
     {
+        "id": "syntaxe_cascade_vers_modele_suivant",
+        "kind": "adversarial",
+        "description": "Code cassé + réparation épuisée → cascade vers le modèle suivant qui réussit",
+    },
+    {
+        "id": "syntaxe_cascade_tous_epuises",
+        "kind": "adversarial",
+        "description": "Tous les modèles en syntaxe cassée → code 3 propagé, pas 1",
+    },
+    {
         "id": "enveloppe_absente_repli",
         "kind": "adversarial",
         "description": "Modèle qui ignore l'enveloppe → repli sur l'extraction historique",
@@ -2846,6 +2908,8 @@ _CHECKS = {
     "syntaxe_sortie_3": _cas_syntaxe_sortie_3,
     "enveloppe_repare_la_syntaxe": _cas_enveloppe_repare_la_syntaxe,
     "enveloppe_reparation_epuisee": _cas_enveloppe_reparation_epuisee,
+    "syntaxe_cascade_vers_modele_suivant": _cas_syntaxe_cascade_vers_modele_suivant,
+    "syntaxe_cascade_tous_epuises": _cas_syntaxe_cascade_tous_epuises,
     "enveloppe_absente_repli": _cas_enveloppe_absente_repli,
     "contexte_pave_et_cache": _cas_contexte_pave_et_cache,
     "contexte_partiel": _cas_contexte_partiel,

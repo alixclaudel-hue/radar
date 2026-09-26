@@ -1135,6 +1135,11 @@ def main(argv: list[str] | None = None) -> int:
     tentatives = 0
     dernier_statut: int | None = None
     dernier_motif = ""
+    # Code de retour du dernier candidat ayant échoué sur sa sortie (syntax_error,
+    # empty_response). Propagé au retour final si toute la cascade échoue de cette
+    # façon — permet au shell appelant de distinguer un échec de transport (1) d'une
+    # sortie inexploitable (3 ou 4), même quand plusieurs candidats ont été essayés.
+    dernier_code_sortie = 1
     # Dernier candidat réellement tenté : c'est lui qui nomme le reçu d'échec
     # total, sans quoi une cascade épuisée ne dit ni fournisseur ni modèle.
     dernier_candidat: router.Candidate | None = None
@@ -1340,8 +1345,11 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     quota.save_state(quota_state)
                     health.save(health_state)
-                    ai_query.write_receipt(mode, "error", **meta)
-                    return 1
+                    # Ne pas écrire le reçu ici : si un candidat suivant réussit,
+                    # c'est lui qui l'écrit. Sortir de la boucle de réparation et
+                    # laisser la cascade continuer — même mécanique que ProviderError.
+                    abandonner = True
+                    break
 
                 # Un seul contrôle pour les trois garanties : le code compile, le
                 # JSON est lisible, et il dit ce que la demande attendait. Le
@@ -1397,8 +1405,14 @@ def main(argv: list[str] | None = None) -> int:
                     # ligne d'erreur — jamais une ligne « ok ».
                     quota.save_state(quota_state)
                     health.save(health_state)
-                    ai_query.write_receipt(mode, "error", **meta)
-                    return probleme["code"]
+                    # Même logique que la réponse vide : ne pas conclure ici,
+                    # laisser la cascade tenter le candidat suivant. Le reçu
+                    # d'erreur global est écrit si tous les candidats échouent.
+                    dernier_motif = f"{probleme['type']}: {probleme['detail'][:200]}"
+                    dernier_code_sortie = probleme["code"]
+                    echecs.append({"candidate": candidat.key, "error": dernier_motif})
+                    abandonner = True
+                    break
 
                 reparations += 1
                 sys.stderr.write(
@@ -1578,12 +1592,15 @@ def main(argv: list[str] | None = None) -> int:
         meta["quota"] = _etat_quota(catalogue, quota_state, policy)
     if dernier_statut is not None:
         meta["error_type"] = f"http_{dernier_statut}"
-    else:
+    elif not meta.get("error_type"):
+        # Préserver l'error_type posé par le dernier candidat (syntax_error,
+        # empty_response) : quand tous les candidats échouent de cette façon,
+        # le type réel est plus utile que le générique cascade_exhausted.
         meta["error_type"] = ERROR_CASCADE_EXHAUSTED
     meta["error_detail"] = str(dernier_motif or "cascade épuisée")[:200]
     meta["elapsed_ms"] = round((time.time() - started) * 1000)
     ai_query.write_receipt(mode, "error", **meta)
-    return 1
+    return dernier_code_sortie
 
 
 if __name__ == "__main__":

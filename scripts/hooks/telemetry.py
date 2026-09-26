@@ -133,6 +133,131 @@ def write_line(path, record):
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def usage_state_path(telemetry_dir, session_id):
+    """Chemin du curseur de lecture du transcript pour une session donnée."""
+    return os.path.join(telemetry_dir, ".claude_usage_state", session_id + ".json")
+
+
+def load_usage_offset(state_path):
+    """Octet déjà traité du transcript, 0 si le curseur est absent ou invalide."""
+    try:
+        with open(state_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            offset = data.get("offset")
+            if isinstance(offset, int):
+                return offset
+    except Exception:
+        pass
+    return 0
+
+
+def save_usage_offset(state_path, offset):
+    """Persiste le curseur, en écriture atomique (tmp + `os.replace`)."""
+    try:
+        os.makedirs(os.path.dirname(state_path), exist_ok=True)
+        tmp_path = state_path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"offset": offset}, f)
+        os.replace(tmp_path, state_path)
+    except Exception:
+        pass
+
+
+def _to_int(value):
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def claude_usage_deltas(transcript_path, offset):
+    """Jetons réels consommés depuis `offset`, un par appel API distinct.
+
+    Le transcript répète le même `usage` sur plusieurs lignes JSONL d'un même
+    appel (bloc de texte, appel d'outil...) — dédoublonnage par `requestId`,
+    en gardant la dernière valeur rencontrée mais l'ordre de première
+    apparition. Une ligne finale sans `\\n` est encore en cours d'écriture :
+    elle n'est pas consommée, le nouvel offset pointe juste avant elle."""
+    try:
+        if os.path.getsize(transcript_path) < offset:
+            offset = 0                       # transcript tronqué ou recréé
+        with open(transcript_path, "rb") as f:
+            f.seek(offset)
+            data = f.read()
+    except Exception:
+        return [], offset
+
+    if b"\n" not in data:
+        return [], offset
+
+    lines = data.split(b"\n")
+    last_incomplete = lines[-1]
+    complete_lines = lines[:-1]
+    new_offset = offset + len(data) - len(last_incomplete)
+
+    deltas = []
+    index_by_request = {}
+    for line_bytes in complete_lines:
+        if not line_bytes:
+            continue
+        try:
+            obj = json.loads(line_bytes.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            continue
+        if not isinstance(obj, dict) or obj.get("type") != "assistant":
+            continue
+
+        message = obj.get("message") or {}
+        usage = message.get("usage") or {}
+        entry = {
+            "model": message.get("model") or "inconnu",
+            "input_tokens": _to_int(usage.get("input_tokens")),
+            "output_tokens": _to_int(usage.get("output_tokens")),
+            "cache_creation_input_tokens": _to_int(usage.get("cache_creation_input_tokens")),
+            "cache_read_input_tokens": _to_int(usage.get("cache_read_input_tokens")),
+        }
+
+        request_id = obj.get("requestId")
+        if request_id is None:
+            deltas.append(entry)
+        elif request_id in index_by_request:
+            deltas[index_by_request[request_id]] = entry
+        else:
+            index_by_request[request_id] = len(deltas)
+            deltas.append(entry)
+
+    return deltas, new_offset
+
+
+def log_claude_usage(event, project_dir):
+    """Émet un événement `claude_usage` par appel API vu depuis le dernier tour.
+
+    Appelé à `Stop`/`SessionEnd` seulement : c'est là que `transcript_path` est
+    déjà flush pour le tour qui vient de finir. Le curseur par session rend
+    l'appel idempotent — un `SessionEnd` qui revoit un tour déjà traité au
+    `Stop` précédent n'écrit rien de plus."""
+    if event.get("hook_event_name") not in ("Stop", "SessionEnd"):
+        return
+    transcript_path = str(event.get("transcript_path") or "").strip()
+    session_id = str(event.get("session_id") or "").strip()
+    if not transcript_path or not session_id:
+        return
+
+    telemetry_dir = os.path.dirname(telemetry_path(project_dir))
+    state_path = usage_state_path(telemetry_dir, session_id)
+    offset = load_usage_offset(state_path)
+    deltas, new_offset = claude_usage_deltas(transcript_path, offset)
+
+    if deltas:
+        path = telemetry_path(project_dir)
+        ts = time.time()
+        for entry in deltas:
+            write_line(path, dict(entry, session=session_id, ts=ts, kind="claude_usage"))
+    if new_offset != offset:
+        save_usage_offset(state_path, new_offset)
+
+
 def main():
     try:
         raw = sys.stdin.read().strip()
@@ -146,6 +271,7 @@ def main():
         record = build_record(event, project_dir, policy)
         if record is not None:
             write_line(telemetry_path(project_dir), record)
+        log_claude_usage(event, project_dir)
     except Exception:
         pass                                 # mesurer ne doit jamais coûter une action
     return 0

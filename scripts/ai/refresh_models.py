@@ -67,10 +67,12 @@ SOURCES: dict[str, dict] = {
         "kind": "openai",
         "base_url": "https://openrouter.ai/api/v1",
         "keys_env": ["OPENROUTER_API_KEY_1", "OPENROUTER_API_KEY_2", "OPENROUTER_API_KEY"],
-        # 50 req/jour sous 10 $ de crédit cumulé, 1000 req/jour au-delà. Le
-        # chiffre exact est un point de vérification du plan (§11) : tant qu'il
-        # n'est pas constaté, on déclare la limite documentée la plus basse.
-        "quota": {"window": "daily", "limit": 50},
+        # 1000 req/jour sur les modèles `:free` dès que le compte a dépassé
+        # 10 $ de crédit cumulé (50 req/jour en dessous). Constaté sur ce compte
+        # le 26/09 via `GET /api/v1/auth/key` : `is_free_tier: false` et
+        # `free_model_daily_requests: {limit: 1000}` — le point de vérification
+        # du plan (§11) est donc levé, et la limite déclarée est la vraie.
+        "quota": {"window": "daily", "limit": 1000},
         "reasoning_style": "reasoning_effort",
         "models_public": True,
         "free_only": True,

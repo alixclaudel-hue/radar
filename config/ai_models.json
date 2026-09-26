@@ -7,8 +7,11 @@
     "paid_modes": [
       "reasoning"
     ],
-    "paid_allowlist": [],
-    "daily_paid_cap_usd": null,
+    "paid_allowlist": [
+      "deepseek-flash",
+      "deepseek-v4-pro"
+    ],
+    "daily_paid_cap_usd": 2.0,
     "max_candidates": 6,
     "retry": {
       "per_model": 2,
@@ -763,8 +766,12 @@
           "label": "DeepSeek-V4.1-Flash",
           "context_length": 1048576,
           "pricing": {
-            "prompt_per_1m": "n/a",
-            "completion_per_1m": "n/a"
+            "prompt_per_1m": 0.3,
+            "completion_per_1m": 1.2,
+            "cache_hit_per_1m": 0.006,
+            "prompt_hors_pointe_per_1m": 0.15,
+            "completion_hors_pointe_per_1m": 0.6,
+            "note": "grille opérateur du 26/09/2026. Les deux champs retenus sont le majorant — entrée au tarif cache miss, heure de pointe — pour que le plafond ne sous-estime jamais un appel. cache_hit_per_1m est lui aussi la valeur de pointe."
           },
           "rank": 1000,
           "provider_family": "deepseek"
@@ -775,8 +782,12 @@
           "label": "DeepSeek-V4-Pro",
           "context_length": 1048576,
           "pricing": {
-            "prompt_per_1m": "n/a",
-            "completion_per_1m": "n/a"
+            "prompt_per_1m": 1.32,
+            "completion_per_1m": 3.96,
+            "cache_hit_per_1m": 0.044,
+            "prompt_hors_pointe_per_1m": 0.66,
+            "completion_hors_pointe_per_1m": 1.98,
+            "note": "grille opérateur du 26/09/2026. Les deux champs retenus sont le majorant — entrée au tarif cache miss, heure de pointe — pour que le plafond ne sous-estime jamais un appel. cache_hit_per_1m est lui aussi la valeur de pointe."
           },
           "rank": 1000,
           "provider_family": "deepseek"

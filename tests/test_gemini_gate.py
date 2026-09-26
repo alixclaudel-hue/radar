@@ -375,5 +375,50 @@ class RequiredModesLectureTests(unittest.TestCase):
         self.assertIsNone(gemini_gate.compte_lignes_seuil("/inexistant.txt", 80))
 
 
+class RequiredModesGitDiffTests(unittest.TestCase):
+    """`required_modes()` sur `git diff` brut — la lecture directe d'un diff par
+    Claude, contournant la délégation, observée en session (git diff -- f1 f2
+    lu tel quel au lieu d'être relayé à `ai_broker.py --mode pr/diag`)."""
+
+    def test_git_diff_brut_non_relaye_retourne_pr_diag_context(self):
+        commande = "git diff -- radar_web/app.py radar_web/templates/partials/release_meta.html"
+        modes = gemini_gate.required_modes("Bash", {"command": commande})
+        self.assertEqual(modes, ("pr", "diag", "context"))
+
+    def test_git_diff_pipe_vers_ai_broker_retourne_none(self):
+        commande = "git diff origin/main | python3 scripts/ai_broker.py --mode pr --stdin"
+        modes = gemini_gate.required_modes("Bash", {"command": commande})
+        self.assertIsNone(modes)
+
+    def test_git_diff_pipe_vers_ai_query_retourne_none(self):
+        commande = "git diff origin/main | python3 scripts/ai_query.py --mode diag --stdin"
+        modes = gemini_gate.required_modes("Bash", {"command": commande})
+        self.assertIsNone(modes)
+
+    def test_git_diff_pipe_vers_tail_reste_gate(self):
+        """Piper vers `tail`/`cat` fait toujours atterrir le diff brut chez Claude."""
+        commande = "git diff origin/main | tail -100"
+        modes = gemini_gate.required_modes("Bash", {"command": commande})
+        self.assertEqual(modes, ("pr", "diag", "context"))
+
+    def test_git_diff_sans_pipe_du_tout_gate(self):
+        modes = gemini_gate.required_modes("Bash", {"command": "git diff --stat"})
+        self.assertEqual(modes, ("pr", "diag", "context"))
+
+    def test_git_diff_mentionne_entre_guillemets_ignore(self):
+        commande = "echo 'faire un git diff avant de committer' && ls"
+        modes = gemini_gate.required_modes("Bash", {"command": commande})
+        self.assertIsNone(modes)
+
+    def test_git_status_non_concerne(self):
+        self.assertIsNone(gemini_gate.required_modes("Bash", {"command": "git status"}))
+
+    def test_git_commit_reste_prioritaire_sur_diff(self):
+        """Un commit avec 'diff' dans le message ne bascule pas sur la branche diff."""
+        commande = "git commit -m 'fix: corrige le diff affiché'"
+        modes = gemini_gate.required_modes("Bash", {"command": commande})
+        self.assertEqual(modes, ("pr",))
+
+
 if __name__ == "__main__":
     unittest.main()

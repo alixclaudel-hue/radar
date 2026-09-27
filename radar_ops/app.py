@@ -268,7 +268,9 @@ def page_workflows(request: Request, since: str | None = None,
                            until_ts=_paris_local_ts(until), project=project or None)
     return tpl.TemplateResponse(request, "workflows.html", {
         "page": "delegation", "w": w, "sha": codeversion.short(),
-        "f": {"since": since, "until": until or "", "project": project}})
+        "f": {"since": since, "until": until or "", "project": project,
+              # Epoch pour préplacer le curseur de période (heure de Paris résolue côté serveur).
+              "since_ts": _paris_local_ts(since), "until_ts": _paris_local_ts(until)}})
 
 
 @app.get("/delegation/workflows/request/{req_id}.json")

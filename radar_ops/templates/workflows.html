@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_range_slider.html" import range_slider %}
 {% block title %}Radar — workflows{% endblock %}
 {% block body %}
 <style>
@@ -77,8 +78,9 @@
 </nav>
 
 <form class="filters" method="get" action="/delegation/workflows">
-  <label>Du <input type="datetime-local" name="since" value="{{ f.since }}"></label>
-  <label>Au <input type="datetime-local" name="until" value="{{ f.until }}"></label>
+  {{ range_slider("wf-range", days=30) }}
+  <input type="hidden" name="since" id="wf-since" value="{{ f.since }}">
+  <input type="hidden" name="until" id="wf-until" value="{{ f.until }}">
   <label>Projet
     <select name="project">
       <option value="">tous</option>
@@ -143,6 +145,13 @@
 {% endblock %}
 
 {% block script %}
+<script>
+// Curseur de période : les champs cachés gardent le format `AAAA-MM-JJTHH:MM` (heure de Paris) attendu par la route.
+RangeSlider.init("wf-range", {{ f.since_ts | tojson }}, {{ f.until_ts | tojson }}, (fromTs, toTs) => {
+  document.getElementById("wf-since").value = RangeSlider.parisLocal(fromTs);
+  document.getElementById("wf-until").value = toTs == null ? "" : RangeSlider.parisLocal(toTs);
+});
+</script>
 <script>
 const W = {{ w | tojson }};
 const SVG = "http://www.w3.org/2000/svg";

@@ -1,0 +1,95 @@
+{#- Curseur double (début/fin) pour choisir un intervalle de dates au lieu de
+    saisir deux datetime-local, pénibles surtout sur iPhone.
+    Deux <input type="range"> superposés : seule la poignée capte le pointeur,
+    la piste laisse passer les clics vers l'autre curseur.
+    Borne droite au maximum = « maintenant » (fin ouverte, valeur vide).
+    Usage : {% from "_range_slider.html" import range_slider %}
+            {{ range_slider("rs", days=30) }}
+    puis en JS : RangeSlider.init("rs", fromTs, toTs, (fromTs, toTs) => …)
+    (epoch en secondes, toTs = null quand la fin est « maintenant »). -#}
+{% macro range_slider(id, days=30, step_hours=1) %}
+<style>
+  .rslider { min-width: 16rem; flex: 1 1 22rem; max-width: 36rem; }
+  .rslider .rs-track { position: relative; height: 1.6rem; }
+  .rslider .rs-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%;
+    height: 4px; margin-top: -2px; background: var(--line); border-radius: 2px; }
+  .rslider .rs-fill { position: absolute; top: 50%; height: 4px; margin-top: -2px;
+    background: var(--accent); border-radius: 2px; }
+  .rslider input[type="range"] { position: absolute; left: 0; width: 100%; top: 0; height: 1.6rem;
+    margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+  .rslider input[type="range"]::-webkit-slider-runnable-track { background: none; }
+  .rslider input[type="range"]::-moz-range-track { background: none; }
+  .rslider input[type="range"]::-webkit-slider-thumb { pointer-events: auto; -webkit-appearance: none;
+    width: 1.1rem; height: 1.1rem; border-radius: 50%; background: var(--accent);
+    border: 2px solid var(--bg); cursor: grab; }
+  .rslider input[type="range"]::-moz-range-thumb { pointer-events: auto; width: 1rem; height: 1rem;
+    border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); cursor: grab; }
+  .rslider .rs-labels { display: flex; justify-content: space-between; gap: .5rem;
+    font-size: .78rem; color: var(--fg); font-variant-numeric: tabular-nums; }
+  .rslider .rs-bounds { display: flex; justify-content: space-between;
+    font-size: .68rem; color: var(--dim); }
+</style>
+<div class="rslider" id="{{ id }}" data-days="{{ days }}" data-step="{{ step_hours * 3600 }}">
+  <div class="rs-labels"><span class="rs-from"></span><span class="rs-dur"></span><span class="rs-to"></span></div>
+  <div class="rs-track">
+    <div class="rs-fill"></div>
+    <input type="range" class="rs-a" aria-label="Début de la période">
+    <input type="range" class="rs-b" aria-label="Fin de la période">
+  </div>
+  <div class="rs-bounds"><span class="rs-min"></span><span>maintenant</span></div>
+</div>
+<script>
+window.RangeSlider = window.RangeSlider || {
+  // Affichage toujours en heure de Paris, quel que soit le fuseau du navigateur.
+  fmt(ts) {
+    return new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", weekday: "short",
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(ts * 1000));
+  },
+  // `AAAA-MM-JJTHH:MM` en heure de Paris (format attendu par /delegation/workflows).
+  parisLocal(ts) {
+    const p = {};
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", hourCycle: "h23", year: "numeric",
+      month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      .formatToParts(new Date(ts * 1000)).forEach(x => { p[x.type] = x.value; });
+    return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+  },
+  duration(sec) {
+    const h = Math.round(sec / 3600);
+    return h < 48 ? `${h} h` : `${Math.round(h / 24)} j`;
+  },
+  init(id, fromTs, toTs, onChange) {
+    const root = document.getElementById(id);
+    const step = +root.dataset.step;
+    // Borne haute arrondie à l'heure suivante : le curseur de fin tout à droite = « maintenant ».
+    const max = Math.ceil(Date.now() / 1000 / step) * step;
+    const min = max - (+root.dataset.days) * 86400;
+    const a = root.querySelector(".rs-a"), b = root.querySelector(".rs-b");
+    for (const el of [a, b]) { el.min = min; el.max = max; el.step = step; }
+    const clamp = v => Math.min(max, Math.max(min, v));
+    a.value = clamp(fromTs || min);
+    b.value = toTs ? clamp(toTs) : max;
+    root.querySelector(".rs-min").textContent = this.fmt(min);
+    const render = (moved) => {
+      // Les poignées ne se croisent pas : celle qu'on bouge pousse l'autre d'un pas.
+      if (+a.value >= +b.value) {
+        if (moved === a) a.value = +b.value - step; else b.value = +a.value + step;
+      }
+      const va = +a.value, vb = +b.value;
+      const pct = v => (v - min) / (max - min) * 100;
+      const fill = root.querySelector(".rs-fill");
+      fill.style.left = pct(va) + "%";
+      fill.style.width = (pct(vb) - pct(va)) + "%";
+      // La poignée de gauche passe dessus quand elle est collée à droite, sinon plus attrapable.
+      a.style.zIndex = va > max - step * 2 ? 3 : 1;
+      root.querySelector(".rs-from").textContent = this.fmt(va);
+      root.querySelector(".rs-to").textContent = vb >= max ? "maintenant" : this.fmt(vb);
+      root.querySelector(".rs-dur").textContent = this.duration(vb - va);
+      onChange(va, vb >= max ? null : vb);
+    };
+    a.addEventListener("input", () => render(a));
+    b.addEventListener("input", () => render(b));
+    render(null);
+  },
+};
+</script>
+{% endmacro %}

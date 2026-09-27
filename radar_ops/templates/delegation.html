@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_range_slider.html" import range_slider %}
 {% block body %}
 <style>
   .toolbar { background: var(--panel); border: 1px solid var(--line);
@@ -16,9 +17,6 @@
   .custom { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
             padding-top: .5rem; border-top: 1px dashed var(--line); }
   .custom label { color: var(--dim); font-size: .8rem; }
-  .custom input[type="datetime-local"] {
-    font: inherit; background: var(--bg); color: var(--fg);
-    border: 1px solid var(--line); border-radius: 4px; padding: .2rem .4rem; }
   .custom select { font: inherit; background: var(--bg); color: var(--fg);
                    border: 1px solid var(--line); border-radius: 4px;
                    padding: .2rem .4rem; }
@@ -104,8 +102,7 @@
     {% endfor %}
   </div>
   <div class="custom" id="custom" {% if d.period.preset != "custom" %}hidden{% endif %}>
-    <label>Du <input type="datetime-local" id="from_local"></label>
-    <label>Au <input type="datetime-local" id="to_local"></label>
+    {{ range_slider("dg-range", days=30) }}
     <label>Granularité
       <select name="granularity" id="granularity">
         <option value="">auto ({{ d.period.granularity }})</option>
@@ -492,24 +489,14 @@
     });
   });
 
-  // Préremplir les datetime-local depuis la période active si custom.
-  if (data.period && data.period.since_ts && data.period.preset === "custom") {
-    const fmt = ts => {
-      const d = new Date(ts * 1000);
-      const pad = n => n.toString().padStart(2, "0");
-      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    };
-    document.getElementById("from_local").value = fmt(data.period.since_ts);
-    document.getElementById("to_local").value = fmt(data.period.until_ts);
-  }
-
-  // À la soumission : convertir datetime-local en epoch (secondes).
-  form.addEventListener("submit", () => {
-    const from = document.getElementById("from_local").value;
-    const to = document.getElementById("to_local").value;
-    document.getElementById("from_ts").value = from ? Math.floor(new Date(from).getTime() / 1000) : "";
-    document.getElementById("to_ts").value = to ? Math.floor(new Date(to).getTime() / 1000) : "";
-  });
+  // Curseur de période : alimente directement les champs cachés en epoch.
+  const custom = data.period && data.period.preset === "custom";
+  RangeSlider.init("dg-range",
+    custom ? data.period.since_ts : null, custom ? data.period.until_ts : null,
+    (fromTs, toTs) => {
+      document.getElementById("from_ts").value = fromTs;
+      document.getElementById("to_ts").value = toTs == null ? "" : toTs;
+    });
 
   // Export JSON : chaque bouton porte son bloc, on garde les filtres courants.
   function exporter(bloc) {

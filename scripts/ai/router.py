@@ -403,6 +403,9 @@ def order_candidates(
         explicit_model=explicit_model,
     )
     retenus = [(c, i) for c, i in paires if c is not None]
+    bloques = {str(m) for m in (policy.get("blocked_ids") or [])}
+    if bloques:
+        retenus = [(c, i) for c, i in retenus if c.model not in bloques]
     if provider:
         # Filtre **avant** la troncature. `_evaluate` laisse volontairement les
         # autres fournisseurs dans `paires` : `explain()` doit continuer de tout

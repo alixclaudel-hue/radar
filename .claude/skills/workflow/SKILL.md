@@ -22,6 +22,18 @@ appel au courtier ne coûte aucun jeton Claude. Le levier n'est donc pas de
 mieux écrire, c'est de **faire moins d'allers-retours d'outils dans le fil
 principal**.
 
+Diagnostic du 27/09 (voir `.claude/gemini-receipts.jsonl` et un cas concret :
+régénération de `docs/app-overview.md`) : le fil principal enchaînait 3 `Bash`
+de vérif d'état (hash git, méta, existence du fichier) + 1 `Agent` +
+2 `Read` intégraux du fichier généré — 6 tours pour UNE tâche conceptuelle.
+Le découpage se faisait par COMMANDE SHELL, pas par LIVRABLE : voir §2.
+
+Ce rappel n'est plus laissé à la seule mémoire de Claude : le hook
+`UserPromptSubmit` (`scripts/hooks/workflow_reminder.py`) l'injecte
+automatiquement sur toute requête qui contient un verbe d'action ou dépasse
+60 caractères sans être une simple question — une requête chatbot pure
+("c'est quoi X ?") n'est pas rappelée.
+
 ## Les 4 étapes
 
 ### 1. Analyse & cadrage (fil principal, court)
@@ -35,6 +47,16 @@ Si une décision revient réellement à l'utilisateur, la poser MAINTENANT
 Découper en tâches à périmètre fermé : chacune a une entrée (fichiers, données),
 une sortie (fichier écrit, verdict, chiffre) et un critère de fin. Une tâche qui
 ne tient pas en un prompt autonome de ~15 lignes est à redécouper.
+
+**Le découpage se fait par LIVRABLE, jamais par commande shell.** Une
+vérification d'état qui sert seulement à DÉCIDER si le livrable doit être
+produit (hash git, existence d'un fichier, taille d'un diff, méta de
+fraîcheur) fait partie du prompt de la tâche déléguée qui produit ce livrable
+— elle ne devient pas un tour séparé du fil principal avant délégation.
+Exemple : « régénérer `docs/app-overview.md` si le dépôt a changé depuis sa
+dernière génération » est UNE tâche pour un sous-agent (il vérifie lui-même
+le hash/la méta dans son contexte frais et décide), jamais 3 `Bash` de
+vérification + 1 `Agent`.
 
 ### 3. Ordonnancement
 

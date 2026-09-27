@@ -76,7 +76,16 @@
 
   .footer-blocks { margin-top: 2rem; padding-top: 1rem;
                    border-top: 1px dashed var(--line); }
+  .subtabs { display: flex; gap: .3rem; margin-bottom: 1rem; }
+  .subtabs a { color: var(--dim); text-decoration: none; padding: .25rem .7rem;
+               border: 1px solid var(--line); border-radius: 4px; font-size: .85rem; }
+  .subtabs a.on { color: var(--fg); border-color: var(--accent); }
 </style>
+
+<nav class="subtabs">
+  <a href="/delegation" class="on">Tableau de bord</a>
+  <a href="/delegation/workflows">Workflows</a>
+</nav>
 
 <form class="toolbar" method="get" action="/delegation" id="filtres">
   <input type="hidden" name="period" id="period" value="{{ d.period.preset }}">

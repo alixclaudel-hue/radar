@@ -154,6 +154,60 @@ class IngestionTests(Base):
         self.assertEqual(wi.ingest_one(os.path.join(self.tmp.name, "absent.jsonl"), self.tmp.name), 0)
 
 
+class VentilationCacheTtlTests(unittest.TestCase):
+    """Ventilation 1h/5m de l'écriture de cache (`usage.cache_creation`)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "t.jsonl")
+
+    def _write(self, lines):
+        with open(self.path, "w", encoding="utf-8") as f:
+            for line in lines:
+                f.write(json.dumps(line) + "\n")
+
+    def test_ventilation_cache_cumulee_dans_totaux(self):
+        usage = dict(USAGE, cache_creation={"ephemeral_1h_input_tokens": 60,
+                                             "ephemeral_5m_input_tokens": 40})
+        self._write([user("10:00:00", "Fais X"),
+                     assistant("10:00:01", "r1", {"type": "text", "text": "OK"})])
+        # `assistant()` fige USAGE : on patche l'usage de la ligne écrite après coup.
+        with open(self.path) as f:
+            lines = [json.loads(l) for l in f if l.strip()]
+        lines[1]["message"]["usage"] = usage
+        self._write(lines)
+        req = wi.parse_transcript(self.path, [], [])[0]
+        self.assertEqual(req["totals"]["claude"]["cache_create_1h"], 60)
+        self.assertEqual(req["totals"]["claude"]["cache_create_5m"], 40)
+
+    def test_ventilation_cache_absente_totaux_a_zero(self):
+        self._write([user("10:00:00", "Fais X"),
+                     assistant("10:00:01", "r1", {"type": "text", "text": "OK"})])
+        req = wi.parse_transcript(self.path, [], [])[0]
+        self.assertEqual(req["totals"]["claude"]["cache_create_1h"], 0)
+        self.assertEqual(req["totals"]["claude"]["cache_create_5m"], 0)
+        step = req["steps"][1]
+        self.assertNotIn("cache_create_1h", step["tokens"])
+        self.assertNotIn("cache_create_5m", step["tokens"])
+
+    def test_ventilation_cache_pas_double_comptage_meme_requestId(self):
+        self._write([user("10:00:00", "Fais X"),
+                     assistant("10:00:01", "r1", {"type": "text", "text": "un"}),
+                     assistant("10:00:02", "r1", {"type": "text", "text": "deux"})])
+        with open(self.path) as f:
+            lines = [json.loads(l) for l in f if l.strip()]
+        lines[1]["message"]["usage"] = dict(USAGE, cache_creation={
+            "ephemeral_1h_input_tokens": 30, "ephemeral_5m_input_tokens": 20})
+        lines[2]["message"]["usage"] = dict(USAGE, cache_creation={
+            "ephemeral_1h_input_tokens": 999, "ephemeral_5m_input_tokens": 999})
+        self._write(lines)
+        req = wi.parse_transcript(self.path, [], [])[0]
+        # Même requestId -> une seule ligne comptée (la première rencontrée), pas la somme.
+        self.assertEqual(req["totals"]["claude"]["cache_create_1h"], 30)
+        self.assertEqual(req["totals"]["claude"]["cache_create_5m"], 20)
+
+
 class LectureOpsTests(Base):
     def setUp(self):
         super().setUp()
@@ -173,7 +227,14 @@ class LectureOpsTests(Base):
         fresh = 3 * (10 + 100 + 5)
         self.assertEqual(first["claude_fresh"], fresh)
         self.assertEqual(first["delegated_tokens"], 550)
-        self.assertEqual(first["share_delegated"], round(550 / (550 + fresh), 3))
+        # share_delegated se calcule désormais en tokens équivalents : le cache
+        # relu (3000, pondéré 0,1) entre dans claude_equiv sans y être exclu.
+        claude_equiv = 3 * 10 + 3000 * 0.10 + 3 * 100 * 2.0 + 3 * 5 * 5.0
+        delegated_equiv = 500 * 1.0 + 50 * 5.0
+        self.assertEqual(first["claude_equiv"], round(claude_equiv))
+        self.assertEqual(first["delegated_equiv"], round(delegated_equiv))
+        self.assertEqual(first["share_delegated"],
+                         round(delegated_equiv / (delegated_equiv + claude_equiv), 3))
         self.assertEqual(ov["projects"], ["/p/radar-work"])
 
     def test_sankey(self):

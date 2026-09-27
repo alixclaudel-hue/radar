@@ -218,6 +218,16 @@ def claude_usage_deltas(transcript_path, offset):
             "cache_creation_input_tokens": _to_int(usage.get("cache_creation_input_tokens")),
             "cache_read_input_tokens": _to_int(usage.get("cache_read_input_tokens")),
         }
+        # Ventilation de l'écriture de cache par TTL (1h coûte 2x, 5m 1.25x) :
+        # absente si `cache_creation` n'est pas un dict, distinct de 0 (non ventilé).
+        cache_creation = usage.get("cache_creation")
+        if isinstance(cache_creation, dict):
+            entry["cache_creation_1h_input_tokens"] = _to_int(
+                cache_creation.get("ephemeral_1h_input_tokens")
+            )
+            entry["cache_creation_5m_input_tokens"] = _to_int(
+                cache_creation.get("ephemeral_5m_input_tokens")
+            )
 
         request_id = obj.get("requestId")
         if request_id is None:

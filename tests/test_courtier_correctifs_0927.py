@@ -42,7 +42,7 @@ class ShareExcludesFailuresTests(unittest.TestCase):
     """Tests de non-régression : les échecs ne comptent pas dans la part déléguée."""
 
     def test_sankey_exclut_echecs_du_numerateur(self):
-        """Sankey : useful_delegated_tokens exclut failed_tokens, share_delegated = 0.5."""
+        """Sankey : useful_delegated_tokens exclut failed_tokens (part sur équivalents)."""
         req = {
             'totals': {
                 'claude': {
@@ -79,7 +79,15 @@ class ShareExcludesFailuresTests(unittest.TestCase):
         totals = result['totals']
         self.assertEqual(totals['useful_delegated_tokens'], 100)
         self.assertEqual(totals['failed_tokens'], 300)
-        self.assertEqual(totals['share_delegated'], 0.5)
+        # share_delegated se calcule maintenant en tokens équivalents : le
+        # cache relu (10000, pondéré 0,1 -> 1000) entre dans claude_equiv au
+        # lieu d'en être exclu, ce qui change le ratio par rapport à l'ancien
+        # calcul sur jetons bruts (qui donnait 0.5).
+        self.assertEqual(totals['claude_equiv'], 100 + 10000 * 0.10)
+        self.assertEqual(totals['delegated_equiv'], 50 + 50 * 5.0 + 300)
+        self.assertEqual(totals['failed_equiv'], 300)
+        self.assertEqual(totals['useful_delegated_equiv'], 300)
+        self.assertEqual(totals['share_delegated'], round(300 / (300 + 1100), 3))
 
     def test_summary_calcul_part_deleguee_et_echecs(self):
         """Summary : share_delegated = 0.5 et delegated_failed_tokens = 400."""
@@ -101,14 +109,21 @@ class ShareExcludesFailuresTests(unittest.TestCase):
 
 class SousTraitanceTests(unittest.TestCase):
     def test_echecs_et_cache_relu_hors_part(self):
+        # Champs bruts inchangés (cache relu toujours exclu de claude_tokens) ;
+        # share_delegated, lui, se calcule désormais sur les équivalents, où le
+        # cache relu (10000 jetons) est pondéré à 0,1 (1000) plutôt qu'exclu :
+        # claude_equiv = 100 (input) + 1000 = 1100, delegated_equiv = 100 (utile).
         r = delegation._sous_traitance(
-            {"total_tokens": 1000, "useful_tokens": 100, "failed_tokens": 900},
-            {"total_tokens": 10100, "cache_read_tokens": 10000},
+            {"total_tokens": 1000, "useful_tokens": 100, "failed_tokens": 900,
+             "equiv_tokens": 1000, "useful_equiv_tokens": 100, "failed_equiv_tokens": 900},
+            {"total_tokens": 10100, "cache_read_tokens": 10000, "equiv_tokens": 1100},
         )
         self.assertEqual(r["delegated_tokens"], 100)
         self.assertEqual(r["claude_tokens"], 100)
-        self.assertEqual(r["share_delegated"], 0.5)
         self.assertEqual(r["delegated_failed_tokens"], 900)
+        self.assertEqual(r["delegated_equiv"], 100)
+        self.assertEqual(r["claude_equiv"], 1100)
+        self.assertEqual(r["share_delegated"], round(100 / 1200, 3))
 
 
 class DotenvWorktreeTests(unittest.TestCase):

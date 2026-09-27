@@ -181,6 +181,8 @@ def page_scoring(request: Request):
 # ------------------------------------------------------------------ délégation
 _PERIODES_AUTORISEES = {"today", "yesterday", "7d", "30d", "all", "custom"}
 _GRANULARITES_AUTORISEES = {"hour", "day"}
+# Bascule d'affichage : bruts (défaut) ou équivalents (pondérés cache/sortie).
+_UNITES_AUTORISEES = {"raw", "eq"}
 # Blocs exportables : la clé de l'URL (`table`) doit rester stable, elle sert
 # de nom de fichier téléchargé côté navigateur.
 _BLOCS_EXPORTABLES = {"totals", "by_mode", "by_model", "top_models", "top_modes",
@@ -223,10 +225,13 @@ def page_delegation(request: Request,
                     period: str = "7d",
                     from_ts: str | None = None,
                     to_ts: str | None = None,
-                    granularity: str | None = None):
+                    granularity: str | None = None,
+                    unit: str = "raw"):
+    if unit not in _UNITES_AUTORISEES:
+        unit = "raw"
     d = _delegation_snapshot(period, from_ts, to_ts, granularity)
     return tpl.TemplateResponse(request, "delegation.html", {
-        "page": "delegation", "d": d, "sha": codeversion.short()})
+        "page": "delegation", "d": d, "sha": codeversion.short(), "unit": unit})
 
 
 @app.get("/delegation/export/{table}.json")

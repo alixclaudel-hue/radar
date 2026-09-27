@@ -1,4 +1,4 @@
-"""Job `prune_labels` (crate_jobs.py) -- chantier C du pt 57 (CLAUDE.md),
+"""Job `prune_labels` (radar_jobs/curation.py) -- chantier C du pt 57 (CLAUDE.md),
 brief révisé par la session VPS le 17/09 : retirer de `label_categories`
 (Cœur+Aimé) les labels hors du goût courant (`taste_categories`/`Ctx.wmap`),
 sauf label possédé ou écouté (garde-fous non désactivables).
@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _TMP = tempfile.mkdtemp(prefix="radar-test-")
 os.environ.setdefault("CRATE_DATA_DIR", _TMP)
 
-import crate_jobs  # noqa: E402
+from radar_jobs import curation  # noqa: E402
 from radar_web.radar import paths, store  # noqa: E402
 
 
@@ -80,14 +80,14 @@ class PruneLabelsTestCase(unittest.TestCase):
         store._CONFIG_CACHE.clear()
 
     def tearDown(self):
-        for p in glob.glob(f"{crate_jobs.CONFIG_PATH}.bak-*"):
+        for p in glob.glob(f"{curation.CONFIG_PATH}.bak-*"):
             os.remove(p)
-        for p in glob.glob(os.path.join(crate_jobs.USER_DIR, "prune_labels_report_*.json")):
+        for p in glob.glob(os.path.join(curation.USER_DIR, "prune_labels_report_*.json")):
             os.remove(p)
 
     def _run(self, **params):
         job = FakeJob()
-        crate_jobs.job_prune_labels(job, params)
+        curation.job_prune_labels(job, params)
         return job
 
     def test_simulation_ne_modifie_pas_la_config(self):
@@ -117,15 +117,15 @@ class PruneLabelsTestCase(unittest.TestCase):
         self.assertEqual(remaining, {"Label A (gardé, connu)", "Label C (possédé, épargné)",
                                       "Label D (écouté, épargné)"})
 
-        backups = glob.glob(f"{crate_jobs.CONFIG_PATH}.bak-*")
+        backups = glob.glob(f"{curation.CONFIG_PATH}.bak-*")
         self.assertEqual(len(backups), 1)
-        backup_cfg = crate_jobs.load_json(backups[0], {})
+        backup_cfg = curation.load_json(backups[0], {})
         old_names = {n for cid in ("1", "2") for n in backup_cfg["label_categories"][cid]}
         self.assertEqual(len(old_names), 5, "la sauvegarde doit contenir la config AVANT retrait")
 
-        reports = glob.glob(os.path.join(crate_jobs.USER_DIR, "prune_labels_report_*.json"))
+        reports = glob.glob(os.path.join(curation.USER_DIR, "prune_labels_report_*.json"))
         self.assertEqual(len(reports), 1)
-        report = crate_jobs.load_json(reports[0], {})
+        report = curation.load_json(reports[0], {})
         removed_names = {r["name"] for r in report["removed"]}
         self.assertEqual(removed_names, {"Label B (retiré, inconnu)", "Label E (retiré, pct bas)"})
         self.assertEqual(report["kept_count"], 3)

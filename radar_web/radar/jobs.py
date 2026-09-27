@@ -3,7 +3,7 @@
 `launch()` **empile** dans /data/jobs/queue.json. Un worker unique
 (`radar_web.worker`, service compose `radar-worker`) dépile un job à la fois,
 en round-robin entre utilisateurs, et lance `crate_jobs.py` avec RADAR_UID.
-Le suivi par utilisateur est écrit par `crate_jobs.Job` dans
+Le suivi par utilisateur est écrit par `radar_jobs.common.Job` dans
 /data/jobs/<uid>/<name>.status.json.
 """
 import os

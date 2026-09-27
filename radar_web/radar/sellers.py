@@ -15,7 +15,7 @@
   percuter.
 
 Aucun appel API ici : la lecture est instantanée. DEUX jobs remplissent ces
-fichiers (crate_jobs.py) : `scan_catalog` (catalogue de vendeurs, en pause
+fichiers (radar_jobs/search.py) : `scan_catalog` (catalogue de vendeurs, en pause
 depuis le point 56) et `seller_inventory` (un vendeur nommé à la volée depuis
 /search, point 68) — même format, donc un snapshot écrit par l'un sert à
 l'autre.

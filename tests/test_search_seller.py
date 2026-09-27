@@ -35,7 +35,7 @@ os.environ.setdefault("CRATE_DATA_DIR", _TMP)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-import crate_jobs  # noqa: E402
+from radar_jobs import search  # noqa: E402
 from radar_web import app as appmod  # noqa: E402
 from radar_web.radar import (discogs, discogs_dump as dd, jobs, paths,  # noqa: E402
                              sellers as scat, store)
@@ -271,7 +271,7 @@ class SearchSellerTestCase(unittest.TestCase):
 
 
 class FakeJob:
-    """Duck-type de `crate_jobs.Job` : suit done/total comme le vrai (le job lit
+    """Duck-type de `radar_jobs.common.Job` : suit done/total comme le vrai (le job lit
     `st["done"]` pour journaliser le nombre de pages) et retient l'erreur, que
     `finish(error=...)` doit remonter telle quelle."""
 
@@ -314,7 +314,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
             mock.patch.object(scat, "INV_DIR", os.path.join(self._tmp.name, "inv")),
             mock.patch.object(scat, "INV_META_PATH",
                               os.path.join(self._tmp.name, "inv_meta.json")),
-            mock.patch.object(crate_jobs, "cfg_load", return_value={"token": "tok"}),
+            mock.patch.object(search, "cfg_load", return_value={"token": "tok"}),
         ]
         for p in patchers:
             p.start()
@@ -324,7 +324,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
                                 return_value=(LISTINGS, False)) as inv:
-            crate_jobs.job_seller_inventory(job, {"seller": "boutique"})
+            search.job_seller_inventory(job, {"seller": "boutique"})
         self.assertEqual(inv.call_args.kwargs["max_pages"], 0)     # pas de plafond
         snap = scat.load_inventory("boutique")
         self.assertEqual(sorted(snap), ["101", "102", "103", "999"])
@@ -339,7 +339,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
                                 return_value=(LISTINGS, False)) as inv:
-            crate_jobs.job_seller_inventory(job, {"seller": " @boutique "})
+            search.job_seller_inventory(job, {"seller": " @boutique "})
         self.assertEqual(inv.call_args[0][0], "boutique")
         self.assertTrue(scat.load_inventory("boutique"))
 
@@ -358,7 +358,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
 
         job = FakeJob(stopped_after=2)
         with mock.patch.object(discogs, "seller_inventory", side_effect=_fake):
-            crate_jobs.job_seller_inventory(job, {"seller": "boutique"})
+            search.job_seller_inventory(job, {"seller": "boutique"})
         self.assertEqual(job.st["done"], 2)                        # coupé à la 2e page
         self.assertEqual(job.st["total"], pages)
         self.assertIn("interrompue", job.finished)
@@ -369,7 +369,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
                                 return_value=(LISTINGS[:1], True)):
-            crate_jobs.job_seller_inventory(job, {"seller": "boutique"})
+            search.job_seller_inventory(job, {"seller": "boutique"})
         self.assertEqual(sorted(scat.load_inventory("boutique")), ["101", "102"])
         self.assertIn("conservé", job.finished)
 
@@ -379,7 +379,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
                                 return_value=(LISTINGS[:2], True)):
-            crate_jobs.job_seller_inventory(job, {"seller": "boutique"})
+            search.job_seller_inventory(job, {"seller": "boutique"})
         self.assertEqual(sorted(scat.load_inventory("boutique")), ["101", "102"])
         self.assertTrue(scat.inv_meta("boutique")["partial"])
 
@@ -387,7 +387,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
                                 side_effect=discogs.DiscogsError("Erreur Discogs 404 : not found")):
-            crate_jobs.job_seller_inventory(job, {"seller": "nexistepas"})
+            search.job_seller_inventory(job, {"seller": "nexistepas"})
         self.assertIn("nexistepas", job.error)
         self.assertIn("404", job.error)
         self.assertEqual(scat.load_inventory("nexistepas"), {})
@@ -396,15 +396,15 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
                                 side_effect=AssertionError("aucun appel attendu")):
-            crate_jobs.job_seller_inventory(job, {})
+            search.job_seller_inventory(job, {})
         self.assertIn("Aucun vendeur", job.error)
 
     def test_sans_token_pas_d_appel(self):
         job = FakeJob()
-        with mock.patch.object(crate_jobs, "cfg_load", return_value={}), \
+        with mock.patch.object(search, "cfg_load", return_value={}), \
              mock.patch.object(discogs, "seller_inventory",
                                 side_effect=AssertionError("aucun appel attendu")):
-            crate_jobs.job_seller_inventory(job, {"seller": "boutique"})
+            search.job_seller_inventory(job, {"seller": "boutique"})
         self.assertIn("token Discogs", job.error)
 
 

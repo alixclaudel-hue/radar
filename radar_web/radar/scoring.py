@@ -745,7 +745,7 @@ class Ctx:
 
     def build_reco_index(self):
         """Recalcule l'index SANS lire le cache disque ni retenir les lignes.
-        Utilisé par le job `reco_index` (crate_jobs.py), qui alimente ce cache."""
+        Utilisé par le job `reco_index` (radar_jobs/scorestore.py), qui alimente ce cache."""
         return {r["key"]: r["score"] for r in self._iter_reco_rows()}
 
     def reco_index_is_fresh(self):

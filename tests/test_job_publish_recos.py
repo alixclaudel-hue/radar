@@ -1,5 +1,5 @@
 """BUG 1/2/3 du diagnostic VPS 16/09 (relecture des PR #158/#159) dans
-`crate_jobs.job_publish_recos` :
+`radar_jobs.recos.job_publish_recos` :
 
   - BUG 1 : une exception non classée (RuntimeError d'une erreur API non
     reconnue, aléa réseau) sortait de la fonction SANS jamais persister
@@ -26,12 +26,12 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crate_jobs  # noqa: E402
+from radar_jobs import recos  # noqa: E402
 from radar_web.radar import ytcache  # noqa: E402
 
 
 class FakeJob:
-    """Duck-type minimal de `crate_jobs.Job` : job_publish_recos ne touche
+    """Duck-type minimal de `radar_jobs.common.Job` : job_publish_recos ne touche
     jamais le disque directement via `job`, seulement via ses méthodes."""
 
     def __init__(self):
@@ -65,9 +65,9 @@ class JobPublishRecosTestCase(unittest.TestCase):
             "RECOS_PLAYLIST_PATH": os.path.join(tmp, "recos_playlist.json"),
             "RECOS_SEARCH_BUDGET_PATH": os.path.join(tmp, "recos_search_budget.json"),
         }
-        patchers = [mock.patch.object(crate_jobs, name, path)
+        patchers = [mock.patch.object(recos, name, path)
                     for name, path in self.paths.items()]
-        patchers.append(mock.patch.object(crate_jobs, "cfg_load", return_value={}))
+        patchers.append(mock.patch.object(recos, "cfg_load", return_value={}))
         patchers.append(mock.patch.object(ytcache, "youtube_keys", return_value=["k"]))
         for p in patchers:
             p.start()
@@ -78,24 +78,24 @@ class JobPublishRecosTestCase(unittest.TestCase):
                 for i in range(n)]
 
     def _budget_count(self):
-        d = crate_jobs.load_json(self.paths["RECOS_SEARCH_BUDGET_PATH"], {})
+        d = recos.load_json(self.paths["RECOS_SEARCH_BUDGET_PATH"], {})
         return int(d.get("count", 0))
 
     def _remaining(self):
-        return crate_jobs.load_json(self.paths["RECOS_CANDIDATES_PATH"], [])
+        return recos.load_json(self.paths["RECOS_CANDIDATES_PATH"], [])
 
     def test_bug2_quota_exhausted_ne_decompte_pas_le_budget(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(1))
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(1))
         with mock.patch.object(ytcache, "search_video_diag",
                                 side_effect=ytcache.QuotaExhausted("épuisé")):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual(self._budget_count(), 0)
         self.assertEqual(len(self._remaining()), 1)
         self.assertIn("Quota YouTube", job.messages[-1])
 
     def test_bug3_ratelimited_arrete_le_run_sans_rejouer_chaque_candidat(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(5))
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(5))
         calls = []
 
         def fake_search(*a, **kw):
@@ -104,7 +104,7 @@ class JobPublishRecosTestCase(unittest.TestCase):
 
         with mock.patch.object(ytcache, "search_video_diag", side_effect=fake_search):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         # 1 seul candidat réellement tenté malgré 5 en file : les 4 suivants
         # sont renvoyés en `remaining` sans nouvel appel à search_video_diag.
         self.assertEqual(len(calls), 1)
@@ -113,7 +113,7 @@ class JobPublishRecosTestCase(unittest.TestCase):
         self.assertIn("limite le débit", job.finished)
 
     def test_bug1_exception_non_classee_persiste_quand_meme_letat_du_run(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(3))
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(3))
         calls = []
 
         def fake_search(*a, **kw):
@@ -128,7 +128,7 @@ class JobPublishRecosTestCase(unittest.TestCase):
         with mock.patch.object(ytcache, "search_video_diag", side_effect=fake_search):
             job = FakeJob()
             with self.assertRaises(RuntimeError):
-                crate_jobs.job_publish_recos(job, {})
+                recos.job_publish_recos(job, {})
         # Les 2 premiers candidats (échec "aucun résultat", remis en file avec
         # `attempts` incrémenté) doivent être persistés malgré l'exception sur
         # le 3e -- avant le correctif, tout `remaining`/le budget étaient
@@ -142,11 +142,11 @@ class JobPublishRecosTestCase(unittest.TestCase):
 
     def test_bug1_requestexception_reseau_ne_perd_pas_le_candidat(self):
         import requests
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(1))
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], self._candidates(1))
         with mock.patch.object(ytcache, "search_video_diag",
                                 side_effect=requests.Timeout("timed out")):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})  # ne doit PAS lever
+            recos.job_publish_recos(job, {})  # ne doit PAS lever
         self.assertEqual(len(self._remaining()), 1)
         self.assertEqual(self._budget_count(), 0)
 

@@ -15,7 +15,7 @@ basculer).
 
 Deux tables :
 - `release_scores` : score par SORTIE, rafraîchi en entier à chaque passage
-  de `job_scorestore_releases` (crate_jobs.py) — recalcul purement local via
+  de `job_scorestore_releases` (radar_jobs/scorestore.py) — recalcul purement local via
   `Ctx.album_score`, aucun appel réseau, donc pas besoin de bookkeeping de
   fraîcheur séparé.
 - `track_scores` : score par PISTE, pour les sorties les mieux notées
@@ -27,7 +27,7 @@ Deux tables :
   de goût sans jamais re-fetcher une tracklist déjà connue).
 
 Lot 4 : infrastructure + jobs seulement. Lot 5 (cf. CLAUDE.md point 43) :
-`job_scan_recos` (crate_jobs.py) lit `track_scores` pour alimenter la
+`job_scan_recos` (radar_jobs/recos.py) lit `track_scores` pour alimenter la
 playlist RECOS RADAR — premier consommateur de ces tables."""
 import json
 import os

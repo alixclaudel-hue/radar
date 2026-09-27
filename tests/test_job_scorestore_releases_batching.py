@@ -30,7 +30,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crate_jobs  # noqa: E402
+from radar_jobs import scorestore as scorestore_jobs  # noqa: E402
 from radar_web.radar import discogs_dump, scorestore  # noqa: E402
 from radar_web.radar import jobs as job_queue  # noqa: E402
 from radar_web.radar import scoring  # noqa: E402
@@ -65,7 +65,7 @@ class ScorestoreReleasesBatchingTestCase(unittest.TestCase):
                     "scoring": {"scorestore": {"releases_batch_per_run": 2}}}
 
         patchers = [
-            mock.patch.object(crate_jobs, "cfg_load", side_effect=lambda: self.cfg),
+            mock.patch.object(scorestore_jobs, "cfg_load", side_effect=lambda: self.cfg),
             mock.patch.object(scorestore, "db_path", lambda uid: self.db),
             mock.patch.object(discogs_dump, "available", return_value=True),
             mock.patch.object(discogs_dump, "search_local", side_effect=self._fake_search_local),
@@ -86,7 +86,7 @@ class ScorestoreReleasesBatchingTestCase(unittest.TestCase):
 
     def _run(self):
         job = FakeJob()
-        crate_jobs.job_scorestore_releases(job, {})
+        scorestore_jobs.job_scorestore_releases(job, {})
         return job
 
     def _cursor(self):
@@ -160,14 +160,14 @@ class ChainedJobsPriorityTestCase(unittest.TestCase):
         self.addCleanup(launch_patcher.stop)
 
     def test_chain_scorestore_tracks_priority_fond(self):
-        crate_jobs._chain_scorestore_tracks()
+        scorestore_jobs._chain_scorestore_tracks()
         self.launch.assert_called_once_with(
-            "scorestore_tracks", {}, uid=crate_jobs.RADAR_UID, priority=0)
+            "scorestore_tracks", {}, uid=scorestore_jobs.RADAR_UID, priority=0)
 
     def test_chain_scorestore_releases_priority_fond(self):
-        crate_jobs._chain_scorestore_releases()
+        scorestore_jobs._chain_scorestore_releases()
         self.launch.assert_called_once_with(
-            "scorestore_releases", {}, uid=crate_jobs.RADAR_UID, priority=0)
+            "scorestore_releases", {}, uid=scorestore_jobs.RADAR_UID, priority=0)
 
 
 if __name__ == "__main__":

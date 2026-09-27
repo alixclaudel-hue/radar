@@ -5,8 +5,9 @@ description: >
   utilisateur du 27/09/2026) : 1. Analyse & cadrage, 2. WBS, 3. Ordonnancement
   (séquence vs parallèle), 4. Délégation de chaque tâche à l'exécutant le plus
   adapté (mode du courtier `scripts/ai_broker.py`, ou ouvrier `scripts/ai_worker.py`
-  — qui passe lui-même par le courtier — ou `Explore` en lecture seule), puis
-  consolidation par Claude. S'applique sans attendre de demande explicite ; son
+  — qui passe lui-même par le courtier — ou agent projet `explore-leger` en
+  lecture seule), puis consolidation par Claude. S'applique sans attendre de
+  demande explicite ; son
   but chiffré est de baisser le cache relu par le fil principal.
 ---
 
@@ -80,7 +81,7 @@ et/ou appels courtier `run_in_background`), les autres attendent leur prérequis
 | Un seul jet de texte : premier jet de code/tests, résumé de doc, diagnostic de log, message de PR | courtier, mode `code`/`test`/`context`/`diag`/`pr` | 0 jeton Claude |
 | Question fermée sur le dépôt (où est X ?) | courtier `--mode search` | 0 jeton Claude |
 | Raisonnement que le gratuit rate | courtier `--mode reasoning` | payant, plafonné |
-| Balayage large de fichiers, conclusion seule utile | `Explore` (`model: haiku`) | lecture seule, contexte frais |
+| Balayage large de fichiers, conclusion seule utile | agent projet `explore-leger` (`model: haiku`) | lecture seule, contexte frais, modèle léger — l'agent intégré `Explore` hérite du modèle de session (sonnet) et n'est pas modifiable |
 | Tâche à nombreux appels d'outils (explorer + modifier + tester) | **ouvrier `scripts/ai_worker.py`**, un par tâche du WBS | **0 jeton Claude** : boucle bornée pilotée par un modèle gratuit via le courtier, worktree isolé, rend un diff à relire |
 | Jugement : architecture, sécurité, arbitrage produit, relecture finale, commit, merge | fil principal | non délégable (RÈGLE N°1) |
 
@@ -91,6 +92,16 @@ Sonnet « pour orienter » revient à piloter l'exécution par Claude — ce que
 décision utilisateur du 27/09 a écarté. `ai_worker.py` appelle lui-même le
 courtier (`_decider_courtier`), écrit dans un `git worktree` dédié et rend un
 diff ; le fil principal ne paie aucun jeton Claude pour la production.
+
+**Le balayage en lecture seule, c'est `explore-leger`, pas `Explore`.** L'agent
+intégré `Explore` de Claude Code est codé en dur avec `model: inherit` : il
+hérite du modèle de la session (sonnet) et rien dans `.claude/` ne peut
+l'abaisser. Le créneau « balayage large, conclusion seule utile » est donc tenu
+par l'agent projet `.claude/agents/explore-leger.md` (`model: haiku`, outils
+`Read`/`Glob`/`Grep`) — fichier versionné, aucun effet de bord sur les autres
+sous-agents. S'il faut *écrire* ou *tester*, c'est un ouvrier (`ai_worker.py`,
+0 jeton Claude), pas lui ; pour un simple « où est X ? », le courtier
+`--mode search` suffit (0 jeton Claude).
 
 Lancer un ouvrier :
 

@@ -229,7 +229,9 @@ def _evaluate(
             # Un modèle explicite demandé court-circuite tout le reste : les
             # autres entrées sont hors périmètre, et le dire vaut mieux que de
             # les taire.
-            if explicit_model and modele != explicit_model:
+            # `--list-candidates` affiche `fournisseur:modèle` : l'accepter tel quel
+            # (le 26/09, quatre appels copiés depuis cet affichage ne trouvaient rien).
+            if explicit_model and explicit_model not in (modele, f"{nom}:{modele}"):
                 info["reason"] = f"hors périmètre : modèle explicite « {explicit_model} »"
                 resultats.append((None, info))
                 continue
@@ -411,6 +413,9 @@ def order_candidates(
     def cle(item: tuple[Candidate, dict]):
         candidat, info = item
         commun = (
+            # Un modèle qui vient d'échouer au contrat de ce mode passe derrière
+            # ceux qui n'ont pas échoué, sans être exclu : c'est un rang, pas un veto.
+            health.contract_failures(health_state, candidat.provider, candidat.model, mode),
             info.get("provider_rank", 1000),
             _tier_rank(candidat.entry, tier),
             _rank(candidat.entry),

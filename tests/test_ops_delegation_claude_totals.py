@@ -16,7 +16,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 0,
             "prompt_tokens": 0,
             "output_tokens": 0,
-            "total_tokens": 0,
+            "total_tokens": 0, "cache_read_tokens": 0
         })
 
     def test_since_ts_none_compte_tout_jusqua_until_ts(self):
@@ -30,7 +30,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 2,
             "prompt_tokens": 30,
             "output_tokens": 15,
-            "total_tokens": 45,
+            "total_tokens": 45, "cache_read_tokens": 0
         })
 
     def test_since_ts_fourni_exclut_avant(self):
@@ -44,7 +44,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 2,
             "prompt_tokens": 50,
             "output_tokens": 25,
-            "total_tokens": 75,
+            "total_tokens": 75, "cache_read_tokens": 0
         })
 
     def test_until_ts_exclut_apres(self):
@@ -59,7 +59,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 2,
             "prompt_tokens": 30,
             "output_tokens": 15,
-            "total_tokens": 45,
+            "total_tokens": 45, "cache_read_tokens": 0
         })
 
     def test_bornes_inclusives(self):

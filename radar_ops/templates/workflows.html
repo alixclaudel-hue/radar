@@ -191,7 +191,7 @@ function renderTiles() {
     ["Tokens Claude", fmt(t.claude_tokens), "dont " + fmt(t.claude_fresh) + " hors cache relu"],
     ["Tokens délégués", fmt(t.delegated_tokens), (t.delegated_calls || 0) + " appels courtier"
       + (t.failed_tokens ? " · dont " + fmt(t.failed_tokens) + " en tentatives échouées" : "")],
-    ["Part déléguée", Math.round((t.share_delegated || 0) * 100) + " %", "délégué / (délégué + Claude hors cache)"],
+    ["Part déléguée", Math.round((t.share_delegated || 0) * 100) + " %", "délégué abouti / (délégué abouti + Claude hors cache) — échecs exclus"],
     ["Échecs courtier", String(t.delegated_failed || 0), ""],
     ["Appels outils", fmt(t.tools_calls), "Read, Edit, Bash…"],
     ["Coût payant", "$" + (t.cost_usd || 0).toFixed(4), ""],

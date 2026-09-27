@@ -289,7 +289,21 @@ def _key_from_dotenv(dotenv_path: str | None = None) -> str | None:
     """
     if dotenv_path is None:
         racine = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        dotenv_path = os.path.join(racine, ".env")
+        chemins = [os.path.join(racine, ".env")]
+        try:  # repli worktree → `.env` du dépôt principal
+            from scripts.ai import catalogue as _cat
+            chemins = _cat.dotenv_paths()
+        except ImportError:
+            try:
+                from ai import catalogue as _cat
+                chemins = _cat.dotenv_paths()
+            except ImportError:
+                pass
+        for chemin in chemins:
+            cle = _key_from_dotenv(chemin)
+            if cle:
+                return cle
+        return None
     try:
         with open(dotenv_path, "r", encoding="utf-8") as f:
             for ligne in f:

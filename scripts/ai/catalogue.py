@@ -39,6 +39,27 @@ def repo_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+def dotenv_paths() -> list[str]:
+    """`.env` candidats : celui du checkout, puis celui du dépôt principal.
+
+    Un worktree git (`.worktrees/<branche>`) n'a pas de `.env` (non versionné) :
+    sans ce repli, le courtier y écartait tous les fournisseurs faute de clé
+    (« aucun candidat utilisable », 27/09).
+    """
+    racine = repo_root()
+    chemins = [os.path.join(racine, ".env")]
+    try:
+        with open(os.path.join(racine, ".git"), "r", encoding="utf-8") as f:
+            gitdir = f.read().strip().partition("gitdir:")[2].strip()
+        # gitdir = <principal>/.git/worktrees/<nom>
+        principal = os.path.dirname(os.path.dirname(os.path.dirname(gitdir)))
+        if principal and os.path.abspath(principal) != racine:
+            chemins.append(os.path.join(principal, ".env"))
+    except OSError:
+        pass
+    return chemins
+
+
 def catalogue_path(path: str | None = None) -> str:
     """Emplacement du catalogue : argument, puis `RADAR_AI_CATALOGUE`, puis dépôt.
 

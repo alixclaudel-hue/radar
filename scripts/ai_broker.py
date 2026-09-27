@@ -481,6 +481,22 @@ def _etat_quota(
     return etat
 
 
+def _resume_ecartes(raisons: list[dict]) -> str:
+    """« aucun candidat utilisable » + motifs d'écartement les plus fréquents.
+
+    Le reçu nu ne disait pas *pourquoi* : les échecs du 26-27/09 (worktree sans
+    `.env`, `--model` mal formé) n'étaient lisibles que dans le transcript.
+    """
+    motifs: dict[str, int] = {}
+    for info in raisons:
+        motif = (info.get("reason") or "").split(" (")[0]
+        if motif and not info.get("included"):
+            motifs[motif] = motifs.get(motif, 0) + 1
+    tete = sorted(motifs.items(), key=lambda kv: -kv[1])[:3]
+    detail = " ; ".join(f"{m} ×{n}" for m, n in tete)
+    return "aucun candidat utilisable" + (f" — {detail}" if detail else "")
+
+
 def _build_prompt(args) -> str:
     """Assemble le prompt : instruction, fichiers injectés, entrée standard.
 
@@ -954,6 +970,7 @@ def main(argv: list[str] | None = None) -> int:
             catalogue,
             mode=mode,
             tier=tier,
+            explicit_model=args.model,
             allow_paid=args.allow_paid,
             escalate=args.escalate,
         )
@@ -1089,6 +1106,7 @@ def main(argv: list[str] | None = None) -> int:
             catalogue,
             mode=mode,
             tier=tier,
+            explicit_model=args.model,
             allow_paid=args.allow_paid,
             escalate=args.escalate,
             quota_state=quota_state,
@@ -1108,7 +1126,7 @@ def main(argv: list[str] | None = None) -> int:
             mode,
             "error",
             error_type=ERROR_CASCADE_EXHAUSTED,
-            error_detail="aucun candidat utilisable",
+            error_detail=_resume_ecartes(raisons),
             tier=tier,
             prompt_chars=len(full_prompt),
             cost_usd=0.0,
@@ -1403,6 +1421,9 @@ def main(argv: list[str] | None = None) -> int:
                     # Même raison que pour la réponse vide : l'appel a bien été
                     # fait, donc il compte dans le quota du jour et laisse une
                     # ligne d'erreur — jamais une ligne « ok ».
+                    health.record_contract_failure(
+                        health_state, candidat.provider, candidat.model, mode
+                    )
                     quota.save_state(quota_state)
                     health.save(health_state)
                     # Même logique que la réponse vide : ne pas conclure ici,

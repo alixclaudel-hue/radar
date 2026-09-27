@@ -1,0 +1,77 @@
+---
+name: workflow
+description: >
+  Déroulé systématique de TOUTE requête utilisateur sur ce dépôt (décision
+  utilisateur du 27/09/2026) : 1. Analyse & cadrage, 2. WBS, 3. Ordonnancement
+  (séquence vs parallèle), 4. Délégation de chaque tâche au modèle le plus
+  adapté (mode du courtier `scripts/ai_broker.py` ou sous-agent `executant` /
+  `Explore`), puis consolidation par Claude. S'applique sans attendre de demande
+  explicite ; son but chiffré est de baisser le cache relu par le fil principal.
+---
+
+# Workflow par requête — cadrer, découper, ordonnancer, déléguer
+
+## Pourquoi
+
+Mesure du 27/09 (cartographie `/delegation/workflows`, 20 requêtes, 426 appels
+API) : **58,3 M jetons de cache relu contre 1,3 M de travail frais**. Le fil
+principal démarre à ~62k jetons de contexte et monte à 200-230k en session
+longue ; chaque appel d'outil relit toute cette fenêtre. Un sous-agent frais
+démarre à ~40k et ne renvoie au fil principal qu'un compte rendu court ; un
+appel au courtier ne coûte aucun jeton Claude. Le levier n'est donc pas de
+mieux écrire, c'est de **faire moins d'allers-retours d'outils dans le fil
+principal**.
+
+## Les 4 étapes
+
+### 1. Analyse & cadrage (fil principal, court)
+
+Besoin reformulé en une phrase, critère de fin vérifiable, périmètre exclu.
+Si une décision revient réellement à l'utilisateur, la poser MAINTENANT
+(une seule question groupée), pas au milieu de l'exécution.
+
+### 2. WBS
+
+Découper en tâches à périmètre fermé : chacune a une entrée (fichiers, données),
+une sortie (fichier écrit, verdict, chiffre) et un critère de fin. Une tâche qui
+ne tient pas en un prompt autonome de ~15 lignes est à redécouper.
+
+### 3. Ordonnancement
+
+Tableau court : tâche → dépend de → exécutant. Les tâches sans dépendance entre
+elles partent **dans le même message** (plusieurs `Agent` et/ou appels courtier
+`run_in_background`), les autres attendent leur prérequis.
+
+### 4. Délégation, puis consolidation
+
+| Nature de la tâche | Exécutant | Pourquoi |
+|---|---|---|
+| Un seul jet de texte : premier jet de code/tests, résumé de doc, diagnostic de log, message de PR | courtier, mode `code`/`test`/`context`/`diag`/`pr` | 0 jeton Claude |
+| Question fermée sur le dépôt (où est X ?) | courtier `--mode search` | 0 jeton Claude |
+| Raisonnement que le gratuit rate | courtier `--mode reasoning` | payant, plafonné |
+| Balayage large de fichiers, conclusion seule utile | sous-agent `Explore` (`model: haiku`) | contexte frais, modèle léger |
+| Tâche à nombreux appels d'outils (explorer + modifier + tester) | sous-agent `executant` (sonnet) | contexte frais ~40k, compte rendu ≤ 20 lignes |
+| Jugement : architecture, sécurité, arbitrage produit, relecture finale, commit, merge | fil principal | non délégable (RÈGLE N°1) |
+
+Règles de délégation :
+
+- **Jamais `subagent_type: "fork"`** : il hérite du contexte complet (mesuré à 180k au démarrage) et annule le gain.
+- Le prompt d'un sous-agent est **autonome** : répertoire de travail, fichiers et lignes concernés, ce qui est déjà établi, critère de fin, format de retour. Il n'a pas la conversation.
+- Un sous-agent applique lui-même la RÈGLE N°1 (le courtier avant lui) — le rappeler n'est pas nécessaire, c'est dans sa définition.
+- Pas de sous-agent pour une tâche de 1 à 3 appels d'outils : son démarrage (~40k) coûte plus que la tâche faite sur place.
+
+Consolidation (fil principal) : relire les comptes rendus, rouvrir de façon
+chirurgicale (`limit` ≤ 30) uniquement ce qui est douteux, trancher, lancer la
+vérification finale (suite de tests), commit/PR via le mode `pr`.
+
+## Hygiène de session (même objectif)
+
+- Requête sans lien avec la précédente → proposer `/clear` avant de commencer : une session qui enchaîne les sujets relit à chaque appel l'historique de tous les sujets précédents.
+- Ne jamais relire un fichier déjà lu ou éditer « pour vérifier » ; ne pas rapatrier de sortie d'outil volumineuse dans le fil principal (la faire résumer par le courtier ou la tronquer à la source).
+
+## Trace attendue dans la réponse
+
+Pour une requête de plus d'une tâche, la réponse finale montre en quelques
+lignes le WBS avec, par tâche, l'exécutant réel (mode courtier, sous-agent, ou
+fil principal + pourquoi). C'est ce qui permet de vérifier après coup, dans
+`/delegation/workflows`, que le cache relu baisse vraiment.

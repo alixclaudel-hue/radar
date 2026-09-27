@@ -115,6 +115,8 @@
     </summary>
     <div class="acc__body">
       <p class="small muted">Bandcamp → réglages → <em>Subsonic</em> : génère un identifiant + mot de passe.</p>
+      <p class="small muted">⚠︎ Bandcamp filtre les IP de datacenter (page anti-bot « Fastly ») : l'import
+        peut échouer depuis le serveur même avec des identifiants valides. Réessaie plus tard.</p>
       <div class="row">
         <div class="field"><label>Identifiant Subsonic
           <input name="bandcamp_sub_user" value="{{ cfg.bandcamp_sub_user or '' }}"></label></div>

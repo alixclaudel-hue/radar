@@ -188,14 +188,64 @@ def spotify_items(pid, tok, max_pages=40):
 
 # ============================================================= Bandcamp / Subsonic
 
+# Bandcamp sert une page « Client Challenge » (protection Fastly) aux clients qui
+# n'ont pas l'air d'un navigateur : en-têtes réalistes = au pire la page de
+# challenge (200 text/html) au lieu d'un 403 sec, qu'on sait désormais détecter.
+SUBSONIC_UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+SUBSONIC_HEADERS = {"User-Agent": SUBSONIC_UA,
+                    "Accept": "application/json, text/plain, */*"}
+
+_CHALLENGE_HINT = ("Bandcamp renvoie une page anti-bot (Fastly) au lieu de JSON : "
+                   "l'API collection/Subsonic est bloquée depuis ce serveur (les IP "
+                   "de datacenter sont filtrées). Réessaie plus tard ou importe "
+                   "depuis un autre réseau.")
+
+
+def _looks_like_html(r):
+    ctype = (r.headers.get("content-type") or "").lower()
+    head = (r.text or "").lstrip()[:200].lower()
+    return "text/html" in ctype or head.startswith("<!doctype") or head.startswith("<html")
+
+
 def subsonic_get(method, user, password, **params):
+    """Appelle l'API Subsonic de Bandcamp et renvoie le bloc `subsonic-response`.
+
+    Robustesse (bug 2026-09-27 : « JSONDecodeError: Expecting value: line 1 column
+    1 » affiché à l'utilisateur dans la section Bandcamp) : Bandcamp protège
+    `bandcamp.com/api/...` par un « Client Challenge » Fastly. La réponse est
+    ALORS un 200 `text/html`, et `r.json()` levait un JSONDecodeError brut remonté
+    tel quel dans le suivi du job. On détecte ce cas et on lève un RuntimeError
+    explicite, avec quelques retries sur les erreurs réseau/transitoires."""
     salt = os.urandom(8).hex()
     tok = hashlib.md5((password + salt).encode()).hexdigest()
     p = {"u": user, "t": tok, "s": salt, "v": "1.16.1", "c": "CrateRadar", "f": "json", **params}
-    r = requests.get(f"{SUBSONIC_BASE}/{method}", params=p, timeout=25)
+    url = f"{SUBSONIC_BASE}/{method}"
+    r = None
+    for attempt in range(3):
+        try:
+            r = requests.get(url, params=p, headers=SUBSONIC_HEADERS, timeout=25)
+        except requests.RequestException as e:
+            if attempt == 2:
+                raise RuntimeError(f"Subsonic {method} : réseau injoignable ({e}).") from e
+            time.sleep(2 + 2 * attempt)
+            continue
+        if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+            time.sleep(3 + 3 * attempt)
+            continue
+        break
     if not r.ok:
-        raise RuntimeError(f"Subsonic {method} HTTP {r.status_code}")
-    body = r.json().get("subsonic-response", {})
+        raise RuntimeError(f"Subsonic {method} HTTP {r.status_code}.")
+    if _looks_like_html(r):
+        raise RuntimeError(f"Subsonic {method} : {_CHALLENGE_HINT}")
+    try:
+        data = r.json()
+    except ValueError:
+        extrait = (r.text or "").strip().replace("\n", " ")[:120]
+        raise RuntimeError(
+            f"Subsonic {method} : réponse illisible (JSON attendu, reçu "
+            f"{r.headers.get('content-type', '?')}) — {extrait!r}.")
+    body = data.get("subsonic-response", {})
     if body.get("status") != "ok":
         raise RuntimeError(f"Subsonic {method}: {body.get('error', {}).get('message', body)}")
     return body

@@ -24,6 +24,18 @@ than doing it here.
 
 ---
 
+## Délégation multi-fournisseurs — RÈGLE N°1
+
+Avant de lire `<doc>` en entier (step 1c et step 2), utilise le skill `delegate` pour
+le pré-digérer : `python3 scripts/ai_broker.py --mode context -f <doc>`. Le JSON
+structuré (`sections`, `key_points`) suffit souvent pour produire le brief sans
+charger le document complet dans le contexte. Ne charge le fichier entier que si
+le résumé délégué ne couvre pas un point nécessaire au diagramme.
+
+Pour le diff (Branch C), si >150 lignes : `git diff ... | python3 scripts/ai_broker.py --mode summary --stdin` avant de décider si un incrément ou une regen est nécessaire.
+
+---
+
 ## Step 0 — Settle the target and the scope
 
 Read the arguments given to this skill. They arrive after `ARGUMENTS:`.
@@ -110,6 +122,22 @@ that wants it narrower records `scope` in `.doc-meta.json` (Step 1c).
 
 Everywhere below, `<agent>`, `<doc>`, `<brief>`, `<drawing>`, `<meta_key>` and
 `<pathspec>` mean the values decided here.
+
+### 0d. Names of the agents and skills this skill calls
+
+This skill calls four agents (`app-overview`, `function-doc-generator`,
+`data-pipeline-doc-generator`, `data-tables-doc-generator`) and one skill
+(`diagram-brief`). They ship together, and their exact names depend on how they
+were installed:
+
+- installed as the `diagrams` Claude Code plugin, they are prefixed:
+  `diagrams:app-overview`, `diagrams:diagram-brief`, and so on;
+- copied by hand into `~/.claude/agents` and `~/.claude/skills`, they are not.
+
+Use whichever form appears in your list of available agent types and skills.
+If both appear, use the prefixed one. Everywhere below, `<agent>` and
+`diagram-brief` mean that resolved name. `general-purpose` is built in and never
+prefixed.
 
 ---
 
@@ -263,6 +291,21 @@ selects the broad default.
 
 Read `<doc>` into context for Step 2.
 
+### 1d. Target `pipeline` only — also ensure the schema doc
+
+A pipeline diagram that names `orders_clean.json` without saying what is in it
+leaves the reader guessing at every intermediate file. The pipeline agent
+records what each stage reads and writes, not the fields; the `tables` agent
+records the fields. So `pipeline` needs both documents.
+
+After `<doc>` is settled, run Steps 1a to 1c a second time with the **`tables`**
+row of the target table (`data-tables-doc-generator`, `docs/data-tables-map.md`,
+meta key `data-tables-map`), whole project, no focus. The same cache applies:
+if the schema doc is current, nothing is spawned. Read it into context too.
+
+Do this even when the pipeline target has a focus. The schema doc covers the
+whole project and is reused by every later run, scoped or not.
+
 ---
 
 ## Step 2 — Create the diagram brief
@@ -271,7 +314,8 @@ Always run this step, and Step 3 after it, whatever the cache decided in Step 1.
 Both are cheap, and rebuilding them from the current doc is the only way to be
 sure the drawing matches it.
 
-Use the Skill tool to invoke `diagram-brief`. The args depend on the target.
+Use the Skill tool to invoke `diagram-brief` (or `diagrams:diagram-brief`, see
+0d). The args depend on the target.
 
 ### Target `app`
 
@@ -350,6 +394,29 @@ Arrows:
 - Between stages where one stage's output feeds the next
 - From each final stage to its output file(s), labeled with the filename being passed
 
+Orchestrators: a script that only runs the other stages (refresh_all.py, a
+Makefile, a DAG file) is one box whose note lists what it runs. Draw at most
+one arrow from it, to the first stage. An arrow from it to every stage says
+nothing the note does not, and crosses the whole drawing.
+
+Columns — also read docs/data-tables-map.md. For every INTERMEDIATE or OUTPUT
+file box (anything a stage writes), add one directive listing its fields:
+
+  Add columns to <box>: field type, field type, field type.
+
+- Take the fields from the matching section of docs/data-tables-map.md, as
+  "name type", in the order the section lists them.
+- More than 12 fields: keep the keys (ID, join fields) and fill up to 10 with
+  the most significant for the flow, then end with
+  "+N more (see docs/data-tables-map.md)".
+- Raw input files: no columns. Their schema is the `tables` diagram's job, and
+  listing them here doubles the height of the first column for nothing.
+- Lineage, only when docs/data-pipeline-map.md says which fields a stage
+  creates: prefix those fields with "+" in the directive of the file that stage
+  writes ("+ remaining_hours number"). Never infer lineage from field names.
+- A file box with no matching section in the schema doc gets no directive.
+  Do not invent fields.
+
 Save output to <brief>.
 ```
 
@@ -368,10 +435,11 @@ Flow summary: Show every data structure in the project, what it holds, and how t
 
 Draw:
 - One box per data structure, labeled with its name
-- Its Note carries: type and location on the first line, then the fields as
-  "fieldName  type", one per line
-- Structures with more than 12 fields: list the primary key, the foreign keys
-  and the 5 most significant fields, then "+N more fields (see <doc>)"
+- Its Note carries its type and location, in one line
+- Its fields go in a separate directive, one per structure:
+    Add columns to <box>: field type, field type, field type.
+- Structures with more than 12 fields: the primary key, the foreign keys and
+  the 5 most significant fields, then "+N more (see <doc>)"
 
 Groups — use the "Produced by" field of the Relationships Summary to sort every
 structure into exactly one:
@@ -459,21 +527,36 @@ script does the whole transform in well under a second.
 Run via Bash, from the project root:
 
 ```
-python "$HOME/.agents/skills/diagram-render/scripts/brief_to_excalidraw.py" <brief> <drawing>
+python3 "${CLAUDE_SKILL_DIR}/../diagram-render/scripts/brief_to_excalidraw.py" <brief> <drawing>
 ```
+
+`diagram-render` is installed next to this skill, so the script sits in the
+sibling folder. `${CLAUDE_SKILL_DIR}` is this skill's own folder, filled in by
+Claude Code. If it shows up literally, or the file is not there, try in order:
+
+1. `${CLAUDE_PLUGIN_ROOT}/skills/diagram-render/scripts/brief_to_excalidraw.py`
+2. `~/.claude/skills/diagram-render/scripts/brief_to_excalidraw.py`
+3. `~/.agents/skills/diagram-render/scripts/brief_to_excalidraw.py`
+4. otherwise Glob for `**/diagram-render/scripts/brief_to_excalidraw.py` under
+   the home directory, and use the first match.
 
 Notes:
 
 - On Windows use `python`; `python3` there opens the Microsoft Store and runs
-  nothing. On macOS and Linux use `python3`.
-- If `$HOME` does not expand, substitute the absolute path to
-  `~/.agents/skills/diagram-render/scripts/`.
+  nothing. On macOS and Linux use `python3`. The script needs Python 3.8+ and
+  the standard library only.
 - The script prints one summary line, `groups / boxes / arrows`. Read it: if
   **boxes is 0**, the brief did not match the directive format the script
-  expects. In that case invoke the `diagram-render` skill with the Skill tool
+  expects. In that case invoke the `diagram-render` skill (`diagrams:diagram-render`
+  as a plugin) with the Skill tool
   and let it handle the fallback, rather than patching the JSON by hand.
 - Relay any WARNING line the script prints (an arrow referencing a box that was
   never defined), and still deliver the file.
+- The script reads the brief's `Layout:` line. `left-to-right`, `top-to-bottom`
+  and `grouped` get a layered layout: each box is placed by the flow, groups
+  are colours, and an arrow that skips columns is routed between the boxes.
+  Only `swim lane` keeps one row per group (the `functions` target). The
+  summary line says which layout ran. `--layout=lr|tb|bands` overrides it.
 
 The output overwrites `<drawing>` if it exists, which is what we want — the file
 tracks the current state of the code.

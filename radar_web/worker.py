@@ -187,13 +187,13 @@ def _maybe_scorestore_build():
         print(f"[worker] scorestore check : {e}", file=sys.stderr, flush=True)
 
 
-def _last_successful_run(name):
+def _last_successful_run(name, uid=paths.DEFAULT_UID):
     """Timestamp de la DERNIÈRE exécution qui est allée à son terme sans erreur
     (0.0 si jamais complétée) — lu depuis le statut persisté du job lui-même,
     jamais depuis une marque posée au lancement (cf. commentaire plus haut :
     c'était le bug qui a laissé build_graph "oublié" 30 j après une
     interruption par déploiement)."""
-    s = jobs.status(name, uid=paths.DEFAULT_UID)
+    s = jobs.status(name, uid=uid)
     if not s or s.get("running") or s.get("error") or not s.get("finished_at"):
         return 0.0
     try:
@@ -242,9 +242,10 @@ def _maybe_reco_index_build():
 
 
 def _maybe_auto_maintenance():
-    """Enfile canonicalize / profile_labels / build_graph (owner) chacun selon
-    sa propre cadence, sans action de l'utilisateur — remplace les boutons
-    manuels retirés de Réglages."""
+    """Enfile canonicalize / profile_labels / build_graph pour CHAQUE utilisateur
+    (profil, labels résolus et graphe sont par compte : les invités n'avaient
+    aucun entretien), chacun selon sa propre cadence, sans action de
+    l'utilisateur — remplace les boutons manuels retirés de Réglages."""
     global _last_auto_maint_check
     if os.environ.get("RADAR_AUTO_MAINTENANCE") != "1":
         return
@@ -252,15 +253,17 @@ def _maybe_auto_maintenance():
         return
     _last_auto_maint_check = time.time()
     try:
-        queued_names = {j["name"] for j in jobs.load_queue()}
+        queued = {(j["uid"], j["name"]) for j in jobs.load_queue()}
         now = time.time()
-        for name, params in (("canonicalize", {"scope": "corpus"}),
-                              ("profile_labels", {"limit": 150}),
-                              ("build_graph", {"mode": "taste"})):
-            if name in queued_names or now - _last_successful_run(name) < AUTO_MAINT_EVERY[name]:
-                continue
-            jobs.launch(name, params, uid=paths.DEFAULT_UID, priority=0)
-            print(f"[worker] entretien de fond enfilé : {name}", file=sys.stderr, flush=True)
+        for uid in _recos_uids():
+            for name, params in (("canonicalize", {"scope": "corpus"}),
+                                  ("profile_labels", {"limit": 150}),
+                                  ("build_graph", {"mode": "taste"})):
+                if ((uid, name) in queued
+                        or now - _last_successful_run(name, uid) < AUTO_MAINT_EVERY[name]):
+                    continue
+                jobs.launch(name, params, uid=uid, priority=0)
+                print(f"[worker] entretien de fond enfilé : {name} ({uid})", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] auto maintenance check : {e}", file=sys.stderr, flush=True)
 
@@ -286,23 +289,30 @@ def _maybe_recos_scan():
         return
     _last_recos_check = time.time()
     try:
-        # Bornée à DEFAULT_UID (pas juste le nom) : un job scan_recos/publish_recos
-        # d'un AUTRE utilisateur ne doit pas bloquer l'auto-scan de owner. Une
-        # entrée "running" reste dans load_queue() tout le temps de son exécution
-        # (worker.main() ne la retire qu'après _run(), cf. docstring plus haut) :
-        # ce test couvre donc bien aussi un job déjà en cours, pas seulement en file.
-        queued_names = {j["name"] for j in jobs.load_queue() if j["uid"] == paths.DEFAULT_UID}
-        if "scan_recos" in queued_names or "publish_recos" in queued_names:
-            return
-        pending = store.load(paths.user_paths(paths.DEFAULT_UID).recos_candidates, [])
-        if pending:
-            jobs.launch("publish_recos", {}, uid=paths.DEFAULT_UID, priority=0)
-            print("[worker] publish_recos enfilé (file d'attente non vide)", file=sys.stderr, flush=True)
-        else:
-            jobs.launch("scan_recos", {}, uid=paths.DEFAULT_UID, priority=0)
-            print("[worker] scan_recos enfilé (file d'attente vide)", file=sys.stderr, flush=True)
+        # Par couple (uid, nom) : un job recos d'un utilisateur ne bloque pas
+        # l'auto-scan des autres. Une entrée "running" reste dans load_queue()
+        # tout le temps de son exécution (worker.main() ne la retire qu'après
+        # _run()) : ce test couvre donc aussi un job déjà en cours.
+        queued = {(j["uid"], j["name"]) for j in jobs.load_queue()}
+        for uid in _recos_uids():
+            if (uid, "scan_recos") in queued or (uid, "publish_recos") in queued:
+                continue
+            pending = store.load(paths.user_paths(uid).recos_candidates, [])
+            name = "publish_recos" if pending else "scan_recos"
+            jobs.launch(name, {}, uid=uid, priority=0)
+            print(f"[worker] {name} enfilé ({uid})", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] recos check : {e}", file=sys.stderr, flush=True)
+
+
+def _recos_uids():
+    """Tous les utilisateurs enregistrés, owner en tête : la boucle RECOS
+    n'alimentait que DEFAULT_UID, la playlist des autres comptes restait vide
+    faute de bouton manuel. Owner d'abord car la clé YouTube est commune à tous
+    (budget compté par utilisateur, quota Google partagé) : en cas d'épuisement,
+    ce sont les comptes suivants qui attendent le lendemain."""
+    uids = paths.all_uids()
+    return [paths.DEFAULT_UID] + [u for u in uids if u != paths.DEFAULT_UID]
 
 
 def _maybe_recos_midnight_purge():
@@ -322,13 +332,14 @@ def _maybe_recos_midnight_purge():
     if today == _last_midnight_purge_date:
         return
     _last_midnight_purge_date = today
-    path = paths.user_paths(paths.DEFAULT_UID).recos_playlist
-    playlist = store.load(path, [])
-    kept = [t for t in playlist if not t.get("played")]
-    if len(kept) != len(playlist):
-        store.save(path, kept)
-        print(f"[worker] purge minuit RECOS : {len(playlist) - len(kept)} piste(s) écoutée(s) retirée(s)",
-              file=sys.stderr, flush=True)
+    for uid in _recos_uids():
+        path = paths.user_paths(uid).recos_playlist
+        playlist = store.load(path, [])
+        kept = [t for t in playlist if not t.get("played")]
+        if len(kept) != len(playlist):
+            store.save(path, kept)
+            print(f"[worker] purge minuit RECOS ({uid}) : {len(playlist) - len(kept)} piste(s) "
+                  "écoutée(s) retirée(s)", file=sys.stderr, flush=True)
 
 
 def _pick(q, last_uid):

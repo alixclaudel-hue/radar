@@ -194,8 +194,11 @@ def job_import_discogs_dump(job, params):
     # et double à tort les jobs de fond d'autres utilisateurs déjà en file
     # (cf. CLAUDE.md, correctif famine scorestore du 24/09).
     from radar_web.radar import jobs as job_queue
-    job_queue.launch("canonicalize", {"scope": "corpus"}, uid="owner", priority=0)
-    job_queue.launch("profile_labels", {"limit": 150}, uid="owner", priority=0)
+    # Tous les comptes : profil et labels résolus sont par utilisateur.
+    from radar_web.radar import paths as radar_paths
+    for uid in radar_paths.all_uids() or ["owner"]:
+        job_queue.launch("canonicalize", {"scope": "corpus"}, uid=uid, priority=0)
+        job_queue.launch("profile_labels", {"limit": 150}, uid=uid, priority=0)
 
     job.finish(f"Dump {latest} importé : {n_total} sortie(s) tous formats "
                f"(dont {n_vinyl} vinyle 12\"/LP), {n_labels} label(s), {n_artists} artiste(s), "

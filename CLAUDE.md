@@ -178,25 +178,15 @@ Répartition des rôles : **Claude reste architecte et responsable sécurité** 
 ## TODO — vérifications VPS en attente
 
 **RECOS RADAR** :
-- Vidéo Discogs avant YouTube (pt 32) : relancer `publish_recos` plusieurs fois, relever le compteur "via vidéo Discogs" vs "par recherche" — décide si le chantier "vidéos du dump" (parser `<videos>` XML + réimport complet) vaut la peine.
-- Playlist UI : suppression sans rechargement (y compris piste en cours de lecture), mobile portrait.
+
 - Filtre albums possédés : relancer `fetch_collection` ET `ingest_bandcamp` puis `scan_recos force=1` (exclusion Bandcamp ajoutée pt 41, jamais vérifiée en conditions réelles).
-- Budget/quota YouTube (pt 31) : confirmer en usage réel que le budget ne se bloque plus artificiellement et qu'un rate-limit ne fait plus abandonner tout un run.
-- Nouveau texte de page (pt 41) : relire en conditions réelles, confirmer que rien d'utile n'a été perdu dans la simplification.
+
 
 **Labels & scoring** :
-- `reco_rows` non-additif (pts 34/36) : comparer un échantillon de scores avant/après déploiement.
-- Curseur tier Cœur/Aimé (`/settings`) : vérifier l'effet réel sur `/univers?tab=labels`.
-- 3ᵉ composante voisinage catalogue (pt 36) : confirmer que des labels jamais vus apparaissent désormais dans les recos.
-- `reco_index` (pt 35) : vérifier gain mémoire/temps après un premier lancement du job CLI. Décision utilisateur en attente : activer `RADAR_RECO_INDEX=1` dans le `.env` VPS (et `RADAR_CATALOG_LABELGRAPH=1`, sans urgence — le graphe est déjà construit).
-- Sujet non traité, à chiffrer séparément : catalogues-labels géants qui polluent le signal malgré `prune_labels` (pt 38).
-- Panneau « À vérifier » (pt 41) : tester en conditions réelles le bouton 🗑 supprimer sur un label/artiste "jamais identifié" — confirme qu'il disparaît du panneau ET de `/univers?tab=labels`.
-- Correctif famine scorestore (pt 49) : après déploiement, rejouer le diagnostic sur `docker logs radar-radar-worker-1` — confirmer que `scorestore_tracks` ne double plus les `scorestore_releases` d'autres utilisateurs en file, que `scan_recos`/`publish_recos` tournent bien environ toutes les heures (plus de trou de plusieurs heures), et mesurer le temps réel d'un tour complet de labels pour le profil à 561 labels (owner) avec le plafond par défaut de 100 labels/lancement.
+
 
 **Recherche vendeur** (pt 37) :
-- Tester en réel : job `seller_inventory` sur un gros vendeur (temps, nb de pages), filtre style qui élargit bien avec plusieurs styles cochés, bouton panier qui ouvre la bonne annonce.
-- Décision utilisateur en attente : afficher prix/état des disques sur les résultats.
-- Nouveau sélecteur de 3 modes (pt 41) : tester en conditions réelles le basculement JS (mobile inclus) et confirmer que revenir sur `/search` réaffiche bien le mode de la dernière recherche.
+
 
 **Divers** :
 - **Gate `git diff` + recherche exhaustive (pt 56)** : `Bash` était déjà dans le matcher `PreToolUse` (pt 55) — le nouveau blocage sur `git diff` brut s'applique donc dès que le code est déployé, sans action utilisateur supplémentaire sur `.claude/settings.json`. À vérifier en conditions réelles : qu'un `git diff -- fichier` sans pipe déclenche bien le blocage avec le bon message, et que le repli `search` reste utile (pas trop bruyant) sur des requêtes réelles à l'échelle du dépôt complet, pas seulement `radar_web`.

@@ -1,6 +1,22 @@
-# Reverse-proxy + HTTPS auto (Let's Encrypt). Le domaine vient de RADAR_DOMAIN
-# dans .env ; sans lui, Caddy sert en local (certif auto-signé) sans planter.
+# Reverse-proxy + HTTPS auto (Let's Encrypt). Les domaines viennent de .env :
+# RADAR_DOMAIN pour l'appli, RADAR_OPS_DOMAIN pour le tableau de bord de
+# diagnostic. docker-compose.yml fournit un défaut NON VIDE pour chacun, et ce
+# n'est pas cosmétique : une variable présente mais *vide* produit une adresse
+# de site vide et casse TOUTE la configuration Caddy — radar compris, pas
+# seulement le site visé (vérifié avec `caddy adapt`).
 {$RADAR_DOMAIN:localhost} {
 	encode zstd gzip
 	reverse_proxy radar-web:8600
+}
+
+# Tableau de bord `radar-ops` sur son propre sous-domaine. Il partage
+# l'authentification propriétaire de l'appli (comptes et signature de session
+# dans radar_web/radar/websession.py) et reste en LECTURE SEULE sur /data : un
+# visiteur non propriétaire est renvoyé vers /login par le garde de l'appli.
+# L'accès Tailscale/loopback (RADAR_WEB_BIND) reste en place en parallèle.
+# Pas d'`encode` ici, volontairement : les pages Jobs et Actions sont en
+# Server-Sent Events, et une compression en flux retarderait exactement ce que
+# ces pages existent pour montrer en temps réel.
+{$RADAR_OPS_DOMAIN:ops.localhost} {
+	reverse_proxy radar-ops:8610
 }

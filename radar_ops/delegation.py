@@ -61,6 +61,8 @@ from zoneinfo import ZoneInfo
 
 from scripts.ai import health as ai_health
 
+from . import tokens
+
 RECEIPTS_NAME = "gemini-receipts.jsonl"
 EVENTS_NAME = "telemetry.jsonl"
 HEALTH_NAME = ai_health.STATE_NAME
@@ -192,8 +194,8 @@ def _group(receipts, field, label, unknown):
     affiché deux totaux différents pour la même chose."""
     buckets = collections.defaultdict(
         lambda: {"calls": 0, "ok": 0, "err": 0, "prompt_tokens": 0,
-                 "output_tokens": 0, "total_tokens": 0, "fallbacks": 0,
-                 "_ms": []})
+                 "output_tokens": 0, "total_tokens": 0, "equiv_tokens": 0,
+                 "fallbacks": 0, "_ms": []})
     for r in receipts:
         b = buckets[str(r.get(field) or unknown)]
         b["calls"] += 1
@@ -203,6 +205,8 @@ def _group(receipts, field, label, unknown):
             b["err"] += 1
         for k in ("prompt_tokens", "output_tokens", "total_tokens", "fallbacks"):
             b[k] += _int(r, k)
+        b["equiv_tokens"] += tokens.equiv(input=_int(r, "prompt_tokens"),
+                                          output=_int(r, "output_tokens"))
         ms = _num(r.get("elapsed_ms"))
         if ms is not None:
             b["_ms"].append(ms)
@@ -223,18 +227,22 @@ def _by_day(receipts, now_ts, days):
     Les jours sans appel sont présents à zéro : une courbe qui saute les jours
     vides raccourcit visuellement les périodes d'inactivité, donc ment."""
     counts = collections.Counter()
-    tokens = collections.Counter()
+    tok = collections.Counter()
+    tok_equiv = collections.Counter()
     for r in receipts:
         day = datetime.datetime.fromtimestamp(
             r["ts"], datetime.timezone.utc).date()
         counts[day] += 1
-        tokens[day] += _int(r, "total_tokens")
+        tok[day] += _int(r, "total_tokens")
+        tok_equiv[day] += tokens.equiv(input=_int(r, "prompt_tokens"),
+                                       output=_int(r, "output_tokens"))
 
     today = datetime.datetime.fromtimestamp(
         now_ts, datetime.timezone.utc).date()
     return [{"date": (today - datetime.timedelta(days=n)).isoformat(),
              "calls": counts[today - datetime.timedelta(days=n)],
-             "total_tokens": tokens[today - datetime.timedelta(days=n)]}
+             "total_tokens": tok[today - datetime.timedelta(days=n)],
+             "equiv_tokens": tok_equiv[today - datetime.timedelta(days=n)]}
             for n in range(days - 1, -1, -1)]
 
 
@@ -451,6 +459,15 @@ def summarize(receipts, events, now=None, days=14, health_state=None):
         "total_tokens": sum(_int(r, "total_tokens") for r in receipts),
         "useful_tokens": sum(_int(r, "total_tokens") for r in receipts if r.get("status") == "ok"),
         "failed_tokens": sum(_int(r, "total_tokens") for r in receipts if r.get("status") != "ok"),
+        "equiv_tokens": sum(tokens.equiv(input=_int(r, "prompt_tokens"),
+                                         output=_int(r, "output_tokens"))
+                            for r in receipts),
+        "useful_equiv_tokens": sum(tokens.equiv(input=_int(r, "prompt_tokens"),
+                                                output=_int(r, "output_tokens"))
+                                   for r in receipts if r.get("status") == "ok"),
+        "failed_equiv_tokens": sum(tokens.equiv(input=_int(r, "prompt_tokens"),
+                                                output=_int(r, "output_tokens"))
+                                   for r in receipts if r.get("status") != "ok"),
         "elapsed_ms": sum(_int(r, "elapsed_ms") for r in receipts),
         "median_ms": _median(ms),
         "fallbacks": sum(_int(r, "fallbacks") for r in receipts),
@@ -551,16 +568,27 @@ def _claude_usage_rows(events):
         ts = _num(ev.get("ts"))
         if ts is None:
             continue
-        prompt_tokens = (_int(ev, "input_tokens") + _int(ev, "cache_creation_input_tokens")
-                         + _int(ev, "cache_read_input_tokens"))
+        input_tokens = _int(ev, "input_tokens")
+        cache_create_tokens = _int(ev, "cache_creation_input_tokens")
+        cache_read_tokens = _int(ev, "cache_read_input_tokens")
+        prompt_tokens = input_tokens + cache_create_tokens + cache_read_tokens
         output_tokens = _int(ev, "output_tokens")
+        # 1h/5m : champs récents du hook, absents des anciennes lignes — laissés
+        # à None (pas 0) pour que `tokens.equiv` retombe sur le repli ×2.0
+        # plutôt que de croire à une écriture nulle.
+        cache_write_1h = _num(ev.get("cache_creation_1h_input_tokens"))
+        cache_write_5m = _num(ev.get("cache_creation_5m_input_tokens"))
         rows.append({
             "ts": ts,
             "model": str(ev.get("model") or "inconnu"),
-            "cache_read_tokens": _int(ev, "cache_read_input_tokens"),
+            "cache_read_tokens": cache_read_tokens,
             "prompt_tokens": prompt_tokens,
             "output_tokens": output_tokens,
             "total_tokens": prompt_tokens + output_tokens,
+            "equiv_tokens": tokens.equiv(
+                input=input_tokens, cache_read=cache_read_tokens,
+                cache_write=cache_create_tokens, output=output_tokens,
+                cache_write_1h=cache_write_1h, cache_write_5m=cache_write_5m),
         })
     return rows
 
@@ -580,16 +608,21 @@ def _claude_totals(claude_rows, since_ts, until_ts):
         "output_tokens": sum(_int(r, "output_tokens") for r in rows),
         "total_tokens": sum(_int(r, "total_tokens") for r in rows),
         "cache_read_tokens": sum(_int(r, "cache_read_tokens") for r in rows),
+        "equiv_tokens": sum(_int(r, "equiv_tokens") for r in rows),
     }
 
 
 def _sous_traitance(delegated_totals, claude_totals):
     """Part des jetons traités par le courtier plutôt que par Claude en local.
 
-    `share_delegated` vaut `None` seulement quand aucun jeton n'est mesuré ni
-    d'un côté ni de l'autre (absence de mesure) — jamais confondu avec une
-    part mesurée à 0. Volume brut des deux côtés, pas une économie estimée
-    (cf. la légende du graphique, même réserve)."""
+    Les champs bruts (`*_tokens`) restent la mesure directe, cache relu exclu
+    du côté Claude comme avant. `share_delegated`, en revanche, se calcule
+    désormais sur les tokens ÉQUIVALENTS (`radar_ops.tokens`) : le cache relu
+    n'y est plus exclu mais pondéré à 0,1, ce qui le distingue d'un jeton frais
+    sans l'ignorer complètement — un dénominateur qui l'excluait entièrement
+    écrasait la part déléguée dès que Claude relisait beaucoup de contexte.
+    `share_delegated` vaut `None` seulement quand aucun équivalent n'est mesuré
+    ni d'un côté ni de l'autre — jamais confondu avec une part mesurée à 0."""
     # Numérateur : les seuls appels délégués qui ont abouti. Une tentative en
     # échec a consommé des jetons sans rien produire — la compter gonflait la
     # part déléguée alors que Claude refaisait ensuite le travail.
@@ -600,13 +633,23 @@ def _sous_traitance(delegated_totals, claude_totals):
     # (même convention que la cartographie des requêtes, workflows._share).
     claude = _int(claude_totals, "total_tokens") - _int(claude_totals, "cache_read_tokens")
     combined = delegated + claude
+
+    delegated_equiv = _int(
+        delegated_totals,
+        "useful_equiv_tokens" if "useful_equiv_tokens" in (delegated_totals or {}) else "equiv_tokens")
+    claude_equiv = _int(claude_totals, "equiv_tokens")
+    total_equiv = delegated_equiv + claude_equiv
+
     return {
         "delegated_tokens": delegated,
         "delegated_failed_tokens": _int(delegated_totals, "failed_tokens"),
         "claude_tokens": claude,
         "claude_cache_read_tokens": _int(claude_totals, "cache_read_tokens"),
         "total_tokens": combined,
-        "share_delegated": (round(delegated / combined, 3) if combined else None),
+        "delegated_equiv": delegated_equiv,
+        "claude_equiv": claude_equiv,
+        "total_equiv": total_equiv,
+        "share_delegated": (round(delegated_equiv / total_equiv, 3) if total_equiv else None),
     }
 
 
@@ -663,6 +706,7 @@ def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris",
             "prompt_tokens": 0,
             "output_tokens": 0,
             "total_tokens": 0,
+            "equiv_tokens": 0,
             "by_model": {},
         })
         cursor += bucket_secs
@@ -676,17 +720,22 @@ def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris",
         idx = int((ts - since_aligned_ts) // bucket_secs)
         if 0 <= idx < len(buckets):
             b = buckets[idx]
+            equiv_r = tokens.equiv(input=_int(r, "prompt_tokens"),
+                                   output=_int(r, "output_tokens"))
             b["calls"] += 1
             b["prompt_tokens"] += _int(r, "prompt_tokens")
             b["output_tokens"] += _int(r, "output_tokens")
             b["total_tokens"] += _int(r, "total_tokens")
+            b["equiv_tokens"] += equiv_r
             model = str(r.get("model") or "inconnu")
             m = b["by_model"].setdefault(model, {"calls": 0, "prompt_tokens": 0,
-                                                  "output_tokens": 0, "total_tokens": 0})
+                                                  "output_tokens": 0, "total_tokens": 0,
+                                                  "equiv_tokens": 0})
             m["calls"] += 1
             m["prompt_tokens"] += _int(r, "prompt_tokens")
             m["output_tokens"] += _int(r, "output_tokens")
             m["total_tokens"] += _int(r, "total_tokens")
+            m["equiv_tokens"] += equiv_r
 
     if claude_rows:
         for row in claude_rows:
@@ -697,11 +746,13 @@ def bucket_by_time(receipts, since_ts, until_ts, granularity, tz="Europe/Paris",
             if 0 <= idx < len(buckets):
                 m = buckets[idx]["by_model"].setdefault(
                     row["model"], {"calls": 0, "prompt_tokens": 0,
-                                   "output_tokens": 0, "total_tokens": 0})
+                                   "output_tokens": 0, "total_tokens": 0,
+                                   "equiv_tokens": 0})
                 m["calls"] += 1
                 m["prompt_tokens"] += row["prompt_tokens"]
                 m["output_tokens"] += row["output_tokens"]
                 m["total_tokens"] += row["total_tokens"]
+                m["equiv_tokens"] += _int(row, "equiv_tokens")
 
     return buckets
 
@@ -751,13 +802,16 @@ def top_items(receipts, field, n=5, unknown="inconnu"):
     """Top N par nombre d'appels sur un champ donné."""
     if not receipts:
         return []
-    counts = collections.defaultdict(lambda: {"calls": 0, "total_tokens": 0})
+    counts = collections.defaultdict(lambda: {"calls": 0, "total_tokens": 0, "equiv_tokens": 0})
     for r in receipts:
         key = str(r.get(field) or unknown)
         counts[key]["calls"] += 1
         counts[key]["total_tokens"] += _int(r, "total_tokens")
+        counts[key]["equiv_tokens"] += tokens.equiv(input=_int(r, "prompt_tokens"),
+                                                     output=_int(r, "output_tokens"))
     total_calls = len(receipts)
     items = [{"name": k, "calls": v["calls"], "total_tokens": v["total_tokens"],
+              "equiv_tokens": v["equiv_tokens"],
               "share": round(v["calls"] / total_calls, 3)}
              for k, v in counts.items()]
     items.sort(key=lambda x: (-x["calls"], -x["total_tokens"], x["name"]))
@@ -775,10 +829,11 @@ def per_day_breakdown(receipts, since_ts, until_ts, tz="Europe/Paris"):
     # Grouper par jour local
     days = collections.defaultdict(lambda: {
         "calls": 0, "ok": 0, "err": 0,
-        "prompt_tokens": 0, "output_tokens": 0, "total_tokens": 0,
+        "prompt_tokens": 0, "output_tokens": 0, "total_tokens": 0, "equiv_tokens": 0,
         "errors": collections.defaultdict(lambda: {"count": 0, "last_ts": None, "last_detail": None}),
         "by_model": collections.defaultdict(lambda: {"calls": 0, "prompt_tokens": 0,
-                                                      "output_tokens": 0, "total_tokens": 0}),
+                                                      "output_tokens": 0, "total_tokens": 0,
+                                                      "equiv_tokens": 0}),
         "quota_snapshots": {},  # (provider, model) -> (ts, quota_block)
         "small_prompts": {"measured": 0, "small": 0},
     })
@@ -790,6 +845,8 @@ def per_day_breakdown(receipts, since_ts, until_ts, tz="Europe/Paris"):
         local = datetime.datetime.fromtimestamp(ts, tzinfo)
         day_key = local.date().isoformat()
         d = days[day_key]
+        equiv_r = tokens.equiv(input=_int(r, "prompt_tokens"),
+                               output=_int(r, "output_tokens"))
         d["calls"] += 1
         if r.get("status") == "ok":
             d["ok"] += 1
@@ -798,6 +855,7 @@ def per_day_breakdown(receipts, since_ts, until_ts, tz="Europe/Paris"):
         d["prompt_tokens"] += _int(r, "prompt_tokens")
         d["output_tokens"] += _int(r, "output_tokens")
         d["total_tokens"] += _int(r, "total_tokens")
+        d["equiv_tokens"] += equiv_r
 
         # Erreurs
         if r.get("status") != "ok":
@@ -816,6 +874,7 @@ def per_day_breakdown(receipts, since_ts, until_ts, tz="Europe/Paris"):
         m["prompt_tokens"] += _int(r, "prompt_tokens")
         m["output_tokens"] += _int(r, "output_tokens")
         m["total_tokens"] += _int(r, "total_tokens")
+        m["equiv_tokens"] += equiv_r
 
         # Quota snapshot
         bloc = r.get("quota")
@@ -856,6 +915,7 @@ def per_day_breakdown(receipts, since_ts, until_ts, tz="Europe/Paris"):
                 "prompt_tokens": m["prompt_tokens"],
                 "output_tokens": m["output_tokens"],
                 "total_tokens": m["total_tokens"],
+                "equiv_tokens": m["equiv_tokens"],
             })
         by_model_fmt.sort(key=lambda x: -x["total_tokens"])
 
@@ -885,6 +945,7 @@ def per_day_breakdown(receipts, since_ts, until_ts, tz="Europe/Paris"):
             "prompt_tokens": d["prompt_tokens"],
             "output_tokens": d["output_tokens"],
             "total_tokens": d["total_tokens"],
+            "equiv_tokens": d["equiv_tokens"],
             "small_prompts": {"threshold": 10, "small": sp["small"],
                                "measured": sp["measured"], "share": share},
             "errors": errors_fmt,
@@ -928,6 +989,7 @@ def snapshot(data_root, days=14):
         "health_seen": len(health_state.get("entries") or {}),
         "days": days,
         "missing": missing,
+        "weights": tokens.weights_public(),
     })
     return out
 
@@ -1035,4 +1097,5 @@ def snapshot_windowed(data_root, preset="7d", from_ts=None, to_ts=None,
         "errors": errors_global,
         "per_day": per_day,
         "model_colors": model_colors,
+        "weights": tokens.weights_public(),
     }

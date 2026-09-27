@@ -196,7 +196,8 @@ def _new_request(rid, session, project, t, prompt, redact):
         "title": " ".join(prompt.split())[:120],
         "model": "",
         "totals": {
-            "claude": {"calls": 0, "input": 0, "cache_read": 0, "cache_create": 0, "output": 0},
+            "claude": {"calls": 0, "input": 0, "cache_read": 0, "cache_create": 0, "output": 0,
+                       "cache_create_1h": 0, "cache_create_5m": 0},
             "delegated": {"calls": 0, "with_receipt": 0, "prompt": 0, "output": 0,
                           "cost_usd": 0.0, "failed": 0, "attempts_failed": 0,
                           "failed_prompt": 0, "failed_output": 0},
@@ -229,6 +230,12 @@ def _on_assistant(req, line, t, redact):
                   "cache_read": int(u.get("cache_read_input_tokens") or 0),
                   "cache_create": int(u.get("cache_creation_input_tokens") or 0),
                   "output": int(u.get("output_tokens") or 0)}
+        # Ventilation par TTL de cache (1h/5m) : absente si `cache_creation`
+        # n'est pas un dict, distinct de 0 (non ventilé) — cf. telemetry.py.
+        cache_creation = u.get("cache_creation")
+        if isinstance(cache_creation, dict):
+            tokens["cache_create_1h"] = int(cache_creation.get("ephemeral_1h_input_tokens") or 0)
+            tokens["cache_create_5m"] = int(cache_creation.get("ephemeral_5m_input_tokens") or 0)
         c = req["totals"]["claude"]
         c["calls"] += 1
         for k, v in tokens.items():

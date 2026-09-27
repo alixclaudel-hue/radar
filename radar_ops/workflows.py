@@ -12,6 +12,7 @@ import os
 import re
 from datetime import datetime
 
+from . import tokens
 from .delegation import log_dir
 
 _SESSION_RE = re.compile(r"[A-Za-z0-9_-]+")
@@ -35,6 +36,19 @@ def _int(d, key):
         return int((d or {}).get(key) or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _opt_int(d, key):
+    """Comme `_int`, mais renvoie `None` si le champ est absent — un champ
+    récent (ventilation 1h/5m) absent des anciennes lignes n'est pas un 0
+    mesuré, `tokens.equiv` doit pouvoir retomber sur son repli non ventilé."""
+    v = (d or {}).get(key)
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def _read(path):
@@ -83,23 +97,39 @@ def _claude_split(totals):
     return {k: _int(c, k) for k in ("input", "cache_read", "cache_create", "output")}
 
 
-def _share(delegated, fresh):
-    # Le cache relu est exclu du dénominateur : c'est la même fenêtre refacturée,
-    # pas du travail — le compter écraserait toute part déléguée vers zéro.
-    denom = delegated + fresh
-    return round(delegated / denom, 3) if denom else 0.0
+def _share(delegated_equiv, claude_equiv):
+    """Part du volume traité par le courtier, en tokens équivalents.
+
+    Les deux arguments sont déjà des équivalents (`radar_ops.tokens.equiv`) :
+    le cache relu y est pondéré à 0,1 plutôt qu'exclu, donc `claude_equiv` peut
+    inclure du cache sans écraser la part déléguée vers zéro comme le faisait
+    l'ancien calcul sur jetons bruts."""
+    denom = delegated_equiv + claude_equiv
+    return round(delegated_equiv / denom, 3) if denom else 0.0
 
 
 def summary(r):
     """Ligne de liste d'une requête, sans étapes ni texte intégral."""
     totals = r.get("totals") or {}
     c = _claude_split(totals)
+    craw = totals.get("claude") or {}
     d = totals.get("delegated") or {}
     t = totals.get("tools") or {}
     fresh = c["input"] + c["cache_create"] + c["output"]
     delegated = _int(d, "prompt") + _int(d, "output")
     wasted = _int(d, "failed_prompt") + _int(d, "failed_output")
     start, end = _iso_to_ts(r.get("started")), _iso_to_ts(r.get("ended"))
+
+    # Équivalents : `claude_equiv` porte TOUT le volume Claude, cache relu
+    # compris (pondéré 0,1) — contrairement à `fresh` qui l'excluait.
+    claude_equiv = tokens.equiv(
+        input=c["input"], cache_read=c["cache_read"], cache_write=c["cache_create"],
+        output=c["output"], cache_write_1h=_opt_int(craw, "cache_create_1h"),
+        cache_write_5m=_opt_int(craw, "cache_create_5m"))
+    delegated_equiv = tokens.equiv(input=_int(d, "prompt"), output=_int(d, "output"))
+    delegated_failed_equiv = tokens.equiv(input=_int(d, "failed_prompt"),
+                                          output=_int(d, "failed_output"))
+
     return {
         "id": r.get("id"),
         "session": r.get("session"),
@@ -113,14 +143,17 @@ def summary(r):
         "claude_tokens": sum(c.values()),
         "claude_fresh": fresh,
         "claude_calls": _int(totals.get("claude"), "calls"),
+        "claude_equiv": claude_equiv,
         "delegated_tokens": delegated,
         "delegated_calls": _int(d, "calls"),
         "delegated_failed": _int(d, "failed"),
         "delegated_failed_tokens": wasted,
+        "delegated_equiv": delegated_equiv,
+        "delegated_failed_equiv": delegated_failed_equiv,
         "tools_calls": _int(t, "calls"),
         "tools_errors": _int(t, "errors"),
         "cost_usd": float(d.get("cost_usd") or 0),
-        "share_delegated": _share(delegated, fresh),
+        "share_delegated": _share(delegated_equiv, claude_equiv),
     }
 
 
@@ -149,13 +182,18 @@ def sankey(reqs):
     L'entrée du Courtier est la somme de ses sorties (modèles retenus + tentatives
     en échec) : le Sankey reste conservatif même quand un reçu manque."""
     claude = {"input": 0, "cache_read": 0, "cache_create": 0, "output": 0}
+    claude_cache_1h = claude_cache_5m = 0
     by_model, failed_tokens, by_mode = {}, 0, {}
+    by_model_equiv, failed_equiv = {}, 0
     delegated_calls = delegated_failed = tools_calls = 0
     cost = 0.0
     for r in reqs:
         totals = r.get("totals") or {}
         for k, v in _claude_split(totals).items():
             claude[k] += v
+        craw = totals.get("claude") or {}
+        claude_cache_1h += _int(craw, "cache_create_1h")
+        claude_cache_5m += _int(craw, "cache_create_5m")
         d = totals.get("delegated") or {}
         delegated_calls += _int(d, "calls")
         delegated_failed += _int(d, "failed")
@@ -172,25 +210,36 @@ def sankey(reqs):
             if isinstance(rec, dict) and rec.get("status") == "ok":
                 key = _model_key(rec.get("provider"), rec.get("model"))
                 by_model[key] = by_model.get(key, 0) + _int(rec, "prompt_tokens") + _int(rec, "output_tokens")
+                by_model_equiv[key] = by_model_equiv.get(key, 0) + tokens.equiv(
+                    input=_int(rec, "prompt_tokens"), output=_int(rec, "output_tokens"))
             for att in step.get("attempts") or []:
                 if isinstance(att, dict) and att.get("status") != "ok":
                     tok = att.get("tokens") or {}
                     failed_tokens += _int(tok, "prompt_tokens") + _int(tok, "output_tokens")
+                    failed_equiv += tokens.equiv(input=_int(tok, "prompt_tokens"),
+                                                 output=_int(tok, "output_tokens"))
 
     nodes, links = [], []
 
     def node(nid, label, col):
         nodes.append({"id": nid, "label": label, "col": col})
 
-    def link(src, dst, value, kind):
+    def link(src, dst, value, kind, value_eq=None):
+        # `value` reste le jeton brut affiché tel quel ; `value_eq` (par défaut
+        # égal à `value` si l'appelant n'a rien de plus précis) est l'équivalent.
         if value > 0:
-            links.append({"source": src, "target": dst, "value": value, "kind": kind})
+            links.append({"source": src, "target": dst, "value": value, "kind": kind,
+                         "value_eq": value if value_eq is None else value_eq})
 
     claude_total = sum(claude.values())
+    claude_equiv_total = tokens.equiv(
+        input=claude["input"], cache_read=claude["cache_read"], cache_write=claude["cache_create"],
+        output=claude["output"], cache_write_1h=claude_cache_1h, cache_write_5m=claude_cache_5m)
     broker_total = sum(by_model.values()) + failed_tokens
+    broker_equiv_total = sum(by_model_equiv.values()) + failed_equiv
     node("req", f"Requêtes ({len(reqs)})", 0)
-    link("req", "claude", claude_total, "claude")
-    link("req", "broker", broker_total, "delegated")
+    link("req", "claude", claude_total, "claude", claude_equiv_total)
+    link("req", "broker", broker_total, "delegated", broker_equiv_total)
     if claude_total:
         node("claude", "Claude", 1)
         for nid, key, label in (("cache_read", "cache_read", "Contexte relu (cache)"),
@@ -199,18 +248,30 @@ def sankey(reqs):
                                 ("claude_out", "output", "Sortie Claude")):
             if claude[key]:
                 node(nid, label, 2)
-                link("claude", nid, claude[key], "claude")
+                if key == "cache_create":
+                    # Ventilé 1h/5m quand connu (repli tout-à-2.0 sinon, cf. tokens.equiv).
+                    v_eq = tokens.equiv(cache_write=claude[key],
+                                        cache_write_1h=claude_cache_1h,
+                                        cache_write_5m=claude_cache_5m)
+                elif key == "cache_read":
+                    v_eq = tokens.equiv(cache_read=claude[key])
+                elif key == "input":
+                    v_eq = tokens.equiv(input=claude[key])
+                else:
+                    v_eq = tokens.equiv(output=claude[key])
+                link("claude", nid, claude[key], "claude", v_eq)
     if broker_total:
         node("broker", "Courtier", 1)
         for key, val in sorted(by_model.items(), key=lambda kv: -kv[1]):
             if val:
                 node("m:" + key, key, 2)
-                link("broker", "m:" + key, val, "delegated")
+                link("broker", "m:" + key, val, "delegated", by_model_equiv.get(key, 0))
         if failed_tokens:
             node("failed", "Tentatives en échec", 2)
-            link("broker", "failed", failed_tokens, "failed")
+            link("broker", "failed", failed_tokens, "failed", failed_equiv)
 
     fresh = claude["input"] + claude["cache_create"] + claude["output"]
+    useful_delegated_equiv = broker_equiv_total - failed_equiv
     return {
         "nodes": nodes,
         "links": links,
@@ -227,7 +288,11 @@ def sankey(reqs):
             # Les tentatives en échec restent visibles dans le Sankey (gaspillage)
             # mais hors numérateur : elles n'ont rien produit.
             "useful_delegated_tokens": broker_total - failed_tokens,
-            "share_delegated": _share(broker_total - failed_tokens, fresh),
+            "claude_equiv": claude_equiv_total,
+            "delegated_equiv": broker_equiv_total,
+            "failed_equiv": failed_equiv,
+            "useful_delegated_equiv": useful_delegated_equiv,
+            "share_delegated": _share(useful_delegated_equiv, claude_equiv_total),
             "broker_by_mode": by_mode,
         },
     }
@@ -241,4 +306,5 @@ def overview(data_root, since_ts=None, until_ts=None, project=None):
         "requests": [summary(r) for r in kept],
         "sankey": sankey(kept),
         "projects": sorted({r.get("project") for r in reqs if r.get("project")}),
+        "weights": tokens.weights_public(),
     }

@@ -96,8 +96,13 @@
 <h2>Flux agrégé</h2>
 <div class="panel-box">
   <div class="sankey-tools">
+    <span class="unit-toggle" role="radiogroup" aria-label="Unité des tokens">
+      <label><input type="radio" name="unit" value="raw" checked> tokens bruts</label>
+      <label><input type="radio" name="unit" value="eq"> tokens équivalents</label>
+    </span>
     <label><input type="checkbox" id="hide-cache"> masquer le contexte relu (cache)</label>
     <span>bleu = Claude · vert = délégué · rouge = tentatives en échec · épaisseur ∝ tokens (3 px minimum)</span>
+    <span id="unit-formula" hidden>équivalent = entrée×1 + cache relu×0,10 + écriture cache (1 h×2,0 · 5 min×1,25) + sortie×5</span>
   </div>
   <svg id="sankey" role="img" aria-label="Flux de tokens agrégé"></svg>
   <p class="empty" id="sankey-empty" hidden>Aucune donnée sur la période.</p>
@@ -155,6 +160,21 @@ RangeSlider.init("wf-range", {{ f.since_ts | tojson }}, {{ f.until_ts | tojson }
 <script>
 const W = {{ w | tojson }};
 const SVG = "http://www.w3.org/2000/svg";
+// Bruts ou équivalents (pondérés sur le prix d'un jeton d'entrée, poids servis par
+// radar_ops/tokens.py) : choix par navigateur, sans incidence sur les données.
+const WGT = W.weights || { input: 1, cache_read: 0.1, cache_write_5m: 1.25, cache_write_1h: 2, output: 5 };
+let UNIT = "raw";
+try { if (localStorage.getItem("wf-unit") === "eq") UNIT = "eq"; } catch (e) {}
+const EQ = () => UNIT === "eq";
+// Même règle que tokens.equiv : écriture de cache non ventilée comptée au tarif 1 h.
+function claudeEq(tk) {
+  const w1 = tk.cache_create_1h || 0, w5 = tk.cache_create_5m || 0;
+  const rest = Math.max((tk.cache_create || 0) - w1 - w5, 0);
+  return Math.round((tk.input || 0) * WGT.input + (tk.cache_read || 0) * WGT.cache_read
+    + w1 * WGT.cache_write_1h + w5 * WGT.cache_write_5m + rest * WGT.cache_write_1h
+    + (tk.output || 0) * WGT.output);
+}
+function brokerEq(prompt, output) { return Math.round((prompt || 0) * WGT.input + (output || 0) * WGT.output); }
 const COLORS = { claude: "var(--accent)", tools: "var(--dim)", delegated: "var(--ok)", failed: "var(--bad)" };
 
 function fmt(n) {
@@ -197,10 +217,13 @@ function renderTiles() {
   const t = (W.sankey && W.sankey.totals) || {};
   const tiles = [
     ["Requêtes", fmt(t.requests), ""],
-    ["Tokens Claude", fmt(t.claude_tokens), "dont " + fmt(t.claude_fresh) + " hors cache relu"],
-    ["Tokens délégués", fmt(t.delegated_tokens), (t.delegated_calls || 0) + " appels courtier"
-      + (t.failed_tokens ? " · dont " + fmt(t.failed_tokens) + " en tentatives échouées" : "")],
-    ["Part déléguée", Math.round((t.share_delegated || 0) * 100) + " %", "délégué abouti / (délégué abouti + Claude hors cache) — échecs exclus"],
+    EQ() ? ["Tokens Claude (éq.)", fmt(t.claude_equiv), fmt(t.claude_tokens) + " bruts, cache relu compté à 0,10"]
+         : ["Tokens Claude", fmt(t.claude_tokens), "dont " + fmt(t.claude_fresh) + " hors cache relu"],
+    EQ() ? ["Tokens délégués (éq.)", fmt(t.delegated_equiv), (t.delegated_calls || 0) + " appels courtier"
+             + (t.failed_equiv ? " · dont " + fmt(t.failed_equiv) + " en tentatives échouées" : "")]
+         : ["Tokens délégués", fmt(t.delegated_tokens), (t.delegated_calls || 0) + " appels courtier"
+             + (t.failed_tokens ? " · dont " + fmt(t.failed_tokens) + " en tentatives échouées" : "")],
+    ["Part déléguée", Math.round((t.share_delegated || 0) * 100) + " %", "délégué abouti / (délégué abouti + Claude), en tokens équivalents — échecs exclus"],
     ["Échecs courtier", String(t.delegated_failed || 0), ""],
     ["Appels outils", fmt(t.tools_calls), "Read, Edit, Bash…"],
     ["Coût payant", "$" + (t.cost_usd || 0).toFixed(4), ""],
@@ -214,7 +237,8 @@ function renderTiles() {
 /* ---------- Sankey ---------- */
 function sankeyData(hideCache) {
   const s = W.sankey || { nodes: [], links: [] };
-  let nodes = s.nodes.slice(), links = s.links.map(l => Object.assign({}, l));
+  let nodes = s.nodes.slice(), links = s.links.map(l => Object.assign({}, l,
+    EQ() ? { value: l.value_eq ?? l.value } : {}));
   if (hideCache) {
     const cr = links.find(l => l.target === "cache_read");
     if (cr) {
@@ -268,7 +292,7 @@ function renderSankey() {
     const d = `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + th} C${xm},${y1 + th} ${xm},${y0 + th} ${x0},${y0 + th} Z`;
     const p = el("path", { d, class: "band", fill: COLORS[l.kind] || COLORS.claude });
     const ln = id => (nodes.find(n => n.id === id) || {}).label || id;
-    p.append(el("title", {}, `${ln(l.source)} → ${ln(l.target)} : ${l.value.toLocaleString("fr-FR")} tokens`));
+    p.append(el("title", {}, `${ln(l.source)} → ${ln(l.target)} : ${l.value.toLocaleString("fr-FR")} tokens${EQ() ? " équivalents" : ""}`));
     svg.append(p);
   }
   for (const n of used) {
@@ -292,14 +316,16 @@ function renderTable() {
   body.replaceChildren(...W.requests.map(r => {
     const share = Math.round((r.share_delegated || 0) * 100);
     const bar = h("i", {}, [h("b", { style: `width:${share}%` })]);
-    const deleg = h("td", {}, [document.createTextNode(`${fmt(r.delegated_tokens)} · ${r.delegated_calls} appel(s)`)]);
+    const deleg = h("td", {}, [document.createTextNode(`${fmt(EQ() ? r.delegated_equiv : r.delegated_tokens)} · ${r.delegated_calls} appel(s)`)]);
     if (r.delegated_failed) deleg.append(h("span", { cls: "bad", text: ` · ${r.delegated_failed} échec(s)` }));
     const tr = h("tr", { "data-id": r.id }, [
       h("td", { text: paris(r.started) }),
       h("td", { cls: "dim", text: r.project_short }),
       h("td", { cls: "title", title: r.title, text: r.title }),
-      h("td", {}, [document.createTextNode(fmt(r.claude_tokens) + " "),
-                   h("span", { cls: "dim", text: `(${fmt(r.claude_fresh)} hors cache · ${r.claude_calls} appels)` })]),
+      EQ() ? h("td", {}, [document.createTextNode(fmt(r.claude_equiv) + " "),
+                          h("span", { cls: "dim", text: `(éq. · ${r.claude_calls} appels)` })])
+           : h("td", {}, [document.createTextNode(fmt(r.claude_tokens) + " "),
+                          h("span", { cls: "dim", text: `(${fmt(r.claude_fresh)} hors cache · ${r.claude_calls} appels)` })]),
       deleg,
       h("td", {}, [document.createTextNode(String(r.tools_calls)),
                    r.tools_errors ? h("span", { cls: "bad", text: ` (${r.tools_errors} err.)` }) : ""]),
@@ -336,8 +362,9 @@ function renderDetail(r) {
     item("début", paris(r.started, true)),
     item("durée", dur((end - start) / 1000)),
     item("modèle", r.model || "?"),
-    item("Claude", `${c.calls || 0} appels · ${fmt((c.input || 0) + (c.cache_create || 0) + (c.output || 0))} hors cache · ${fmt(c.cache_read)} cache relu`),
-    item("délégué", `${d.calls || 0} appels · ${fmt((d.prompt || 0) + (d.output || 0))} tokens` + (d.failed ? ` · ${d.failed} échec(s)` : "")),
+    item("Claude", EQ() ? `${c.calls || 0} appels · ${fmt(claudeEq(c))} tokens éq.`
+                        : `${c.calls || 0} appels · ${fmt((c.input || 0) + (c.cache_create || 0) + (c.output || 0))} hors cache · ${fmt(c.cache_read)} cache relu`),
+    item("délégué", `${d.calls || 0} appels · ${fmt(EQ() ? brokerEq(d.prompt, d.output) : (d.prompt || 0) + (d.output || 0))} tokens${EQ() ? " éq." : ""}` + (d.failed ? ` · ${d.failed} échec(s)` : "")),
     item("outils", String((t.tools || {}).calls || 0)),
   );
   renderSequence(r.steps || []);
@@ -363,7 +390,8 @@ function sequenceRows(steps) {
     else if (s.kind === "claude_call") {
       const fresh = (tk.input || 0) + (tk.cache_create || 0) + (tk.output || 0);
       rows.push({ si, box: "claude", color: COLORS.claude,
-                  label: `appel #${s.n || ""} · ${fmt(fresh)} frais · ${fmt(tk.cache_read)} cache` + (s.output ? " · texte" : "") });
+                  label: (EQ() ? `appel #${s.n || ""} · ${fmt(claudeEq(tk))} éq.`
+                               : `appel #${s.n || ""} · ${fmt(fresh)} frais · ${fmt(tk.cache_read)} cache`) + (s.output ? " · texte" : "") });
     } else if (s.kind === "tool") {
       const col = s.is_error ? COLORS.failed : COLORS.tools;
       rows.push({ si, from: "claude", to: "tools", color: col, label: s.label });
@@ -385,7 +413,7 @@ function sequenceRows(steps) {
       const rec = s.receipt;
       rows.push({ si, part: "ret", from: "broker", to: "claude", color: rec && rec.status !== "ok" ? COLORS.failed : COLORS.delegated,
                   dash: true, w: 2,
-                  label: rec ? `${fmt((rec.prompt_tokens || 0) + (rec.output_tokens || 0))} tok · ${rec.status}` : (s.is_error ? "erreur · sans reçu" : "sans reçu") });
+                  label: rec ? `${fmt(EQ() ? brokerEq(rec.prompt_tokens, rec.output_tokens) : (rec.prompt_tokens || 0) + (rec.output_tokens || 0))} tok${EQ() ? " éq." : ""} · ${rec.status}` : (s.is_error ? "erreur · sans reçu" : "sans reçu") });
     } else if (s.kind === "answer") rows.push({ si, from: "claude", to: "user", color: COLORS.claude, label: "réponse", w: 2, dash: true });
   });
   return rows;
@@ -476,6 +504,19 @@ document.querySelectorAll("#io [data-copy]").forEach(b => b.addEventListener("cl
     .then(() => { b.textContent = "copié"; setTimeout(() => { b.textContent = "copier"; }, 1200); });
 }));
 document.getElementById("hide-cache").addEventListener("change", renderSankey);
+function applyUnit() {
+  document.querySelectorAll('input[name="unit"]').forEach(i => { i.checked = i.value === UNIT; });
+  document.getElementById("unit-formula").hidden = !EQ();
+  renderTiles(); renderSankey(); renderTable();
+  if (current) renderDetail(current);
+}
+document.querySelectorAll('input[name="unit"]').forEach(i => i.addEventListener("change", () => {
+  UNIT = i.value === "eq" ? "eq" : "raw";
+  try { localStorage.setItem("wf-unit", UNIT); } catch (e) {}
+  applyUnit();
+}));
+document.querySelectorAll('input[name="unit"]').forEach(i => { i.checked = i.value === UNIT; });
+document.getElementById("unit-formula").hidden = !EQ();
 
 renderTiles();
 renderSankey();

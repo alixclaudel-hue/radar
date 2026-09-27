@@ -4,12 +4,12 @@ Discogs de l'utilisateur. Élargi le 20/09 (issue #62) à la collection Bandcamp
 (corpus, job_ingest_bandcamp) : même remarque, un achat Bandcamp n'est pas
 moins « possédé » qu'un disque en collection Discogs.
 
-Vérifie que `crate_jobs.job_scan_recos` écarte les pistes d'un album possédé
+Vérifie que `radar_jobs.recos.job_scan_recos` écarte les pistes d'un album possédé
 (Discogs OU Bandcamp), par release_id ET par identité artiste+titre (un autre
 pressage du même disque porte un id Discogs différent), sans écarter le reste.
 
 Base scorestore SQLite synthétique dans un dossier temporaire, chemins de
-`crate_jobs` patchés : aucun accès au vrai `/data`, aucun appel réseau.
+`radar_jobs.recos` patchés : aucun accès au vrai `/data`, aucun appel réseau.
 
 Lancer : python3 -m unittest tests.test_job_scan_recos_owned -v
 """
@@ -22,7 +22,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crate_jobs  # noqa: E402
+from radar_jobs import ingest, recos, tracks  # noqa: E402
 from radar_web.radar import scorestore  # noqa: E402
 
 from tests.test_job_publish_recos import FakeJob  # noqa: E402
@@ -40,9 +40,9 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
             "COLLECTION_CACHE_PATH": os.path.join(tmp, "collection_cache.json"),
             "CORPUS_PATH": os.path.join(tmp, "taste_corpus.json"),
         }
-        patchers = [mock.patch.object(crate_jobs, name, path)
+        patchers = [mock.patch.object(recos, name, path)
                     for name, path in self.paths.items()]
-        patchers.append(mock.patch.object(crate_jobs, "cfg_load", return_value={}))
+        patchers.append(mock.patch.object(recos, "cfg_load", return_value={}))
         self.db = os.path.join(tmp, "scorestore.sqlite3")
         patchers.append(mock.patch.object(scorestore, "db_path", lambda uid: self.db))
         for p in patchers:
@@ -72,15 +72,15 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
         con.close()
 
     def _collection(self, **kw):
-        crate_jobs.save_json(self.paths["COLLECTION_CACHE_PATH"], kw)
+        recos.save_json(self.paths["COLLECTION_CACHE_PATH"], kw)
 
     def _corpus(self, rows):
-        crate_jobs.save_json(self.paths["CORPUS_PATH"], rows)
+        recos.save_json(self.paths["CORPUS_PATH"], rows)
 
     def _run(self):
         job = FakeJob()
-        crate_jobs.job_scan_recos(job, {})
-        return job, crate_jobs.load_json(self.paths["RECOS_CANDIDATES_PATH"], [])
+        recos.job_scan_recos(job, {})
+        return job, recos.load_json(self.paths["RECOS_CANDIDATES_PATH"], [])
 
     def test_sans_collection_rien_n_est_ecarte(self):
         job, candidates = self._run()
@@ -91,7 +91,7 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
         # collection = le seul pressage 111 ; 222 est le MÊME album sous un autre
         # id Discogs, il doit tomber lui aussi (clé artiste+titre).
         self._collection(owned_release_ids=[111],
-                         owned_release_keys=[crate_jobs._release_identity_key(
+                         owned_release_keys=[tracks._release_identity_key(
                              "Soichi Terada", "Asakusa Light")])
         job, candidates = self._run()
         self.assertEqual([c["release_id"] for c in candidates], [333])
@@ -101,7 +101,7 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
         # cas réel : la collection porte un pressage (id 999) que la découverte
         # RECOS n'a jamais vu — seule l'identité artiste+titre peut rapprocher.
         self._collection(owned_release_ids=[999],
-                         owned_release_keys=[crate_jobs._release_identity_key(
+                         owned_release_keys=[tracks._release_identity_key(
                              "Soichi Terada", "Asakusa Light")])
         _, candidates = self._run()
         self.assertEqual([c["release_id"] for c in candidates], [333])
@@ -134,17 +134,17 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
 
 class ReleaseIdentityKeyTestCase(unittest.TestCase):
     def test_suffixe_de_desambiguisation_retire_sur_l_artiste_seulement(self):
-        self.assertEqual(crate_jobs._release_identity_key("Rhythm (2)", "Asakusa Light"),
-                         crate_jobs._release_identity_key("Rhythm", "Asakusa Light"))
+        self.assertEqual(tracks._release_identity_key("Rhythm (2)", "Asakusa Light"),
+                         tracks._release_identity_key("Rhythm", "Asakusa Light"))
         # un titre peut légitimement finir par un nombre entre parenthèses :
         # il ne doit pas être confondu avec un autre disque.
-        self.assertNotEqual(crate_jobs._release_identity_key("A", "Volume (2)"),
-                            crate_jobs._release_identity_key("A", "Volume"))
+        self.assertNotEqual(tracks._release_identity_key("A", "Volume (2)"),
+                            tracks._release_identity_key("A", "Volume"))
 
     def test_moitie_manquante_ne_produit_aucune_cle(self):
-        self.assertEqual(crate_jobs._release_identity_key("Soichi Terada", ""), "")
-        self.assertEqual(crate_jobs._release_identity_key("", "Asakusa Light"), "")
-        self.assertEqual(crate_jobs._release_identity_key(None, None), "")
+        self.assertEqual(tracks._release_identity_key("Soichi Terada", ""), "")
+        self.assertEqual(tracks._release_identity_key("", "Asakusa Light"), "")
+        self.assertEqual(tracks._release_identity_key(None, None), "")
 
 
 class FetchCollectionOwnedTestCase(unittest.TestCase):
@@ -156,9 +156,9 @@ class FetchCollectionOwnedTestCase(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.cache = os.path.join(self._tmp.name, "collection_cache.json")
         patchers = [
-            mock.patch.object(crate_jobs, "COLLECTION_CACHE_PATH", self.cache),
-            mock.patch.object(crate_jobs, "cfg_load", return_value={"token": "t"}),
-            mock.patch.object(crate_jobs, "time", mock.Mock(sleep=lambda s: None)),
+            mock.patch.object(ingest, "COLLECTION_CACHE_PATH", self.cache),
+            mock.patch.object(ingest, "cfg_load", return_value={"token": "t"}),
+            mock.patch.object(ingest, "time", mock.Mock(sleep=lambda s: None)),
         ]
         for p in patchers:
             p.start()
@@ -179,12 +179,12 @@ class FetchCollectionOwnedTestCase(unittest.TestCase):
                 "pagination": {"pages": 1}}
 
     def test_collection_memorisee_wantlist_ignoree(self):
-        with mock.patch.object(crate_jobs, "discogs_get", side_effect=self._api):
-            crate_jobs.job_fetch_collection(FakeJob(), {"merge_base": False})
+        with mock.patch.object(ingest, "discogs_get", side_effect=self._api):
+            ingest.job_fetch_collection(FakeJob(), {"merge_base": False})
         cache = json.load(open(self.cache))
         self.assertEqual(cache["owned_release_ids"], [111])
         self.assertEqual(cache["owned_release_keys"],
-                         [crate_jobs._release_identity_key("Soichi Terada", "Asakusa Light")])
+                         [tracks._release_identity_key("Soichi Terada", "Asakusa Light")])
         # la wantlist n'est PAS de la possession : un disque voulu doit rester
         # proposable en reco.
         self.assertNotIn(555, cache["owned_release_ids"])

@@ -1,6 +1,6 @@
 """Les scores précalculés tiennent-ils compte de la méthode de scoring COURANTE ?
 
-Le précalcul (`crate_jobs.job_scorestore_releases`) estampille la base de
+Le précalcul (`radar_jobs.scorestore.job_scorestore_releases`) estampille la base de
 l'utilisateur avec l'empreinte de ses entrées — la configuration de scoring et
 l'état des fichiers dont `Ctx` dépend, telle que la renvoie
 `scoring.derived_key()`. Comparer cette estampille à l'empreinte du moment

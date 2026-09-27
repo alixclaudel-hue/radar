@@ -40,7 +40,7 @@ from radar_web.radar import paths, store, ytcache  # noqa: E402
 # mais l'historique RECOS en contient encore d'AVANT ce correctif — 15 des 40
 # premiers cas capturés le 19/09. Les garder ferait tester un chemin mort, et
 # figerait comme « attendu » le comportement que le pt 27 a justement corrigé.
-# Doit rester aligné sur `crate_jobs._PLACEHOLDER_ARTISTS`.
+# Doit rester aligné sur `radar_jobs.tracks._PLACEHOLDER_ARTISTS`.
 _PLACEHOLDER_ARTISTS = {"various", "various artists", "va", "v/a",
                         "unknown artist", "unknown", "no artist"}
 

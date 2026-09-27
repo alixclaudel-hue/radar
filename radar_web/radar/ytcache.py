@@ -54,7 +54,7 @@ _DAILY_QUOTA_MESSAGE_MARKERS = ("per day",)
 _RATE_LIMIT_RETRY_DELAYS = (1, 2, 4)
 # Espacement minimal entre deux appels HTTP à l'API (toutes clés confondues) :
 # aucun throttle n'existait avant, et les relances de candidats en échec
-# partent avec force=True (crate_jobs.job_publish_recos) donc en rafale —
+# partent avec force=True (radar_jobs.recos.job_publish_recos) donc en rafale —
 # exactement ce qui déclenche la limite de débit ci-dessus.
 _MIN_CALL_INTERVAL = 0.34  # ~3 req/s
 _last_call_ts = 0.0
@@ -111,7 +111,7 @@ class RateLimited(RuntimeError):
     """Limite de débit YouTube (par seconde/utilisateur) après épuisement des
     retries -- distincte de QuotaExhausted : transitoire, pas le quota
     journalier. L'appelant doit reprendre plus tard, pas abandonner tout le
-    run (cf. crate_jobs.job_publish_recos)."""
+    run (cf. radar_jobs.recos.job_publish_recos)."""
     pass
 
 

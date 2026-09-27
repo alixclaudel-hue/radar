@@ -272,7 +272,7 @@ VALID_JOBS = {"fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_ba
 
 ## 13. Pour aller chercher une fonctionnalité précise
 
-- **Ajouter un nouveau job lançable depuis l'appli** : écrire `job_xxx(job, params)` dans `crate_jobs.py`, l'ajouter au dict `JOBS`, puis l'ajouter à `VALID_JOBS` dans `radar_web/app.py` (sinon la route `/jobs/{name}/launch` le refusera silencieusement).
+- **Ajouter un nouveau job lançable depuis l'appli** : écrire `job_xxx(job, params)` dans le module de `radar_jobs/` du domaine concerné, l'inscrire au dict `JOBS` de `crate_jobs.py` (nom → module), puis l'ajouter à `VALID_JOBS` dans `radar_web/app.py` (sinon la route `/jobs/{name}/launch` le refusera silencieusement).
 - **Changer la fréquence d'une tâche d'entretien automatique** : `radar_web/worker.py`, constantes `AUTO_MAINT_EVERY`, `SELLER_SCAN_EVERY`, `DUMP_SYNC_CHECK_EVERY`, `CATALOG_LABELGRAPH_CHECK_EVERY`, `SCORESTORE_CHECK_EVERY`.
 - **Comprendre pourquoi un job ne se relance pas** : vérifier `jobs.launch()` (doublon en file, ou statut "running" de moins de 150s) puis `jobs.status()`/`reap_orphans()` si un déploiement vient d'avoir lieu.
 - **Ajouter un troisième étage à un pipeline chaîné** : suivre le patron `_chain_publish_recos()`/`_chain_scorestore_tracks()` — une fonction appelée juste avant `job.finish()` qui vérifie l'absence de doublon en file avant d'enfiler la suite.

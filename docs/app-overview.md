@@ -285,7 +285,7 @@ a couple of small localStorage-free JS widgets.
   `job_publish_recos`, `radar_web/worker.py._maybe_recos_scan`, `reco_radar.html`
 - YouTube search/matching quality -> `radar/ytcache.py`
 - Discogs catalog search without hitting the live API -> `radar/discogs_dump.py`
-- Background job wiring (new job type) -> add to `crate_jobs.JOBS` dict and a
+- Background job wiring (new job type) -> write `job_xxx` in the matching `radar_jobs/` module, register it in `crate_jobs.JOBS` (name -> module) and a
   route in `app.py` under `/patte/run/{job}` or `/jobs/{name}/launch`
 - Login/accounts/invites -> `radar/accounts.py` + `/login`, `/register`,
   `/account/invite` routes in `app.py`

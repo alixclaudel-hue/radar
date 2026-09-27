@@ -1,7 +1,7 @@
 """Référentiel local des sorties Discogs, construit à partir du dump mensuel
 officiel (data.discogs.com) — catalogue/labels/artistes/genres, PAS le
 marketplace (vendeurs/prix/inventaire, qui reste toujours en API live, cf.
-`sellers.py`/`crate_jobs.job_scan_catalog`).
+`sellers.py`/`radar_jobs.search.job_scan_catalog`).
 
 Le dump complet fait plusieurs dizaines de Go décompressés pour ~18-20M de
 sorties TOUS FORMATS confondus (vinyle, CD, fichier audio, cassette, etc.) —
@@ -18,7 +18,7 @@ autres dans /data) — nettement plus volumineux qu'avant cet élargissement,
 à surveiller côté disque VPS (cf. CLAUDE.md point 12, déjà eu un incident de
 saturation).
 
-Rempli par le job `import_discogs_dump` (crate_jobs.py), rafraîchi par la
+Rempli par le job `import_discogs_dump` (radar_jobs/dump.py), rafraîchi par la
 veille mensuelle du worker (RADAR_DISCOGS_DUMP_SYNC=1). Un dump mensuel est
 un instantané complet, jamais un delta — "actualiser" retélécharge et
 reconstruit l'index en entier.
@@ -535,7 +535,7 @@ def finalize_new_db(con, db_path=None):
 #
 # Diagnostic VPS 2026-09-15 : le XML brut du dump CONTIENT les crédits par piste
 # (`<tracklist><track><artists>`) — seul le schéma SQLite ne les exploitait pas,
-# forçant `job_scorestore_tracks` (crate_jobs.py) à un appel API par sortie pour
+# forçant `job_scorestore_tracks` (radar_jobs/scorestore.py) à un appel API par sortie pour
 # récupérer sa tracklist, plafonné à `fetches_per_run`. Base séparée de
 # `discogs_dump.sqlite3` (comme `catalog_labelgraph.sqlite3`) plutôt qu'une table
 # de plus dedans : un problème de parsing tracklist ne doit jamais bloquer la
@@ -614,7 +614,7 @@ def connect_tracks_readonly():
 
 def tracks_for_release(release_id, con=None, main_con=None):
     """[{"position","type_","title","artists"}] — forme compatible avec
-    `real_tracks()`/`_track_credit_artist()` (crate_jobs.py), pour que
+    `real_tracks()`/`_track_credit_artist()` (radar_jobs/tracks.py), pour que
     `job_scorestore_tracks` (pass b) puisse consommer le dump local exactement
     comme une tracklist API, sans code spécifique. `None` si cette sortie n'est
     PAS dans le référentiel courant (absente du dernier import mensuel — sortie
@@ -1026,7 +1026,7 @@ def _parse_tracklist(elem):
     pistes ont un crédit par piste (les autres restent à `""`, PAS l'artiste de la
     sortie — le repli sur l'artiste de la sortie, comme la normalisation des
     placeholders "Various"/"Unknown Artist", reste la responsabilité de l'appelant,
-    cf. `_track_credit_artist` dans crate_jobs.py, jamais dupliquée ici).
+    cf. `_track_credit_artist` dans radar_jobs/tracks.py, jamais dupliquée ici).
 
     `artist` : comma-joint si plusieurs artistes crédités sur une même piste, même
     simplification que l'artiste de la SORTIE plus haut dans cette fonction (le
@@ -1193,7 +1193,7 @@ def _has_table(con, name):
 
 
 def _in_chunks(con, sql_tmpl, ids, extra_params=()):
-    """Comme `_sql_in_chunks` (crate_jobs.py) mais gardé ici : discogs_dump.py
+    """Comme `_sql_in_chunks` (radar_jobs/graph.py) mais gardé ici : discogs_dump.py
     ne doit pas dépendre du script de jobs (sens d'import inverse). Par lots
     de 900 pour rester sous SQLITE_MAX_VARIABLE_NUMBER."""
     out = []
@@ -1243,7 +1243,7 @@ def artist_ids_for_labels(label_keys, con=None):
     """{artist_id: {"name": str, "n": int, "styles": {style: n}}} — artistes
     crédités sur au moins un des label_keys donnés (release_artists JOIN
     releases), l'artiste générique "Various" (id 194, cf.
-    crate_jobs.VARIOUS_ARTIST_ID) exclu. Mirroir de `label_ids_for_artists`
+    radar_jobs.graph.VARIOUS_ARTIST_ID) exclu. Mirroir de `label_ids_for_artists`
     pour le ranking artistes : "cet artiste a-t-il un disque chez un label
     que je suis déjà". `styles` (styles DE CES SORTIES PRÉCISES, pas du label
     en général) permet à l'appelant de croiser le style de la sortie créditée

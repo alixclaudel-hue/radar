@@ -37,7 +37,7 @@ def _pu():
 
 # Valeur de repli si cfg["scoring"]["recos"]["max_tracks"] est absente (config
 # jamais réglée) -- réglable désormais via le curseur de /settings, affichage
-# seulement (crate_jobs.job_publish_recos lit la même clé pour la vraie limite).
+# seulement (radar_jobs.recos.job_publish_recos lit la même clé pour la vraie limite).
 RECOS_MAX_TRACKS = 5
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1511,7 +1511,7 @@ def tracklist(request: Request, rid: int):
     for t in real_tracks(data.get("tracklist", [])):
         ttl = (t.get("title") or "").strip()
         tart = ", ".join(a.get("name", "") for a in t.get("artists", [])) or ra
-        # min_overlap=0 : même raison que crate_jobs._discogs_release_video, cf.
+        # min_overlap=0 : même raison que radar_jobs.recos._discogs_release_video, cf.
         # textmatch.best_video_uri (diagnostic VPS 2026-09-18).
         uri = best_video_uri(videos, tart, ttl, min_overlap=0)
         if uri:
@@ -1679,7 +1679,7 @@ def _inbox(request, path, source_key, key_ns, mins=30):
                                  "style": it.get("style") or []})
         rid = str(it.get("release_id") or it.get("listing_id") or "")
         # le scan (règles ou vendeurs) pose déjà sa propre pochette sur l'item — cf.
-        # job_scan_veille/job_scan_sellers (crate_jobs.py) — le cache release_meta n'est
+        # job_scan_veille/job_scan_sellers (radar_jobs/search.py) — le cache release_meta n'est
         # qu'un repli pour les items plus anciens scannés avant l'ajout de ce champ.
         thumb = it.get("thumb") or (meta_cache.get(rid) or {}).get("thumb") or ""
         scored.append({"it": it, "score": sc, "det": det, "src": it.get(source_key), "thumb": thumb})

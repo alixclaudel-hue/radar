@@ -21,7 +21,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import crate_jobs  # noqa: E402
+from radar_jobs import recos  # noqa: E402
 from radar_web.radar import textmatch, ytcache  # noqa: E402
 
 from tests.test_job_publish_recos import FakeJob  # noqa: E402
@@ -183,14 +183,14 @@ class PublishRecosDiscogsFirstTestCase(unittest.TestCase):
             "RECOS_PLAYLIST_PATH": os.path.join(tmp, "recos_playlist.json"),
             "RECOS_SEARCH_BUDGET_PATH": os.path.join(tmp, "recos_search_budget.json"),
         }
-        patchers = [mock.patch.object(crate_jobs, name, path)
+        patchers = [mock.patch.object(recos, name, path)
                     for name, path in self.paths.items()]
         patchers += [
-            mock.patch.object(crate_jobs, "cfg_load",
+            mock.patch.object(recos, "cfg_load",
                               return_value={"token": "tok",
                                             "scoring": {"recos": {"max_tracks": 10}}}),
             mock.patch.object(ytcache, "youtube_keys", return_value=["k"]),
-            mock.patch.object(crate_jobs.time, "sleep"),   # cadence Discogs : pas d'attente en test
+            mock.patch.object(recos.time, "sleep"),   # cadence Discogs : pas d'attente en test
         ]
         for p in patchers:
             p.start()
@@ -203,32 +203,32 @@ class PublishRecosDiscogsFirstTestCase(unittest.TestCase):
         return c
 
     def _playlist(self):
-        return crate_jobs.load_json(self.paths["RECOS_PLAYLIST_PATH"], [])
+        return recos.load_json(self.paths["RECOS_PLAYLIST_PATH"], [])
 
     def _budget_count(self):
-        d = crate_jobs.load_json(self.paths["RECOS_SEARCH_BUDGET_PATH"], {})
+        d = recos.load_json(self.paths["RECOS_SEARCH_BUDGET_PATH"], {})
         return int(d.get("count", 0))
 
     def test_video_discogs_publiee_sans_recherche_youtube(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
-        with mock.patch.object(crate_jobs, "discogs_get", return_value={"videos": VIDEOS}), \
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "discogs_get", return_value={"videos": VIDEOS}), \
              mock.patch.object(ytcache, "playable_video", return_value=True), \
              mock.patch.object(ytcache, "search_video_diag",
                                 side_effect=AssertionError("aucune recherche attendue")) as search:
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual(search.call_count, 0)
         self.assertEqual([t["video_id"] for t in self._playlist()], ["aaaaaaaaaaa"])
         self.assertEqual(self._budget_count(), 0)          # aucune unité de recherche consommée
         self.assertIn("vidéo Discogs", job.ticks[-1])
 
     def test_repli_recherche_si_aucune_video_ne_correspond(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"],
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"],
                              [self._candidate(artist="Soichi Terada", title="Sun Showers")])
-        with mock.patch.object(crate_jobs, "discogs_get", return_value={"videos": VIDEOS}), \
+        with mock.patch.object(recos, "discogs_get", return_value={"videos": VIDEOS}), \
              mock.patch.object(ytcache, "search_video_diag", return_value=("zzz", "")) as search:
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual(search.call_count, 1)
         self.assertEqual([t["video_id"] for t in self._playlist()], ["zzz"])
         self.assertEqual(self._budget_count(), 1)
@@ -237,66 +237,66 @@ class PublishRecosDiscogsFirstTestCase(unittest.TestCase):
     def test_repli_recherche_si_la_video_discogs_est_illisible(self):
         """Lien Discogs vers une vidéo supprimée/privée : ne jamais publier tel
         quel, repasser par la recherche."""
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
-        with mock.patch.object(crate_jobs, "discogs_get", return_value={"videos": VIDEOS}), \
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "discogs_get", return_value={"videos": VIDEOS}), \
              mock.patch.object(ytcache, "playable_video", return_value=False), \
              mock.patch.object(ytcache, "search_video_diag", return_value=("zzz", "")) as search:
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual(search.call_count, 1)
         self.assertEqual([t["video_id"] for t in self._playlist()], ["zzz"])
 
     def test_sortie_sans_video_declenche_la_recherche(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
-        with mock.patch.object(crate_jobs, "discogs_get", return_value={}), \
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "discogs_get", return_value={}), \
              mock.patch.object(ytcache, "search_video_diag", return_value=("zzz", "")) as search:
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual(search.call_count, 1)
 
     def test_publie_encore_quand_le_budget_du_jour_est_epuise(self):
         """Intérêt principal du chemin Discogs : il ne dépend pas du quota de
         recherche, donc la playlist continue de se remplir après épuisement."""
-        crate_jobs._recos_searches_record(crate_jobs.RECOS_DAILY_SEARCH_BUDGET)
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
-        with mock.patch.object(crate_jobs, "discogs_get", return_value={"videos": VIDEOS}), \
+        recos._recos_searches_record(recos.RECOS_DAILY_SEARCH_BUDGET)
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "discogs_get", return_value={"videos": VIDEOS}), \
              mock.patch.object(ytcache, "playable_video", return_value=True), \
              mock.patch.object(ytcache, "search_video_diag",
                                 side_effect=AssertionError("aucune recherche attendue")):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual([t["video_id"] for t in self._playlist()], ["aaaaaaaaaaa"])
 
     def test_budget_epuise_sans_token_discogs_arrete_le_run(self):
         """Sans token, aucun chemin ne contourne le quota : on garde l'arrêt net."""
-        crate_jobs._recos_searches_record(crate_jobs.RECOS_DAILY_SEARCH_BUDGET)
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
-        with mock.patch.object(crate_jobs, "cfg_load", return_value={}), \
-             mock.patch.object(crate_jobs, "discogs_get",
+        recos._recos_searches_record(recos.RECOS_DAILY_SEARCH_BUDGET)
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "cfg_load", return_value={}), \
+             mock.patch.object(recos, "discogs_get",
                                 side_effect=AssertionError("aucun appel Discogs attendu")):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertIn("Budget quotidien", job.finished)
         self.assertEqual(self._playlist(), [])
 
     def test_plafond_d_appels_discogs_par_lancement(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"],
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"],
                              [self._candidate(title=f"Track {i}") for i in range(4)])
-        with mock.patch.object(crate_jobs, "RECOS_DISCOGS_LOOKUPS_PER_RUN", 2), \
-             mock.patch.object(crate_jobs, "discogs_get", return_value={}) as dg, \
+        with mock.patch.object(recos, "RECOS_DISCOGS_LOOKUPS_PER_RUN", 2), \
+             mock.patch.object(recos, "discogs_get", return_value={}) as dg, \
              mock.patch.object(ytcache, "search_video_diag", return_value=("", "rien")):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual(dg.call_count, 2)
 
     def test_candidat_sans_release_id_passe_direct_a_la_recherche(self):
-        crate_jobs.save_json(self.paths["RECOS_CANDIDATES_PATH"],
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"],
                              [self._candidate(release_id=None)])
-        with mock.patch.object(crate_jobs, "discogs_get",
+        with mock.patch.object(recos, "discogs_get",
                                 side_effect=AssertionError("aucun appel Discogs attendu")), \
              mock.patch.object(ytcache, "search_video_diag", return_value=("zzz", "")):
             job = FakeJob()
-            crate_jobs.job_publish_recos(job, {})
+            recos.job_publish_recos(job, {})
         self.assertEqual([t["video_id"] for t in self._playlist()], ["zzz"])
 
 

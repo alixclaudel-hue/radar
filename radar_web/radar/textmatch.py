@@ -45,7 +45,7 @@ def overlap(want, cand):
 # Valeur d'origine de la tracklist de /search (bouton play), reprise telle
 # quelle par la playlist RECOS RADAR : une vidéo mal appariée est pire que pas
 # de vidéo (même principe que ytcache.MIN_MATCH_SCORE). Les DEUX appelants
-# actuels de `best_video_uri` (`app.py::tracklist`, `crate_jobs.py::
+# actuels de `best_video_uri` (`app.py::tracklist`, `radar_jobs/recos.py::
 # _discogs_release_video`) passent `min_overlap=0` pour le DÉSACTIVER — cf.
 # note sous `best_video_uri` — il ne reste donc utile qu'à un futur appelant
 # qui comparerait des vidéos non garanties déjà rattachées à la bonne sortie

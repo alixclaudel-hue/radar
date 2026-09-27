@@ -44,7 +44,7 @@ AUTO_MAINT_EVERY = {"canonicalize": 7 * 86400, "profile_labels": 7 * 86400, "bui
 _last_auto_maint_check = 0.0
 
 # RECOS RADAR (candidats + publication dans la playlist interne à Radar, cf.
-# crate_jobs.job_publish_recos) : opt-in via RADAR_RECOS_SCAN=1. Draine la file
+# radar_jobs.recos.job_publish_recos) : opt-in via RADAR_RECOS_SCAN=1. Draine la file
 # d'attente (publish_recos) tant qu'elle n'est pas vide ; ne relance un scan
 # (scan_recos, qui rechaîne lui-même publish_recos) qu'une fois la file vide —
 # pas un scan quotidien fixe qui laissait des candidats déjà en attente sans
@@ -165,7 +165,7 @@ def _maybe_scorestore_build():
     qu'un déclencheur événementiel ici. scorestore_releases rechaîne
     lui-même scorestore_tracks en fin de course, qui se rechaîne à son tour
     tant qu'il reste des sorties sans tracklist (cf.
-    crate_jobs._chain_scorestore_tracks) — cette cadence ne sert donc qu'à
+    radar_jobs.scorestore._chain_scorestore_tracks) — cette cadence ne sert donc qu'à
     redémarrer la chaîne si elle s'est complètement vidée ou si le worker
     vient de repartir, pas à cadencer chaque lot."""
     global _last_scorestore_check
@@ -277,7 +277,7 @@ def _maybe_recos_scan():
     .env, ignoré par ce `return` depuis la pause du 10/09 — playlist bloquée à
     0/240). Sûr désormais côté quota YouTube : RECOS_DAILY_SEARCH_BUDGET est un
     vrai compteur journalier persistant appliqué DANS job_publish_recos (cf.
-    crate_jobs._recos_searches_used_today), pas seulement une limite de
+    radar_jobs.recos._recos_searches_used_today), pas seulement une limite de
     longueur de file — 24 ticks/jour ne peuvent plus dépasser le budget."""
     global _last_recos_check
     if os.environ.get("RADAR_RECOS_SCAN") != "1":

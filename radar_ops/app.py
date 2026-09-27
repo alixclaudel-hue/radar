@@ -22,7 +22,7 @@ from fastapi.templating import Jinja2Templates
 from radar_web.radar import accounts, codeversion, opslog, paths, scorestore, store, websession
 from radar_web.radar import scoring as sc
 
-from . import delegation, freshness, inventory, probe, workflows
+from . import delegation, freshness, inventory, memory, probe, workflows
 from .sampler import Sampler
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,6 +31,7 @@ tpl = Jinja2Templates(directory=os.path.join(HERE, "templates"))
 
 SAMPLE_EVERY = 2.0          # cadence d'échantillonnage du débit des jobs
 STREAM_EVERY = 2.0          # cadence d'envoi aux pages ouvertes
+STREAM_MEM_EVERY = 1.0      # cadence du cadran mémoire (plus vif que les jobs)
 sampler = Sampler()
 
 accounts.bootstrap()
@@ -307,6 +308,32 @@ async def stream_actions(request: Request):
             for ev in events:
                 yield "data: " + json.dumps(ev, default=str) + "\n\n"
             await asyncio.sleep(1.0)
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------------- serveur
+@app.get("/serveur", response_class=HTMLResponse)
+def page_serveur(request: Request):
+    """Cadran de capacité mémoire de l'hôte, alimenté en direct par SSE.
+
+    L'instantané initial est injecté dans la page (variable `boot`) pour que le
+    cadran affiche tout de suite une valeur : sans lui, la page resterait vide
+    jusqu'au premier événement du flux."""
+    return tpl.TemplateResponse(request, "serveur.html", {
+        "page": "serveur", "mem": memory.snapshot(), "sha": codeversion.short()})
+
+
+@app.get("/ops/stream/mem")
+async def stream_mem(request: Request):
+    """Flux Server-Sent Events de l'occupation mémoire de l'hôte."""
+    async def gen():
+        while True:
+            if await request.is_disconnected():
+                return
+            yield "data: " + json.dumps(memory.snapshot(), default=str) + "\n\n"
+            await asyncio.sleep(STREAM_MEM_EVERY)
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",
                                       "X-Accel-Buffering": "no"})

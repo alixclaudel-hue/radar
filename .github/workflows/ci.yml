@@ -102,6 +102,7 @@ jobs:
           check /delegation/workflows '200|303'
           check /delegation/workflows/request/inconnu:1.json '404|303'
           check /actions  '200|303'
+          check /serveur  '200|303'
           kill $pid 2>/dev/null || true
           exit $fail
 

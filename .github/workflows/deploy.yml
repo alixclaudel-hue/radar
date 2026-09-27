@@ -3,6 +3,12 @@ name: deploy
 on:
   push:
     branches: [main]
+    # skills/agents/docs ne tournent jamais dans les conteneurs prod —
+    # les ignorer évite un rebuild+redeploy complet pour rien (pt du 27/09,
+    # 8 merges non-code en 4h15 ont collisionné avec l'entretien de fond)
+    paths-ignore:
+      - '.claude/**'
+      - 'docs/**'
 
 concurrency: deploy-prod   # jamais deux déploiements en parallèle
 

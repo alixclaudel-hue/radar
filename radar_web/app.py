@@ -1149,29 +1149,37 @@ def search_seller_sync(seller: str = Form("")):
 _DISCO_CACHE = _TtlCache(ttl=300, maxlen=60)      # (kind, key) -> sorties brutes
 
 
-def _disco_resolve(c, kind, key):
-    """-> (nom d'affichage, valeur de requête Discogs)."""
+def _disco_resolve(c, kind, key, hint=""):
+    """-> (nom d'affichage, valeur de requête Discogs). `hint` : nom déjà
+    connu de l'appelant (ex. nœud d'un graphe label/artiste) à utiliser si
+    l'entité n'a jamais été résolue côté utilisateur (`resolved.json` /
+    `artists_resolved.json` ne couvrent que les labels/artistes de son propre
+    corpus -- un voisin découvert par le graphe n'y est pas forcément) ; sans
+    lui, on retombait sur la clé normalisée (minuscules) comme nom ET comme
+    requête Discogs, ce qui cassait l'affichage juste après la construction
+    d'un graphe (seul moyen d'atteindre ces clés-là)."""
+    hint = (hint or "").strip()
     if kind == "label":
         res = c.resolved.get(key) or {}
-        name = res.get("discogs_name") or res.get("original") or key
+        name = res.get("discogs_name") or res.get("original") or hint or key
         return name, name
     if key.startswith("id:"):
         name = c.artist_disp().get(key, key)
         return (name, name) if not str(name).startswith("id:") else (key, key[3:])
     e = c.artists_res.get(key) or {}
-    name = e.get("discogs_name") or key
+    name = e.get("discogs_name") or hint or key
     return name, name
 
 
 @app.get("/disco", response_class=HTMLResponse)
 def disco_page(request: Request, kind: str = "artist", key: str = "",
-               styles: str = "", pages: str = "3"):
+               styles: str = "", pages: str = "3", name: str = ""):
     if kind not in ("artist", "label") or not key:
         return render(request, "pages/disco.html", active="", name="?", kind=kind, key=key,
                       results=None, mystyles=[], sel=[], error="Entité inconnue.")
     c = Ctx()
     token = c.cfg.get("token", "")
-    name, qval = _disco_resolve(c, kind, key)
+    name, qval = _disco_resolve(c, kind, key, hint=name)
     npages = _clamp_int(pages, 1, 5, 3)
 
     def err(msg):

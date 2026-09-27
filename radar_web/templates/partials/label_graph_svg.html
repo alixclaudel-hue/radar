@@ -11,7 +11,13 @@
         >{{ icons.artist() if (kind or 'label') == 'artist' else icons.label() }} {{ '—' if nt is none else nt }}</span>
 {% endmacro %}
 
-{% macro disco_href(k) %}/disco?kind={{ kind or 'label' }}&amp;key={{ k|urlencode }}{% endmacro %}
+{# `name` (nom d'affichage du nœud) est transmis en clair dans l'URL : un nœud
+   de graphe peut être un voisin jamais résolu par l'utilisateur (absent de
+   resolved.json/artists_resolved.json), auquel cas /disco n'a que la clé
+   normalisée (minuscules, espaces compressés) pour deviner le nom -- ce qui
+   cassait la discographie des labels/artistes tout juste découverts par le
+   graphe. #}
+{% macro disco_href(k, name) %}/disco?kind={{ kind or 'label' }}&amp;key={{ k|urlencode }}&amp;name={{ (name or '')|urlencode }}{% endmacro %}
 
 {% macro graph_svg(full) %}
 <svg class="gsvg {{ 'gsvg--full' if full }}" viewBox="0 0 560 560" preserveAspectRatio="xMidYMid meet">
@@ -29,7 +35,7 @@
     <g class="gnode" data-gnode data-key="{{ k }}" tabindex="0" role="button"
        aria-label="{{ n.name }} — voir la fiche">
     {% else %}
-    <a class="gnode" href="{{ disco_href(k) }}" aria-label="Discographie de {{ n.name }}">
+    <a class="gnode" href="{{ disco_href(k, n.name) }}" aria-label="Discographie de {{ n.name }}">
     {% endif %}
       {# cible tactile élargie : le point visible seul est trop petit au doigt #}
       <circle cx="{{ p[0] }}" cy="{{ p[1] }}" r="{{ r + (16 if full else 9) }}" fill="transparent"></circle>
@@ -91,7 +97,7 @@
         {% endif %}
         {% if inf.facts %}<p class="small" style="margin:6px 0">{{ inf.facts|join(' · ') }}</p>{% endif %}
         {% if inf.why %}<p class="small muted" style="margin:6px 0">{{ inf.why|join(' · ') }}</p>{% endif %}
-        <a class="chip gcard__go" href="{{ disco_href(k) }}">Voir la discographie →</a>
+        <a class="chip gcard__go" href="{{ disco_href(k, n.name) }}">Voir la discographie →</a>
       </div>
       {% endfor %}
       <div class="gnodes">

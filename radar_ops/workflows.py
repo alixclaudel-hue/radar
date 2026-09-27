@@ -98,6 +98,7 @@ def summary(r):
     t = totals.get("tools") or {}
     fresh = c["input"] + c["cache_create"] + c["output"]
     delegated = _int(d, "prompt") + _int(d, "output")
+    wasted = _int(d, "failed_prompt") + _int(d, "failed_output")
     start, end = _iso_to_ts(r.get("started")), _iso_to_ts(r.get("ended"))
     return {
         "id": r.get("id"),
@@ -115,6 +116,7 @@ def summary(r):
         "delegated_tokens": delegated,
         "delegated_calls": _int(d, "calls"),
         "delegated_failed": _int(d, "failed"),
+        "delegated_failed_tokens": wasted,
         "tools_calls": _int(t, "calls"),
         "tools_errors": _int(t, "errors"),
         "cost_usd": float(d.get("cost_usd") or 0),
@@ -222,7 +224,10 @@ def sankey(reqs):
             "failed_tokens": failed_tokens,
             "tools_calls": tools_calls,
             "cost_usd": round(cost, 6),
-            "share_delegated": _share(broker_total, fresh),
+            # Les tentatives en échec restent visibles dans le Sankey (gaspillage)
+            # mais hors numérateur : elles n'ont rien produit.
+            "useful_delegated_tokens": broker_total - failed_tokens,
+            "share_delegated": _share(broker_total - failed_tokens, fresh),
             "broker_by_mode": by_mode,
         },
     }

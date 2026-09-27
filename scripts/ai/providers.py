@@ -171,7 +171,11 @@ def _dotenv_lookup(name: str, dotenv_path: str | None = None) -> str | None:
     exporté. Parseur minimal et tolérant, jamais bloquant.
     """
     if dotenv_path is None:
-        dotenv_path = os.path.join(repo_root(), ".env")
+        for chemin in cat_mod.dotenv_paths():
+            valeur = _dotenv_lookup(name, chemin)
+            if valeur:
+                return valeur
+        return None
     try:
         with open(dotenv_path, "r", encoding="utf-8") as f:
             for ligne in f:

@@ -50,6 +50,13 @@ def _http_error(status, body=b"{}"):
     return urllib.error.HTTPError("http://x", status, "err", None, io.BytesIO(body))
 
 
+
+def _SANS_DOTENV():
+    """Neutralise le `.env` réel : vider l'environnement ne suffit pas, la clé
+    y est relue en repli — sur un poste où elle existe, ces tests échouaient."""
+    return patch("scripts.ai_query._key_from_dotenv", return_value=None)
+
+
 class QueryGeminiTests(unittest.TestCase):
 
     @patch("urllib.request.urlopen")
@@ -59,7 +66,7 @@ class QueryGeminiTests(unittest.TestCase):
         côté environnement) qui s'authentifie au niveau transport, invisible
         d'ici -- cf. `.claude/skills/ask-gemini/SKILL.md`."""
         mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True), _SANS_DOTENV():
             query_gemini("Bonjour", api_key=None)
         req = mock_urlopen.call_args[0][0]
         self.assertNotIn("key=", req.full_url)
@@ -71,7 +78,7 @@ class QueryGeminiTests(unittest.TestCase):
         session cloud, qui n'en a jamais (authentification au niveau proxy)."""
         mock_urlopen.return_value = _fake_urlopen_cm(
             {"candidates": [{"content": {"parts": [{"text": "PONG"}]}}]})
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True), _SANS_DOTENV():
             res, model, usage = query_with_fallback("Bonjour", tier="fast", api_key=None)
         self.assertEqual(res, "PONG")
         self.assertEqual(model, TIER_CASCADES["fast"][0])
@@ -82,7 +89,7 @@ class QueryGeminiTests(unittest.TestCase):
             {"error": {"message": "API key not valid. Please pass a valid API key."}}
         ).encode("utf-8")
         mock_urlopen.side_effect = _http_error(400, body)
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True), _SANS_DOTENV():
             with self.assertRaises(RuntimeError) as ctx:
                 query_gemini("Bonjour", api_key=None)
         self.assertIn("API key not valid", str(ctx.exception))
@@ -94,7 +101,7 @@ class QueryGeminiTests(unittest.TestCase):
         d'authentification enverrait sur une fausse piste."""
         body = json.dumps({"error": {"message": "models/x is not found"}}).encode("utf-8")
         mock_urlopen.side_effect = _http_error(404, body)
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True), _SANS_DOTENV():
             with self.assertRaises(GeminiHTTPError) as ctx:
                 query_gemini("Bonjour", api_key=None, model="gemini-inexistant")
         self.assertNotIn("identifiant réseau", str(ctx.exception))
@@ -553,7 +560,7 @@ class AuthHintTests(unittest.TestCase):
     def _erreur(self, status, message, mock_urlopen):
         body = json.dumps({"error": {"message": message}}).encode("utf-8")
         mock_urlopen.side_effect = _http_error(status, body)
-        with patch.dict("os.environ", {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True), _SANS_DOTENV():
             with self.assertRaises(GeminiHTTPError) as ctx:
                 query_gemini("x", api_key=None)
         return str(ctx.exception)

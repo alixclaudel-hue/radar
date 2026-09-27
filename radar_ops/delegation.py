@@ -449,6 +449,8 @@ def summarize(receipts, events, now=None, days=14, health_state=None):
         "prompt_tokens": sum(_int(r, "prompt_tokens") for r in receipts),
         "output_tokens": sum(_int(r, "output_tokens") for r in receipts),
         "total_tokens": sum(_int(r, "total_tokens") for r in receipts),
+        "useful_tokens": sum(_int(r, "total_tokens") for r in receipts if r.get("status") == "ok"),
+        "failed_tokens": sum(_int(r, "total_tokens") for r in receipts if r.get("status") != "ok"),
         "elapsed_ms": sum(_int(r, "elapsed_ms") for r in receipts),
         "median_ms": _median(ms),
         "fallbacks": sum(_int(r, "fallbacks") for r in receipts),
@@ -555,6 +557,7 @@ def _claude_usage_rows(events):
         rows.append({
             "ts": ts,
             "model": str(ev.get("model") or "inconnu"),
+            "cache_read_tokens": _int(ev, "cache_read_input_tokens"),
             "prompt_tokens": prompt_tokens,
             "output_tokens": output_tokens,
             "total_tokens": prompt_tokens + output_tokens,
@@ -576,6 +579,7 @@ def _claude_totals(claude_rows, since_ts, until_ts):
         "prompt_tokens": sum(_int(r, "prompt_tokens") for r in rows),
         "output_tokens": sum(_int(r, "output_tokens") for r in rows),
         "total_tokens": sum(_int(r, "total_tokens") for r in rows),
+        "cache_read_tokens": sum(_int(r, "cache_read_tokens") for r in rows),
     }
 
 
@@ -586,12 +590,21 @@ def _sous_traitance(delegated_totals, claude_totals):
     d'un côté ni de l'autre (absence de mesure) — jamais confondu avec une
     part mesurée à 0. Volume brut des deux côtés, pas une économie estimée
     (cf. la légende du graphique, même réserve)."""
-    delegated = _int(delegated_totals, "total_tokens")
-    claude = _int(claude_totals, "total_tokens")
+    # Numérateur : les seuls appels délégués qui ont abouti. Une tentative en
+    # échec a consommé des jetons sans rien produire — la compter gonflait la
+    # part déléguée alors que Claude refaisait ensuite le travail.
+    delegated = _int(delegated_totals,
+                     "useful_tokens" if "useful_tokens" in (delegated_totals or {}) else "total_tokens")
+    # Côté Claude, le cache relu est la même fenêtre refacturée à chaque appel,
+    # pas du travail : le laisser au dénominateur écrasait la part vers zéro
+    # (même convention que la cartographie des requêtes, workflows._share).
+    claude = _int(claude_totals, "total_tokens") - _int(claude_totals, "cache_read_tokens")
     combined = delegated + claude
     return {
         "delegated_tokens": delegated,
+        "delegated_failed_tokens": _int(delegated_totals, "failed_tokens"),
         "claude_tokens": claude,
+        "claude_cache_read_tokens": _int(claude_totals, "cache_read_tokens"),
         "total_tokens": combined,
         "share_delegated": (round(delegated / combined, 3) if combined else None),
     }

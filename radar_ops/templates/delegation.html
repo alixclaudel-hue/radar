@@ -177,7 +177,7 @@
     <button class="export" data-bloc="sous_traitance" title="Exporter en JSON">💾</button>
     <div class="label">Part sous-traitée</div>
     <div class="big">{{ "%.0f%%"|format(d.sous_traitance.share_delegated * 100) if d.sous_traitance.share_delegated is not none else "—" }}</div>
-    <div class="sub">{{ "{:,}".format(d.sous_traitance.delegated_tokens).replace(",", " ") }} délégués / {{ "{:,}".format(d.sous_traitance.total_tokens).replace(",", " ") }} jetons</div>
+    <div class="sub">{{ "{:,}".format(d.sous_traitance.delegated_tokens).replace(",", " ") }} délégués utiles / {{ "{:,}".format(d.sous_traitance.total_tokens).replace(",", " ") }} jetons (hors cache relu){% if d.sous_traitance.delegated_failed_tokens %} · {{ "{:,}".format(d.sous_traitance.delegated_failed_tokens).replace(",", " ") }} perdus en échec{% endif %}</div>
   </div>
 </div>
 

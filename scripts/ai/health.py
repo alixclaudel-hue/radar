@@ -212,6 +212,38 @@ def cooling(state: dict, now: float | None = None) -> list[tuple[str, str, float
     return sorted(out, key=lambda item: -item[2])
 
 
+CONTRACT_WINDOW = 24 * 3600
+
+
+def record_contract_failure(
+    state: dict, provider: str, model: str, mode: str, now: float | None = None
+) -> dict:
+    """Sortie inexploitable (JSON hors contrat, code qui ne compile pas) pour un mode.
+
+    Tenu à part de `entries` : le modèle a bien répondu en HTTP, `record_success`
+    efface donc son entrée — et il restait premier de la cascade alors qu'il
+    échouait au même contrat depuis des heures (nemotron en mode `context`,
+    80 à 490 s perdus par tentative, 26-27/09).
+    """
+    moment = now if now is not None else time.time()
+    par_modele = state.setdefault("contract", {}).setdefault(key(provider, model), {})
+    horodatages = [t for t in par_modele.get(mode, []) if moment - t < CONTRACT_WINDOW]
+    horodatages.append(moment)
+    par_modele[mode] = horodatages[-10:]
+    return state
+
+
+def contract_failures(
+    state: dict | None, provider: str, model: str, mode: str, now: float | None = None
+) -> int:
+    """Échecs de contrat récents de ce modèle dans ce mode (fenêtre de 24 h)."""
+    if not state:
+        return 0
+    moment = now if now is not None else time.time()
+    par_modele = (state.get("contract") or {}).get(key(provider, model)) or {}
+    return sum(1 for t in par_modele.get(mode) or [] if moment - float(t) < CONTRACT_WINDOW)
+
+
 def prune(state: dict, now: float | None = None) -> dict:
     """Retire les entrées expirées, sauf les modèles retirés (information durable)."""
     moment = now if now is not None else time.time()

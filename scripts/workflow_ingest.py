@@ -198,7 +198,8 @@ def _new_request(rid, session, project, t, prompt, redact):
         "totals": {
             "claude": {"calls": 0, "input": 0, "cache_read": 0, "cache_create": 0, "output": 0},
             "delegated": {"calls": 0, "with_receipt": 0, "prompt": 0, "output": 0,
-                          "cost_usd": 0.0, "failed": 0, "attempts_failed": 0},
+                          "cost_usd": 0.0, "failed": 0, "attempts_failed": 0,
+                          "failed_prompt": 0, "failed_output": 0},
             "tools": {"calls": 0, "errors": 0, "by_name": {}},
         },
         "steps": [{"i": 0, "t": to_iso(t), "kind": "prompt", "from": "user", "to": "claude",
@@ -285,19 +286,32 @@ def _on_tool_results(req, line, t, matcher, redact):
         d["attempts_failed"] += sum(1 for a in step["attempts"] if a["status"] != "ok")
         if rec:
             step["receipt"] = rec
-            pt, ot = int(rec.get("prompt_tokens") or 0), int(rec.get("output_tokens") or 0)
-            step["tokens"] = {"prompt": pt, "output": ot}
-            d["with_receipt"] += 1
-            d["prompt"] += pt
-            d["output"] += ot
-            d["cost_usd"] = round(d["cost_usd"] + float(rec.get("cost_usd") or 0), 6)
-            if rec.get("status") != "ok":
-                d["failed"] += 1
+            _count_receipt(step, d, rec)
         elif "running in background" in text:
             step["background"] = True
             req["_background"].append((step, t0))
         elif err:
             d["failed"] += 1
+
+
+def _count_receipt(step, d, rec):
+    """Jetons d'un reçu : utiles s'il a abouti, gaspillés sinon — jamais mêlés.
+
+    Un reçu d'échec (JSON hors contrat, cascade épuisée) porte des jetons
+    consommés pour rien ; les ajouter à `prompt`/`output` faisait monter la part
+    déléguée d'autant, alors que Claude reprenait ensuite la tâche lui-même.
+    """
+    pt, ot = int(rec.get("prompt_tokens") or 0), int(rec.get("output_tokens") or 0)
+    step["tokens"] = {"prompt": pt, "output": ot}
+    d["with_receipt"] += 1
+    d["cost_usd"] = round(d["cost_usd"] + float(rec.get("cost_usd") or 0), 6)
+    if rec.get("status") == "ok":
+        d["prompt"] += pt
+        d["output"] += ot
+    else:
+        d["failed"] += 1
+        d["failed_prompt"] = d.get("failed_prompt", 0) + pt
+        d["failed_output"] = d.get("failed_output", 0) + ot
 
 
 def _on_notification(req, line, t, text, redact):
@@ -321,14 +335,7 @@ def _settle_background(req, matcher):
                             if a["t"] <= rec["t"]]
         d["attempts_failed"] += sum(1 for a in step["attempts"] if a["status"] != "ok")
         step["receipt"] = rec
-        pt, ot = int(rec.get("prompt_tokens") or 0), int(rec.get("output_tokens") or 0)
-        step["tokens"] = {"prompt": pt, "output": ot}
-        d["with_receipt"] += 1
-        d["prompt"] += pt
-        d["output"] += ot
-        d["cost_usd"] = round(d["cost_usd"] + float(rec.get("cost_usd") or 0), 6)
-        if rec.get("status") != "ok":
-            d["failed"] += 1
+        _count_receipt(step, d, rec)
 
 
 def _close(req, redact, matcher):

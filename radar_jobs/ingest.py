@@ -159,7 +159,14 @@ def job_ingest_bandcamp(job, params):
     if not (u and pw):
         return job.finish(error="Identifiants Subsonic manquants.")
     job.msg("Lecture de la collection Bandcamp…")
-    albums = bandcamp_albums(u, pw)
+    try:
+        albums = bandcamp_albums(u, pw)
+    except Exception as e:                       # noqa: BLE001
+        # Message déjà explicite côté sources.subsonic_get ; on termine le job
+        # proprement plutôt que de laisser remonter une stacktrace dans l'UI.
+        return job.finish(error=str(e))
+    if not albums:
+        return job.finish(error="Collection Bandcamp vide ou illisible (identifiants Subsonic ?).")
     cache = load_json(LOOKUP_CACHE_PATH, {})
     _ingest_lookup_loop(job, "bandcamp", albums, token, cache, deep=deep, kind="release")
 

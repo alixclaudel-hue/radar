@@ -7,12 +7,23 @@ services:
       - "80:80"
       - "443:443"
     env_file: .env
+    environment:
+      # Défauts NON VIDES : une variable vide casserait l'ensemble de la config
+      # Caddy (cf. commentaire du Caddyfile). `${VAR:-défaut}` couvre « absente »
+      # ET « présente mais vide » — .env.example laisse la ligne vide à dessein.
+      RADAR_DOMAIN: ${RADAR_DOMAIN:-localhost}
+      RADAR_OPS_DOMAIN: ${RADAR_OPS_DOMAIN:-ops.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - radar-web
+      # radar-ops est servi sur son propre sous-domaine, Caddy démarre après lui.
+      # Effet de bord utile : ajouter cette dépendance recrée le conteneur caddy
+      # au prochain déploiement, ce qui recharge le Caddyfile — un fichier monté
+      # n'est pas relu par un simple `docker compose up -d`.
+      - radar-ops
 
   # Interface FastAPI + HTMX — servie publiquement par Caddy (HTTPS).
   # Le port 8600 n'est publié que sur RADAR_WEB_BIND (défaut 127.0.0.1 = local

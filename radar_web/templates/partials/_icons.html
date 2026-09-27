@@ -71,6 +71,13 @@
      fill="currentColor" stroke="none"/></svg>
 {%- endmacro %}
 
+{% macro heart(filled=False, cls="") -%}
+<svg class="ic {{ cls }}" viewBox="0 0 24 24" fill="{{ 'currentColor' if filled else 'none' }}"
+     stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+     aria-hidden="true"><path d="M12 20.5s-7.5-4.7-10-9.3C.6 8 2 4.5 5.3 3.7 7.6 3.1 10 4.3 12 7c2-2.7
+     4.4-3.9 6.7-3.3C22 4.5 23.4 8 22 11.2 19.5 15.8 12 20.5 12 20.5z"/></svg>
+{%- endmacro %}
+
 {% macro thumbdown(cls="") -%}
 <svg class="ic {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2

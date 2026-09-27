@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Mes tracks aimées · Radar{% endblock %}
+{% block content %}
+<h1>♥ Mes tracks aimées</h1>
+<p class="muted small">Pistes marquées d'un cœur depuis <a href="/reco-radar">Reco Radar</a> —
+  {{ n_liked }} piste{{ 's' if n_liked > 1 }}.</p>
+
+{% if not liked %}
+<p class="muted small" style="margin-top:16px">Aucune piste aimée pour l'instant — clique le cœur sur une
+  piste dans <a href="/reco-radar">Reco Radar</a>.</p>
+{% else %}
+<p class="small">
+  {% for b in export_batches %}
+  <a class="tag" target="_blank" rel="noopener"
+     href="https://www.youtube.com/watch_videos?video_ids={{ b.ids }}">⇪ Importer dans YouTube
+     ({{ b.start }}-{{ b.end }})</a>
+  {% endfor %}
+</p>
+<p class="small muted">Chaque lien ouvre un nouvel onglet YouTube avec ces pistes prêtes à ajouter à une
+  playlist (YouTube limite ce lien à 50 vidéos, d'où les lots) — aucun accès n'est demandé au compte
+  Google, contrairement à une vraie synchronisation de playlist.</p>
+
+<div class="yt-player-wrap"><div id="yt-player"></div></div>
+
+<div class="tbl-wrap">
+<table class="tbl">
+  <thead><tr>
+    <th style="width:52px">#</th>
+    <th>Track</th>
+    <th>Release / Label</th>
+    <th class="num" style="width:60px">Année</th>
+    <th style="width:34px"></th>
+  </tr></thead>
+  {% include "partials/liked_rows.html" %}
+</table>
+</div>
+
+<script>
+(() => {
+  // Même mécanisme que pages/reco_radar.html : le lecteur charge sa propre liste
+  // au démarrage, appariée aux lignes par video_id (data-vid), pas par position.
+  const initialIds = {{ liked | map(attribute='video_id') | list | tojson }};
+  let player = null;
+
+  window.onYouTubeIframeAPIReady = () => {
+    player = new YT.Player('yt-player', {
+      playerVars: { playsinline: 1 },
+      events: { onReady: () => player.loadPlaylist({ playlist: initialIds, index: 0 }) },
+    });
+  };
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.body.appendChild(tag);
+})();
+</script>
+{% endif %}
+{% endblock %}

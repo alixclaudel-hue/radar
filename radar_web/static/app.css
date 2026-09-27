@@ -243,9 +243,24 @@ a.tk-play .ic{ width:15px; height:15px; }
 .chip{ font-size:11px; padding:2px 9px; border-radius:999px; border:1px solid var(--line); color:var(--ink); text-decoration:none; display:inline-block; }
 a.chip:hover{ border-color:var(--pin); }
 .topbar-right{ margin-left:auto; display:flex; align-items:center; gap:8px; }
-.cart-tab{ font-size:13px; padding:6px 15px; font-weight:600; }
 .profile-tab{ font-size:13px; padding:6px 15px; font-weight:600; }
 .profile-tab.active{ background:var(--pin); border-color:var(--pin); color:var(--paper); }
+/* menu déroulant "Mon profil" (zéro JS, <details>/<summary>) */
+.profile-menu{ position:relative; }
+.profile-menu > summary{ list-style:none; }
+.profile-menu > summary::-webkit-details-marker{ display:none; }
+.profile-menu-list{
+  position:absolute; top:calc(100% + 6px); right:0; z-index:20; min-width:190px;
+  display:flex; flex-direction:column; gap:2px; padding:6px;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:0 6px 18px rgba(0,0,0,.15);
+}
+.profile-menu-list a{
+  padding:7px 10px; border-radius:6px; font-size:13px; color:var(--ink); text-decoration:none;
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.profile-menu-list a:hover{ background:var(--line); }
+.profile-menu-list a.active{ color:var(--pin); font-weight:600; }
 .catno{ font-size:11px; color:var(--soft); }
 
 .vote{ display:inline-flex; align-items:center; gap:4px; }

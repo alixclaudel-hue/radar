@@ -213,19 +213,43 @@ def _last_successful_run(name, uid=paths.DEFAULT_UID):
 RECO_INDEX_CHECK_EVERY = 3600
 _last_reco_index_check = 0.0
 
+# Jobs qui écrivent une des entrées de `scoring.derived_key` (les 7 fichiers de
+# `scoring._derived_inputs` + le sous-arbre de config de `_config_scoring_sig`) :
+# après l'un d'eux le cache disque `reco_index` est périmé À COUP SÛR, on le
+# revérifie donc sans attendre le prochain contrôle horaire (cf. main()).
+RECO_INDEX_INVALIDATING = frozenset({
+    "build_graph",               # producer_graph.json
+    "resolve_artists",           # artists_resolved.json
+    "merge_corpus",              # taste_corpus.json
+    "fetch_collection",          # collection_cache.json
+    "profile_labels",            # labels_profile.json
+    "import_discogs_dump",       # discogs_dump.sqlite3
+    "build_catalog_labelgraph",  # catalog_labelgraph.sqlite3
+    "canonicalize",              # label_categories / artist_categories (config)
+    "prune_labels",              # label_categories (config)
+    "enrich",                    # catégories (config) via pending_enrich.json
+})
 
-def _maybe_reco_index_build():
+
+def _maybe_reco_index_build(force=False):
     """Enfile `reco_index` pour chaque utilisateur dont le cache est périmé.
 
     La fraîcheur est jugée sur `scoring.derived_key(uid, config)` — la MÊME
     signature que le cache mémoire de `Ctx` — volontairement calculée sans
     instancier `Ctx` : un `Ctx()` coûte ~4 s (il charge `producer_graph.json`,
     69,3 Mo en prod), inacceptable à chaque tour de boucle juste pour répondre
-    « rien à faire »."""
+    « rien à faire ».
+
+    `force=True` court-circuite le garde-temps horaire : appelé juste après un
+    job de `RECO_INDEX_INVALIDATING`, dont on sait qu'il vient de périmer le
+    cache. Sans ce forçage, un job écrivant une entrée dérivée MOINS d'une heure
+    après le dernier contrôle laissait le cache périmé jusqu'à 60 min : la 1re
+    requête reco du web recalculait alors 465 k labels EN LIGNE (~183 s, ~1 Go
+    de pointe transitoire) — cause du pic mémoire du 27/09."""
     global _last_reco_index_check
     if os.environ.get("RADAR_RECO_INDEX") != "1":
         return
-    if time.time() - _last_reco_index_check < RECO_INDEX_CHECK_EVERY:
+    if not force and time.time() - _last_reco_index_check < RECO_INDEX_CHECK_EVERY:
         return
     _last_reco_index_check = time.time()
     try:
@@ -371,6 +395,21 @@ def _run(job):
               file=sys.stderr, flush=True)
 
 
+def _after_job(job):
+    """Réactions post-exécution, une fois le job terminé (appelé par `main()`).
+
+    Aujourd'hui : l'invalidation événementielle du cache `reco_index`. Un job de
+    `RECO_INDEX_INVALIDATING` vient peut-être de réécrire une entrée dérivée
+    (graphe, artistes résolus, corpus, collection, profil de labels, dump
+    Discogs, graphe label ou catégories de config) : le cache disque est alors
+    périmé. On le revérifie TOUT DE SUITE (le job `reco_index` sera enfilé en
+    priorité 0 et pris au tour suivant) au lieu d'attendre le contrôle horaire,
+    sinon la première requête reco du web retombait sur le calcul en ligne
+    (465 k labels, ~183 s, ~1 Go de pointe) — cause du pic mémoire du 27/09."""
+    if job["name"] in RECO_INDEX_INVALIDATING:
+        _maybe_reco_index_build(force=True)
+
+
 def main():
     print("[worker] démarré", file=sys.stderr, flush=True)
     for j in jobs.reap_orphans():
@@ -397,6 +436,7 @@ def main():
         _run(job)
         jobs.save_queue([j for j in jobs.load_queue() if j["id"] != job["id"]])
         last_uid = job["uid"]
+        _after_job(job)
 
 
 if __name__ == "__main__":

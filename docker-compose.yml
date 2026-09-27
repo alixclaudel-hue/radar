@@ -40,6 +40,16 @@ services:
     env_file: .env
     environment:
       RADAR_CODE_SHA: ${RADAR_CODE_SHA:-}
+      # Empreinte mémoire (incident OOM du 27/09) : glibc conserve les arènes
+      # malloc après les gros pics transitoires (calcul de reco_index : ~1 Go
+      # alloué puis libéré) et ne rend JAMAIS ce RSS à l'OS — 2,9 Go retenus par
+      # radar-web jusqu'au redémarrage suivant. MALLOC_ARENA_MAX plafonne le
+      # nombre d'arènes, TRIM/MMAP forcent la restitution au noyau (une
+      # allocation mmap est rendue dès free()). Mesuré : 2,79 Go -> 46 Mo au
+      # repos, ~865 Mo après une requête reco chaude (au lieu de 2,9 Go).
+      MALLOC_ARENA_MAX: "2"
+      MALLOC_TRIM_THRESHOLD_: "131072"
+      MALLOC_MMAP_THRESHOLD_: "131072"
     volumes:
       - ./data:/data
 
@@ -53,6 +63,11 @@ services:
     env_file: .env
     environment:
       RADAR_CODE_SHA: ${RADAR_CODE_SHA:-}
+      # même plafond mémoire que radar-web : le worker relit le même
+      # producer_graph.json (~286 Mo en objets Python) pour ses jobs.
+      MALLOC_ARENA_MAX: "2"
+      MALLOC_TRIM_THRESHOLD_: "131072"
+      MALLOC_MMAP_THRESHOLD_: "131072"
     volumes:
       - ./data:/data
     # ne sert pas HTTP : le HEALTHCHECK du Dockerfile (hérité de la même image

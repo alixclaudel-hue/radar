@@ -22,6 +22,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -176,6 +177,88 @@ class RecoIndexTestCase(unittest.TestCase):
         with open(clg.DB_PATH, "w", encoding="utf-8") as fh:
             fh.write("x")
         self.assertNotEqual(scoring.derived_key(self.uid, c.cfg), before)
+
+
+class RecoIndexInvalidePostJobTestCase(unittest.TestCase):
+    """Invalidation ÉVÉNEMENTIELLE du cache disque (correctif du pic mémoire du
+    27/09/2026).
+
+    La fraîcheur n'était jugée qu'une fois par heure (`RECO_INDEX_CHECK_EVERY`) :
+    un job écrivant une entrée de `scoring.derived_key` moins d'une heure après
+    ce contrôle laissait le cache périmé jusqu'à 60 min. Pendant cette fenêtre,
+    la 1re requête reco du web payait le calcul en ligne (465 k labels, ~183 s,
+    ~1 Go de pointe transitoire) — c'est ce pic qui a rempli la RAM du VPS.
+    Désormais `_after_job()` force la revérification dès la fin du job fautif.
+    """
+
+    def setUp(self):
+        from radar_web import worker as workermod
+        self.w = workermod
+        self._saved = workermod._last_reco_index_check
+        self.addCleanup(setattr, workermod, "_last_reco_index_check", self._saved)
+        env = mock.patch.dict(os.environ, {"RADAR_RECO_INDEX": "1"})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def _check(self, force, fresh=False):
+        """Appelle `_maybe_reco_index_build` avec un contrôle horaire « frais »
+        (comme si on venait de le faire) et retourne le mock de `jobs.launch`."""
+        w = self.w
+        w._last_reco_index_check = time.time()
+        with mock.patch.object(w.paths, "all_uids", return_value=[w.paths.DEFAULT_UID]), \
+                mock.patch.object(w.jobs, "load_queue", return_value=[]), \
+                mock.patch.object(w.jobs, "launch") as launch, \
+                mock.patch.object(w.recoindex, "is_fresh", return_value=fresh), \
+                mock.patch.object(w.store, "read_config", return_value={}), \
+                mock.patch.object(w.scoring, "derived_key", return_value="k"):
+            w._maybe_reco_index_build(force=force)
+        return launch
+
+    def test_le_garde_temps_horaire_bloque_toujours_sans_force(self):
+        """Non-régression : le comportement horaire par défaut est inchangé."""
+        self._check(force=False).assert_not_called()
+
+    def test_force_recontrole_meme_dans_l_heure(self):
+        """Le cache périmé est réenfilé sans attendre la fin de l'heure."""
+        launch = self._check(force=True)
+        launch.assert_called_once()
+        self.assertEqual(launch.call_args.args[:2], ("reco_index", {}))
+        self.assertEqual(launch.call_args.kwargs["uid"], self.w.paths.DEFAULT_UID)
+        self.assertEqual(launch.call_args.kwargs["priority"], 0)
+
+    def test_force_nenfile_pas_si_le_cache_est_frais(self):
+        """`force` ne fait que court-circuiter le garde-temps : la fraîcheur
+        réelle reste l'arbitre, on n'enfile rien d'inutile."""
+        self._check(force=True, fresh=True).assert_not_called()
+
+    def test_job_invalidant_declenche_le_controle_force(self):
+        """`_after_job` force le contrôle pour un job qui écrit une entrée
+        dérivée, et reste silencieux pour les autres (pas de stat inutile)."""
+        w = self.w
+        with mock.patch.object(w, "_maybe_reco_index_build") as check:
+            w._after_job({"uid": "owner", "name": "build_graph"})
+        check.assert_called_once_with(force=True)
+
+        with mock.patch.object(w, "_maybe_reco_index_build") as check:
+            w._after_job({"uid": "owner", "name": "search_base"})
+        check.assert_not_called()
+
+    def test_jobs_ecrivains_dentrees_derivees_tous_couverts(self):
+        """Garde-fou contre l'oubli : chaque fichier de `scoring._derived_inputs`
+        a un job qui le réécrit, et ces jobs sont dans l'ensemble invalidant.
+        Un nouveau job écrivant une entrée dérivée sans être ajouté ici
+        rouvrirait la fenêtre de péremption silencieuse."""
+        for name in ("build_graph", "resolve_artists", "merge_corpus",
+                     "fetch_collection", "profile_labels", "import_discogs_dump",
+                     "build_catalog_labelgraph", "canonicalize", "prune_labels",
+                     "enrich"):
+            self.assertIn(name, self.w.RECO_INDEX_INVALIDATING)
+
+    def test_main_appelle_bien_after_job(self):
+        """La boucle doit réellement brancher le déclencheur : une fonction
+        correcte mais jamais appelée serait un correctif mort."""
+        import inspect
+        self.assertIn("_after_job(job)", inspect.getsource(self.w.main))
 
 
 if __name__ == "__main__":

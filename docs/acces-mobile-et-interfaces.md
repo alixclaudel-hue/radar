@@ -53,16 +53,24 @@ Conséquences à ne pas perdre de vue :
 | `sshd` | écoute sur `0.0.0.0:22` et `[::]:22` |
 | Authentification SSH | **clé uniquement** — `PasswordAuthentication no` |
 | Clés autorisées | `radar-deploy`, `github-actions-radar-deploy` (ED25519) |
-| Tableau de bord `radar-ops` | `100.94.157.91:8610` (Tailscale) et `127.0.0.1:8610` (loopback) |
+| Tableau de bord `radar-ops` | `https://ops.hubclaudel.fr` (Caddy) · `100.94.157.91:8610` (Tailscale) · `127.0.0.1:8610` (loopback) |
 | Pare-feu | `ufw` **actif** (`systemctl is-active` → `active`) |
 
-Deux points d'attention immédiats :
+Trois points d'attention immédiats :
 
 - Le port `8610` de `radar-ops` **n'est pas exposé sur l'IP publique** — seulement en
-  loopback et sur l'interface Tailscale. C'est voulu, et c'est ce qui rend le
-  tableau de bord joignable depuis l'iPhone sans ouvrir de port public.
-- Le port `8600` (autre service) n'écoute **que** en loopback : il n'est atteignable
-  ni depuis le PC ni depuis le téléphone, et ne passe pas par Caddy.
+  loopback et sur l'interface Tailscale. C'est ce qui rend le tableau de bord
+  joignable depuis l'iPhone sans ouvrir de port public.
+- Depuis le 27/09/2026, `radar-ops` est **aussi** servi publiquement, sur son propre
+  sous-domaine `https://ops.hubclaudel.fr` (Caddy → `radar-ops:8610`, certificat
+  Let's Encrypt). L'accès reste fermé par **la même authentification propriétaire**
+  que l'appli : toute session non propriétaire est renvoyée vers `/login`. C'est ce
+  qui permet de le consulter depuis un PC sans Tailscale. Le port `8610` lui-même
+  reste absent de l'IP publique — l'exposition passe uniquement par le
+  reverse-proxy HTTPS.
+- Le port `8600` (autre service) n'écoute **que** en loopback : il n'est pas
+  joignable directement depuis le PC ou le téléphone, et n'est atteint qu'à travers
+  Caddy, sous `radar.hubclaudel.fr`.
 
 ---
 
@@ -184,11 +192,11 @@ petit (le téléphone). L'alternative `manual` fige complètement la taille.
 
 ## 6. Tableau de bord `radar-ops` depuis le téléphone
 
-Une fois Tailscale connecté, `radar-ops` est joignable directement depuis le
-navigateur du téléphone :
+Deux voies, selon que Tailscale est disponible ou non :
 
 ```
-http://100.94.157.91:8610/
+https://ops.hubclaudel.fr/     # voie publique — login propriétaire requis
+http://100.94.157.91:8610/     # voie Tailscale — login déjà satisfait par la session
 ```
 
 C'est l'intérêt d'avoir fait écouter le service sur l'interface Tailscale et non sur
@@ -248,4 +256,7 @@ tmux attach -t claude
 
 # Tableau de bord, depuis n'importe quel appareil du tailnet
 # http://100.94.157.91:8610/
+
+# Tableau de bord, depuis n'importe quel navigateur (login propriétaire requis)
+# https://ops.hubclaudel.fr/
 ```

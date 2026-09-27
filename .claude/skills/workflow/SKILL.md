@@ -48,6 +48,14 @@ Découper en tâches à périmètre fermé : chacune a une entrée (fichiers, do
 une sortie (fichier écrit, verdict, chiffre) et un critère de fin. Une tâche qui
 ne tient pas en un prompt autonome de ~15 lignes est à redécouper.
 
+**Le WBS chiffre aussi le nombre de tours prévus au fil principal et cherche à
+le minimiser** — chaque appel d'outil du fil principal relit tout son contexte
+(cache qui grandit, cf. §Pourquoi). Fusionner deux tâches strictement
+séquentielles sans jugement intermédiaire en un seul prompt délégué plutôt que
+deux allers-retours. Ne dupliquer un exécutant en comparaison (§4) que pour une
+tâche identifiée comme complexe : chaque exemplaire supplémentaire est un coût
+à justifier, jamais un réflexe.
+
 **Le découpage se fait par LIVRABLE, jamais par commande shell.** Une
 vérification d'état qui sert seulement à DÉCIDER si le livrable doit être
 produit (hash git, existence d'un fichier, taille d'un diff, méta de
@@ -72,8 +80,14 @@ elles partent **dans le même message** (plusieurs `Agent` et/ou appels courtier
 | Question fermée sur le dépôt (où est X ?) | courtier `--mode search` | 0 jeton Claude |
 | Raisonnement que le gratuit rate | courtier `--mode reasoning` | payant, plafonné |
 | Balayage large de fichiers, conclusion seule utile | sous-agent `Explore` (`model: haiku`) | contexte frais, modèle léger |
-| Tâche à nombreux appels d'outils (explorer + modifier + tester) | sous-agent `executant` (sonnet) | contexte frais ~40k, compte rendu ≤ 20 lignes |
+| Tâche à nombreux appels d'outils (explorer + modifier + tester) | sous-agent `executant` (un par tâche du WBS) | contexte frais ~40k, relaie au courtier (jamais de rédaction directe en Sonnet), compte rendu ≤ 20 lignes |
 | Jugement : architecture, sécurité, arbitrage produit, relecture finale, commit, merge | fil principal | non délégable (RÈGLE N°1) |
+
+Un `executant` n'est pas un rédacteur : il oriente (quel mode du courtier
+appeler), relit la sortie du courtier, et fait la mécanique que le courtier ne
+peut pas faire (chirurgie fine sur un fichier, `py_compile`, tests ciblés). Sa
+production propre en Sonnet reste de l'orchestration, jamais du contenu
+substantiel — cf. `.claude/agents/executant.md`.
 
 Règles de délégation :
 
@@ -81,6 +95,8 @@ Règles de délégation :
 - Le prompt d'un sous-agent est **autonome** : répertoire de travail, fichiers et lignes concernés, ce qui est déjà établi, critère de fin, format de retour. Il n'a pas la conversation.
 - Un sous-agent applique lui-même la RÈGLE N°1 (le courtier avant lui) — le rappeler n'est pas nécessaire, c'est dans sa définition.
 - Pas de sous-agent pour une tâche de 1 à 3 appels d'outils : son démarrage (~40k) coûte plus que la tâche faite sur place.
+- **Plusieurs `executant` en parallèle, un par tâche indépendante du WBS** (cf. §3) : c'est la règle, pas l'exception — c'est Claude (fil principal) qui assemble ensuite les comptes rendus.
+- **Comparaison ciblée** : pour une tâche complexe (spec ambiguë, sécurité, cœur d'algorithme, aucun test de référence pour trancher), lancer 2 à 3 `executant` sur EXACTEMENT le même prompt, dans le même message. Le fil principal compare les comptes rendus et choisit ou fusionne la meilleure solution — jamais par défaut, seulement quand la tâche le justifie (coût 2-3x sur le budget d'appels de cette tâche, cf. §2).
 
 Consolidation (fil principal) : relire les comptes rendus, rouvrir de façon
 chirurgicale (`limit` ≤ 30) uniquement ce qui est douteux, trancher, lancer la
@@ -95,5 +111,7 @@ vérification finale (suite de tests), commit/PR via le mode `pr`.
 
 Pour une requête de plus d'une tâche, la réponse finale montre en quelques
 lignes le WBS avec, par tâche, l'exécutant réel (mode courtier, sous-agent, ou
-fil principal + pourquoi). C'est ce qui permet de vérifier après coup, dans
-`/delegation/workflows`, que le cache relu baisse vraiment.
+fil principal + pourquoi) et le nombre d'exemplaires lancés (1, ou 2-3 en
+comparaison + pourquoi celle-ci le justifiait). C'est ce qui permet de vérifier
+après coup, dans `/delegation/workflows`, que le cache relu baisse vraiment et
+que les comparaisons restent l'exception.

@@ -12,6 +12,8 @@ import asyncio
 import json
 import os
 import time
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
@@ -20,7 +22,7 @@ from fastapi.templating import Jinja2Templates
 from radar_web.radar import accounts, codeversion, opslog, paths, scorestore, store, websession
 from radar_web.radar import scoring as sc
 
-from . import delegation, freshness, inventory, probe
+from . import delegation, freshness, inventory, probe, workflows
 from .sampler import Sampler
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -243,6 +245,38 @@ def export_delegation(table: str,
     filename = f"delegation-{table}-{period}.json"
     return JSONResponse(payload, headers={
         "Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+_PARIS = ZoneInfo("Europe/Paris")
+# Premier jour d'historique disponible : début de la comparaison demandée (26/09 22h, Paris).
+_WORKFLOWS_DEFAULT_SINCE = "2026-09-26T22:00"
+
+
+def _paris_local_ts(value):
+    """`AAAA-MM-JJTHH:MM` saisi en heure de Paris -> epoch, ou None."""
+    try:
+        return datetime.fromisoformat(value).replace(tzinfo=_PARIS).timestamp()
+    except (TypeError, ValueError):
+        return None
+
+
+@app.get("/delegation/workflows", response_class=HTMLResponse)
+def page_workflows(request: Request, since: str | None = None,
+                   until: str | None = None, project: str = ""):
+    since = since if since is not None else _WORKFLOWS_DEFAULT_SINCE
+    w = workflows.overview(paths.DATA, since_ts=_paris_local_ts(since),
+                           until_ts=_paris_local_ts(until), project=project or None)
+    return tpl.TemplateResponse(request, "workflows.html", {
+        "page": "delegation", "w": w, "sha": codeversion.short(),
+        "f": {"since": since, "until": until or "", "project": project}})
+
+
+@app.get("/delegation/workflows/request/{req_id}.json")
+def workflow_request(req_id: str):
+    r = workflows.get_request(paths.DATA, req_id)
+    if r is None:
+        return JSONResponse({"error": "requête inconnue"}, status_code=404)
+    return JSONResponse(r)
 
 
 # --------------------------------------------------------------------- actions

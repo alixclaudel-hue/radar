@@ -19,6 +19,7 @@ git, donc hors de la machine.
 """
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -258,6 +259,24 @@ def log_claude_usage(event, project_dir):
         save_usage_offset(state_path, new_offset)
 
 
+def refresh_workflow(event, project_dir):
+    """Réingère le workflow de la session courante à `Stop`/`SessionEnd`.
+
+    Processus détaché : relire un transcript de quelques Mo ne doit jamais
+    retarder la fin d'un tour. Même dossier de sortie que la télémétrie."""
+    if event.get("hook_event_name") not in ("Stop", "SessionEnd"):
+        return
+    transcript_path = str(event.get("transcript_path") or "").strip()
+    if not transcript_path:
+        return
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          "workflow_ingest.py")
+    ops_dir = os.path.dirname(telemetry_path(project_dir))
+    subprocess.Popen([sys.executable, script, "--transcript", transcript_path, "--ops-dir", ops_dir],
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, start_new_session=True)
+
+
 def main():
     try:
         raw = sys.stdin.read().strip()
@@ -272,6 +291,7 @@ def main():
         if record is not None:
             write_line(telemetry_path(project_dir), record)
         log_claude_usage(event, project_dir)
+        refresh_workflow(event, project_dir)
     except Exception:
         pass                                 # mesurer ne doit jamais coûter une action
     return 0

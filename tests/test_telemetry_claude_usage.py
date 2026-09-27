@@ -135,6 +135,74 @@ class TestTelemetryNouvellesFonctions(unittest.TestCase):
         self.assertEqual(deltas[0]["cache_creation_input_tokens"], 100)
         self.assertEqual(deltas[0]["cache_read_input_tokens"], 10)
 
+    def test_claude_usage_deltas_cache_creation_ventile_present(self):
+        """`usage.cache_creation` présent -> clés 1h/5m remplies dans le delta."""
+        line = {
+            "type": "assistant",
+            "requestId": "req1",
+            "message": {
+                "model": "claude-sonnet-5",
+                "usage": {
+                    "input_tokens": 2,
+                    "output_tokens": 50,
+                    "cache_creation_input_tokens": 100,
+                    "cache_read_input_tokens": 10,
+                    "cache_creation": {
+                        "ephemeral_1h_input_tokens": 60,
+                        "ephemeral_5m_input_tokens": 40,
+                    },
+                },
+            },
+        }
+        path = self._write_transcript([line])
+        deltas, _ = self.telemetry.claude_usage_deltas(path, 0)
+        self.assertEqual(deltas[0]["cache_creation_1h_input_tokens"], 60)
+        self.assertEqual(deltas[0]["cache_creation_5m_input_tokens"], 40)
+
+    def test_claude_usage_deltas_cache_creation_absent_pas_de_cles(self):
+        """Pas de `usage.cache_creation` -> clés 1h/5m absentes (pas 0 : non ventilé)."""
+        line = {
+            "type": "assistant",
+            "requestId": "req1",
+            "message": {
+                "model": "claude-sonnet-5",
+                "usage": {
+                    "input_tokens": 2,
+                    "output_tokens": 50,
+                    "cache_creation_input_tokens": 100,
+                    "cache_read_input_tokens": 10,
+                },
+            },
+        }
+        path = self._write_transcript([line])
+        deltas, _ = self.telemetry.claude_usage_deltas(path, 0)
+        self.assertNotIn("cache_creation_1h_input_tokens", deltas[0])
+        self.assertNotIn("cache_creation_5m_input_tokens", deltas[0])
+
+    def test_claude_usage_deltas_cache_creation_dedoublonne_par_requestId(self):
+        """Même requestId sur deux lignes -> un seul delta, valeurs de la DERNIÈRE ligne."""
+        line1 = {
+            "type": "assistant", "requestId": "req1",
+            "message": {"model": "m1", "usage": {
+                "input_tokens": 1, "output_tokens": 2,
+                "cache_creation_input_tokens": 3, "cache_read_input_tokens": 4,
+                "cache_creation": {"ephemeral_1h_input_tokens": 11, "ephemeral_5m_input_tokens": 22},
+            }},
+        }
+        line2 = {
+            "type": "assistant", "requestId": "req1",
+            "message": {"model": "m1", "usage": {
+                "input_tokens": 5, "output_tokens": 6,
+                "cache_creation_input_tokens": 7, "cache_read_input_tokens": 8,
+                "cache_creation": {"ephemeral_1h_input_tokens": 60, "ephemeral_5m_input_tokens": 40},
+            }},
+        }
+        path = self._write_transcript([line1, line2])
+        deltas, _ = self.telemetry.claude_usage_deltas(path, 0)
+        self.assertEqual(len(deltas), 1)
+        self.assertEqual(deltas[0]["cache_creation_1h_input_tokens"], 60)
+        self.assertEqual(deltas[0]["cache_creation_5m_input_tokens"], 40)
+
     def test_claude_usage_deltas_requestId_differents_deux_deltas(self):
         """Deux lignes requestId différents -> deux deltas distincts dans l'ordre."""
         line1 = {"type": "assistant", "requestId": "req1", "message": {"model": "m1", "usage": {"input_tokens": 1, "output_tokens": 2, "cache_creation_input_tokens": 3, "cache_read_input_tokens": 4}}}

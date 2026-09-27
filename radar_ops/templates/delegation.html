@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "_range_slider.html" import range_slider %}
 {% block body %}
+{% set unit = unit if unit in ('raw', 'eq') else 'raw' %}
 <style>
   .toolbar { background: var(--panel); border: 1px solid var(--line);
              border-radius: 6px; padding: .8rem; margin-bottom: 1rem; }
@@ -78,6 +79,11 @@
   .subtabs a { color: var(--dim); text-decoration: none; padding: .25rem .7rem;
                border: 1px solid var(--line); border-radius: 4px; font-size: .85rem; }
   .subtabs a.on { color: var(--fg); border-color: var(--accent); }
+
+  .unit-toggle { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+                 margin-bottom: 1rem; font-size: .82rem; color: var(--dim); }
+  .unit-toggle .preset { font-size: .78rem; }
+  .unit-toggle .formule { font-size: .74rem; }
 </style>
 
 <nav class="subtabs">
@@ -87,6 +93,7 @@
 
 <form class="toolbar" method="get" action="/delegation" id="filtres">
   <input type="hidden" name="period" id="period" value="{{ d.period.preset }}">
+  <input type="hidden" name="unit" value="{{ unit }}">
   <div class="presets">
     {% set presets = [
       ("today", "Aujourd'hui"),
@@ -124,6 +131,13 @@
     {% endif %}
   </div>
 </form>
+
+<div class="unit-toggle">
+  <span>Affichage&nbsp;:</span>
+  <button type="button" class="preset {% if unit != 'eq' %}active{% endif %}" data-unit="raw">Tokens bruts</button>
+  <button type="button" class="preset {% if unit == 'eq' %}active{% endif %}" data-unit="eq">Tokens équivalents</button>
+  <span class="formule">équivalent = entrée×1 + cache lu×0,10 + écriture cache (1&nbsp;h×2,0 · 5&nbsp;min×1,25) + sortie×5</span>
+</div>
 
 <h2>Vue d'ensemble</h2>
 <p class="note">Ce que le courtier multi-fournisseurs a délégué sur la période. Les jetons viennent de <code>usageMetadata</code>, rapporté par l'API elle-même — aucune estimation d'économie n'est calculée ici.</p>
@@ -167,14 +181,19 @@
   <div class="kpi">
     <button class="export" data-bloc="claude_totals" title="Exporter en JSON">💾</button>
     <div class="label">Jetons Claude (période)</div>
-    <div class="big">{{ "{:,}".format(d.claude_totals.total_tokens).replace(",", " ") }}</div>
-    <div class="sub">mesurés depuis le transcript, pas délégués</div>
+    <div class="big">{{ "{:,}".format(d.claude_totals.get('equiv_tokens', d.claude_totals.total_tokens) if unit == 'eq' else d.claude_totals.total_tokens).replace(",", " ") }}</div>
+    <div class="sub">mesurés depuis le transcript, pas délégués{% if unit == 'eq' %} · en tokens équivalents{% endif %}</div>
   </div>
   <div class="kpi">
     <button class="export" data-bloc="sous_traitance" title="Exporter en JSON">💾</button>
     <div class="label">Part sous-traitée</div>
     <div class="big">{{ "%.0f%%"|format(d.sous_traitance.share_delegated * 100) if d.sous_traitance.share_delegated is not none else "—" }}</div>
+    {% if unit == 'eq' %}
+    <div class="sub">{{ "{:,}".format(d.sous_traitance.get('delegated_equiv', d.sous_traitance.delegated_tokens)).replace(",", " ") }} délégués utiles / {{ "{:,}".format(d.sous_traitance.get('total_equiv', d.sous_traitance.total_tokens)).replace(",", " ") }} jetons équivalents (cache relu compté à 0,10){% if d.sous_traitance.delegated_failed_tokens %} · {{ "{:,}".format(d.sous_traitance.delegated_failed_tokens).replace(",", " ") }} perdus en échec{% endif %}</div>
+    {% else %}
     <div class="sub">{{ "{:,}".format(d.sous_traitance.delegated_tokens).replace(",", " ") }} délégués utiles / {{ "{:,}".format(d.sous_traitance.total_tokens).replace(",", " ") }} jetons (hors cache relu){% if d.sous_traitance.delegated_failed_tokens %} · {{ "{:,}".format(d.sous_traitance.delegated_failed_tokens).replace(",", " ") }} perdus en échec{% endif %}</div>
+    {% endif %}
+    <div class="sub" style="font-size:.68rem; opacity:.75;">part calculée en tokens équivalents</div>
   </div>
 </div>
 
@@ -185,14 +204,14 @@
       <button class="export-btn" data-bloc="top_models">💾 exporter</button>
     </div>
     <table><thead><tr>
-      <th>Modèle</th><th class="num">Appels</th><th class="num">Jetons</th>
+      <th>Modèle</th><th class="num">Appels</th><th class="num">Jetons{% if unit == 'eq' %} éq.{% endif %}</th>
       <th class="num">Part</th>
     </tr></thead><tbody>
     {% for r in d.top_models %}
     <tr>
       <td><span style="display:inline-block; width:.7rem; height:.7rem; border-radius:2px; background: {{ d.model_colors.get(r.name, '#94a3b8') }}; margin-right:.4rem;"></span>{{ r.name }}</td>
       <td class="num">{{ r.calls }}</td>
-      <td class="num">{{ r.total_tokens }}</td>
+      <td class="num">{{ r.get('equiv_tokens', r.total_tokens) if unit == 'eq' else r.total_tokens }}</td>
       <td class="num">
         <div class="bar"><i style="width: {{ (r.share * 100) | round(1) }}%"></i></div>
       </td>
@@ -206,14 +225,14 @@
       <button class="export-btn" data-bloc="top_modes">💾 exporter</button>
     </div>
     <table><thead><tr>
-      <th>Mode</th><th class="num">Appels</th><th class="num">Jetons</th>
+      <th>Mode</th><th class="num">Appels</th><th class="num">Jetons{% if unit == 'eq' %} éq.{% endif %}</th>
       <th class="num">Part</th>
     </tr></thead><tbody>
     {% for r in d.top_modes %}
     <tr>
       <td>{{ r.name }}</td>
       <td class="num">{{ r.calls }}</td>
-      <td class="num">{{ r.total_tokens }}</td>
+      <td class="num">{{ r.get('equiv_tokens', r.total_tokens) if unit == 'eq' else r.total_tokens }}</td>
       <td class="num">
         <div class="bar"><i style="width: {{ (r.share * 100) | round(1) }}%"></i></div>
       </td>
@@ -242,7 +261,11 @@
     <span class="tag">{{ jour.calls }} appels</span>
     <span class="tag ok">{{ jour.ok }} succès</span>
     <span class="tag {% if jour.err > 0 %}bad{% endif %}">{{ jour.err }} erreurs</span>
+    {% if unit == 'eq' %}
+    <span class="tag">{{ "{:,}".format(jour.get('equiv_tokens', jour.total_tokens)).replace(",", " ") }} jetons équivalents</span>
+    {% else %}
     <span class="tag">{{ jour.prompt_tokens }} → {{ jour.output_tokens }} jetons</span>
+    {% endif %}
     <span class="tag" title="Part de prompts &lt; {{ jour.small_prompts.threshold }} caractères, mesure de gate-gaming">
       courts : {{ jour.small_prompts.small }} / {{ jour.small_prompts.measured }}
       {% if jour.small_prompts.share is not none %}
@@ -256,7 +279,7 @@
       <table><thead><tr>
         <th>Modèle</th><th class="num">Appels</th>
         <th class="num">Entrée</th><th class="num">Sortie</th>
-        <th class="num">Total</th>
+        <th class="num">Total{% if unit == 'eq' %} éq.{% endif %}</th>
       </tr></thead><tbody>
       {% for m in jour.by_model %}
       <tr>
@@ -264,7 +287,7 @@
         <td class="num">{{ m.calls }}</td>
         <td class="num">{{ m.prompt_tokens }}</td>
         <td class="num">{{ m.output_tokens }}</td>
-        <td class="num">{{ m.total_tokens }}</td>
+        <td class="num">{{ m.get('equiv_tokens', m.total_tokens) if unit == 'eq' else m.total_tokens }}</td>
       </tr>
       {% endfor %}
       </tbody></table>
@@ -398,12 +421,14 @@
 {% endblock %}
 
 {% block script %}
+{% set unit = unit if unit in ('raw', 'eq') else 'raw' %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.js"></script>
 <script id="deleg-data" type="application/json">
 {
   "buckets": {{ d.buckets | tojson }},
   "colors":  {{ d.model_colors | tojson }},
-  "period":  {{ d.period | tojson }}
+  "period":  {{ d.period | tojson }},
+  "unit":    {{ unit | tojson }}
 }
 </script>
 <script>
@@ -430,11 +455,15 @@
         yAxisID: "y1", order: 2
       }
     ];
+    const eq = data.unit === "eq";
     modeles.forEach(m => {
       const c = data.colors[m] || "#94a3b8";
       datasets.push({
         type: "line", label: m,
-        data: data.buckets.map(b => (b.by_model[m] || {}).total_tokens || 0),
+        data: data.buckets.map(b => {
+          const bm = b.by_model[m] || {};
+          return (eq ? bm.equiv_tokens : undefined) ?? bm.total_tokens ?? 0;
+        }),
         borderColor: c, backgroundColor: c + "22",
         tension: 0.25, fill: false, yAxisID: "y0", order: 1,
         pointRadius: 2, pointHoverRadius: 4
@@ -459,7 +488,7 @@
           x: { ticks: { color: dim, maxRotation: 0, autoSkip: true },
                grid: { color: grid } },
           y0: { type: "linear", position: "left",
-                title: { display: true, text: "Jetons", color: dim },
+                title: { display: true, text: eq ? "Jetons équivalents" : "Jetons", color: dim },
                 ticks: { color: dim }, grid: { color: grid } },
           y1: { type: "linear", position: "right",
                 title: { display: true, text: "Appels", color: dim },
@@ -513,6 +542,15 @@
     btn.addEventListener("click", (ev) => {
       ev.preventDefault();
       exporter(btn.dataset.bloc);
+    });
+  });
+
+  // Bascule bruts/équivalents : un lien qui recharge la page en gardant les filtres courants.
+  document.querySelectorAll("[data-unit]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const params = new URLSearchParams(window.location.search);
+      params.set("unit", btn.dataset.unit);
+      window.location.href = "/delegation?" + params.toString();
     });
   });
 })();

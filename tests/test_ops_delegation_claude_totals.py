@@ -16,7 +16,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 0,
             "prompt_tokens": 0,
             "output_tokens": 0,
-            "total_tokens": 0, "cache_read_tokens": 0
+            "total_tokens": 0, "cache_read_tokens": 0, "equiv_tokens": 0
         })
 
     def test_since_ts_none_compte_tout_jusqua_until_ts(self):
@@ -30,7 +30,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 2,
             "prompt_tokens": 30,
             "output_tokens": 15,
-            "total_tokens": 45, "cache_read_tokens": 0
+            "total_tokens": 45, "cache_read_tokens": 0, "equiv_tokens": 0
         })
 
     def test_since_ts_fourni_exclut_avant(self):
@@ -44,7 +44,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 2,
             "prompt_tokens": 50,
             "output_tokens": 25,
-            "total_tokens": 75, "cache_read_tokens": 0
+            "total_tokens": 75, "cache_read_tokens": 0, "equiv_tokens": 0
         })
 
     def test_until_ts_exclut_apres(self):
@@ -59,7 +59,7 @@ class TestClaudeTotals(unittest.TestCase):
             "calls": 2,
             "prompt_tokens": 30,
             "output_tokens": 15,
-            "total_tokens": 45, "cache_read_tokens": 0
+            "total_tokens": 45, "cache_read_tokens": 0, "equiv_tokens": 0
         })
 
     def test_bornes_inclusives(self):
@@ -76,18 +76,26 @@ class TestSousTraitance(unittest.TestCase):
     """Tests pour _sous_traitance."""
 
     def test_deux_positifs_ratio_correct(self):
-        result = delegation._sous_traitance({"total_tokens": 300}, {"total_tokens": 200})
+        # share_delegated se calcule maintenant sur les tokens équivalents,
+        # pas les jetons bruts : ici les deux coïncident (pas de cache/sortie).
+        result = delegation._sous_traitance({"total_tokens": 300, "equiv_tokens": 300},
+                                            {"total_tokens": 200, "equiv_tokens": 200})
         self.assertEqual(result["delegated_tokens"], 300)
         self.assertEqual(result["claude_tokens"], 200)
         self.assertEqual(result["total_tokens"], 500)
+        self.assertEqual(result["delegated_equiv"], 300)
+        self.assertEqual(result["claude_equiv"], 200)
+        self.assertEqual(result["total_equiv"], 500)
         self.assertEqual(result["share_delegated"], round(300 / 500, 3))
 
     def test_claude_zero_delegue_positif_share_1(self):
-        result = delegation._sous_traitance({"total_tokens": 100}, {"total_tokens": 0})
+        result = delegation._sous_traitance({"total_tokens": 100, "equiv_tokens": 100},
+                                            {"total_tokens": 0, "equiv_tokens": 0})
         self.assertEqual(result["share_delegated"], 1.0)
 
     def test_delegue_zero_claude_positif_share_0(self):
-        result = delegation._sous_traitance({"total_tokens": 0}, {"total_tokens": 100})
+        result = delegation._sous_traitance({"total_tokens": 0, "equiv_tokens": 0},
+                                            {"total_tokens": 100, "equiv_tokens": 100})
         self.assertEqual(result["share_delegated"], 0.0)
 
     def test_les_deux_zero_share_none(self):

@@ -112,26 +112,9 @@ Follow with a "Where to look for any feature" bullet list if the app is complex 
 
 ---
 
-## Délégation — RÈGLE N°1
-
-**La passerelle passe AVANT Claude sur toute lecture de fichier volumineux.**
-Utilise `scripts/ai_broker.py` (skill `delegate`) pour pré-digérer les gros
-fichiers au lieu de les charger intégralement dans ton contexte :
-
-- **`CLAUDE.md` et docs existants** : `python3 scripts/ai_broker.py --mode context -f <fichier>`
-  → JSON structuré (`title`, `sections`, `key_points`, `uncertain`). Ne rouvre
-  que les passages signalés dans `uncertain`.
-- **Modules volumineux** (>200 lignes) : `--mode context -f <module>` avant de les
-  lire en entier. Le résumé suffit souvent pour la vue d'ensemble ; ne lis le
-  fichier directement que si le résumé ne couvre pas ce dont tu as besoin.
-- **Logs ou traces** si pertinents : `--mode summary --stdin`.
-
-Un appel qui échoue (quota, panne) écrit son reçu et te rend la main — continue
-sans délégation plutôt que de rester bloqué.
-
 ## How to gather the information
 
-1. Pré-digère `CLAUDE.md` via `delegate mode context`, puis `README.md` ou `package.json`/`requirements.txt` si présents. Glance at `docs/` for orientation — but treat anything you find there as potentially stale. This agent is the one responsible for keeping `docs/` updated, so if it was triggered, it is likely because `docs/` is incomplete or out of date. Always derive your understanding from the actual code, not from prior doc files.
+1. Read CLAUDE.md, README.md, or package.json / requirements.txt if present. You may also glance at the `docs/` folder for orientation — but treat anything you find there as potentially stale. This agent is the one responsible for keeping `docs/` updated, so if it was triggered, it is likely because `docs/` is incomplete or out of date. Always derive your understanding from the actual code, not from prior doc files.
 2. Find the main entry points: app/, pages/, src/, routes/ for web apps; main.py, app.py, server.js, manage.py for backends.
 3. Pour les modules volumineux (>200 lignes), utilise `delegate mode context` avant de les lire directement. Read the entry point(s) and layout/shell files. Skim a representative page or route to understand the pattern.
 4. Identify the data layer: API calls, database, static files, third-party services?

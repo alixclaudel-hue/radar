@@ -52,8 +52,11 @@ Pick one:
 - **Left → right**: use for pipelines, request flows, data transformations.
 - **Top → bottom**: use for call stacks, trigger chains, hierarchies.
 - **Grouped / nested**: use for module-based architectures where grouping is more important than flow.
+- **Swim lane**: one row per group, in the order the groups are declared. Use only when a group really is a lane — the renderer lays out every other value by flow and places boxes by what connects to what, with groups shown as colours.
 
-State the chosen layout at the top of the brief.
+State the chosen layout at the top of the brief. The renderer reads that line.
+
+Group order and box order in the brief no longer decide where things land (except in swim lanes): the renderer places boxes by the arrows. Declare them in whatever order reads best; spend the effort on getting the arrows right.
 
 ---
 
@@ -62,7 +65,7 @@ State the chosen layout at the top of the brief.
 ```
 # Diagram Brief: [Doc or Feature Name]
 
-**Layout**: [left-to-right | top-to-bottom | grouped]
+**Layout**: [left-to-right | top-to-bottom | grouped | swim lane]
 **Flow summary**: [One sentence — what this diagram shows]
 
 ---
@@ -109,6 +112,16 @@ Add a note to [Element]: "[short description]".
 ```
 Mark [Element] as [entry point | external | database | async].
 ```
+
+**Columns** (a table or a data file whose fields matter to the reader)
+```
+Add columns to [Element]: [field] [type], [field] [type], [field] [type].
+```
+One directive per box, fields in the order the source document gives them.
+Commas inside parentheses do not split (`counts object (a, b)`). Past 12
+fields, keep the keys and the most significant, then end with
+`+N more (see <doc>)`. Prefix a field with `+` only when the documentation says
+this step creates it. Never invent a field the documentation does not list.
 
 ---
 
@@ -179,4 +192,4 @@ Mark Route Handler as entry point.
 - No element is mentioned in an arrow without first appearing as a box or group.
 - Groups are declared before their contents.
 - The flow summary matches the actual arrow directions.
-- Element count is between 8 and 20. If over 20, consolidate into groups.
+- Element count is between 8 and 20, unless the calling instructions set their own scale (the diagram-codebase skill does). If over 20 with no such instruction, consolidate into groups.

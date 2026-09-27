@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block body %}
+<h2>Serveur — capacité mémoire <span id="live" class="live off">hors ligne</span></h2>
+<p class="note">Occupation mémoire de l'hôte (le VPS), lue dans
+<code>/proc/meminfo</code> et rafraîchie en continu. Le conteneur n'ayant pas de
+limite mémoire, la valeur décrit la machine entière, tous conteneurs confondus —
+c'est la « capacité du serveur ». Seuils : confortable sous 60 %, chargé de 60
+à 85 %, critique au-delà. La mémoire « utilisée » vaut total − disponible, la
+seule mesure qui reflète vraiment la pression (le cache disque, récupérable, est
+donc compté comme libre).</p>
+
+<div class="dial-wrap">
+  <svg class="dial" viewBox="0 0 400 322" role="img" aria-label="Occupation mémoire de l'hôte">
+    <g id="dial-zones"></g>
+    <g id="dial-ticks"></g>
+    <text id="dial-pct" class="dial-pct" x="200" y="176">—</text>
+    <text class="dial-sub" x="200" y="198">% de la RAM occupée</text>
+    <g id="dial-needle"><polygon points="197,220 203,220 200,84" /></g>
+    <circle class="dial-hub" cx="200" cy="220" r="9" />
+    <text id="dial-state" class="dial-state" x="200" y="262">en attente du flux</text>
+  </svg>
+  <div class="dial-legend">
+    <span><i class="dot ok"></i>confortable < 60 %</span>
+    <span><i class="dot warn"></i>chargé 60–85 %</span>
+    <span><i class="dot bad"></i>critique ≥ 85 %</span>
+  </div>
+</div>
+
+<h2 id="detail-title">Détail</h2>
+<div class="facts">
+  <div class="fact"><span class="k">Utilisé</span><span id="f-used" class="v">—</span></div>
+  <div class="fact"><span class="k">Disponible</span><span id="f-avail" class="v">—</span></div>
+  <div class="fact"><span class="k">Total</span><span id="f-total" class="v">—</span></div>
+  <div class="fact"><span class="k">Swap</span><span id="f-swap" class="v">—</span></div>
+</div>
+<p class="note" id="f-updated">Dernière mesure : —</p>
+
+<style>
+  .dial-wrap { border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+               padding: .8rem .6rem 1rem; margin-bottom: 1rem; }
+  .dial { width: 100%; max-width: 520px; height: auto; display: block; margin: 0 auto; }
+  .zone { fill: none; stroke-width: 12; stroke-linecap: butt; }
+  .zone-ok   { stroke: var(--ok); }
+  .zone-warn { stroke: var(--warn); }
+  .zone-bad  { stroke: var(--bad); }
+  .tick { stroke: var(--line); stroke-width: 2; }
+  .tick.major { stroke: var(--dim); }
+  .tick-label { fill: var(--dim); font-size: 13px; text-anchor: middle; }
+  #dial-needle { transform-box: view-box; transform-origin: 200px 220px;
+                 transition: transform .8s cubic-bezier(.2,.8,.2,1); }
+  #dial-needle polygon { fill: var(--fg); }
+  .dial-hub { fill: var(--bg); stroke: var(--fg); stroke-width: 3; }
+  .dial-pct { fill: var(--fg); font-size: 46px; font-weight: 700; text-anchor: middle;
+              font-variant-numeric: tabular-nums; }
+  .dial-sub { fill: var(--dim); font-size: 11px; text-anchor: middle;
+              text-transform: uppercase; letter-spacing: .06em; }
+  .dial-state { font-size: 13px; font-weight: 600; text-anchor: middle; fill: var(--dim); }
+  .dial-state.ok { fill: var(--ok); } .dial-state.warn { fill: var(--warn); }
+  .dial-state.bad { fill: var(--bad); }
+  .dial-legend { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+                 color: var(--dim); font-size: .78rem; margin-top: .3rem; }
+  .dial-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+                      margin-right: .35rem; vertical-align: middle; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); }
+  .dot.bad { background: var(--bad); }
+  .live { font-size: .68rem; font-weight: 600; padding: .05rem .45rem; border-radius: 999px;
+          border: 1px solid var(--line); color: var(--dim); text-transform: uppercase;
+          letter-spacing: .06em; vertical-align: middle; }
+  .live.on { border-color: var(--ok); color: var(--ok); }
+  .live.off { border-color: var(--bad); color: var(--bad); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+           gap: .6rem; margin-bottom: .5rem; }
+  .fact { border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
+          padding: .55rem .7rem; display: flex; flex-direction: column; gap: .15rem; }
+  .fact .k { color: var(--dim); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; }
+  .fact .v { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+</style>
+{% endblock %}
+
+{% block script %}
+<script id="boot" type="application/json">{{ mem | tojson }}</script>
+<script>
+// Un seul moteur de rendu, amorcé par l'instantané injecté côté serveur puis
+// alimenté par le flux SSE — dupliquer le rendu serveur/navigateur ferait
+// diverger les deux affichages (même parti pris que la page Jobs).
+const NS = "http://www.w3.org/2000/svg";
+const CX = 200, CY = 220, R = 150;
+const START = -120, SWEEP = 240;          // 0 % à −120°, 100 % à +120°
+const DANGER = 85, WARN = 60;
+
+// Coordonnées d'un point du cadran pour un angle donné (0° = vers le haut).
+const polar = (deg, r = R) => {
+  const rad = deg * Math.PI / 180;
+  return [CX + r * Math.sin(rad), CY - r * Math.cos(rad)];
+};
+const arcPath = (a, b, r = R) => {
+  const [x0, y0] = polar(a, r), [x1, y1] = polar(b, r);
+  return `M ${x0} ${y0} A ${r} ${r} 0 ${(b - a) > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+};
+const pctToDeg = p => START + SWEEP * Math.min(100, Math.max(0, p)) / 100;
+
+function buildDial() {
+  // Zones colorées posées sur l'arc : vert < 60, jaune 60-85, rouge ≥ 85.
+  const zones = document.getElementById("dial-zones");
+  [[0, WARN, "zone-ok"], [WARN, DANGER, "zone-warn"], [DANGER, 100, "zone-bad"]]
+    .forEach(([a, b, cls]) => {
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", arcPath(pctToDeg(a), pctToDeg(b)));
+      p.setAttribute("class", "zone " + cls);
+      zones.appendChild(p);
+    });
+
+  // Graduations tous les 10 %, étiquetées tous les 20 %.
+  const ticks = document.getElementById("dial-ticks");
+  for (let i = 0; i <= 10; i++) {
+    const deg = pctToDeg(i * 10);
+    const [x0, y0] = polar(deg, R - 1), [x1, y1] = polar(deg, i % 2 === 0 ? R - 16 : R - 10);
+    const l = document.createElementNS(NS, "line");
+    l.setAttribute("x1", x0); l.setAttribute("y1", y0);
+    l.setAttribute("x2", x1); l.setAttribute("y2", y1);
+    l.setAttribute("class", "tick" + (i % 2 === 0 ? " major" : ""));
+    ticks.appendChild(l);
+    if (i % 2 === 0) {
+      const [tx, ty] = polar(deg, R - 30);
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", tx); t.setAttribute("y", ty + 4);
+      t.setAttribute("class", "tick-label");
+      t.textContent = i * 10;
+      ticks.appendChild(t);
+    }
+  }
+}
+
+const go = b => (b == null ? "—" : (b / (1024 ** 3)).toFixed(2) + " Go");
+
+function render(s) {
+  const needle = document.getElementById("dial-needle");
+  const pctEl = document.getElementById("dial-pct");
+  const stateEl = document.getElementById("dial-state");
+  const ok = s && s.available && s.used_pct != null;
+
+  if (!ok) {
+    needle.style.transform = "rotate(" + START + "deg)";
+    pctEl.textContent = "—";
+    stateEl.textContent = (s && s.reason) || "mémoire indisponible";
+    stateEl.className = "dial-state bad";
+    ["f-used", "f-avail", "f-total", "f-swap"].forEach(id =>
+      document.getElementById(id).textContent = "—");
+  } else {
+    const pct = s.used_pct;
+    needle.style.transform = "rotate(" + pctToDeg(pct) + "deg)";
+    pctEl.textContent = pct.toFixed(1);
+    const level = pct >= DANGER ? "bad" : pct >= WARN ? "warn" : "ok";
+    const word = pct >= DANGER ? "critique" : pct >= WARN ? "chargé" : "confortable";
+    stateEl.textContent = word;
+    stateEl.className = "dial-state " + level;
+    document.getElementById("f-used").textContent = go(s.used_b);
+    document.getElementById("f-avail").textContent = go(s.available_b);
+    document.getElementById("f-total").textContent = go(s.total_b);
+    const swap = s.swap_total_b > 0
+      ? go(s.swap_used_b) + " / " + go(s.swap_total_b) + " (" + (s.swap_pct ?? 0) + " %)"
+      : "aucun";
+    document.getElementById("f-swap").textContent = swap;
+  }
+  if (s && s.ts) {
+    document.getElementById("f-updated").textContent =
+      "Dernière mesure : " + new Date(s.ts * 1000).toLocaleTimeString("fr-FR");
+  }
+}
+
+const live = document.getElementById("live");
+function setLive(on, label) {
+  live.className = "live " + (on ? "on" : "off");
+  live.textContent = label;
+}
+
+buildDial();
+render(JSON.parse(document.getElementById("boot").textContent));
+
+const src = new EventSource("/ops/stream/mem");
+src.onopen = () => setLive(true, "en direct");
+src.onmessage = e => render(JSON.parse(e.data));
+src.onerror = () => setLive(false, "flux interrompu");
+</script>
+{% endblock %}

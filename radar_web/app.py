@@ -434,7 +434,7 @@ def reco_radar_page(request: Request):
                   playlist=playlist, n_playlist=len(playlist), max_tracks=max_tracks,
                   recos_pending=len(load(_pu().recos_candidates, [])),
                   last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"),
-                  in_cart=_cart_ids(), voted=_voted_map())
+                  in_cart=_cart_ids(), voted=_voted_map(), liked_vids=_liked_ids())
 
 
 @app.post("/reco-radar/delete", response_class=HTMLResponse)
@@ -456,7 +456,7 @@ def reco_radar_delete_track(request: Request, video_id: str = Form("")):
             save(_pu().recos_playlist, new_playlist)
             playlist = new_playlist
     return frag(request, "partials/reco_rows.html", playlist=playlist,
-                in_cart=_cart_ids(), voted=_voted_map())
+                in_cart=_cart_ids(), voted=_voted_map(), liked_vids=_liked_ids())
 
 
 @app.post("/reco-radar/mark-played")
@@ -486,6 +486,88 @@ def reco_radar_clear_candidates():
     radar/scorestore.py (Lot 5, cf. CLAUDE.md point 43)."""
     save(_pu().recos_candidates, [])
     return RedirectResponse("/reco-radar", status_code=303)
+
+
+def _style_key(s):
+    """Normalisation identité artiste/titre — COPIE VOLONTAIRE de
+    radar_jobs.common.style_key (dédoublonnage de recos_history.json) : la couche
+    web n'importe pas radar_jobs (cf. CLAUDE.md pt17, un seul module de job chargé
+    à la fois par crate_jobs.py), donc on mirrore plutôt que d'importer."""
+    return re.sub(r"\s+", " ", (s or "").lower().replace("-", " ")).strip()
+
+
+def _liked_track_key(t):
+    """Identité (artiste, titre) normalisée d'une piste dict — sert de clé de
+    dédoublonnage pour « Mes tracks aimées » (le video_id YouTube n'est PAS
+    l'identité : deux vidéos différentes peuvent être la même piste)."""
+    return (_style_key(t.get("artist")), _style_key(t.get("title")))
+
+
+def _liked_ids():
+    """video_id de recos_playlist.json actuellement « aimés » (identité présente
+    dans liked_tracks.json) — même esprit que _cart_ids(), pour préremplir l'état
+    du cœur à chaque ligne de /reco-radar."""
+    liked_keys = {_liked_track_key(t) for t in load(_pu().liked_tracks, [])}
+    playlist = load(_pu().recos_playlist, [])
+    return {t["video_id"] for t in playlist if _liked_track_key(t) in liked_keys}
+
+
+@app.post("/reco-radar/like-toggle", response_class=HTMLResponse)
+def reco_radar_like_toggle(request: Request, video_id: str = Form("")):
+    """Bascule le « j'aime » d'une piste dans liked_tracks.json. Ne lève JAMAIS
+    (même philosophie que discogs_get(), cf. CLAUDE.md pt10) : video_id inconnu ->
+    état neutre. Gère aussi bien le like depuis /reco-radar (piste présente dans
+    recos_playlist.json) que le unlike depuis « Mes tracks aimées » (piste qui a pu
+    entre-temps disparaître de la playlist)."""
+    if not video_id:
+        return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
+
+    playlist = load(_pu().recos_playlist, [])
+    track = next((t for t in playlist if t.get("video_id") == video_id), None)
+    liked = load(_pu().liked_tracks, [])
+
+    if track:
+        artist, title = track.get("artist"), track.get("title")
+    else:
+        matched = next((t for t in liked if t.get("video_id") == video_id), None)
+        if not matched:
+            return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
+        artist, title = matched.get("artist"), matched.get("title")
+
+    key = _liked_track_key({"artist": artist, "title": title})
+    new_liked = [t for t in liked if _liked_track_key(t) != key]
+
+    if len(new_liked) != len(liked):
+        save(_pu().liked_tracks, new_liked)
+        return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
+
+    entry = dict(track) if track else {"video_id": video_id, "artist": artist, "title": title}
+    entry["liked_at"] = datetime.now().isoformat(timespec="seconds")
+    save(_pu().liked_tracks, liked + [entry])
+    return frag(request, "partials/like_button.html", video_id=video_id, liked=True)
+
+
+@app.get("/tracks-aimees", response_class=HTMLResponse)
+def tracks_aimees_page(request: Request):
+    """« Mes tracks aimées » : pistes marquées d'un cœur depuis Reco Radar, avec
+    lecteur IFrame et export vers YouTube (watch_videos?video_ids=..., lien public
+    SANS OAuth — cf. RECOS RADAR pt19 CLAUDE.md, pas de playlist créée sur un
+    compte). YouTube limite ce paramètre à 50 identifiants : découpage en lots fait
+    ici en Python (plus simple à tester qu'en Jinja)."""
+    liked = load(_pu().liked_tracks, [])
+    vids = [t.get("video_id") for t in liked if t.get("video_id")]
+
+    export_batches = []
+    for i in range(0, len(vids), 50):
+        chunk = vids[i:i + 50]
+        export_batches.append({
+            "start": i + 1,
+            "end": min(i + 50, len(vids)),
+            "ids": ",".join(chunk),
+        })
+
+    return render(request, "pages/tracks_aimees.html", active="tracks_aimees",
+                  liked=liked, n_liked=len(liked), export_batches=export_batches)
 
 
 def _apply_patte_form(f):

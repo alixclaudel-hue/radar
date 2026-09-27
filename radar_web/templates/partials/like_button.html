@@ -1,0 +1,10 @@
+{% import "partials/_icons.html" as icons -%}
+{#- Fragment du SEUL bouton cœur (pas la ligne ni la liste entière) : la route
+   app.py::reco_radar_like_toggle le renvoie après bascule, ciblé par htmx sur
+   #like-<video_id> (cf. partials/reco_rows.html et partials/liked_rows.html). -#}
+<span class="like-cell" id="like-{{ video_id }}">
+  <button type="button" class="ic-btn {{ 'liked' if liked else '' }}"
+          title="{{ 'Retirer des tracks aimées' if liked else 'Ajouter aux tracks aimées' }}"
+          hx-post="/reco-radar/like-toggle" hx-vals='{"video_id": {{ video_id|tojson }}}'
+          hx-target="#like-{{ video_id }}" hx-swap="outerHTML">{{ icons.heart(filled=liked) }}</button>
+</span>

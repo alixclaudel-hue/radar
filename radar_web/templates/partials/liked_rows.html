@@ -1,0 +1,27 @@
+{% import "partials/_icons.html" as icons -%}
+{#- Lignes de « Mes tracks aimées » (liked_tracks.json). Même invariant que
+   partials/reco_rows.html : `data-vid` (video_id), pas la position — le lecteur
+   IFrame de pages/tracks_aimees.html apparie sa liste par identifiant. -#}
+<tbody id="liked-rows">
+  {% for t in liked %}
+  <tr data-vid="{{ t.video_id }}">
+    <td class="small muted">
+      {{ loop.index }}
+      {% if t.album_score is not none %}
+      <span class="badge small" title="Score album /100">{{ icons.album() }} {{ t.album_score }}</span>
+      {% endif %}
+    </td>
+    <td>{{ t.artist }} - {{ t.title }}</td>
+    <td>
+      {{ t.release_title or '—' }}
+      {% if t.label %}<br><a class="small" href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}
+    </td>
+    <td class="num small muted">{{ t.year or '—' }}</td>
+    <td>
+      {% set video_id = t.video_id %}
+      {% set liked = true %}
+      {% include "partials/like_button.html" with context %}
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>

@@ -52,6 +52,11 @@
       {% endif %}
     </td>
     <td>
+      {% set video_id = t.video_id %}
+      {% set liked = t.video_id in (liked_vids or []) %}
+      {% include "partials/like_button.html" with context %}
+    </td>
+    <td>
       <button type="button" class="small" title="Retirer cette piste de la playlist"
               hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'
               hx-target="#reco-rows" hx-swap="outerHTML">🗑️</button>

@@ -3,10 +3,11 @@ name: workflow
 description: >
   Déroulé systématique de TOUTE requête utilisateur sur ce dépôt (décision
   utilisateur du 27/09/2026) : 1. Analyse & cadrage, 2. WBS, 3. Ordonnancement
-  (séquence vs parallèle), 4. Délégation de chaque tâche au modèle le plus
-  adapté (mode du courtier `scripts/ai_broker.py` ou sous-agent `executant` /
-  `Explore`), puis consolidation par Claude. S'applique sans attendre de demande
-  explicite ; son but chiffré est de baisser le cache relu par le fil principal.
+  (séquence vs parallèle), 4. Délégation de chaque tâche à l'exécutant le plus
+  adapté (mode du courtier `scripts/ai_broker.py`, ou ouvrier `scripts/ai_worker.py`
+  — qui passe lui-même par le courtier — ou `Explore` en lecture seule), puis
+  consolidation par Claude. S'applique sans attendre de demande explicite ; son
+  but chiffré est de baisser le cache relu par le fil principal.
 ---
 
 # Workflow par requête — cadrer, découper, ordonnancer, déléguer
@@ -16,11 +17,11 @@ description: >
 Mesure du 27/09 (cartographie `/delegation/workflows`, 20 requêtes, 426 appels
 API) : **58,3 M jetons de cache relu contre 1,3 M de travail frais**. Le fil
 principal démarre à ~62k jetons de contexte et monte à 200-230k en session
-longue ; chaque appel d'outil relit toute cette fenêtre. Un sous-agent frais
-démarre à ~40k et ne renvoie au fil principal qu'un compte rendu court ; un
-appel au courtier ne coûte aucun jeton Claude. Le levier n'est donc pas de
-mieux écrire, c'est de **faire moins d'allers-retours d'outils dans le fil
-principal**.
+longue ; chaque appel d'outil relit toute cette fenêtre. Un ouvrier frais
+démarre à ~0 jeton Claude et ne renvoie au fil principal qu'un rapport court et
+un diff ; un appel au courtier ne coûte aucun jeton Claude. Le levier n'est donc
+pas de mieux écrire, c'est de **faire moins d'allers-retours d'outils dans le
+fil principal**.
 
 Diagnostic du 27/09 (voir `.claude/gemini-receipts.jsonl` et un cas concret :
 régénération de `docs/app-overview.md`) : le fil principal enchaînait 3 `Bash`
@@ -62,15 +63,15 @@ produit (hash git, existence d'un fichier, taille d'un diff, méta de
 fraîcheur) fait partie du prompt de la tâche déléguée qui produit ce livrable
 — elle ne devient pas un tour séparé du fil principal avant délégation.
 Exemple : « régénérer `docs/app-overview.md` si le dépôt a changé depuis sa
-dernière génération » est UNE tâche pour un sous-agent (il vérifie lui-même
+dernière génération » est UNE tâche pour un exécutant (il vérifie lui-même
 le hash/la méta dans son contexte frais et décide), jamais 3 `Bash` de
 vérification + 1 `Agent`.
 
 ### 3. Ordonnancement
 
 Tableau court : tâche → dépend de → exécutant. Les tâches sans dépendance entre
-elles partent **dans le même message** (plusieurs `Agent` et/ou appels courtier
-`run_in_background`), les autres attendent leur prérequis.
+elles partent **dans le même message** (plusieurs ouvriers en arrière-plan
+et/ou appels courtier `run_in_background`), les autres attendent leur prérequis.
 
 ### 4. Délégation, puis consolidation
 
@@ -79,28 +80,46 @@ elles partent **dans le même message** (plusieurs `Agent` et/ou appels courtier
 | Un seul jet de texte : premier jet de code/tests, résumé de doc, diagnostic de log, message de PR | courtier, mode `code`/`test`/`context`/`diag`/`pr` | 0 jeton Claude |
 | Question fermée sur le dépôt (où est X ?) | courtier `--mode search` | 0 jeton Claude |
 | Raisonnement que le gratuit rate | courtier `--mode reasoning` | payant, plafonné |
-| Balayage large de fichiers, conclusion seule utile | sous-agent `Explore` (`model: haiku`) | contexte frais, modèle léger |
-| Tâche à nombreux appels d'outils (explorer + modifier + tester) | sous-agent `executant` (un par tâche du WBS) | contexte frais ~40k, relaie au courtier (jamais de rédaction directe en Sonnet), compte rendu ≤ 20 lignes |
+| Balayage large de fichiers, conclusion seule utile | `Explore` (`model: haiku`) | lecture seule, contexte frais |
+| Tâche à nombreux appels d'outils (explorer + modifier + tester) | **ouvrier `scripts/ai_worker.py`**, un par tâche du WBS | **0 jeton Claude** : boucle bornée pilotée par un modèle gratuit via le courtier, worktree isolé, rend un diff à relire |
 | Jugement : architecture, sécurité, arbitrage produit, relecture finale, commit, merge | fil principal | non délégable (RÈGLE N°1) |
 
-Un `executant` n'est pas un rédacteur : il oriente (quel mode du courtier
-appeler), relit la sortie du courtier, et fait la mécanique que le courtier ne
-peut pas faire (chirurgie fine sur un fichier, `py_compile`, tests ciblés). Sa
-production propre en Sonnet reste de l'orchestration, jamais du contenu
-substantiel — cf. `.claude/agents/executant.md`.
+**L'exécutant est l'ouvrier `ai_worker.py`, pas un sous-agent Claude.** Un
+sous-agent Claude Code ne peut être configuré que sur un modèle Anthropic (le
+champ `model:` n'accepte que `sonnet`/`opus`/`haiku`/`inherit`) : le garder en
+Sonnet « pour orienter » revient à piloter l'exécution par Claude — ce que la
+décision utilisateur du 27/09 a écarté. `ai_worker.py` appelle lui-même le
+courtier (`_decider_courtier`), écrit dans un `git worktree` dédié et rend un
+diff ; le fil principal ne paie aucun jeton Claude pour la production.
+
+Lancer un ouvrier :
+
+```bash
+python3 scripts/ai_worker.py "<tâche autonome>" --json
+# comparaison : un worktree/branche DISTINCTS par exemplaire
+python3 scripts/ai_worker.py "<tâche>" --worktree .worktrees/cmp-a --branche cmp/a --json
+```
+
+Il rend un rapport JSON (`statut`, `fichiers_modifies`, `commandes`, `diff`,
+`escalade_disponible`, `paye`) et, avec `--diff`, le diff unifié. Bornes dures :
+étapes, durée, jetons estimés, fichiers — les atteindre est un arrêt avec
+rapport, jamais un échec silencieux. Escalade payante (DeepSeek) uniquement sur
+`--escalate-paid`, jamais automatique.
 
 Règles de délégation :
 
 - **Jamais `subagent_type: "fork"`** : il hérite du contexte complet (mesuré à 180k au démarrage) et annule le gain.
-- Le prompt d'un sous-agent est **autonome** : répertoire de travail, fichiers et lignes concernés, ce qui est déjà établi, critère de fin, format de retour. Il n'a pas la conversation.
-- Un sous-agent applique lui-même la RÈGLE N°1 (le courtier avant lui) — le rappeler n'est pas nécessaire, c'est dans sa définition.
-- Pas de sous-agent pour une tâche de 1 à 3 appels d'outils : son démarrage (~40k) coûte plus que la tâche faite sur place.
-- **Plusieurs `executant` en parallèle, un par tâche indépendante du WBS** (cf. §3) : c'est la règle, pas l'exception — c'est Claude (fil principal) qui assemble ensuite les comptes rendus.
-- **Comparaison ciblée** : pour une tâche complexe (spec ambiguë, sécurité, cœur d'algorithme, aucun test de référence pour trancher), lancer 2 à 3 `executant` sur EXACTEMENT le même prompt, dans le même message. Le fil principal compare les comptes rendus et choisit ou fusionne la meilleure solution — jamais par défaut, seulement quand la tâche le justifie (coût 2-3x sur le budget d'appels de cette tâche, cf. §2).
+- Le prompt d'une tâche déléguée est **autonome** : répertoire de travail, fichiers et lignes concernés, ce qui est déjà établi, critère de fin, format de retour. Il n'a pas la conversation.
+- L'ouvrier applique lui-même la RÈGLE N°1 (le courtier avant lui) — c'est son mode de décision par défaut, le rappeler n'est pas nécessaire.
+- Pas d'ouvrier pour une tâche de 1 à 3 appels d'outils : son démarrage coûte plus que la tâche faite sur place.
+- **Plusieurs ouvriers en parallèle, un par tâche indépendante du WBS** (cf. §3) : chaque tâche produit son propre worktree (`worker-<slug>`) ; c'est Claude (fil principal) qui assemble ensuite les rapports et les diffs.
+- **Comparaison ciblée** : pour une tâche complexe (spec ambiguë, sécurité, cœur d'algorithme, aucun test de référence pour trancher), lancer 2 à 3 ouvriers sur EXACTEMENT la même tâche, **avec des `--worktree`/`--branche` distincts** (sinon ils se marchent dessus). Le fil principal compare les diffs et choisit ou fusionne la meilleure solution — jamais par défaut, seulement quand la tâche le justifie.
+- L'ouvrier ne `commit` ni ne `push` : la consolidation, le commit et le merge restent au fil principal (jugement non délégable).
 
-Consolidation (fil principal) : relire les comptes rendus, rouvrir de façon
-chirurgicale (`limit` ≤ 30) uniquement ce qui est douteux, trancher, lancer la
-vérification finale (suite de tests), commit/PR via le mode `pr`.
+Consolidation (fil principal) : relire les rapports, ouvrir de façon
+chirurgicale (`limit` ≤ 30) uniquement le douteux, appliquer ou adapter le diff
+retenu, trancher, lancer la vérification finale (suite de tests), commit/PR via
+le mode `pr`.
 
 ## Hygiène de session (même objectif)
 
@@ -110,7 +129,7 @@ vérification finale (suite de tests), commit/PR via le mode `pr`.
 ## Trace attendue dans la réponse
 
 Pour une requête de plus d'une tâche, la réponse finale montre en quelques
-lignes le WBS avec, par tâche, l'exécutant réel (mode courtier, sous-agent, ou
+lignes le WBS avec, par tâche, l'exécutant réel (mode courtier, ouvrier, ou
 fil principal + pourquoi) et le nombre d'exemplaires lancés (1, ou 2-3 en
 comparaison + pourquoi celle-ci le justifiait). C'est ce qui permet de vérifier
 après coup, dans `/delegation/workflows`, que le cache relu baisse vraiment et

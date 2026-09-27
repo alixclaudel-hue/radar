@@ -48,6 +48,18 @@ RETIRED_MODEL_STATUSES = frozenset({404})
 # fournisseur, on continue ailleurs.
 PROVIDER_FATAL_STATUSES = frozenset({401, 403})
 
+# Un 403 peut aussi ne parler que du MODÈLE (restriction commerciale), jamais
+# de la clé : OpenRouter le dit dans le corps de la réponse (constaté le 27/09
+# sur `thinkingmachines/inkling-small:free` : « is only available on agentic
+# harnesses »). Traiter ce cas comme `PROVIDER_FATAL` bannit tout le
+# fournisseur — les autres modèles gratuits du même tour, sains, en paient le
+# prix. Ces marqueurs distinguent les deux : présents dans le message, le 403
+# ne condamne que ce modèle (cf. `ProviderError.provider_fatal`).
+MODEL_RESTRICTED_MARKERS = (
+    "only available on",
+    "not available for",
+)
+
 # Statuts qui condamnent la REQUÊTE telle qu'elle a été écrite pour ce
 # fournisseur — un paramètre inconnu, un contexte trop long — mais qu'un autre
 # fournisseur peut accepter telle quelle. La version mono-Gemini abandonnait
@@ -79,7 +91,15 @@ class ProviderError(Exception):
 
     @property
     def provider_fatal(self) -> bool:
-        return self.status in PROVIDER_FATAL_STATUSES
+        if self.status not in PROVIDER_FATAL_STATUSES:
+            return False
+        message = str(self).lower()
+        if any(marqueur in message for marqueur in MODEL_RESTRICTED_MARKERS):
+            # Restriction du modèle, pas de la clé : on laisse `record_failure`
+            # mettre CE modèle en quarantaine, la cascade continue sur les
+            # autres candidats du même fournisseur.
+            return False
+        return True
 
     @property
     def model_retired(self) -> bool:

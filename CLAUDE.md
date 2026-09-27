@@ -82,6 +82,7 @@ Tier déduit du mode (`code`/`test`/`pr`/`reasoning` → heavy, le reste → fas
 56. **Gate `git diff` brut** + repli tokenisé du mode `search` (`scripts/ai/locate.py`).
 57. **Cartographie des requêtes** (`/delegation/workflows`) : `scripts/workflow_ingest.py` côté hôte (le conteneur ne voit pas `~/.claude`), relancé par le hook `Stop`, rattrapage en CLI (`--since`). **Pièges transcripts** : un appel API = plusieurs lignes JSONL au même `usage` (compter par `requestId`) ; `tool_result` dans des lignes `user` ; une `<task-notification>` prolonge la requête ; le prompt exact envoyé au modèle délégué n'est pas conservé.
 58. **Courtier (27/09)** : worktree sans `.env` → repli sur le `.env` du dépôt principal (`catalogue.dotenv_paths()`) ; `--model fournisseur:modèle` accepté ; santé par contrat (`health.record_contract_failure` : sortie hors contrat → fin de cascade 24 h pour ce mode). Part déléguée = délégations abouties seulement, cache relu exclu. Repères : contexte de départ ~62k jetons, sous-agent frais ~40k, `fork` ~180k.
+59. **Correctifs circuit délégation (PR #250, 27/09)** : un 403 qui ne parle que du MODÈLE (ex. `inkling-small:free` « only available on agentic harnesses ») était confondu avec une faute de clé et bannissait tout le fournisseur — distingué dans `providers.provider_fatal` ; liste noire `policy.blocked_ids` (survit au refresh mensuel du catalogue). Hook `UserPromptSubmit` (`workflow_reminder.py`) force le rappel du skill `workflow` sauf question simple sans verbe d'action. WBS du skill `workflow` : découpage désormais par LIVRABLE (les vérifs d'état vont dans le prompt délégué), plus par commande shell.
 
 ## TODO — vérifications VPS en attente
 
@@ -95,3 +96,4 @@ Tier déduit du mode (`code`/`test`/`pr`/`reasoning` → heavy, le reste → fas
 - **Perf** : temps de chargement à froid de `/wantlist` et `/patte`.
 - **`vps-ops`** : périmètre du pt 5 appliqué (drapeaux documentés, merge par PR, jamais de secret en rapport).
 - **Boucle scripts (pts 39-40)** : `/script-observe ytcache` puis `/script-loop ytcache` ; vérifier l'ouverture de PR et le garde-fou de merge au premier vrai cas.
+- **Correctifs délégation (pt 59)** : le hook `workflow_reminder.py` déclenche bien sur requête d'action et se tait sur question chatbot en usage réel (heuristique par mots-clés, pas d'apprentissage) ; `blocked_ids` survit à un vrai `refresh_models.py` en prod ; aucun autre modèle du catalogue ne 403 avec un marqueur de restriction non couvert par `MODEL_RESTRICTED_MARKERS`.

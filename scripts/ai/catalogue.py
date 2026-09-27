@@ -95,6 +95,11 @@ def default_policy() -> dict:
         "daily_paid_cap_usd": None,
         "max_candidates": 6,
         "retry": {"per_model": 2, "base_delay": 4.0, "max_delay": 30.0},
+        # Identifiants jamais essayés, quel que soit le mode : un modèle publié
+        # gratuit sur le papier mais qui refuse systématiquement (403 modèle,
+        # cf. `inkling-small:free` le 27/09) gaspille un tour de cascade à
+        # chaque appel sans jamais pouvoir répondre.
+        "blocked_ids": [],
     }
 
 

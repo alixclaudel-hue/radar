@@ -394,6 +394,7 @@ _PRESERVED_POLICY_FIELDS = (
     "daily_paid_cap_usd",
     "max_candidates",
     "retry",
+    "blocked_ids",
 )
 
 

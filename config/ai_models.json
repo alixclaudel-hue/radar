@@ -17,7 +17,10 @@
       "per_model": 2,
       "base_delay": 4.0,
       "max_delay": 30.0
-    }
+    },
+    "blocked_ids": [
+      "thinkingmachines/inkling-small:free"
+    ]
   },
   "providers": {
     "openrouter": {

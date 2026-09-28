@@ -54,7 +54,7 @@ prises et les points encore ouverts.
 - Instrumentation de `scripts/ai_query.py` — le reçu de chaque appel porte désormais
   le modèle réellement utilisé, le tier, le nombre de replis de cascade, les jetons
   rapportés par `usageMetadata` et la durée. Vérifiée par un appel réel. Le hook
-  `gemini_gate.py` ne lit toujours que `ts`, `mode` et `status` : un reçu ancien,
+  `delegation_gate.py` ne lit toujours que `ts`, `mode` et `status` : un reçu ancien,
   sans ces champs, reste valide.
 - `RADAR_TELEMETRY_DIR` : redirige l'écriture du journal hors du dépôt. Sur le VPS la
   variable pointera `/data/ops/`, ce qui évite de salir le checkout de production —

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Passerelle polyvalente vers l'API Gemini (Google AI Studio) pour Radar.
 
-Rôle : délester les tâches mécaniques (logs, diffs, premiers jets de code ou
-de tests) pour économiser les tokens Claude — cf. `.claude/skills/ask-gemini/`.
+Rôle : transport bas niveau vers l'API Gemini (Google AI Studio), mobilisé par
+le courtier `ai_broker.py` via `scripts/ai/` — cf. `.claude/skills/delegate/`.
 
 - Deux cascades de modèles (`TIER_CASCADES`) : `heavy` pour le raisonnement
   (code, tests), `fast` pour le volume (logs, diffs, docs).
@@ -28,41 +28,9 @@ _DEFAULT_BASE_URL_TEMPLATE = (
 )
 
 
-_GATEWAY_MARKER = "/tmp/radar-gemini-gateway.url"
-
-
-def _read_gateway_marker() -> str:
-    """URL du gateway écrite par `scripts/cloud-gemini-gateway.sh` au SessionStart.
-
-    Repli quand `RADAR_GEMINI_BASE_URL` n'est pas exportée dans l'environnement
-    du process appelant (le hook shell ne peut pas exporter dans le shell parent).
-    Fichier éphémère volontairement placé sous `/tmp` — jamais commité, disparaît
-    à la fin de la session. Absent sur le VPS : chemin direct inchangé.
-    """
-    try:
-        with open(_GATEWAY_MARKER, "r", encoding="utf-8") as f:
-            return f.read().strip()
-    except OSError:
-        return ""
-
-
-def _base_url_template() -> str:
-    """URL cible pour l'appel Gemini, avec override par `RADAR_GEMINI_BASE_URL`.
-
-    En session cloud (dépôt frais, sans clé Gemini exportée), un mini gateway
-    local — `scripts/gemini_gateway.py` — reçoit `RADAR_GEMINI_BASE_URL` sous la
-    forme `http://127.0.0.1:8632/v1beta/models/` et ajoute lui-même `?key=`.
-    Sur le VPS et en Docker, la variable est absente : appel direct à Google
-    inchangé.
-    """
-    override = (os.environ.get("RADAR_GEMINI_BASE_URL") or "").strip()
-    if not override:
-        override = _read_gateway_marker()
-    if not override:
-        return _DEFAULT_BASE_URL_TEMPLATE
-    return override.rstrip("/") + "/{model}:generateContent"
-
-
+# Le transport est un simple appel direct à Google : la passerelle locale de
+# session cloud (`gemini_gateway.py`) a été supprimée avec les autres résidus
+# morts (correctif C-7). Seul `ai_broker.py` reste point d'entrée public.
 BASE_URL_TEMPLATE = _DEFAULT_BASE_URL_TEMPLATE  # rétrocompat pour tests qui l'importaient
 
 # Cascades ordonnées par capacité décroissante. Les noms sont ceux renvoyés par
@@ -402,22 +370,10 @@ def query_gemini(
     session cloud. Sans clé locale ni identifiant réseau, Gemini répond avec
     une erreur d'authentification explicite (capturée plus bas).
 
-    Pour CE modèle, deux essais sont enchaînés quand une passerelle locale est
-    configurée (session cloud, via `RADAR_GEMINI_BASE_URL` ou le marqueur
-    `/tmp/radar-gemini-gateway.url`) : la passerelle d'abord (c'est elle qui
-    pose la clé), puis en repli l'appel direct à Google avec la clé locale —
-    sans ce second essai, une passerelle éteinte ou en erreur épuisait la
-    cascade ENTIÈRE de modèles sur un transport mort, alors qu'un appel direct
-    peut aboutir avec la clé de l'environnement. Un `api_key` explicitement
-    passé par l'appelant (usage programmatique, tests) court-circuite la
-    passerelle : c'est un contrat d'appel qui doit être respecté, un seul essai
-    est fait, avec cette clé.
+    Un `api_key` explicitement passé par l'appelant (usage programmatique,
+    tests) prime sur la clé de l'environnement : c'est un contrat d'appel.
     """
     key = api_key or os.getenv("GEMINI_API_KEY") or _key_from_dotenv()
-    gateway_configured = (not api_key) and (
-        bool((os.environ.get("RADAR_GEMINI_BASE_URL") or "").strip())
-        or bool(_read_gateway_marker())
-    )
 
     gen_config: dict = {"temperature": temperature}
     if json_mode:
@@ -446,24 +402,10 @@ def query_gemini(
             "parts": [{"text": system_instruction}]
         }
 
-    direct_url = _DEFAULT_BASE_URL_TEMPLATE.format(model=model)
-    attempts: list[tuple[str, str | None]] = []
-    if gateway_configured:
-        attempts.append((_base_url_template().format(model=model), None))
-    attempts.append((direct_url + (f"?key={key}" if key else ""), key))
-
-    last_err: Exception | None = None
-    for i, (url, url_key) in enumerate(attempts):
-        try:
-            return _send_gemini_request(url, payload, timeout, url_key)
-        except (GeminiHTTPError, RuntimeError) as e:
-            last_err = e
-            if i < len(attempts) - 1:
-                sys.stderr.write(
-                    f"[ai_query] passerelle locale en erreur ({e}), "
-                    f"repli sur l'appel direct à Google pour '{model}'...\n"
-                )
-    raise last_err
+    url = _DEFAULT_BASE_URL_TEMPLATE.format(model=model)
+    if key:
+        url += f"?key={key}"
+    return _send_gemini_request(url, payload, timeout, key)
 
 
 def _retry_delay(attempt: int) -> float:
@@ -640,10 +582,31 @@ def receipts_dir() -> str:
     return os.path.join(root, ".claude")
 
 
+# Origine du reçu, écrite dans le champ `via` :
+#   - "direct"  : `ai_query.py` appelé tel quel (transport bas niveau). NE
+#                 satisfait PAS le gate de délégation (cf. correctifs C-4/C-5).
+#   - "broker"  : appel passé par `scripts/ai_broker.py` (relais conforme).
+#   - "worker"  : chantier mené par `scripts/ai_worker.py`.
+# Posée par `set_receipt_origin()` avant les appels du courtier/l'ouvrier. Un
+# reçu sans `via` (antérieur au champ) reste conforme — le gate ne rejette que
+# le marquage explicite `direct`.
+_RECEIPT_ORIGIN = "direct"
+
+
+def set_receipt_origin(origin: str) -> None:
+    """Fixe l'origine (`via`) des prochains reçus du process courant.
+
+    `ai_broker.py` (`"broker"`) et `ai_worker.py` (`"worker"`) l'appellent une
+    fois au démarrage : sans cela, leurs reçus porteraient le défaut `"direct"`
+    et ne compteraient pas comme délégation pour `delegation_gate.py`."""
+    global _RECEIPT_ORIGIN
+    _RECEIPT_ORIGIN = (origin or "").strip().lower() or "direct"
+
+
 def write_receipt(mode: str, status: str, **extra) -> None:
     """Trace l'appel dans `gemini-receipts.jsonl` (un JSON par ligne), via `receipts_dir()`.
 
-    C'est la preuve que lit le hook `scripts/hooks/gemini_gate.py` avant
+    C'est la preuve que lit le hook `scripts/hooks/delegation_gate.py` avant
     d'autoriser un commit ou l'écriture d'un premier jet : sans cette trace, la
     délégation reposerait de nouveau sur la seule vigilance du modèle. Un appel
     RATÉ est tracé lui aussi (`status="error"`) — la règle du projet est
@@ -652,15 +615,19 @@ def write_receipt(mode: str, status: str, **extra) -> None:
 
     `extra` porte la mesure lue dans `usageMetadata` (modèle, tier, jetons,
     durée) : c'est la source du tableau de bord de délégation de `radar_ops`.
-    Le hook, lui, ne lit toujours que `ts`, `mode` et `status` — un reçu ancien
-    sans ces champs reste valide.
+    Le hook, lui, ne lit toujours que `ts`, `mode`, `status` et `via`.
+
+    Le champ `via` (`direct`/`broker`/`worker`) est posé automatiquement d'après
+    l'origine du process — un appel direct reste tracé mais ne débloque plus le
+    gate. `extra` peut le surcharger au besoin.
 
     N'échoue jamais : tracer est un effet de bord, pas la mission du script.
     """
     try:
         d = receipts_dir()
         os.makedirs(d, exist_ok=True)
-        row = {"ts": time.time(), "mode": mode, "status": status}
+        row = {"ts": time.time(), "mode": mode, "status": status,
+               "via": _RECEIPT_ORIGIN}
         row.update({k: v for k, v in extra.items() if v is not None})
         line = json.dumps(row, ensure_ascii=False)
         with open(os.path.join(d, "gemini-receipts.jsonl"), "a", encoding="utf-8") as f:

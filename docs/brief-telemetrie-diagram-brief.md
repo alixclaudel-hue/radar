@@ -14,7 +14,7 @@ reconnaît à ces formules exactes ; les libellés et les notes sont en françai
 
 ## Elements
 
-Create a group labeled "Session de développement (cloud ou VPS)" that contains: Claude Code, Hook telemetry.py, telemetry.jsonl, ai_query.py, gemini-receipts.jsonl, Garde gemini_gate.py.
+Create a group labeled "Session de développement (cloud ou VPS)" that contains: Claude Code, Hook telemetry.py, telemetry.jsonl, ai_query.py, gemini-receipts.jsonl, Garde delegation_gate.py.
 
 Create a group labeled "Transport git" that contains: telemetry_ship.py, Branche telemetry.
 
@@ -34,7 +34,7 @@ Create a box labeled "API Gemini". Note: service externe. Rapporte lui-même sa 
 
 Create a box labeled "gemini-receipts.jsonl". Note: un reçu par appel — mode, statut, tier, modèle, replis, jetons, durée.
 
-Create a box labeled "Garde gemini_gate.py". Note: hook PreToolUse. Bloque commit, test et nouveau module tant qu'aucun reçu de moins d'une heure n'existe.
+Create a box labeled "Garde delegation_gate.py". Note: hook PreToolUse. Bloque commit, test et nouveau module tant qu'aucun reçu de moins d'une heure n'existe.
 
 Create a box labeled "telemetry_ship.py". Note: écrit les objets git directement, sans toucher à l'index ni à la branche courante. Lancé à la demande, jamais par un hook.
 
@@ -60,9 +60,9 @@ Draw an arrow from API Gemini to ai_query.py. Label it "réponse + usageMetadata
 
 Draw an arrow from ai_query.py to gemini-receipts.jsonl. Label it "reçu mesuré".
 
-Draw an arrow from gemini-receipts.jsonl to Garde gemini_gate.py. Label it "preuve de tentative".
+Draw an arrow from gemini-receipts.jsonl to Garde delegation_gate.py. Label it "preuve de tentative".
 
-Draw an arrow from Garde gemini_gate.py to Claude Code. Label it "autorise ou bloque l'action".
+Draw an arrow from Garde delegation_gate.py to Claude Code. Label it "autorise ou bloque l'action".
 
 Draw an arrow from telemetry.jsonl to telemetry_ship.py. Label it "2000 dernières lignes".
 
@@ -109,7 +109,7 @@ Mark Page /delegation as entry point.
   délégation. À ajouter si le lot 3 veut une vue unique des quatre pages.
 
 - La boucle de contrôle du schéma est le couple `gemini-receipts.jsonl` →
-  `gemini_gate.py` → `Claude Code` : c'est elle qui rend la règle de délégation
+  `delegation_gate.py` → `Claude Code` : c'est elle qui rend la règle de délégation
   contraignante au lieu de déclarative. Si le rendu permet un style distinct, la
   tracer en boucle fermée plutôt qu'en flèches droites.
 

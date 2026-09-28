@@ -108,8 +108,7 @@ seulement sur critère explicite et sous plafond ; Claude ne prend le relais
 qu'une fois le gratuit épuisé (quota, panne, sortie inexploitable) — jamais
 l'inverse, jamais par commodité. Le skill `delegate`
 (`.claude/skills/delegate/SKILL.md`) documente la syntaxe complète et les
-modes — lis-le au premier appel de la session. Le skill `ask-gemini` n'est
-plus qu'un **alias** qui pointe dessus.
+modes — lis-le au premier appel de la session.
 
 **Le hook `delegation_gate.py` applique la règle mécaniquement** : il bloque le
 commit, l'écriture d'un test ou d'un nouveau module `.py` tant qu'aucun reçu
@@ -356,7 +355,7 @@ cinq portes.
 `~/radar/scripts/ai_broker.py` est un script du dépôt, en lecture seule — **le
 lancer n'est pas y écrire**, exactement comme lancer un job. La syntaxe
 complète et les modes sont dans le skill `delegate`
-(`.claude/skills/delegate/SKILL.md`) ; `ask-gemini` n'en est que l'alias.
+(`.claude/skills/delegate/SKILL.md`).
 L'usage opérationnel est décrit dans la section « Délégation
 multi-fournisseurs — RANG 2 » ci-dessus.
 

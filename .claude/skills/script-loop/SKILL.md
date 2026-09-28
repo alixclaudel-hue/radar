@@ -40,7 +40,7 @@ PR de boucle n'est déjà ouverte sur ce script : deux sessions qui corrigent le
 mêmes fichiers en parallèle, c'est le conflit que la séparation historique
 existait pour empêcher.
 
-Lis `.claude/skills/delegate/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire (alias `ask-gemini`).
+Lis `.claude/skills/delegate/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.
 ---
 
 ## Étape 0 — Quel script

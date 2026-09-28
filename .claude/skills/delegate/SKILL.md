@@ -29,7 +29,7 @@ passerelle absorbe le volume et les premiers jets.
 Ce skill est **fournisseur-neutre** : il décrit le contrat de
 [`scripts/ai_broker.py`](../../../scripts/ai_broker.py:1), qui choisit lui-même
 le fournisseur et le modèle (OpenRouter gratuit, Gemini, repli DeepSeek payant).
-L'ancien alias [`ask-gemini`](../ask-gemini/SKILL.md:1) renvoie ici.
+Ce skill est l'unique point d'entrée (l'alias `ask-gemini` a été supprimé — correctif C-7).
 
 ## L'ordre n'est pas négociable
 
@@ -49,6 +49,21 @@ passent toujours — rétrocompatibilité et porte de sortie quand tous les
 fournisseurs sont en panne. Le courtier écrit ce reçu à chaque appel, succès
 (`status: ok`) **comme échec** (`status: error`) — d'où la porte de sortie : une
 tentative sincère qui rate rend la main à Claude, une tentative jamais faite non.
+
+Depuis le diagnostic sous-traitance (correctifs C-1→C-6), le gate lit en plus le
+**marqueur de requête** `.claude/current_request.json` (écrit par
+`workflow_reminder.py` au `UserPromptSubmit`) et durcit la règle selon le
+pattern : **(C-1)** au-delà de 8 appels d'outils dans la requête courante
+(`RADAR_WORKER_GATE_MIN_TOOLS`), une écriture `.py` exige un reçu **ouvrier**
+(`ai_worker.py`, mode/via `worker`) ; **(C-2)** une requête marquée multi-étapes
+exige une délégation (`worker`/`code`/`test`) **postérieure au début de la
+requête** ; **(C-3)** un `Edit` sur un `.py` **existant** dont le patch dépasse
+40 lignes (`RADAR_EDIT_GATE_MIN_LINES`) exige une délégation ; **(C-6)** un
+balayage annoncé par la requête (« où est », « trouve tous », « liste les »…)
+exige un reçu `search` (ou la trace d'un `explore-leger`) au lieu d'un `Grep`/
+`Read` natif. Et un reçu `via="direct"` — écrit par un appel direct à
+`ai_query.py`, transport bas niveau — ne satisfait **plus** le gate : seuls
+`ai_broker.py` et l'ouvrier qui passe par lui sont relais conformes.
 
 Le même hook signale, **sans bloquer**, tout reçu récent estampillé `paid` dont
 le mode ne justifie pas la dépense (seul `reasoning` la justifie, ou une

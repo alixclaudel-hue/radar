@@ -1461,6 +1461,36 @@ def _notes_sorted():
     return sorted(load(_pu().ui_notes, []), key=lambda n: n.get("ts", ""), reverse=True)
 
 
+def _all_notes(uid=None):
+    """Retours de TOUS les comptes, étiquetés de leur auteur — vue propriétaire.
+
+    Renvoie `None` pour tout compte autre que le propriétaire : la page /feedback
+    d'un invité ne doit jamais exposer le fichier `ui_notes.json` des autres
+    (l'isolation par-utilisateur reste la règle, cf. `paths.user_paths`). C'est
+    cette valeur `None` que le gabarit teste pour n'afficher la section qu'au
+    propriétaire — pas une condition recopiée dans le HTML.
+
+    **Lecture seule** : on ne réécrit jamais `ui_notes.json` d'autrui. Les
+    actions (statut, suppression) continuent de ne toucher que le fichier de
+    l'utilisateur courant, ce qui évite qu'un propriétaire marque « fait » ou
+    supprime une note à la place de son auteur (et déclenche la suppression du
+    commentaire GitHub associé avec un mauvais contexte)."""
+    uid = uid or store.current_uid()
+    if uid != paths.DEFAULT_UID:
+        return None
+    uids = paths.all_uids()
+    # Propriétaire en tête (comme le worker), puis les autres par ordre
+    # alphabétique : la vue se lit comme la boucle d'entretien de fond.
+    if paths.DEFAULT_UID in uids:
+        uids = [paths.DEFAULT_UID] + [u for u in uids if u != paths.DEFAULT_UID]
+    out = []
+    for u in uids:
+        pseudo = (accounts.get(u) or {}).get("username") or u
+        for n in load(paths.user_paths(u).ui_notes, []):
+            out.append({**n, "uid": u, "username": pseudo})
+    return sorted(out, key=lambda n: n.get("ts", ""), reverse=True)
+
+
 def _gh_feedback_headers(token):
     return {"Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json", "User-Agent": "Radar/1.0"}
@@ -1531,7 +1561,8 @@ def _delete_feedback_from_github(note):
 
 @app.get("/feedback", response_class=HTMLResponse)
 def feedback_page(request: Request):
-    return render(request, "pages/feedback.html", active="", notes=_notes_sorted())
+    return render(request, "pages/feedback.html", active="",
+                  notes=_notes_sorted(), all_notes=_all_notes())
 
 
 @app.post("/feedback/add", response_class=HTMLResponse)

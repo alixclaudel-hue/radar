@@ -444,6 +444,36 @@ def _occasions_manquees(receipts, events):
     }
 
 
+# Seuil d'alerte sur la part de reçus HORS courtier : au-delà, la délégation est
+# jugée insuffisante. Calé sur le diagnostic sous-traitance (87 % de reçus sans
+# `provider`) — le seuil est bas à dessein, la règle du projet étant de déléguer,
+# pas de tolérer un contournement majoritaire.
+DIRECT_SHARE_ALERT = 0.20
+
+
+def _est_hors_courtier(r):
+    """Vrai si le reçu ne provient pas du courtier multi-fournisseurs.
+
+    Un reçu marqué `via="direct"` (appel direct à `ai_query.py`) l'est toujours.
+    Un reçu ANTÉRIEUR au champ `via` l'est s'il n'a pas de `provider` : c'est le
+    profil des reçus pauvres historiques (1094/1252 sans provider), que le champ
+    `via` rend désormais explicite pour les nouveaux (C-5)."""
+    via = str(r.get("via") or "").strip().lower()
+    if via:
+        return via == "direct"
+    return not r.get("provider")
+
+
+def _part_hors_courtier(receipts):
+    """Part (0..1) des reçus hors courtier ; None si aucun reçu.
+
+    None plutôt que 0 : sans reçu, afficher 0 laisserait croire que tout est
+    délégué alors que rien n'a été mesuré (même règle que `per_tool_call`)."""
+    if not receipts:
+        return None
+    return round(sum(1 for r in receipts if _est_hors_courtier(r)) / len(receipts), 4)
+
+
 def summarize(receipts, events, now=None, days=14, health_state=None):
     """Tout ce que la page affiche, dérivé des journaux et du disjoncteur."""
     now_ts = float(now) if now is not None else \
@@ -474,10 +504,16 @@ def summarize(receipts, events, now=None, days=14, health_state=None):
     }
 
     tool_calls = sum(1 for e in events if e.get("kind") == "tool")
+    part_hors_courtier = _part_hors_courtier(receipts)
     return {
         "totals": totals,
         "by_mode": _group(receipts, "mode", "mode", "inconnu"),
         "by_model": _group(receipts, "model", "model", "inconnu"),
+        # C-5 : mesure par fournisseur et par origine du reçu. `by_provider`
+        # montre qui a réellement servi ; `by_via` distingue les délégations
+        # conformes (`broker`/`worker`) des appels directs.
+        "by_provider": _group(receipts, "provider", "provider", "<direct>"),
+        "by_via": _group(receipts, "via", "via", "inconnu"),
         "by_day": _by_day(receipts, now_ts, days),
         "sessions": _sessions(events),
         "quota_du_jour": _quota_du_jour(receipts),
@@ -492,6 +528,13 @@ def summarize(receipts, events, now=None, days=14, health_state=None):
             # rien n'a été délégué, alors que rien n'a été mesuré.
             "per_tool_call": (round(len(receipts) / tool_calls, 3)
                               if tool_calls else None),
+            # Mesure du contournement + alerte : au-delà de DIRECT_SHARE_ALERT,
+            # la délégation est insuffisante (au plus un reçu sur cinq peut
+            # rester hors courtier).
+            "hors_courtier": sum(1 for r in receipts if _est_hors_courtier(r)),
+            "part_hors_courtier": part_hors_courtier,
+            "alerte_hors_courtier": (part_hors_courtier is not None
+                                     and part_hors_courtier > DIRECT_SHARE_ALERT),
         },
     }
 
@@ -1082,6 +1125,11 @@ def snapshot_windowed(data_root, preset="7d", from_ts=None, to_ts=None,
         "totals": base["totals"],
         "by_mode": base["by_mode"],
         "by_model": base["by_model"],
+        # C-5 : répartition par fournisseur et par origine du reçu, pour que la
+        # page montre qui a réellement servi et quelle part est passée hors
+        # courtier (alerte portée par `delegation.alerte_hors_courtier`).
+        "by_provider": base["by_provider"],
+        "by_via": base["by_via"],
         "top_models": top_models,
         "top_modes": top_modes,
         "buckets": buckets,

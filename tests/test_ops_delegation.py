@@ -613,7 +613,8 @@ class FenetrageTemporelTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir, \
                 patch.dict(os.environ, {}, clear=True):
             snap = delegation.snapshot_windowed(tmpdir, preset="7d")
-        for cle in ("period", "totals", "by_model", "by_mode", "top_models",
+        for cle in ("period", "totals", "by_model", "by_mode", "by_provider",
+                    "by_via", "top_models",
                     "top_modes", "buckets", "sessions", "quota_du_jour",
                     "part_gratuite", "cooldowns", "occasions_manquees",
                     "delegation", "small_prompts", "errors", "per_day",
@@ -768,6 +769,73 @@ class DelegationTemplateTests(unittest.TestCase):
         self.assertIn("cdnjs.cloudflare.com/ajax/libs/Chart.js", html)
         # Boutons d'export : au moins un `data-bloc="…"` pour un des blocs.
         self.assertIn("data-bloc=", html)
+
+
+class HorsCourtierTests(unittest.TestCase):
+    """C-5 : mesure de la part de reçus hors courtier et alerte associée.
+
+    Le diagnostic sous-traitance (2026-09-28) relevait 1094/1252 reçus sans
+    `provider`, soit ~87 %. Ces tests verrouillent la fonction qui refait ce
+    calcul et l'alerte qui doit se déclencher au-delà de DIRECT_SHARE_ALERT."""
+
+    def test_est_hors_courtier_via_explicite(self):
+        """`via` fait foi quand il est présent (nouveaux reçus)."""
+        self.assertTrue(delegation._est_hors_courtier({"via": "direct"}))
+        self.assertFalse(delegation._est_hors_courtier({"via": "broker"}))
+        self.assertFalse(delegation._est_hors_courtier({"via": "worker"}))
+        # Casse et espaces neutralisés, comme `set_receipt_origin`.
+        self.assertTrue(delegation._est_hors_courtier({"via": "  DIRECT "}))
+
+    def test_est_hors_courtier_repli_sur_provider_pour_recus_anciens(self):
+        """Reçus antérieurs au champ `via` : l'absence de `provider` est le
+        signal historique des reçus pauvres écrits directement par ai_query.py."""
+        self.assertTrue(delegation._est_hors_courtier({"mode": "code"}))
+        self.assertFalse(delegation._est_hors_courtier({"provider": "gemini"}))
+
+    def test_est_hors_courtier_via_prime_sur_provider(self):
+        """Un reçu marqué `direct` reste hors courtier même s'il porte un
+        `provider` : c'est l'origine de l'appel qui compte, pas le fournisseur."""
+        self.assertTrue(
+            delegation._est_hors_courtier({"via": "direct", "provider": "gemini"}))
+
+    def test_part_hors_courtier_none_sans_recu(self):
+        """Sans reçu, None et non 0 : afficher 0 laisserait croire que tout est
+        délégué alors que rien n'a été mesuré."""
+        self.assertIsNone(delegation._part_hors_courtier([]))
+
+    def test_part_hors_courtier_reconstruit_le_diagnostic(self):
+        """87 reçus sans provider sur 100 -> part ~= 0,87 (chiffre diagnostic)."""
+        recs = [{"mode": "code"}] * 87 + [{"provider": "gemini"}] * 13
+        self.assertAlmostEqual(delegation._part_hors_courtier(recs), 0.87, places=4)
+
+    def test_summarize_expose_by_provider_by_via_et_alerte(self):
+        """Le sommaire doit exposer la répartition par provider et par origine,
+        plus l'alerte quand trop d'appels directs subsistent."""
+        recs = [
+            {"ts": 1, "via": "broker", "provider": "gemini", "total_tokens": 10},
+            {"ts": 2, "via": "direct", "total_tokens": 5},
+        ]
+        soma = delegation.summarize(recs, [])
+        self.assertEqual({g["provider"] for g in soma["by_provider"]},
+                         {"gemini", "<direct>"})
+        self.assertEqual({g["via"] for g in soma["by_via"]}, {"broker", "direct"})
+        # 1 reçu sur 2 hors courtier = 0,5 > 0,20 -> alerte déclenchée.
+        self.assertEqual(soma["delegation"]["hors_courtier"], 1)
+        self.assertEqual(soma["delegation"]["part_hors_courtier"], 0.5)
+        self.assertTrue(soma["delegation"]["alerte_hors_courtier"])
+
+    def test_summarize_pas_d_alerte_quand_tout_est_delegue(self):
+        recs = [{"ts": 1, "via": "broker", "provider": "gemini"}]
+        soma = delegation.summarize(recs, [])
+        self.assertEqual(soma["delegation"]["hors_courtier"], 0)
+        self.assertFalse(soma["delegation"]["alerte_hors_courtier"])
+
+    def test_summarize_alerte_fausse_sans_recu(self):
+        """Aucun reçu -> part None -> pas d'alerte (rien à mesurer, pas un
+        succès). La clé reste False, jamais None, pour le template."""
+        soma = delegation.summarize([], [])
+        self.assertIsNone(soma["delegation"]["part_hors_courtier"])
+        self.assertFalse(soma["delegation"]["alerte_hors_courtier"])
 
 
 if __name__ == "__main__":

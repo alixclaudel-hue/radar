@@ -42,7 +42,7 @@ Quatre codes de retour : `0` succès, `1` échec, `3` syntaxe invalide sous
 `--json-output`). Les trois premiers sont ceux d'`ai_query.py` ; le quatrième est
 propre aux modes à sortie structurée et permet à un appelant shell de distinguer
 « le modèle a répondu n'importe quoi » d'un échec de transport. Le hook
-`scripts/hooks/gemini_gate.py` lit le reçu, pas le code de retour — mais un
+`scripts/hooks/delegation_gate.py` lit le reçu, pas le code de retour — mais un
 appelant shell, si.
 """
 
@@ -57,7 +57,7 @@ import time
 # Lancé en direct (`python3 scripts/ai_broker.py`), `sys.path[0]` vaut `scripts/`
 # et le socle `scripts.ai` serait introuvable. Les skills et le hook appellent ce
 # script par son chemin de fichier : la racine du dépôt doit donc être importable
-# d'elle-même. Même amorçage que `scripts/bench_ai_query.py`.
+# d'elle-même. Même amorçage que `scripts/bench_ai_broker.py`.
 _RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _RACINE not in sys.path:
     sys.path.insert(0, _RACINE)
@@ -936,6 +936,11 @@ def _parse_args(argv: list[str] | None = None):
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+
+    # C-5 : tous les reçus écrits par ce process sont des délégations conformes.
+    # Poser l'origine AVANT les appels garantit que chaque reçu du courtier
+    # porte `via="broker"` et satisfait le gate (un reçu `direct` ne compte pas).
+    ai_query.set_receipt_origin("broker")
 
     catalogue = cat_mod.load(args.catalogue)
     policy = cat_mod.policy(catalogue)

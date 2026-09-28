@@ -18,7 +18,7 @@ Le contrat `vps-ops` s'applique intégralement et **ce skill n'y fait aucune
 exception** : tout reste en lecture seule sur `~/radar`, rien n'est écrit ni
 commité dans ce dépôt. Tout ce que tu produis va dans `~/radar-diag`.
 
-Lis `.claude/skills/delegate/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire (alias `ask-gemini`).
+Lis `.claude/skills/delegate/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.
 Fait appel à `delegate` autant que de besoin notamment le mode context, le mode search, le mode diag, le mode summary, le mode code.
 
 Lis `.claude/skills/vps-ops/SKILL.md` d'abord si tu ne l'as pas déjà en mémoire.

@@ -63,8 +63,12 @@ discogs_profile/
 .claude/worktrees/
 
 # reçus de délégation Gemini (cf. RÈGLE N°1 de CLAUDE.md) : état de session lu par
-# le hook gemini_gate.py, régénéré à chaque appel — rien à versionner
+# le hook delegation_gate.py, régénéré à chaque appel — rien à versionner
 .claude/gemini-receipts.jsonl
+
+# marqueur de la requête en cours (correctif C-2) : écrit par
+# scripts/hooks/workflow_reminder.py au UserPromptSubmit, relu par delegation_gate.py
+.claude/current_request.json
 
 # télémétrie de développement (lot 2 radar_ops) : écrite par scripts/hooks/telemetry.py,
 # expédiée sur la branche `telemetry` par telemetry_ship.py — jamais sur une branche de code

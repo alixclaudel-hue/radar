@@ -14,6 +14,8 @@ from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import scripts.ai_query as ai_query  # noqa: E402  (état global `_RECEIPT_ORIGIN`)
+
 from scripts.ai_query import (  # noqa: E402
     CODE_MODES,
     DEFAULT_MODEL,
@@ -23,9 +25,7 @@ from scripts.ai_query import (  # noqa: E402
     SYSTEM_PROMPTS,
     TIER_CASCADES,
     GeminiHTTPError,
-    _base_url_template,
     _key_from_dotenv,
-    _read_gateway_marker,
     extract_raw_code,
     is_fallback_status,
     main,
@@ -34,6 +34,7 @@ from scripts.ai_query import (  # noqa: E402
     query_with_fallback,
     receipts_dir,
     resolve_tier,
+    set_receipt_origin,
     write_receipt,
 )
 
@@ -64,7 +65,7 @@ class QueryGeminiTests(unittest.TestCase):
         """Sans clé, la requête part quand même (sans `?key=`) : c'est la
         session cloud (proxy réseau + identifiant `x-goog-api-key` configuré
         côté environnement) qui s'authentifie au niveau transport, invisible
-        d'ici -- cf. `.claude/skills/ask-gemini/SKILL.md`."""
+        d'ici -- cf. `.claude/skills/delegate/SKILL.md`."""
         mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
         with patch.dict("os.environ", {}, clear=True), _SANS_DOTENV():
             query_gemini("Bonjour", api_key=None)
@@ -585,120 +586,6 @@ class AuthHintTests(unittest.TestCase):
         self.assertNotIn("identifiant réseau", str(ctx.exception))
 
 
-class GatewayRoutingTests(unittest.TestCase):
-    """Chemin session cloud : le mini gateway `scripts/gemini_gateway.py`
-    prend la relève. La clé Gemini part depuis lui, pas depuis ai_query.py."""
-
-    def setUp(self):
-        # Chaque test doit décider explicitement de l'état du marqueur et
-        # de RADAR_GEMINI_BASE_URL : partons d'un environnement propre.
-        self.env_patcher = patch.dict("os.environ", {}, clear=True)
-        self.env_patcher.start()
-        self.addCleanup(self.env_patcher.stop)
-        self.marker_patcher = patch("scripts.ai_query._read_gateway_marker", return_value="")
-        self.marker_patcher.start()
-        self.addCleanup(self.marker_patcher.stop)
-
-    def test_base_url_par_defaut_pointe_sur_google(self):
-        self.assertIn("generativelanguage.googleapis.com", _base_url_template())
-
-    def test_env_var_override_gagne_sur_le_defaut(self):
-        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
-        self.assertTrue(_base_url_template().startswith("http://127.0.0.1:8632/"))
-
-    def test_marqueur_pris_en_compte_quand_env_var_absente(self):
-        self.marker_patcher.stop()
-        with patch("scripts.ai_query._read_gateway_marker", return_value="http://127.0.0.1:9999/v1beta/models/"):
-            self.assertTrue(_base_url_template().startswith("http://127.0.0.1:9999/"))
-        # Rétablit le patch pour addCleanup.
-        self.marker_patcher = patch("scripts.ai_query._read_gateway_marker", return_value="")
-        self.marker_patcher.start()
-
-    @patch("urllib.request.urlopen")
-    def test_gateway_actif_pas_de_key_dans_url(self, mock_urlopen):
-        # Un gateway est vu (via env var) : ai_query.py ne doit PAS mettre
-        # ?key= dans l'URL — la vraie clé de l'env cloud est invalide sur
-        # v1beta, seule celle posée par le gateway s'authentifie.
-        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
-        os.environ["GEMINI_API_KEY"] = "cle_injectee_par_le_proxy"
-        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
-        query_gemini("Bonjour", api_key=None)
-        req = mock_urlopen.call_args[0][0]
-        self.assertNotIn("key=", req.full_url)
-        self.assertTrue(req.full_url.startswith("http://127.0.0.1:8632/"))
-
-    @patch("urllib.request.urlopen")
-    def test_api_key_explicite_prime_sur_le_gateway(self, mock_urlopen):
-        # Un usage programmatique qui passe api_key= veut vraiment cette clé
-        # dans l'URL (contrat d'appel) ; le gateway ne doit pas court-circuiter.
-        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
-        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
-        query_gemini("Bonjour", api_key="fake-key")
-        req = mock_urlopen.call_args[0][0]
-        self.assertIn("key=fake-key", req.full_url)
-
-    @patch("urllib.request.urlopen")
-    def test_pas_de_gateway_un_seul_essai(self, mock_urlopen):
-        # Chemin VPS/local inchangé : sans passerelle configurée, un seul
-        # essai (l'appel direct) -- jamais de tentative fantôme vers 127.0.0.1.
-        mock_urlopen.return_value = _fake_urlopen_cm({"candidates": []})
-        query_gemini("Bonjour", api_key=None)
-        self.assertEqual(mock_urlopen.call_count, 1)
-
-    @patch("urllib.request.urlopen")
-    def test_repli_direct_apres_panne_reseau_de_la_passerelle(self, mock_urlopen):
-        # La passerelle est injoignable (URLError, gateway mort ou pas démarré) :
-        # l'appel direct à Google avec la clé locale doit être tenté ensuite
-        # POUR LE MÊME MODÈLE, plutôt que d'épuiser toute la cascade sur un
-        # transport mort.
-        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
-        os.environ["GEMINI_API_KEY"] = "cle-locale"
-        mock_urlopen.side_effect = [
-            urllib.error.URLError("connexion refusée"),
-            _fake_urlopen_cm({"candidates": [{"content": {"parts": [{"text": "PONG"}]}}]}),
-        ]
-        text, usage = query_gemini("Bonjour", api_key=None)
-        self.assertEqual(text, "PONG")
-        self.assertEqual(mock_urlopen.call_count, 2)
-        second_req = mock_urlopen.call_args_list[1][0][0]
-        self.assertIn("key=cle-locale", second_req.full_url)
-        self.assertTrue(
-            second_req.full_url.startswith("https://generativelanguage.googleapis.com/")
-        )
-
-    @patch("urllib.request.urlopen")
-    def test_repli_direct_apres_erreur_http_relayee_par_la_passerelle(self, mock_urlopen):
-        # Même repli quand la passerelle répond mais relaie une erreur (500
-        # upstream, quota du projet Google derrière elle) -- pas seulement sur
-        # une panne de transport pure.
-        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
-        os.environ["GEMINI_API_KEY"] = "cle-locale"
-        mock_urlopen.side_effect = [
-            _http_error(500, b"upstream error"),
-            _fake_urlopen_cm({"candidates": [{"content": {"parts": [{"text": "PONG"}]}}]}),
-        ]
-        text, usage = query_gemini("Bonjour", api_key=None)
-        self.assertEqual(text, "PONG")
-        self.assertEqual(mock_urlopen.call_count, 2)
-
-    @patch("urllib.request.urlopen")
-    def test_echec_des_deux_essais_leve_l_erreur_du_direct(self, mock_urlopen):
-        # Si la passerelle ET l'appel direct échouent, l'erreur remontée doit
-        # être celle du DERNIER essai (le direct) : c'est la plus informative
-        # pour l'appelant (cascade de modèles ou utilisateur final).
-        os.environ["RADAR_GEMINI_BASE_URL"] = "http://127.0.0.1:8632/v1beta/models/"
-        os.environ["GEMINI_API_KEY"] = "cle-locale"
-        mock_urlopen.side_effect = [
-            urllib.error.URLError("connexion refusée"),
-            _http_error(401, b'{"error": {"message": "cle-locale invalide"}}'),
-        ]
-        with self.assertRaises(GeminiHTTPError) as ctx:
-            query_gemini("Bonjour", api_key=None)
-        self.assertEqual(ctx.exception.status, 401)
-        self.assertIn("cle-locale invalide", str(ctx.exception))
-        self.assertEqual(mock_urlopen.call_count, 2)
-
-
 class MainTests(unittest.TestCase):
     """`main()` orchestre CLI/fichier/stdin -- `query_gemini` toujours mocké,
     aucun de ces tests ne doit pouvoir toucher le réseau."""
@@ -1010,6 +897,50 @@ class ReceiptsDirTests(unittest.TestCase):
                 write_receipt("code", "ok")
             except Exception as e:  # noqa: BLE001 -- exactement ce qu'on vérifie
                 self.fail(f"write_receipt a laissé fuir une exception : {e}")
+
+
+class ViaOriginTests(unittest.TestCase):
+    """C-5 : chaque reçu porte son origine (`via`).
+
+    Un appel direct à `ai_query.py` est marqué `direct` par défaut ; le courtier
+    (`ai_broker.py`) et l'ouvrier (`ai_worker.py`) réécrivent cette origine via
+    `set_receipt_origin()` AVANT d'écrire leurs reçus. Le gate s'appuie dessus
+    pour distinguer une vraie sous-traitance d'un contournement (C-4)."""
+
+    def setUp(self):
+        # L'origine est un état global : on le remet à sa valeur par défaut pour
+        # qu'un test ne fuie jamais sur le suivant.
+        ai_query.set_receipt_origin("direct")
+
+    def _dernier_recu(self, tmpdir):
+        chemin = os.path.join(tmpdir, "gemini-receipts.jsonl")
+        with open(chemin, "r", encoding="utf-8") as f:
+            lignes = [json.loads(l) for l in f if l.strip()]
+        return lignes[-1]
+
+    def test_write_receipt_marque_direct_par_defaut(self):
+        """Sans appel à `set_receipt_origin`, le reçu est un appel direct : c'est
+        exactement ce que le gate doit refuser comme preuve de délégation."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": tmpdir}, clear=True):
+                write_receipt("code", "ok")
+            self.assertEqual(self._dernier_recu(tmpdir)["via"], "direct")
+
+    def test_set_receipt_origin_change_le_champ_via(self):
+        """Le courtier marque ses reçus `broker` : ils satisfont alors le gate."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict(os.environ, {"RADAR_TELEMETRY_DIR": tmpdir}, clear=True):
+                set_receipt_origin("broker")
+                write_receipt("code", "ok")
+            self.assertEqual(self._dernier_recu(tmpdir)["via"], "broker")
+
+    def test_set_receipt_origin_normalise_et_replie_sur_direct(self):
+        """Casse/espaces neutralisés ; une valeur vide ou None retombe sur
+        `direct` -- le repli le plus sûr, celui qu'aucun gate n'accepte à tort."""
+        for brut, attendu in (("BROKER", "broker"), ("  Worker  ", "worker"),
+                              ("", "direct"), ("   ", "direct"), (None, "direct")):
+            set_receipt_origin(brut)
+            self.assertEqual(ai_query._RECEIPT_ORIGIN, attendu)
 
 
 if __name__ == "__main__":

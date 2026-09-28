@@ -887,6 +887,11 @@ def _resume_humain(rapport: dict) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
+
+    # C-5 : les reçus de l'ouvrier sont des délégations (mode `worker`,
+    # `via="worker"`) — jamais l'appel direct marqué `direct`.
+    ai_query.set_receipt_origin("worker")
+
     if not args.tache.strip():
         sys.stderr.write("Erreur : aucun chantier fourni.\n")
         return 1

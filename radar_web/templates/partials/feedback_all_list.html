@@ -1,0 +1,26 @@
+{# Liste des retours de TOUS les utilisateurs — vue propriétaire, LECTURE SEULE.
+
+   Pas de sélecteur de statut ni de bouton 🗑 ici, à dessein : ces actions
+   écrivent dans `ui_notes.json` de l'utilisateur COURANT (cf. feedback_status /
+   feedback_delete) et supprimeraient au passage le commentaire GitHub associé.
+   Les exposer dans une vue agrégée agirait sur le mauvais fichier (celui du
+   propriétaire, pas de l'auteur). Si un jour le besoin d'agir « au nom de »
+   apparaît, il faudra une route dédiée prenant l'`uid` de la note en paramètre ;
+   tant que ce n'est pas le cas, on s'en tient au constat. #}
+<div id="fb-all">
+{% if not all_notes %}
+  <p class="muted small">Aucun retour pour l'instant.</p>
+{% else %}
+  <div class="lrows">
+    {% for n in all_notes %}
+    <div class="lrow" style="align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <div class="small"><b>{{ n.username }}</b>{% if n.page %} · {{ n.page }}{% endif %}{% if n.target %} · {{ n.target }}{% endif %}</div>
+        <div>{{ n.note }}</div>
+        <div class="small muted">{{ n.ts }} · {{ n.status|default('nouveau') }}{% if not n.gh_posted %} · non transmis à GitHub{% endif %}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endif %}
+</div>

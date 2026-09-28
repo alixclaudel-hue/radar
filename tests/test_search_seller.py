@@ -268,6 +268,9 @@ class SearchSellerTestCase(unittest.TestCase):
         self.assertIn("Ajouter à la wantlist", html)
         self.assertIn('hx-post="/cart/add"', html)
         self.assertNotIn("discogs.com/sell/item", html)
+        # Retour utilisateur 28/09 : le label mène à sa page /disco, comme dans la
+        # playlist reco (avant, c'était du texte mort côté recherche).
+        self.assertIn('/disco?kind=label&key=Aim', html)
 
 
 class FakeJob:

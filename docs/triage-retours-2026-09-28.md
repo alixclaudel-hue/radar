@@ -60,3 +60,10 @@ Statut : `nouveau` = jamais soldé ; `déjà fait` = traité lors d'une passe an
 | R6 | Lien d'invitation visible dans « Mon profil » pour l'owner uniquement | `templates/base.html` |
 | R7 | Poids de régression bornés à `[0, 1]` (plus de « score album » > 1) | `radar/learn.py` |
 | R8 | Catégories `/search` renommées : Générale / Dans mes labels / Chez un vendeur | `templates/pages/search.html` |
+
+## D. Correctifs de suivi (retours du 28/09 en soirée)
+
+| Réf | Retour | Correctif | Fichier(s) |
+|-----|--------|-----------|------------|
+| F10bis | Depuis la **Reco Radar**, ajouter à la wantlist ne fermait toujours pas la mini-fenêtre des pressages vinyle et déformait la page | Le formulaire d'ajout cible le conteneur `[data-wl-matches]` **entier** (outerHTML) au lieu de s'appuyer sur un `hx-on::after-request` sur un élément déjà détaché du DOM (le swap `outerHTML` l'a remplacé avant le handler → `closest()` ne retrouvait plus le conteneur). La fenêtre est aussi rendue en `position:fixed` (hors flux, plus de colonne de tableau qui explose), reçoit un bouton ✕, et les fenêtres déjà ouvertes sont refermées avant chaque nouvel ajout | `templates/partials/release_matches.html`, `templates/partials/reco_rows.html`, `templates/partials/results.html`, `static/app.css` |
+| R9 | Le lien vers la page du label (`/disco?kind=label`) fonctionne dans la playlist reco mais pas dans la page recherche (label en texte mort) | Le label des résultats de recherche devient un lien vers `/disco?kind=label&key=…`, comme en reco | `templates/partials/results.html` |

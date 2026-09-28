@@ -67,6 +67,26 @@ class CartAddVinylFallbackTestCase(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(self.calls, [("Inland Knights", "Big Audio Spidermite")])
 
+    def test_la_mini_fenetre_cible_le_conteneur_entier_pour_se_fermer(self):
+        """Régression F10 (retour utilisateur 28/09) : la fenêtre des pressages doit
+        se refermer après un ajout. Le formulaire d'ajout cible désormais le
+        conteneur [data-wl-matches] ENTIER en outerHTML — et non sa propre balise,
+        qui serait déjà détachée du DOM au moment du hx-on::after-request (d'où le
+        bug : closest() ne le retrouvait plus et la fenêtre restait ouverte). Un
+        bouton ✕ permet aussi de la fermer sans ajout."""
+        row = {"id": 123, "title": "Inland Knights - 12 Till 8",
+               "label": ["Drop Music"], "year": 1999, "format": ["Vinyl"], "thumb": ""}
+        with mock.patch.object(appmod, "_vinyl_matches",
+                               side_effect=lambda token, a, t, **kw: [row]):
+            r = self.client.post("/cart/add", data={
+                "rid": "1228717", "title": "Drop Music", "artist": "Inland Knights",
+                "track": "12 Till 8", "label": "USM Records"})
+        self.assertEqual(r.status_code, 200)
+        html = r.text
+        self.assertIn("data-wl-matches", html)
+        self.assertIn('hx-target="closest [data-wl-matches]"', html)
+        self.assertIn("wl-matches__close", html)
+
 
 if __name__ == "__main__":
     unittest.main()

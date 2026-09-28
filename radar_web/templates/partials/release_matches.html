@@ -1,8 +1,18 @@
-{# F10 (retour utilisateur 28/09) : la « mini-fenêtre » des pressages vinyle se
-   referme d'elle-même après un ajout réussi à la wantlist (avant, elle restait
-   ouverte et « polluait » l'écran). Le conteneur [data-wl-matches] est retiré par
-   le formulaire d'ajout via hx-on::after-request. #}
+{# F10 (retour utilisateur 28/09) : la « mini-fenêtre » des pressages vinyle doit se
+   refermer après un ajout réussi à la wantlist. Le correctif initial (retirer le
+   conteneur depuis hx-on::after-request) ne marchait pas : avec hx-swap="outerHTML"
+   le formulaire est déjà DÉTACHÉ du DOM quand le handler tourne, donc
+   this.closest('[data-wl-matches]') ne retrouve plus le conteneur. On cible donc le
+   conteneur entier en outerHTML : la réponse (✓ ou erreur) le remplace et la fenêtre
+   se ferme. Un bouton ✕ permet aussi de la fermer sans ajout (cas « aucun vinyle »).
+   Le conteneur est en position FIXE (cf. app.css) : injecté dans une cellule de
+   tableau (/reco-radar) ou une carte (/search), il ne déforme plus la page. #}
 <div class="wl-matches" data-wl-matches>
+  <div class="wl-matches__head">
+    <span class="small muted">Pressages vinyle Discogs</span>
+    <button type="button" class="wl-matches__close" title="Fermer"
+            onclick="this.closest('[data-wl-matches]').remove()">✕</button>
+  </div>
 {% if not rows %}
   <p class="small muted" style="margin:4px 0">Aucun vinyle trouvé sur Discogs pour « {{ a }} — {{ t }} ».</p>
 {% else %}
@@ -18,8 +28,7 @@
       {% if r.id|string in in_cart %}
         <span class="small ok">✓ en wantlist</span>
       {% else %}
-      <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline"
-            hx-on::after-request="if(event.detail.successful) this.closest('[data-wl-matches]').remove()">
+      <form hx-post="/cart/add" hx-target="closest [data-wl-matches]" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="rid" value="{{ r.id }}">
         <input type="hidden" name="title" value="{{ r.title }}">
         <input type="hidden" name="artist" value="{{ a }}">

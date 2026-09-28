@@ -27,6 +27,14 @@
             <a href="/patte" class="{{ 'active' if cur=='patte' }}">🎯 Mes goûts</a>
             <a href="/wantlist" class="{{ 'active' if cur=='wantlist' }}">{{ icons.cart("ic-sm") }} Ma Wantlist{% if n_cart %} ({{ n_cart }}){% endif %}</a>
             <a href="/tracks-aimees" class="{{ 'active' if cur=='tracks_aimees' }}">♥ Mes tracks aimées</a>
+            {% if is_owner %}
+            {# Lien d'invitation réservé au propriétaire (retour utilisateur 28/09).
+               `is_owner` vient de render() ; la route /account/invite revérifie le
+               rôle côté serveur (403 sinon), l'UI n'est qu'un confort. #}
+            <button type="button" class="pm-link" hx-post="/account/invite"
+                    hx-target="#invite-out" hx-swap="innerHTML">✉️ Inviter quelqu'un</button>
+            <div id="invite-out" class="pm-invite"></div>
+            {% endif %}
           </nav>
         </details>
       </div>

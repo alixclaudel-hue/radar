@@ -26,6 +26,13 @@
      d="M4 16.5 10.2 6h9.8l-6.2 10.5z"/></svg>
 {%- endmacro %}
 
+{# YouTube : écran + lecture, pour « ouvrir sur YouTube » (F9). #}
+{% macro youtube(cls="") -%}
+<svg class="ic {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+     stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="3.2"/><path
+     d="M10 9.2 15 12l-5 2.8z" fill="currentColor" stroke="none"/></svg>
+{%- endmacro %}
+
 {# Beatport : disque + onde, évoque le logo « beat » sans copier la marque. #}
 {% macro beatport(cls="") -%}
 <svg class="ic ic-beatport {{ cls }}" viewBox="0 0 24 24" fill="none" stroke="currentColor"

@@ -8,7 +8,8 @@
 
 Vérifie aussi l'invariant qui rend la suppression en place possible : les lignes
 portent l'identifiant de la vidéo (`data-vid`), jamais leur position — le lecteur
-IFrame garde sa propre liste, appariée par identifiant (cf. pages/reco_radar.html).
+IFrame est piloté par la liste visible et adresse les vidéos par identifiant, pas
+par rang (cf. pages/reco_radar.html, correctif issue #62 F3/F4/F7).
 
 Lancer : python3 -m unittest tests.test_reco_radar_rows -v
 """

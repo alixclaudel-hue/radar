@@ -56,7 +56,12 @@ def fit(X, y, prior, l2=2.0, iters=600, lr=0.4):
         b -= lr * (gb / n)
     w = [max(0.0, v) for v in w]
     sp, sn = sum(prior.values()), (sum(w) or 1.0)
-    return {keys[j]: round(w[j] * sp / sn, 3) for j in range(len(keys))}
+    # R7 (retour utilisateur 28/09) : des configs dont la somme des poids dépasse 1
+    # (champs /settings libres) donnaient des propositions > 1 après la remise à
+    # l'échelle « à somme constante » — et ces poids hors borne se perpétuaient au
+    # ré-apprentissage suivant. On borne chaque poids proposé à [0, 1].
+    return {keys[j]: round(min(1.0, max(0.0, w[j] * sp / sn)), 3)
+            for j in range(len(keys))}
 
 
 def summary(scoring, min_fb=12, min_cls=3):

@@ -1,3 +1,8 @@
+{# F10 (retour utilisateur 28/09) : la « mini-fenêtre » des pressages vinyle se
+   referme d'elle-même après un ajout réussi à la wantlist (avant, elle restait
+   ouverte et « polluait » l'écran). Le conteneur [data-wl-matches] est retiré par
+   le formulaire d'ajout via hx-on::after-request. #}
+<div class="wl-matches" data-wl-matches>
 {% if not rows %}
   <p class="small muted" style="margin:4px 0">Aucun vinyle trouvé sur Discogs pour « {{ a }} — {{ t }} ».</p>
 {% else %}
@@ -13,7 +18,8 @@
       {% if r.id|string in in_cart %}
         <span class="small ok">✓ en wantlist</span>
       {% else %}
-      <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline">
+      <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline"
+            hx-on::after-request="if(event.detail.successful) this.closest('[data-wl-matches]').remove()">
         <input type="hidden" name="rid" value="{{ r.id }}">
         <input type="hidden" name="title" value="{{ r.title }}">
         <input type="hidden" name="artist" value="{{ a }}">
@@ -26,3 +32,4 @@
   {% endfor %}
   </div>
 {% endif %}
+</div>

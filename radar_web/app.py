@@ -25,7 +25,7 @@ from fastapi.templating import Jinja2Templates
 
 from .radar import opslog, websession
 from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
-                    learn, paths, sellers, store, vocab, volumo, ytcache)
+                    learn, paths, sellers, stores, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 from .radar.textmatch import best_video_uri
@@ -1641,8 +1641,13 @@ def tracklist(request: Request, rid: int):
             q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
             play, kind = "/yt/first?q=" + quote_plus(q), "yt"
         bc = "/bc/go?" + urlencode({"a": tart, "t": ttl, "l": label1, "kind": "t"})
+        # Boutiques DJ protégées par Cloudflare : on ne scrape pas, on redirige le
+        # navigateur de l'utilisateur (cf. radar/stores.py). Mêmes paramètres que
+        # Bandcamp pour rester homogène.
+        shop_q = urlencode({"a": tart, "t": ttl, "l": label1})
         rows.append({"pos": (t.get("position") or "").strip(), "title": ttl,
-                     "play": play, "kind": kind, "bc": bc})
+                     "play": play, "kind": kind, "bc": bc,
+                     "bp": "/bp/go?" + shop_q, "ts": "/ts/go?" + shop_q})
     return frag(request, "partials/tracklist.html", tracks=rows)
 
 
@@ -1674,6 +1679,24 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
     except Exception:                       # noqa: BLE001 — repli toujours possible
         pass
     return RedirectResponse(bandcamp.search_url(a, t, kind), status_code=302)
+
+
+@app.get("/bp/go")
+def bp_go(a: str = "", t: str = "", l: str = ""):
+    """Redirige vers la recherche Beatport (artiste, titre, label).
+
+    Aucun scraping : Beatport est derrière Cloudflare et un appel serveur depuis
+    le VPS serait challengé (IP datacenter + navigateur headless). On redirige le
+    navigateur de l'utilisateur, dont l'IP résidentielle et la session passent la
+    protection — cf. docstring de `radar/stores.py`."""
+    return RedirectResponse(stores.beatport_search_url(a, t, l), status_code=302)
+
+
+@app.get("/ts/go")
+def ts_go(a: str = "", t: str = "", l: str = ""):
+    """Redirige vers la recherche Traxsource (artiste, titre, label). Même
+    logique anti-Cloudflare que `/bp/go`."""
+    return RedirectResponse(stores.traxsource_search_url(a, t, l), status_code=302)
 
 
 @app.get("/release/stores", response_class=HTMLResponse)

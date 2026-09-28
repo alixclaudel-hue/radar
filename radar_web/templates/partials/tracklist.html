@@ -12,6 +12,10 @@
          title="{{ 'Vidéo Discogs' if t.kind == 'discogs' else 'Meilleure vidéo YouTube' }}">▶</a>
       <a class="tk-play" href="{{ t.bc }}" target="_blank" rel="noopener"
          title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
+      <a class="tk-play" href="{{ t.bp }}" target="_blank" rel="noopener"
+         title="Chercher sur Beatport">{{ icons.beatport() }}</a>
+      <a class="tk-play" href="{{ t.ts }}" target="_blank" rel="noopener"
+         title="Chercher sur Traxsource">{{ icons.traxsource() }}</a>
     </div>
   {% endfor %}
 {% endif %}

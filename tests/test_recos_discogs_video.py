@@ -279,6 +279,62 @@ class PublishRecosDiscogsFirstTestCase(unittest.TestCase):
         self.assertIn("Budget quotidien", job.finished)
         self.assertEqual(self._playlist(), [])
 
+    def test_video_discogs_ne_touche_pas_le_compteur_meme_partiellement_consomme(self):
+        """(a) Une vidéo trouvée chez Discogs ne fait aucune recherche YouTube :
+        elle ne doit pas incrémenter le compteur du jour, même quand il est déjà
+        entamé (demande utilisateur 2026-09-28)."""
+        recos._recos_searches_record(10)
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "discogs_get", return_value={"videos": VIDEOS}), \
+             mock.patch.object(ytcache, "playable_video", return_value=True), \
+             mock.patch.object(ytcache, "search_video_diag",
+                                side_effect=AssertionError("aucune recherche attendue")):
+            job = FakeJob()
+            recos.job_publish_recos(job, {})
+        self.assertEqual(self._budget_count(), 10)      # inchangé, pas 11
+        self.assertEqual([t["video_id"] for t in self._playlist()], ["aaaaaaaaaaa"])
+
+    def test_une_alimentation_consomme_tout_le_budget_restant(self):
+        """(b) Plus de plafond « recherches par alimentation » : un run utilisé
+        jusqu'à épuisement du budget QUOTIDIEN restant (demande utilisateur
+        2026-09-28 : « le compteur utilisé en totalité »)."""
+        recos._recos_searches_record(5)                 # 5/80 déjà consommées
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"],
+                        [self._candidate(title=f"Track {i}") for i in range(10)])
+        calls = {"n": 0}
+
+        def fake_search(*a, **kw):
+            calls["n"] += 1
+            return f"vid{calls['n']}", ""
+
+        # token présent : le chemin Discogs est tenté d'abord mais ne renvoie rien
+        # (discogs_get -> {}), donc chaque candidat retombe sur une recherche.
+        with mock.patch.object(recos, "discogs_get", return_value={}), \
+             mock.patch.object(ytcache, "search_video_diag", side_effect=fake_search):
+            job = FakeJob()
+            recos.job_publish_recos(job, {})
+        self.assertEqual(calls["n"], 10)                # les 10, pas 5 (ancien plafond)
+        self.assertEqual(self._budget_count(), 15)      # 5 (avant) + 10 (ce run)
+        self.assertEqual(len(self._playlist()), 10)
+
+    def test_playlist_pleine_aucune_recherche_ni_remplacement(self):
+        """(c) Playlist au max : on ne gaspille aucune recherche et on ne touche
+        pas aux pistes existantes (ni vidage, ni remplacement) — demande
+        utilisateur 2026-09-28."""
+        full = [{"artist": f"A{i}", "title": f"T{i}", "video_id": f"v{i}"}
+                for i in range(10)]                     # max_tracks = 10 (cf. setUp)
+        recos.save_json(self.paths["RECOS_PLAYLIST_PATH"], full)
+        recos.save_json(self.paths["RECOS_CANDIDATES_PATH"], [self._candidate()])
+        with mock.patch.object(recos, "discogs_get",
+                                side_effect=AssertionError("aucun appel Discogs attendu")), \
+             mock.patch.object(ytcache, "search_video_diag",
+                                side_effect=AssertionError("aucune recherche attendue")):
+            job = FakeJob()
+            recos.job_publish_recos(job, {})
+        self.assertIn("Playlist pleine", job.finished)
+        self.assertEqual(self._playlist(), full)        # intacte : ni vidée, ni remplacée
+        self.assertEqual(self._budget_count(), 0)       # aucune recherche gaspillée
+
     def test_plafond_d_appels_discogs_par_lancement(self):
         recos.save_json(self.paths["RECOS_CANDIDATES_PATH"],
                              [self._candidate(title=f"Track {i}") for i in range(4)])

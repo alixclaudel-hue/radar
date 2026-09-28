@@ -248,8 +248,8 @@ def job_scorestore_tracks(job, params):
     budget API). L'API Discogs ne sert plus que de repli pour une sortie
     ABSENTE du dump (ajoutée sur Discogs depuis le dernier import), plafonné
     à `scoring.scorestore.fetches_per_run` appels par lancement (même
-    principe de budget que RECOS_SEARCHES_PER_RUN — coût réseau/rate-limit
-    Discogs, pas juste de la CPU).
+    principe de plafond par lancement — coût réseau/rate-limit Discogs, pas
+    juste de la CPU).
 
     Stocke aussi le détail `{label, artist, style}` de `Ctx.album_score` par
     PISTE (Lot 5, cf. CLAUDE.md point 43 — `job_scan_recos` en a besoin pour

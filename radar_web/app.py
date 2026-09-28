@@ -2626,8 +2626,7 @@ async def settings_save(request: Request):
     for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link", "tier")),
                       ("album", ("label", "artist", "style", "artist_max_vs_mean")),
                       ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link")),
-                      ("recos", ("min_score", "max_new_releases",
-                                 "searches_per_run", "max_tracks"))):
+                      ("recos", ("min_score", "max_new_releases", "max_tracks"))):
         for key in keys:
             v = f.get(f"{grp}__{key}")
             if v not in (None, ""):

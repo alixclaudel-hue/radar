@@ -38,7 +38,6 @@ RECOS_DAILY_SEARCH_BUDGET = 80
 # 80 n'est atteignable en entier qu'avec plusieurs clés : au pire des cas (80
 # échecs à 202 unités) il faudrait ~16 160 unités, soit plus que les 10 000/jour
 # d'une clé unique — le plafond effectif reste alors le quota Google.
-RECOS_SEARCHES_PER_RUN = 5  # repli si scoring.recos.searches_per_run absent
 RECOS_MAX_ATTEMPTS = 3
 # Plafonne les sorties interrogées chez Discogs par lancement pour retrouver une
 # vidéo déjà attachée à la sortie (cf. `_discogs_release_video`). Ressource
@@ -46,11 +45,12 @@ RECOS_MAX_ATTEMPTS = 3
 # d'où le sleep de 1,1 s), pas à la journée. Le plafond borne surtout la DURÉE du
 # run, qui sinon tiendrait ~90 s rien qu'en attente sur une file pleine.
 RECOS_DISCOGS_LOOKUPS_PER_RUN = 40
-# plafonne les RECHERCHES YouTube par lancement de publish_recos, pas seulement les
-# ajouts réussis (correctif 10/09, retour utilisateur) : un plafond sur les seuls
-# ajouts laissait la boucle chercher sur tous les candidats en échec (cf. points
-# 27/28 CLAUDE.md — 92 candidats en échec, quota grillé, 0 ajout) avant de s'arrêter.
-# Limite de test — à remonter/retirer une fois les tests terminés.
+# Plus de plafond « recherches YouTube par lancement » distinct (ancien
+# scoring.recos.searches_per_run, supprimé le 2026-09-28) : le BUDGET QUOTIDIEN
+# ci-dessus est la seule limite de recherches d'un run, pour qu'il soit consommé
+# en totalité chaque jour (demande utilisateur). Le plafond par lancement
+# laissait du budget inutilisé les jours où peu de runs tournaient, et faisait
+# doublon approximatif avec le compteur journalier.
 
 
 def _recos_history_load():
@@ -304,18 +304,23 @@ def job_publish_recos(job, params):
     minuit heure de Paris par le worker (cf. app.py::reco_radar_mark_played,
     worker.py::_maybe_recos_midnight_purge).
 
-    Au plus scoring.recos.searches_per_run recherches YouTube par lancement
-    (curseur /settings, repli RECOS_SEARCHES_PER_RUN) — sur le nombre de
-    RECHERCHES tentées, pas seulement les ajouts réussis, pour que la conso quota
-    reste bornée même si la plupart des candidats échouent à matcher.
+    Le BUDGET QUOTIDIEN RECOS_DAILY_SEARCH_BUDGET est la SEULE limite : un run
+    cherche tant qu'il reste du budget du jour, tant que la playlist n'est pas
+    pleine et tant qu'il reste des candidats (demande utilisateur 2026-09-28 :
+    « le compteur doit être utilisé en totalité tous les jours »). Compté sur le
+    nombre de RECHERCHES YouTube réellement tentées, pas sur les ajouts réussis,
+    pour que la conso quota reste bornée même si la plupart des candidats
+    échouent à matcher. Une vidéo trouvée chez Discogs ne fait AUCUNE recherche
+    YouTube : elle ne touche donc pas ce compteur (cf. `_discogs_release_video`).
 
-    Plafond quotidien RECOS_DAILY_SEARCH_BUDGET appliqué ICI (pas dans le
-    worker) via `_recos_searches_used_today`/`_recos_searches_record` :
-    persistant, il vaut aussi bien pour la boucle horaire (RADAR_RECOS_SCAN=1,
-    réactivée le 15/09, cf. worker._maybe_recos_scan) que pour un lancement
-    manuel (bouton ▶) — sans lui, `searches_per_run` répété à chaque tick
-    horaire pouvait dépasser le quota YouTube en quelques heures (diagnostic
-    VPS 2026-09-15)."""
+    Appliqué ICI (pas dans le worker) via
+    `_recos_searches_used_today`/`_recos_searches_record` : persistant, il vaut
+    aussi bien pour la boucle horaire (RADAR_RECOS_SCAN=1,
+    cf. worker._maybe_recos_scan) que pour un lancement manuel (bouton ▶).
+
+    Playlist PLEINE : on sort avant toute recherche — le budget du jour n'est
+    pas gaspillé et aucune piste existante n'est retirée ni remplacée (demande
+    utilisateur 2026-09-28)."""
     candidates = load_json(RECOS_CANDIDATES_PATH, [])
     if not candidates:
         return job.finish("Aucun candidat en attente.")
@@ -325,6 +330,20 @@ def job_publish_recos(job, params):
     cfg = cfg_load()
     token = cfg.get("token", "")
     keys = ytcache.youtube_keys(cfg)
+    rc = cfg.get("scoring", {}).get("recos", {})
+    max_tracks = int(rc.get("max_tracks", RECOS_MAX_TRACKS))
+
+    # Playlist PLEINE : sortie AVANT toute recherche (demande utilisateur
+    # 2026-09-28). Aucune recherche n'est gaspillée pour rien, et surtout la
+    # playlist existante n'est ni vidée ni remplacée (pas de FIFO/éviction : le
+    # renouvellement passe uniquement par le marquage « écoutée » + purge minuit,
+    # cf. worker._maybe_recos_midnight_purge).
+    if len(playlist) >= max_tracks:
+        return job.finish(
+            f"Playlist pleine ({len(playlist)}/{max_tracks}) — aucune recherche "
+            f"lancée ; plus d'ajout tant qu'une piste n'est pas marquée écoutée "
+            f"(clic sur une ligne, purge à minuit heure de Paris).")
+
     if budget_used >= RECOS_DAILY_SEARCH_BUDGET and not token:
         # Sans token Discogs, le budget épuisé ne laisse rien à faire : les vidéos
         # attachées aux sorties (`_discogs_release_video`) sont le seul chemin qui
@@ -335,9 +354,6 @@ def job_publish_recos(job, params):
         return job.finish(f"Budget quotidien de recherches YouTube atteint ({budget_used}/"
                            f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
 
-    rc = cfg.get("scoring", {}).get("recos", {})
-    searches_per_run = int(rc.get("searches_per_run", RECOS_SEARCHES_PER_RUN))
-    max_tracks = int(rc.get("max_tracks", RECOS_MAX_TRACKS))
     # historique permanent (jamais purgé) : {video_id: entrée} + identité de piste
     # (artiste/titre) déjà publiée par le passé, même si elle n'est plus dans la
     # playlist (FIFO ou suppression manuelle) — retour utilisateur 2026-09-10.
@@ -379,7 +395,7 @@ def job_publish_recos(job, params):
 
                 # (2) Repli : recherche YouTube, sous budget.
                 if not vid:
-                    if (quota_hit or rate_hit or searched >= searches_per_run
+                    if (quota_hit or rate_hit
                             or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
                         if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
                             daily_hit = True
@@ -470,17 +486,16 @@ def job_publish_recos(job, params):
         # API non classée, cf. ytcache.request) sortait auparavant de la
         # fonction SANS jamais exécuter ces 4 lignes — les candidats déjà
         # `attempts`-incrémentés dans ce run et les recherches déjà parties
-        # (jusqu'à `searches_per_run`, ~900 unités de quota Google) étaient
-        # perdus du fichier de budget, qui existe précisément pour protéger
-        # le quota. `remaining` ne contient pas le candidat en cours au moment
+        # (jusqu'au budget quotidien, ~8000 unités de quota Google au pire)
+        # étaient perdus du fichier de budget, qui existe précisément pour
+        # protéger le quota. `remaining` ne contient pas le candidat en cours au moment
         # de l'exception (il n'a pas pu être classé) : perte limitée à 1
         # candidat sur un aléa réellement anormal, pas au run entier.
         save_json(RECOS_HISTORY_PATH, list(history.values()))
         save_json(RECOS_PLAYLIST_PATH, playlist)
         save_json(RECOS_CANDIDATES_PATH, remaining)
         _recos_searches_record(searched)
-    note = (f" — limite de recherche ({searches_per_run}) atteinte."
-            if searched >= searches_per_run else "")
+    note = ""
     if daily_hit:
         note += (f" Budget quotidien atteint ({budget_used + searched}/"
                  f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")

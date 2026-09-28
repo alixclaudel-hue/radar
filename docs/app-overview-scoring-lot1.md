@@ -87,13 +87,13 @@ Chaque sous-cle correspond a un groupe de poids edite depuis `/settings` :
 | `artist_score` | `manual, corpus, collection, graph, djset, label_link` | Poids des 6 signaux qui composent `ascore`. |
 | `graph` | `tier_w, artist_breadth, label_breadth, cat1_bonus, role_*, max_credits, max_levels, level_decay, node_cap` | Parametres du graphe de co-credits (construit par `job_build_graph`, recalcule cote scoring par `graph_rescore()`). |
 | `sources` | `discogs_collection, discogs_want, youtube, spotify, bandcamp, djset` | Poids d'une ligne de corpus selon sa provenance (Bandcamp/collection possedee comptent plus qu'une simple ecoute YouTube). |
-| `recos` | `min_score, max_new_releases, searches_per_run, max_tracks` | Reglages de la feature RECOS RADAR (ce ne sont pas des poids de note, mais des seuils/plafonds). |
+| `recos` | `min_score, max_new_releases, max_tracks` | Reglages de la feature RECOS RADAR (ce ne sont pas des poids de note, mais des seuils/plafonds). |
 | `label_affinity_floor` | entier | Seuil d'affinite en-dessous duquel un label est exclu de `reco_rows` (0 = desactive). |
 | `learn` | `l2, min_feedback, min_per_class` | Parametres du module d'apprentissage a partir du feedback (`learn.py`, hors perimetre de ce document). |
 
 `deep_merge(DEFAULT_SCORING, data.get("scoring", {}))` est applique a CHAQUE
 chargement de config : un utilisateur dont le fichier ne connait pas encore
-une cle recente (ex. `recos.searches_per_run` ajoutee plus tard) recoit la
+une cle recente (ex. `recos.max_tracks` ajoutee plus tard) recoit la
 valeur par defaut sans migration explicite necessaire.
 
 ### 3.3 La migration `label_categories` (coeur du Lot 1)

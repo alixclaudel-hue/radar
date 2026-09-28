@@ -113,7 +113,7 @@ Four things to note about this flow:
   from the artist score (`ascore`). Change an upstream weight (e.g. `artist_score.manual`) and
   every album/track score involving that artist shifts too.
 - **Two config groups look alike but are not weights of these four scores**: `scoring.recos`
-  (RECOS playlist queue: `min_score` threshold, `max_new_releases`, `searches_per_run`,
+  (RECOS playlist queue: `min_score` threshold, `max_new_releases`,
   `max_tracks` capacity) and `scoring.scorestore` (precompute job: `min_score`,
   `fetches_per_run`) only *consume* the already-computed album/track score as a filter
   threshold - they do not feed the formula. Treated as external/boundary here.
@@ -281,7 +281,7 @@ so `sources.*` in config is the only copy that actually affects any score.
   also changes release/album scoring identically.
 - **Two near-identical config keys, `reco` and `recos`, mean different things.** `scoring.reco`
   is the label-score weight group documented in 7.1. `scoring.recos` (with an `s`) is unrelated
-  - it holds RECOS-playlist thresholds (`min_score`, `max_new_releases`, `searches_per_run`,
+  - it holds RECOS-playlist thresholds (`min_score`, `max_new_releases`,
   `max_tracks`) that filter/consume an already-computed track score rather than feed the
   formula. Same naming trap for `scoring.scorestore.min_score`, a third independent threshold.
 - **`scoring.learn.*` is dead configuration** (7.5) - present in defaults and migrated from

@@ -110,7 +110,6 @@
   <h3>🎯 RECOS RADAR
     {{ reset_btn([['recos__min_score', sc.recos.min_score],
                   ['recos__max_new_releases', sc.recos.max_new_releases],
-                  ['recos__searches_per_run', sc.recos.searches_per_run],
                   ['recos__max_tracks', sc.recos.max_tracks]]) }}
   </h3>
   <p class="muted small">Seuil et volume du scan quotidien des labels suivis pour la playlist YouTube
@@ -123,18 +122,16 @@
   </div>
   <div class="row wgroup__fields">
     <div class="field">
-      <label>Recherches YouTube par alimentation <b id="recos-searches-out">{{ sc.recos.searches_per_run|int }}</b>
-        <span class="muted">· pistes cherchées à chaque clic « ▶ Alimenter la playlist », dans la limite du budget quotidien (80)</span></label>
-      <input type="range" id="recos-searches" name="recos__searches_per_run" min="1" max="80" step="1"
-             value="{{ sc.recos.searches_per_run|int }}">
-    </div>
-    <div class="field">
       <label>Capacité de la playlist <b id="recos-maxtracks-out">{{ sc.recos.max_tracks|int }}</b>
-        <span class="muted">· au-delà, plus d'ajout tant qu'une piste n'a pas été marquée écoutée</span></label>
+        <span class="muted">· au-delà, plus d'ajout (et aucune recherche) tant qu'une piste n'a pas été marquée écoutée</span></label>
       <input type="range" id="recos-maxtracks" name="recos__max_tracks" min="1" max="300" step="1"
              value="{{ sc.recos.max_tracks|int }}">
     </div>
   </div>
+  <p class="muted small">Chaque alimentation consomme le budget de recherches YouTube du jour
+    jusqu'à épuisement (~80/jour) : plus de plafond de recherches par alimentation. Les vidéos
+    trouvées via Discogs ne consomment pas ce budget. Si la playlist est pleine, aucune recherche
+    n'est lancée et les pistes existantes ne sont jamais remplacées.</p>
 
   <hr>
   <button class="primary" type="submit">💾 Enregistrer</button>
@@ -156,7 +153,7 @@
   });
 })();
 (function () {
-  [['recos-searches', 'recos-searches-out'], ['recos-maxtracks', 'recos-maxtracks-out']].forEach(function (pair) {
+  [['recos-maxtracks', 'recos-maxtracks-out']].forEach(function (pair) {
     var inp = document.getElementById(pair[0]), out = document.getElementById(pair[1]);
     if (inp && out) inp.addEventListener('input', function () { out.textContent = inp.value; });
   });

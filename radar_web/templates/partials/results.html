@@ -94,7 +94,10 @@
         <div class="buys">
           <button type="button" class="ic-btn" title="Pistes"
                   onclick="var t=document.getElementById('tracks-{{ rr.id }}'); if(t.dataset.loaded==='1'){t.innerHTML='';t.dataset.loaded='';}else{t.dataset.loaded='1';htmx.ajax('GET','/release/{{ rr.id }}/tracks',{target:t,swap:'innerHTML'});}">{{ icons.tracks() }}</button>
-          {% if rr.uri %}<a href="https://www.discogs.com{{ rr.uri }}" target="_blank" rel="noopener"
+          {# R4 (retour utilisateur 28/09) : lien construit sur l'id NUMÉRIQUE du
+             release, jamais le slug `uri` (parfois vide → on retombait sur
+             l'accueil Discogs, d'où les clics répétés avant d'atteindre la fiche). #}
+          {% if rr.id %}<a href="https://www.discogs.com/release/{{ rr.id }}" target="_blank" rel="noopener"
              title="Fiche Discogs" class="ic-btn">{{ icons.discogs() }}</a>{% endif %}
           {% if seller %}
             {% if rr.listing_id %}

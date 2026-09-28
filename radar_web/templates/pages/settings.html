@@ -13,6 +13,13 @@
 {% macro reset_btn(pairs) -%}
 <button type="button" class="small" data-reset-fields='{{ pairs | tojson }}' style="margin-left:10px">↺ annuler (dernier enregistrement)</button>
 {%- endmacro %}
+{# F12 (retour utilisateur 28/09) : un bouton d'enregistrement par groupe de score,
+   au lieu d'un unique bouton tout en bas de page. Tous les champs restent dans le
+   même <form>, donc chaque bouton enregistre l'ensemble (comportement inchangé
+   côté serveur) — il évite juste de devoir défiler jusqu'en bas. #}
+{% macro save_btn() -%}
+<button class="small" type="submit" style="margin-top:8px">💾 Enregistrer</button>
+{%- endmacro %}
 <form method="post" action="/settings">
   <h3>{{ icons.label() }} Score label (reco)
     {{ reset_btn([['reco__collection', sc.reco.collection], ['reco__corpus', sc.reco.corpus],
@@ -41,6 +48,7 @@
       déjà — référentiel local, aucun appel API. « Cœur/Aimé » : le fait même de suivre ce label, pondéré par
       son rang ci-dessous — avant le 17/09 ce rang n'avait aucun effet sur ce score.</p>
   </div>
+  {{ save_btn() }}
 
   <h3>{{ icons.album() }} Score album
     {{ reset_btn([['album__label', sc.album.label], ['album__artist', sc.album.artist],
@@ -59,6 +67,7 @@
       {% endfor %}
     </div>
   </div>
+  {{ save_btn() }}
 
   <h3>{{ icons.artist() }} Score artiste
     {{ reset_btn([['artist_score__manual', sc.artist_score.manual],
@@ -83,6 +92,7 @@
     <p class="muted small">« label aimé » : l'artiste a un disque chez un label que tu suis déjà
       (Cœur ou Aimé) — référentiel local, aucun appel API.</p>
   </div>
+  {{ save_btn() }}
 
   <h3>Rangs (Cœur / Aimés)
     {{ reset_btn([['taste_tiers__1', sc.taste_tiers['1']],
@@ -106,6 +116,7 @@
       <div class="field"><label>Label — Aimés<input name="label_tiers__2" type="number" step="any" value="{{ sc.label_tiers['2'] }}"></label></div>
     </div>
   </div>
+  {{ save_btn() }}
 
   <h3>🎯 RECOS RADAR
     {{ reset_btn([['recos__min_score', sc.recos.min_score],
@@ -128,13 +139,11 @@
              value="{{ sc.recos.max_tracks|int }}">
     </div>
   </div>
+  {{ save_btn() }}
   <p class="muted small">Chaque alimentation consomme le budget de recherches YouTube du jour
     jusqu'à épuisement (~80/jour) : plus de plafond de recherches par alimentation. Les vidéos
     trouvées via Discogs ne consomment pas ce budget. Si la playlist est pleine, aucune recherche
     n'est lancée et les pistes existantes ne sont jamais remplacées.</p>
-
-  <hr>
-  <button class="primary" type="submit">💾 Enregistrer</button>
 </form>
 <script src="/static/wradar.js" defer></script>
 <script>

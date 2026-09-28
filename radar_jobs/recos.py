@@ -12,7 +12,7 @@ import requests
 
 from radar_web.radar import textmatch, ytcache
 from radar_jobs.common import (
-    cfg_load, COLLECTION_CACHE_PATH, CORPUS_PATH, JOBS_USER_DIR, load_json, RADAR_UID,
+    CART_PATH, cfg_load, COLLECTION_CACHE_PATH, CORPUS_PATH, JOBS_USER_DIR, load_json, RADAR_UID,
     RECOS_CANDIDATES_PATH, RECOS_HISTORY_PATH, RECOS_PLAYLIST_PATH, RECOS_SEARCH_BUDGET_PATH,
     save_json, style_key,
 )
@@ -125,6 +125,23 @@ def _owned_releases():
     return ids, keys
 
 
+def _wantlist_releases():
+    """(ids, clés d'identité) des sorties déjà en wantlist (cart.json) — F11
+    (retour utilisateur 23/09) : ne jamais recommander une piste qu'on a déjà
+    mise de côté, comme on le fait déjà pour la collection Discogs et les achats
+    Bandcamp. Vide tant que la wantlist n'a jamais été synchronisée : le filtre
+    est alors sans effet, jamais bloquant."""
+    ids, keys = set(), set()
+    for x in load_json(CART_PATH, []):
+        rid = str(x.get("id") or "").strip()
+        if rid.isdigit():
+            ids.add(int(rid))
+        k = _release_identity_key(x.get("artist"), x.get("title"))
+        if k:
+            keys.add(k)
+    return ids, keys
+
+
 def job_scan_recos(job, params):
     """Candidats pour la playlist RECOS RADAR — refondu au Lot 5 de la refonte
     scoring (cf. CLAUDE.md point 43) : lit directement radar/scorestore.py
@@ -214,9 +231,10 @@ def job_scan_recos(job, params):
                      for c in candidates + playlist}
                     | _recos_history_track_keys(_recos_history_load()))
     owned_ids, owned_keys = _owned_releases()
+    want_ids, want_keys = _wantlist_releases()
     now = datetime.now().isoformat(timespec="seconds")
     job.st["total"] = min(len(rows), max_new)
-    n_added, n_owned = 0, 0
+    n_added, n_owned, n_want = 0, 0, 0
     for (artist, title, score, detail_json, release_id, release_title, label, year,
          release_artist) in rows:
         if job.stopped() or n_added >= max_new or len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
@@ -228,6 +246,10 @@ def job_scan_recos(job, params):
         if (release_id in owned_ids
                 or _release_identity_key(release_artist, release_title) in owned_keys):
             n_owned += 1
+            continue
+        if (release_id in want_ids
+                or _release_identity_key(release_artist, release_title) in want_keys):
+            n_want += 1
             continue
         known_tracks.add(k)
         detail = json.loads(detail_json) if detail_json else {}
@@ -242,8 +264,9 @@ def job_scan_recos(job, params):
         job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
     owned_note = f" {n_owned} piste(s) écartée(s) (album déjà en collection Discogs/Bandcamp)." if n_owned else ""
+    want_note = f" {n_want} piste(s) écartée(s) (déjà en wantlist)." if n_want else ""
     job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
-               f"file : {len(candidates)}.{owned_note}")
+               f"file : {len(candidates)}.{owned_note}{want_note}")
 
 
 def _publish_recos_last_message():

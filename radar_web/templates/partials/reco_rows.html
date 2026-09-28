@@ -34,6 +34,20 @@
     <td>
       <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t"
          target="_blank" rel="noopener" class="ic-btn" title="Chercher sur Bandcamp">{{ icons.bandcamp() }}</a>
+      {# F2 (retour utilisateur 28/09) : ouvrir la fiche Discogs du release — prix,
+         autres pressages, et l'état « déjà en wantlist/collection » y sont visibles.
+         Lien construit sur l'id numérique (jamais le slug `uri`, qui peut manquer). #}
+      {% if t.release_id %}
+      <a href="https://www.discogs.com/release/{{ t.release_id }}" target="_blank" rel="noopener"
+         class="ic-btn" title="Ouvrir sur Discogs">{{ icons.discogs() }}</a>
+      {% endif %}
+      {# F9 (retour utilisateur 28/09) : ouvrir la piste sur YouTube pour l'ajouter
+         à une playlist. Pas d'écriture via l'API (OAuth) : on ouvre la vidéo, où
+         « Enregistrer → playlist » est à un clic. #}
+      {% if t.video_id %}
+      <a href="https://www.youtube.com/watch?v={{ t.video_id }}" target="_blank" rel="noopener"
+         class="ic-btn" title="Ouvrir sur YouTube (ajouter à une playlist)">{{ icons.youtube() }}</a>
+      {% endif %}
     </td>
     <td>
       {% if t.release_id and (t.release_id|string) in (in_cart or []) %}

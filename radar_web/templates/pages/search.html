@@ -10,9 +10,9 @@
   <div class="field">
     <label>Rechercher</label>
     <div class="seg" id="search-mode">
-      <label><input type="radio" name="_mode" value="normal" {{ 'checked' if not q.seller and not q.base_metric }}>Recherche</label>
-      <label><input type="radio" name="_mode" value="labels" {{ 'checked' if q.base_metric }}>🏷️ Mes labels</label>
-      <label><input type="radio" name="_mode" value="seller" {{ 'checked' if q.seller }}>Vendeur</label>
+      <label><input type="radio" name="_mode" value="normal" {{ 'checked' if not q.seller and not q.base_metric }}>Générale</label>
+      <label><input type="radio" name="_mode" value="labels" {{ 'checked' if q.base_metric }}>Dans mes labels</label>
+      <label><input type="radio" name="_mode" value="seller" {{ 'checked' if q.seller }}>Chez un vendeur</label>
     </div>
   </div>
 
@@ -25,10 +25,15 @@
     <div id="label-suggest" class="lbl-suggest" hidden></div>
   </div>
 
-  <div class="field" id="mode-seller"{{ ' hidden' if not q.seller }}>
+  <div class="field combo" id="mode-seller"{{ ' hidden' if not q.seller }}>
     <label for="f-seller">Vendeur Discogs <span class="muted">· cherche dans son stock en vente</span></label>
+    {# R5 (retour utilisateur 28/09) : la barre vendeur propose aussi des noms au
+       fil de la frappe (vendeurs suivis + déjà recherchés), comme label/genre/style. #}
     <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
-           autocomplete="off">
+           autocomplete="off" data-combo="set" role="combobox" aria-autocomplete="list"
+           hx-get="/suggest/sellers" hx-target="#seller-suggest" hx-swap="innerHTML"
+           hx-trigger="focus, keyup changed delay:220ms">
+    <div id="seller-suggest" class="lbl-suggest" hidden></div>
     <p class="small muted">Nom d'utilisateur Discogs. Les filtres ci-dessous s'appliquent alors à
       son stock plutôt qu'au catalogue entier.</p>
   </div>

@@ -185,7 +185,17 @@ label{ display:block; font-size:12px; color:var(--soft); margin:0 0 4px; }
 .row > *{ flex:1 1 140px; }
 
 /* cartes */
-.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; }
+/* Retour utilisateur 28/09 : sur ordinateur, exactement 3 releases par ligne.
+   Avant, `auto-fill` en remplissait 5-6 sur un grand écran (trop condensé) et la
+   largeur des cartes ne collait pas à celle des champs de recherche au-dessus.
+   3 colonnes `1fr` = largeur égale et alignée sur le formulaire.
+   Sous 820 px on garde des colonnes élastiques, mais en `auto-fit` (et non
+   `auto-fill`) : quand il y a moins de résultats que de colonnes disponibles, les
+   cartes s'étirent pour occuper toute la largeur au lieu de laisser des pistes
+   vides à droite — c'est ce décalage qui faisait que les cartes ne prenaient pas
+   la même largeur que les champs au-dessus. */
+.grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:12px; }
+@media (min-width:820px){ .grid{ grid-template-columns:repeat(3,1fr); } }
 .card{
   background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
   overflow:hidden; display:flex; flex-direction:column;
@@ -259,6 +269,15 @@ a.chip:hover{ border-color:var(--pin); }
   padding:7px 10px; border-radius:6px; font-size:13px; color:var(--ink); text-decoration:none;
   display:flex; align-items:center; gap:6px; white-space:nowrap;
 }
+/* bouton-lien « Inviter » (propriétaire seulement, retour utilisateur 28/09) */
+.profile-menu-list .pm-link{
+  text-align:left; background:none; border:none; border-radius:6px; padding:7px 10px;
+  font:inherit; font-size:13px; color:var(--ink); cursor:pointer;
+  display:flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.profile-menu-list .pm-link:hover{ background:var(--line); }
+.profile-menu-list .pm-invite{ padding:2px 4px; }
+.profile-menu-list .pm-invite input{ width:100%; font-size:12px; box-sizing:border-box; }
 .profile-menu-list a:hover{ background:var(--line); }
 .profile-menu-list a.active{ color:var(--pin); font-weight:600; }
 .catno{ font-size:11px; color:var(--soft); }

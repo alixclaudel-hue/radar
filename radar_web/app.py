@@ -445,10 +445,11 @@ def reco_radar_delete_track(request: Request, video_id: str = Form("")):
 
     Renvoie le tableau des pistes à jour (htmx, plus de rechargement complet de la
     page — retour utilisateur 2026-09-18). Le tbody ENTIER est rendu, pas seulement
-    la ligne retirée, pour que la numérotation (#) reste juste. Le lecteur IFrame,
-    lui, garde la liste de vidéos chargée au démarrage : la page l'apparie aux
-    lignes par identifiant de vidéo et non par position, justement pour survivre à
-    ces suppressions (cf. le script de pages/reco_radar.html)."""
+    la ligne retirée, pour que la numérotation (#) reste juste. Le lecteur IFrame est
+    piloté par la liste VISIBLE (cf. le script de pages/reco_radar.html, correctif
+    issue #62) : les lignes portent l'identifiant de la vidéo (`data-vid`) et non
+    leur position, et le JS relit l'ordre du DOM après ce swap — une piste retirée
+    n'existe alors plus dans sa file et ne peut pas continuer à jouer."""
     playlist = load(_pu().recos_playlist, [])
     if video_id:
         new_playlist = [t for t in playlist if t.get("video_id") != video_id]
@@ -894,6 +895,29 @@ def suggest_styles(request: Request, q: str = ""):
 @app.get("/suggest/genres", response_class=HTMLResponse)
 def suggest_genres(request: Request, q: str = ""):
     return _suggest_vocab(request, vocab.GENRES, q, "genres")
+
+
+@app.get("/suggest/sellers", response_class=HTMLResponse)
+def suggest_sellers(request: Request, q: str = ""):
+    """R5 (retour utilisateur 28/09) : propositions pour la barre « Vendeur
+    Discogs » — alimentée par tes vendeurs suivis (config) et ceux déjà
+    recherchés (historique). Aucun appel API : on n'auto-complète que ce que tu
+    connais déjà, pour éviter de taper un nom approximatif."""
+    c = _cfg()
+    pool = [str(s) for s in c.get("sellers", []) if str(s).strip()]
+    seen = {s.lower() for s in pool}
+    for e in load(_pu().search_hist, []):
+        s = str((e.get("params") or {}).get("seller") or "").strip()
+        if s and s.lower() not in seen:
+            seen.add(s.lower())
+            pool.append(s)
+    term = (q or "").strip().lower()
+    hits = [s for s in pool if term in s.lower()] if term else pool
+    rows = [{"v": s} for s in hits[:60]]
+    header = (f"{len(hits)} vendeur" + ("s" if len(hits) > 1 else "") if term
+              else "Tes vendeurs connus / déjà recherchés")
+    return frag(request, "partials/suggest.html", rows=rows, header=header,
+                empty="Aucun vendeur connu ne correspond — saisis le nom exact Discogs.")
 
 
 _DISCOGS_SUGGEST_CACHE = _TtlCache(ttl=300, maxlen=200)    # (type, terme) -> lignes

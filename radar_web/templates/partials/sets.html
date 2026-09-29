@@ -2,13 +2,13 @@
 {% if not groups %}
   <p class="small muted">Aucune track de set (lance une extraction dans « Mon profil → DJ sets »).</p>
 {% else %}
-<div class="row" style="align-items:end;margin-bottom:8px">
-  <div class="field" style="flex:0 0 220px"><label>DJ</label>
+<div class="formbar">
+  <div class="field"><label>DJ</label>
     <select hx-get="/univers/sets" hx-target="#sets" hx-swap="innerHTML" name="dj" hx-trigger="change" hx-include="[name=mins]">
       <option value="">tous ({{ djs|length }})</option>
       {% for d in djs %}<option value="{{ d }}" {{ 'selected' if d==dj }}>{{ d }}</option>{% endfor %}
     </select></div>
-  <div class="field" style="flex:0 0 110px"><label>Note min</label>
+  <div class="field field--sm"><label>Note min</label>
     <input type="number" step="5" name="mins" value="{{ mins }}"
            hx-get="/univers/sets" hx-target="#sets" hx-swap="innerHTML" hx-trigger="change" hx-include="[name=dj]"></div>
 </div>
@@ -17,7 +17,7 @@
   <summary>{{ icons.tracks() }} {{ g.dj }} <span class="tag">{{ g.n }} tracks · {{ g.vids|length }} set(s)</span></summary>
   <div class="acc__body">
     {% for v in g.vids %}
-    <p style="margin:8px 0 2px"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
+    <p class="mt-2 mb-1"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
       <span class="small muted">· {{ v.tracks|length }} track(s)</span></p>
     {% for t in v.tracks %}
     <div id="tk-{{ v.vid }}-{{ loop.index }}">
@@ -43,7 +43,7 @@
         </span>
       </div>
     </div>
-    <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel" style="padding:0 2px 6px 4px"></div>
+    <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel"></div>
     </div>
     {% endfor %}
     {% endfor %}

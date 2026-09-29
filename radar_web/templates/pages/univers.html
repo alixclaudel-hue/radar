@@ -11,7 +11,6 @@
     {% include "partials/review.html" %}
   </div>
 </details>
-<hr>
 {% endif %}
 
 <div class="seg seg--full" role="tablist" aria-label="Sections">
@@ -19,7 +18,6 @@
   <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}"{{ ' aria-current="page"'|safe if tab=='artists' }}>{{ icons.artist() }}Artistes ({{ n_artists }})</a>
   <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}"{{ ' aria-current="page"'|safe if tab=='sets' }}>{{ icons.tracks() }}Sets ({{ n_sets }})</a>
 </div>
-<hr>
 
 {% if tab == 'labels' %}
   {% if n_labels == 0 %}
@@ -34,18 +32,18 @@
     <summary>{{ icons.plus() }} Ajouter un label</summary>
     <div class="acc__body">
       <form hx-post="/univers/labels/add" hx-target="#add-label-msg" hx-swap="innerHTML"
-            hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:480px">
-        <div class="field combo" style="flex:1;margin:0"><label>Nom du label <span class="muted">· propositions Discogs</span>
+            hx-on::after-request="this.reset()" class="formbar">
+        <div class="field combo"><label>Nom du label <span class="muted">· propositions Discogs</span>
           <input name="name" placeholder="ex. Aim Records" data-combo="set" autocomplete="off"
                  hx-get="/suggest/discogs?type=label" hx-target="#sug-add-label" hx-swap="innerHTML"
                  hx-vals='js:{q: event.target.value}'
                  hx-trigger="keyup changed delay:350ms"></label>
           <div id="sug-add-label" class="lbl-suggest" hidden></div></div>
-        <div class="field" style="flex:0 0 auto;margin:0"><label>Catégorie
-          <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimé</option></select></label></div>
+        <div class="field field--auto"><label>Catégorie
+          <select name="tier"><option value="1">Cœur</option><option value="2" selected>Aimé</option></select></label></div>
         <button class="primary" type="submit">Ajouter</button>
       </form>
-      <p id="add-label-msg" class="small" style="margin-top:8px"></p>
+      <p id="add-label-msg" class="small mt-1"></p>
     </div>
   </details>
 
@@ -56,7 +54,6 @@
     </div>
   </details>
 
-  <hr>
   <details class="acc" open>
     <summary>{{ icons.network() }} Graphe de labels <span class="tag">{{ label_graphs|length }} sauvegardé{{ 's' if label_graphs|length != 1 }}</span></summary>
     <div class="acc__body">
@@ -73,34 +70,34 @@
           <div class="chip-list"></div>
         </div>
         <script>window._lgSeeds = {aff: {{ top_aff|tojson }}, reco: {{ top_reco|tojson }}};</script>
-        <div style="margin:4px 0">
-          <button type="button" class="small"
+        <div class="btnrow">
+          <button type="button" class="small tonal"
                   title="Tes labels dont le catalogue colle le plus à tes styles Cœur / Aimés"
                   onclick="var h=document.getElementById('lg-seeds'); h.value=window._lgSeeds.aff; radarRenderChips(h.closest('.combo'));">mes + affinité style</button>
-          <button type="button" class="small"
+          <button type="button" class="small tonal"
                   title="Tes labels les mieux notés : collection + corpus + artistes aimés qui y ont sorti + affinité de style"
                   onclick="var h=document.getElementById('lg-seeds'); h.value=window._lgSeeds.reco; radarRenderChips(h.closest('.combo'));">mes + recommandations</button>
         </div>
-        <div class="row" style="align-items:end">
-          <div class="field" style="flex:0 0 auto">
+        <div class="formbar mt-2">
+          <div class="field field--auto">
             <label>Profondeur</label>
             <div class="seg">
               <label><input type="radio" name="depth" value="1">niveau 1</label>
               <label><input type="radio" name="depth" value="2" checked>niveau 1 + 2</label>
             </div>
           </div>
-          <div class="field" style="flex:0 0 160px"><label>Artistes communs min.
+          <div class="field field--sm"><label>Artistes communs min.
             <input name="min_shared" value="1" inputmode="numeric"></label></div>
-          <div class="field" style="flex:0 0 auto"><button class="primary" type="submit">Construire</button></div>
+          <button class="primary" type="submit">Construire</button>
         </div>
       </form>
       <div id="label-graph-out"></div>
       {% if label_graphs %}
-      <p class="small" style="margin-top:12px">Derniers graphes</p>
-      <div style="display:flex;flex-direction:column">
+      <p class="small mt-2">Derniers graphes</p>
+      <div class="list">
         {% for g in label_graphs %}
-        <div class="inbox-row" style="padding:5px 2px">
-          <a href="javascript:void(0)" class="txt" style="text-decoration:none;color:var(--ink)"
+        <div class="inbox-row inbox-row--tight">
+          <a href="javascript:void(0)" class="txt"
              hx-get="/univers/labels/graph/{{ g.id }}" hx-target="#label-graph-out" hx-swap="innerHTML">
             <b>{{ g.seeds|join(', ') }}</b>
             <div class="sub">{{ g.ts }} · niveau {{ g.depth }} · {{ g.nodes|length }} labels</div>
@@ -112,8 +109,7 @@
     </div>
   </details>
 
-  <hr>
-  <div hx-get="/univers/reco/labels" hx-trigger="load"></div>
+  <div class="mt-3" hx-get="/univers/reco/labels" hx-trigger="load"></div>
 
 {% elif tab == 'artists' %}
   {% if n_artists == 0 %}
@@ -129,22 +125,20 @@
   <details class="acc">
     <summary>{{ icons.artist() }} Les artistes <span class="tag">{{ n_artists }}</span></summary>
     <div class="acc__body">
-      <div class="row" style="align-items:end;max-width:640px">
+      <div class="formbar">
         <div class="field"><label>Filtrer
           <input name="flt" placeholder="nom…" autocomplete="off"
                  hx-get="/univers/artists/table" hx-target="#atable"
                  hx-trigger="input changed delay:250ms" hx-swap="innerHTML" hx-include="[name=hide]"></label>
         </div>
-        <div class="field" style="flex:0 0 auto"><label>&nbsp;</label>
-          <label class="small"><input type="checkbox" name="hide" style="width:auto"
-            hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>
+        <label class="check"><input type="checkbox" name="hide"
+            hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label>
       </div>
       <div id="atable" hx-get="/univers/artists/table" hx-trigger="load"></div>
-      <p style="margin-top:6px"><a class="small" href="/univers/artists/export">{{ icons.download() }} Exporter les artistes classés (CSV)</a></p>
+      <p class="mt-1"><a class="btn small" href="/univers/artists/export">{{ icons.download() }} Exporter les artistes classés (CSV)</a></p>
     </div>
   </details>
 
-  <hr>
   <details class="acc" open>
     <summary>{{ icons.network() }} Graphe d'artistes <span class="tag">{{ artist_graphs|length }} sauvegardé{{ 's' if artist_graphs|length != 1 }}</span></summary>
     <div class="acc__body">
@@ -164,11 +158,11 @@
       </form>
       <div id="artist-graph-out"></div>
       {% if artist_graphs %}
-      <p class="small" style="margin-top:12px">Derniers graphes</p>
-      <div style="display:flex;flex-direction:column">
+      <p class="small mt-2">Derniers graphes</p>
+      <div class="list">
         {% for g in artist_graphs %}
-        <div class="inbox-row" style="padding:5px 2px">
-          <a href="javascript:void(0)" class="txt" style="text-decoration:none;color:var(--ink)"
+        <div class="inbox-row inbox-row--tight">
+          <a href="javascript:void(0)" class="txt"
              hx-get="/univers/artists/graph/{{ g.id }}" hx-target="#artist-graph-out" hx-swap="innerHTML">
             <b>{{ g.seeds|join(', ') }}</b>
             <div class="sub">{{ g.ts }} · {{ g.nodes|length }} artistes</div>
@@ -180,13 +174,11 @@
     </div>
   </details>
 
-  <hr>
-  <div hx-get="/univers/reco/artists" hx-trigger="load"></div>
+  <div class="mt-3" hx-get="/univers/reco/artists" hx-trigger="load"></div>
 
 {% elif tab == 'sets' %}
   <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mon profil</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
-  <hr>
-  <div id="sets" hx-get="/univers/sets" hx-trigger="load"></div>
+  <div id="sets" class="mt-2" hx-get="/univers/sets" hx-trigger="load"></div>
 
 {% endif %}
 {% endblock %}

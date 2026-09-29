@@ -5,8 +5,8 @@
 {% else %}
   <div class="lrows">
     {% for n in notes %}
-    <div class="lrow" style="align-items:flex-start">
-      <div style="flex:1;min-width:0">
+    <div class="lrow lrow--top">
+      <div class="lrow__body">
         <div class="small"><b>{{ n.page }}</b>{% if n.target %} · {{ n.target }}{% endif %}</div>
         <div>{{ n.note }}</div>
         <div class="small muted">{{ n.ts }}
@@ -15,13 +15,13 @@
                   hx-target="#fb-list" hx-swap="outerHTML">{{ icons.refresh() }} renvoyer</button>{% endif %}</div>
       </div>
       <select hx-post="/feedback/status" hx-vals='js:{id: "{{ n.id }}", status: event.target.value}'
-              hx-target="#fb-list" hx-swap="outerHTML" style="width:auto;flex:0 0 auto">
+              hx-target="#fb-list" hx-swap="outerHTML" class="select-sm">
         {% for s in ("nouveau", "en cours", "fait") %}
         <option value="{{ s }}" {{ 'selected' if n.status == s }}>{{ s }}</option>
         {% endfor %}
       </select>
       <button type="button" class="small" hx-post="/feedback/delete" hx-vals='{"id": "{{ n.id }}"}'
-              hx-target="#fb-list" hx-swap="outerHTML" style="flex:0 0 auto"
+              hx-target="#fb-list" hx-swap="outerHTML"
               hx-confirm="Supprimer définitivement cette note (et son commentaire GitHub) ?"
               title="Supprimer (retour déjà traité)" aria-label="Supprimer">{{ icons.trash() }}</button>
     </div>

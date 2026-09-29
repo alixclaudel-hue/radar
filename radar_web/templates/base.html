@@ -17,7 +17,7 @@
     <header class="topbar">
       <a class="brand" href="/">Rada<b>r</b></a>
       {% if me %}<span class="brand-sub">{{ me }} ·
-        <form method="post" action="/logout" style="display:inline">
+        <form method="post" action="/logout" class="inline">
           <button type="submit" class="linklike">déconnexion</button></form></span>
       {% else %}<span class="brand-sub brand-sub--anon">nouvelle interface</span>{% endif %}
       {# Même balisage pour les deux mises en page (charte §7) : onglets soulignés en haut sur

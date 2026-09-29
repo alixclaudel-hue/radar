@@ -15,7 +15,7 @@
 
 <form method="post" action="/patte">
 
-  {% if onboarding %}<p class="small muted" style="margin:0 0 2px">Étape 1 sur 3</p>{% endif %}
+  {% if onboarding %}<p class="step-label">Étape 1 sur 3</p>{% endif %}
   <!-- ============ Discogs ============ -->
   <details class="acc" {{ 'open' if not cfg.token }}>
     <summary>
@@ -30,7 +30,7 @@
         {% if not cfg.token %}<a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">Générer un token sur Discogs {{ icons.external() }}</a>{% endif %}</p>
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-discogs" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">{{ icons.download() }} Importer collection + wantlist</button>
+        <button type="button" class="small tonal" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">{{ icons.download() }} Importer collection + wantlist</button>
         <span id="save-discogs" class="small ok"></span>
       </div>
       <div id="job-fetch_collection" hx-get="/jobs/fetch_collection/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
@@ -38,7 +38,7 @@
   </details>
 
   {% if onboarding %}
-  <p class="small muted" style="margin:14px 0 2px">Facultatif — à ajouter quand tu veux</p>
+  <p class="step-label">Facultatif — à ajouter quand tu veux</p>
   <details class="acc">
     <summary>{{ icons.plus() }} Ajouter d'autres sources <span class="tag">YouTube, Spotify, Bandcamp</span></summary>
     <div class="acc__body">
@@ -57,8 +57,8 @@
       <p class="small">Playlists (une URL par champ)</p>
       {% for u in (pl_urls + ['']) %}
       {% set pid = (u | pl_id) %}
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-        <input name="yt_pl" value="{{ u }}" placeholder="https://youtube.com/playlist?list=…" style="flex:1">
+      <div class="plrow">
+        <input name="yt_pl" value="{{ u }}" placeholder="https://youtube.com/playlist?list=…">
         {% if pid and pl_meta.get(pid) %}
           <span class="small ok">{{ icons.check() }} {{ pl_meta[pid].title }} <span class="muted">· {{ pl_meta[pid].channel }} · {{ pl_meta[pid].n_items }} titres</span></span>
         {% endif %}
@@ -66,7 +66,7 @@
       {% endfor %}
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-youtube" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small" hx-post="/patte/run/ingest_youtube" hx-include="closest form" hx-target="#job-ingest_youtube" hx-swap="outerHTML">{{ icons.download() }} Importer les playlists</button>
+        <button type="button" class="small tonal" hx-post="/patte/run/ingest_youtube" hx-include="closest form" hx-target="#job-ingest_youtube" hx-swap="outerHTML">{{ icons.download() }} Importer les playlists</button>
         <span id="save-youtube" class="small ok"></span>
       </div>
       <div id="job-ingest_youtube" hx-get="/jobs/ingest_youtube/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
@@ -91,8 +91,8 @@
       <p class="small">Playlists (une URL par champ)</p>
       {% for u in (sp_urls + ['']) %}
       {% set pid = (u | sp_id) %}
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
-        <input name="sp_pl" value="{{ u }}" placeholder="https://open.spotify.com/playlist/…" style="flex:1">
+      <div class="plrow">
+        <input name="sp_pl" value="{{ u }}" placeholder="https://open.spotify.com/playlist/…">
         {% if pid and sp_meta.get(pid) %}
           <span class="small ok">{{ icons.check() }} {{ sp_meta[pid].title }} <span class="muted">· {{ sp_meta[pid].channel }} · {{ sp_meta[pid].n_items }} titres</span></span>
         {% endif %}
@@ -100,7 +100,7 @@
       {% endfor %}
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-spotify" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small" hx-post="/patte/run/ingest_spotify" hx-include="closest form" hx-target="#job-ingest_spotify" hx-swap="outerHTML">{{ icons.download() }} Importer les playlists</button>
+        <button type="button" class="small tonal" hx-post="/patte/run/ingest_spotify" hx-include="closest form" hx-target="#job-ingest_spotify" hx-swap="outerHTML">{{ icons.download() }} Importer les playlists</button>
         <span id="save-spotify" class="small ok"></span>
       </div>
       <div id="job-ingest_spotify" hx-get="/jobs/ingest_spotify/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
@@ -126,7 +126,7 @@
       </div>
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-bandcamp" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small" hx-post="/patte/run/ingest_bandcamp" hx-include="closest form" hx-target="#job-ingest_bandcamp" hx-swap="outerHTML">{{ icons.download() }} Importer ma collection</button>
+        <button type="button" class="small tonal" hx-post="/patte/run/ingest_bandcamp" hx-include="closest form" hx-target="#job-ingest_bandcamp" hx-swap="outerHTML">{{ icons.download() }} Importer ma collection</button>
         <span id="save-bandcamp" class="small ok"></span>
       </div>
       <div id="job-ingest_bandcamp" hx-get="/jobs/ingest_bandcamp/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
@@ -141,23 +141,23 @@
 </form>
 
 {% if onboarding %}
-<p class="small muted" style="margin:14px 0 2px">Étape 3 sur 3</p>
+<p class="step-label">Étape 3 sur 3</p>
 <div class="notice">
   <p class="small">Dernière étape : lance une première recherche pour voir le moteur de score à l'œuvre.</p>
-  <a class="primary" style="display:inline-block;text-decoration:none;padding:8px 16px;border-radius:8px"
+  <a class="btn primary"
      href="/search{% if (cats.get('1') or cats.get('2')) %}?style={{ ((cats.get('1') or cats.get('2'))[0]) | urlencode }}{% endif %}">{{ icons.search() }} Chercher un disque</a>
 </div>
 {% endif %}
 
 <!-- ============ DJ sets (hors du formulaire principal) ============ -->
-<details class="acc" style="margin-top:10px">
+<details class="acc">
   <summary>{{ icons.tracks() }} DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
   <div class="acc__body">
     <p class="small muted">Scanne les sets/podcasts YouTube d'un DJ et verse les tracks jouées dans
       ton corpus. Résultats dans <a href="/univers?tab=sets">Mes labels &amp; artistes → Mes sets</a>.</p>
     <form hx-post="/patte/djset/scan" hx-target="#djset-panel" hx-swap="outerHTML"
-          hx-on::after-request="this.reset()" class="row combo" style="align-items:end;max-width:520px">
-      <div class="field" style="flex:1;margin:0"><label>Prochain DJ à scanner <span class="muted">· propositions Discogs</span>
+          hx-on::after-request="this.reset()" class="formbar combo">
+      <div class="field"><label>Prochain DJ à scanner <span class="muted">· propositions Discogs</span>
         <input name="name" placeholder="ex. Gilles Peterson" data-combo="set" autocomplete="off"
                hx-get="/suggest/discogs?type=artist" hx-target="#sug-djset" hx-swap="innerHTML"
                hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:350ms"></label>
@@ -169,9 +169,9 @@
 </details>
 
 <!-- ============ Styles (hors du formulaire principal) ============ -->
-{% if onboarding %}<p class="small muted" style="margin:14px 0 2px">Étape 2 sur 3 · dis ce que tu écoutes</p>{% endif %}
+{% if onboarding %}<p class="step-label">Étape 2 sur 3 · dis ce que tu écoutes</p>{% endif %}
 <form method="post" action="/patte">
-<details class="acc" style="margin-top:10px" {{ 'open' if onboarding }}>
+<details class="acc" {{ 'open' if onboarding }}>
   <summary>{{ icons.album() }} Mes styles <span class="tag">Cœur {{ (cats.get('1') or [])|length }} · Aimés {{ (cats.get('2') or [])|length }}</span></summary>
   <div class="acc__body">
     <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
@@ -198,32 +198,31 @@
 </form>
 
 <!-- ============ Import CSV (hors du formulaire principal) ============ -->
-<details class="acc" style="margin-top:10px">
+<details class="acc">
   <summary>{{ icons.tracks() }} Import CSV (labels / artistes aimés)</summary>
   <div class="acc__body">
-    <div class="row">
-      <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
-        <label>Labels
-        <input type="file" name="file" accept=".csv" required></label>
-        <label class="small">Catégorie
-        <select name="tier" style="width:auto"><option value="1">Cœur</option><option value="2" selected>Aimé</option></select></label>
-        <label class="small"><input type="checkbox" name="replace" style="width:auto"> remplacer (ce tier)</label>
-        <button type="submit" class="small">Importer</button>
+    <div class="stack-gap">
+      <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data" class="formbar">
+        <div class="field"><label>Labels
+          <input type="file" name="file" accept=".csv" required></label></div>
+        <div class="field field--auto"><label>Catégorie
+          <select name="tier" class="select-sm"><option value="1">Cœur</option><option value="2" selected>Aimé</option></select></label></div>
+        <label class="check"><input type="checkbox" name="replace"> remplacer (ce tier)</label>
+        <button type="submit" class="small tonal">Importer</button>
       </form>
-      <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">
-        <label>Artistes aimés
-        <input type="file" name="file" accept=".csv" required></label>
-        <label class="small">Catégorie
-        <select name="tier" style="width:auto"><option value="1">Principaux</option><option value="2" selected>Secondaires</option></select></label>
-        <button type="submit" class="small">Importer</button>
+      <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data" class="formbar">
+        <div class="field"><label>Artistes aimés
+          <input type="file" name="file" accept=".csv" required></label></div>
+        <div class="field field--auto"><label>Catégorie
+          <select name="tier" class="select-sm"><option value="1">Principaux</option><option value="2" selected>Secondaires</option></select></label></div>
+        <button type="submit" class="small tonal">Importer</button>
       </form>
     </div>
     <p id="csv-msg" class="small muted"></p>
   </div>
 </details>
 
-<hr>
-<h3>En bref</h3>
+<h3 class="mt-3">En bref</h3>
 <div class="statgrid">
   <div class="stat" title="labels que tu as ajoutés à ta base"><b>{{ st.labels }}</b><span>labels</span></div>
   <div class="stat" title="parmi eux, ceux dont on connaît le style musical"><b>{{ st.labels_profiled }}</b><span>labels dont on connaît le style</span></div>

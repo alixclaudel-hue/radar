@@ -11,10 +11,10 @@
     <span class="lrow__meta">
       {% if r.owned %}{{ r.owned }} poss.{% endif %}{% if r.want %} · {{ r.want }} want{% endif %}{% if r.corpus %} · corpus {{ r.corpus }}{% endif %}{% if r.artists %} · {{ icons.artist() }}{{ r.artists }}{% endif %}{% if r.aff is not none %} · {{ icons.label() }} {{ r.aff }}% <span title="couverture : part du catalogue classée dans une de tes catégories de style">(couv. {{ r.coverage }}%)</span>{% endif %}
     </span>
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
       <button class="small" title="Ajouter en Cœur">+ Cœur</button></form>
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
       <button class="small" title="Ajouter en Aimé">+ Aimé</button></form>
     <span class="vote" hx-swap="outerHTML">
@@ -27,17 +27,17 @@
 {% endif %}
 
 {% if graph_reco %}
-<p class="small muted" style="margin-top:14px">Via le graphe — labels où tes artistes ont sorti, absents de ta base ({{ n_graph }})</p>
+<p class="small muted mt-2">Via le graphe — labels où tes artistes ont sorti, absents de ta base ({{ n_graph }})</p>
 <div class="lrows">
   {% for r in graph_reco %}
   <div class="lrow">
     <span class="badge small ghost" title="rang de proximité dans le graphe (artistes en commun avec tes graines) — pas un score /100">{{ icons.network() }} {{ r.rank }}{{ 'ᵉʳ' if r.rank == 1 else 'ᵉ' }}</span>
     <a href="/disco?kind=label&key={{ r.key|urlencode }}" class="lrow__name">{{ r.name }}</a>
     <span class="lrow__meta">{{ r.artists }} artiste{{ 's' if r.artists>1 }} · {{ r.seeds }}</span>
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
       <button class="small" title="Ajouter en Cœur">+ Cœur</button></form>
-    <form hx-post="/reco/label" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
       <button class="small" title="Ajouter en Aimé">+ Aimé</button></form>
   </div>

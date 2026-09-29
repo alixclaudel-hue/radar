@@ -20,10 +20,10 @@
   {% endif %}
 
   {% if scanned %}
-  <p class="small" style="margin-top:12px">DJ scannés</p>
-  <div style="display:flex;flex-direction:column">
+  <p class="small mt-2">DJ scannés</p>
+  <div class="list">
     {% for d in scanned %}
-    <div class="inbox-row" style="padding:5px 2px">
+    <div class="inbox-row inbox-row--tight">
       <span class="txt"><b>{{ d.name }}</b>
         <div class="sub">{{ icons.check() }} {{ d.sets }} set{{ 's' if d.sets != 1 }} · {{ d.tracks }} track{{ 's' if d.tracks != 1 }}{% if d.date %} · scanné le {{ d.date }}{% endif %}</div>
       </span>
@@ -31,6 +31,6 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="small muted" style="margin-top:12px">Aucun DJ scanné pour l'instant.</p>
+  <p class="small muted mt-2">Aucun DJ scanné pour l'instant.</p>
   {% endif %}
 </div>

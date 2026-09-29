@@ -1,11 +1,11 @@
 {% import "partials/_icons.html" as icons %}
 <div id="cart-list">
-  <div class="btnrow" style="margin-bottom:6px">
+  <div class="btnrow">
     <button class="small" hx-post="/cart/sync" hx-target="#cart-list" hx-swap="outerHTML"
             title="Recharger depuis la wantlist Discogs (récupère les ajouts faits ailleurs que dans Radar)">
       {{ icons.refresh() }} synchroniser avec la wantlist Discogs
     </button>
-    <a class="small" href="https://www.discogs.com/shop/mywants/" target="_blank" rel="noopener"
+    <a class="btn small" href="https://www.discogs.com/shop/mywants/" target="_blank" rel="noopener"
        title="Annonces Discogs correspondant à ta wantlist">{{ icons.store() }} voir sur Discogs</a>
   </div>
   {% if not cart %}

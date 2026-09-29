@@ -5,13 +5,13 @@
   {% if n_approx %}
   <p class="small">{{ n_approx }} résolution{{ 's' if n_approx > 1 }} deviné{{ 's' if n_approx > 1 }} (pas certain) à vérifier :</p>
   <div class="tbl-wrap">
-  <table class="tbl">
+  <table class="tbl tbl--stack">
     <tbody>
       {% for r in review.labels_approx %}
       <tr>
         <td>{{ r.original }}</td>
-        <td class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
-        <td style="white-space:nowrap">
+        <td class="small muted c-full">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
+        <td class="nowrap c-full">
           <button class="small" hx-post="/univers/review/label/confirm" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.check() }} c'est lui</button>
           <button class="small" hx-post="/univers/review/label/reject" hx-target="#review-panel" hx-swap="outerHTML"
@@ -25,8 +25,8 @@
       {% for r in review.artists_approx %}
       <tr>
         <td>{{ r.original }} <span class="muted small">(artiste)</span></td>
-        <td class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
-        <td style="white-space:nowrap">
+        <td class="small muted c-full">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
+        <td class="nowrap c-full">
           <button class="small" hx-post="/univers/review/artist/confirm" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.check() }} c'est lui</button>
           <button class="small" hx-post="/univers/review/artist/reject" hx-target="#review-panel" hx-swap="outerHTML"
@@ -42,16 +42,16 @@
   </div>
   {% endif %}
   {% if n_nf %}
-  <p class="small muted" style="margin-top:{{ '10px' if n_approx else '0' }}">
+  <p class="small muted{{ ' mt-2' if n_approx }}">
     {{ n_nf }} jamais identifié{{ 's' if n_nf > 1 }} sur Discogs, ni dans le référentiel local ni via l'API —
     corrige l'orthographe en le retirant puis en le rajoutant, ou supprime-le :</p>
   <div class="tbl-wrap">
-  <table class="tbl">
+  <table class="tbl tbl--stack">
     <tbody>
       {% for r in review.labels_not_found %}
       <tr>
         <td>{{ r.original }}</td>
-        <td style="white-space:nowrap">
+        <td class="nowrap c-full">
           <button class="small" hx-post="/univers/review/label/delete" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-confirm="Supprimer « {{ r.original }} » de ta base de labels ?"
                   hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.trash() }} supprimer</button>
@@ -61,7 +61,7 @@
       {% for r in review.artists_not_found %}
       <tr>
         <td>{{ r.original }} <span class="muted small">(artiste)</span></td>
-        <td style="white-space:nowrap">
+        <td class="nowrap c-full">
           <button class="small" hx-post="/univers/review/artist/delete" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-confirm="Supprimer « {{ r.original }} » de ta base d'artistes ?"
                   hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.trash() }} supprimer</button>

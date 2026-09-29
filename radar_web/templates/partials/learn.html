@@ -1,7 +1,7 @@
 {% import "partials/_icons.html" as icons %}
 <p class="small muted">Tes {{ icons.thumbup() }} / {{ icons.thumbdown() }} sur les résultats et nouveautés sont journalisés avec les sous-signaux qui ont produit le score. Au-delà d'un minimum, on ajuste les poids vers tes décisions (régularisé — un coup de pouce, pas un remplacement).</p>
 {% for kind, d in data.items() %}
-<div class="notice" style="margin-bottom:12px">
+<div class="notice mb-2">
   <b>{{ 'Poids score label' if kind=='label' else 'Poids score album' }}</b>
   <span class="small muted"> — {{ d.n }} retours · {{ icons.thumbup() }} {{ d.up }} · {{ icons.thumbdown() }} {{ d.down }}</span>
   {% if d.n %}
@@ -21,7 +21,7 @@
     </tbody></table></div>
   {% endif %}
   {% if d.proposal %}
-    <form method="post" action="/settings/learn/apply" style="margin-top:8px">
+    <form method="post" action="/settings/learn/apply" class="mt-1">
       <input type="hidden" name="kind" value="{{ kind }}">
       <button class="primary" type="submit">{{ icons.check() }} Appliquer ces poids</button>
     </form>

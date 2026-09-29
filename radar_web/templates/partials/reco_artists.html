@@ -11,10 +11,10 @@
           title="note d'artiste /100 (proximité graphe = {{ r.prox }})">{{ icons.artist() }} {{ r.note }}</span>
     <a href="/disco?kind=artist&key={{ r.key|urlencode }}" class="lrow__name">{{ r.name }}</a>
     <span class="lrow__meta">{{ r.why }}</span>
-    <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/artist" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
       <button class="small">+ Principal</button></form>
-    <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/artist" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
       <button class="small">+ Secondaire</button></form>
   </div>

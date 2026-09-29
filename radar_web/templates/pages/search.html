@@ -50,13 +50,13 @@
       <label><input type="radio" name="base_metric" value="reco" {{ 'checked' if q.base_metric == 'reco' }}>reco</label>
       <label><input type="radio" name="base_metric" value="owned" {{ 'checked' if q.base_metric == 'owned' }}>collection</label>
     </div>
-    <div class="field" style="max-width:180px;margin-top:10px">
+    <div class="field field--narrow mt-2">
       <label>Note minimale <span class="muted">optionnel</span></label>
       <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
     </div>
-    <div class="field" style="margin-top:10px">
+    <div class="field mt-2">
       <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
-        <button type="button" class="small" id="mins-reset" style="float:right">{{ icons.undo() }} réinitialiser</button></label>
+        <button type="button" class="small ghost fr" id="mins-reset">{{ icons.undo() }} réinitialiser</button></label>
       <div class="row">
         <div class="field">
           <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
@@ -106,8 +106,8 @@
       <div class="chip-list"></div>
     </div>
   </div>
-  <div class="row" style="align-items:end">
-    <div class="field" style="flex:1">
+  <div class="row row--end">
+    <div class="field field--grow">
       <label>Période <span class="muted" id="yr-label">toutes années</span></label>
       <div class="yrange" id="yrange" data-min="{{ year_min }}" data-max="{{ year_max }}">
         <div class="yrange__rail"><div class="yrange__fill" id="yr-fill"></div></div>
@@ -117,7 +117,7 @@
                min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
       </div>
     </div>
-    <div class="field" style="flex:0 0 90px">
+    <div class="field field--xs">
       <label>Pages/label</label>
       <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}">
     </div>
@@ -141,8 +141,8 @@
   <summary>{{ icons.clock() }} Recherches récentes <span class="tag">{{ history|length }}</span></summary>
   <div class="acc__body">
     {% for h in history %}
-    <div class="inbox-row" style="padding:6px 2px">
-      <a href="/search?sid={{ h.id }}" class="txt" style="text-decoration:none;color:var(--ink)">
+    <div class="inbox-row inbox-row--tight">
+      <a href="/search?sid={{ h.id }}" class="txt">
         <b>{{ h.summary }}</b>
         <div class="sub">{{ h.ts }} · {{ h.n }} résultat{{ 's' if h.n > 1 }}</div>
       </a>

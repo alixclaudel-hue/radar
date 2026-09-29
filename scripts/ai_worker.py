@@ -55,6 +55,7 @@ if _RACINE_DEPOT not in sys.path:
 
 from scripts import ai_query  # noqa: E402
 from scripts.ai import jsonout  # noqa: E402
+from scripts.ai import worker_score  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Constantes de périmètre
@@ -301,8 +302,17 @@ def outil_lire(racine: str, args: dict) -> str:
     chemin = resoudre_dans_perimetre(racine, args.get("chemin", ""))
     with open(chemin, "r", encoding="utf-8", errors="replace") as f:
         contenu = f.read()
+    # Plage de lignes facultative : sans elle, un fichier de plus de LECTURE_MAX
+    # caractères était tronqué SANS moyen d'atteindre la suite — l'ouvrier ne voyait
+    # jamais le code à patcher et relisait en boucle (incident du 29/09).
+    if args.get("debut") or args.get("fin"):
+        lignes = contenu.splitlines()
+        debut = max(1, int(args.get("debut") or 1))
+        fin = min(len(lignes), int(args.get("fin") or len(lignes)))
+        contenu = "\n".join(f"{n}: {l}" for n, l in enumerate(lignes[debut - 1:fin], start=debut))
     if len(contenu) > LECTURE_MAX:
-        return contenu[:LECTURE_MAX] + f"\n[...tronqué : {len(contenu)} caractères]"
+        return contenu[:LECTURE_MAX] + (f"\n[...tronqué : {len(contenu)} caractères — "
+                                        "relis avec \"debut\" et \"fin\" (numéros de ligne)]")
     return contenu
 
 
@@ -509,7 +519,7 @@ Tu réponds par UN SEUL objet JSON, sans texte ni balise autour :
 {{"pensee": "en une phrase", "outil": "<outil>", "arguments": {{...}}}}
 
 Outils disponibles :
-- lire      {{"chemin": "relatif"}}
+- lire      {{"chemin": "relatif", "debut": 1, "fin": 200}}   (debut/fin facultatifs : numéros de ligne)
 - lister    {{"chemin": "relatif ou ."}}
 - chercher  {{"motif": "expression régulière"}}
 - ecrire    {{"chemin": "relatif", "contenu": "texte complet du fichier"}}
@@ -521,10 +531,16 @@ Outils disponibles :
 Interdits, sans exception : chemin absolu, `~`, `..`, `.git`, commande hors
 liste blanche, métacaractère shell, réseau, git commit, git push.
 Appelle `terminer` dès que le chantier est fait ou bloqué.
+
+Méthode : lis chaque fichier UNE seule fois (son contenu est ensuite rappelé dans
+« Fichiers lus », inutile de le relire), puis modifie-le tout de suite avec
+`patch` ou `ecrire`. Le chantier est jugé sur les fichiers écrits et les
+commandes vertes : une lecture sans écriture ne vaut rien.
 """
 
 
-def construire_prompt(tache: str, worktree: str, journal: list[str], passe_payante: bool) -> str:
+def construire_prompt(tache: str, worktree: str, journal: list[str], passe_payante: bool,
+                      fichiers: dict[str, str] | None = None, sans_ecriture: int = 0) -> str:
     entete = CONTRAT_OUTILS.format(worktree=worktree)
     if passe_payante:
         entete += (
@@ -532,6 +548,14 @@ def construire_prompt(tache: str, worktree: str, journal: list[str], passe_payan
             "abouti. Reprends l'état du worktree tel quel, ne repars pas de zéro.\n"
         )
     corps = "\n\n## Chantier\n" + tache.strip()
+    # Le journal ne garde que 400 caractères par résultat : un modèle qui lisait un
+    # fichier n'en voyait qu'un bout et le relisait sans fin (incident du 29/09).
+    # Les derniers fichiers lus sont donc rappelés en entier.
+    for chemin, contenu in (fichiers or {}).items():
+        corps += f"\n\n## Fichiers lus : {chemin}\n{contenu}"
+    if sans_ecriture >= 4:
+        corps += (f"\n\nATTENTION : {sans_ecriture} étapes sans écrire. Écris maintenant "
+                  "(`patch`/`ecrire`) ou appelle `terminer` en disant ce qui te manque.")
     if journal:
         corps += "\n\n## Déroulé des dernières actions\n" + "\n".join(journal[-10:])
     return entete + corps
@@ -565,6 +589,8 @@ def _boucle(
 ) -> dict:
     """Une passe de la boucle. Mute `rapport` et le rend."""
     erreurs_illisibles = 0
+    lus: dict[str, str] = {}        # derniers fichiers lus, rappelés en entier dans le prompt
+    sans_ecriture = 0
     while True:
         if rapport["etapes"] >= bornes.etapes:
             return _arreter(rapport, "etapes")
@@ -573,7 +599,8 @@ def _boucle(
         if rapport["jetons_estimes"] >= bornes.jetons:
             return _arreter(rapport, "jetons")
 
-        prompt = construire_prompt(rapport["tache"], worktree, journal, passe_payante)
+        prompt = construire_prompt(rapport["tache"], worktree, journal, passe_payante,
+                                   lus, sans_ecriture)
         try:
             texte, meta = decider(prompt)
         except Exception as exc:  # noqa: BLE001 — toute panne de décision arrête
@@ -655,7 +682,21 @@ def _boucle(
             _journaliser(journal, f"    {resume[:400]}")
         else:
             texte_resultat = str(resultat)
-            _journaliser(journal, f"{outil} -> {texte_resultat[:400]}")
+            chemin_arg = str(arguments.get("chemin", ""))
+            if outil == "lire":
+                lus.pop(chemin_arg, None)
+                lus[chemin_arg] = texte_resultat
+                for ancien in list(lus)[:-3]:      # 3 fichiers au plus : le prompt reste borné
+                    del lus[ancien]
+                _journaliser(journal, f"lire {chemin_arg} -> {len(texte_resultat)} caractères "
+                                      "(rappelés dans « Fichiers lus »)")
+            else:
+                _journaliser(journal, f"{outil} -> {texte_resultat[:400]}")
+        if outil in ("ecrire", "patch"):
+            lus.pop(str(arguments.get("chemin", "")), None)   # contenu périmé après écriture
+            sans_ecriture = 0
+        elif outil in ("lire", "lister", "chercher"):
+            sans_ecriture += 1
 
 
 # ---------------------------------------------------------------------------
@@ -766,9 +807,15 @@ def executer(
             ecrire_recu_worker(rapport)
         return rapport
 
+    decider_par_defaut = decider is None
+    # Choix du modèle par les notes passées : un modèle qui a fait ses preuves est
+    # préféré, sinon le routeur du courtier décide.
+    choix: dict[str, str | None] = {
+        "modele": worker_score.meilleur(worker_score.mauvais()), "provider": None}
     if decider is None:
         def decider(prompt: str):  # noqa: E306 — closure sur le courtier par défaut
-            return _decider_courtier(prompt)
+            return _decider_courtier(prompt, modele=choix["modele"], provider=choix["provider"])
+    t_debut_ts = time.time()
 
     t0 = horloge()
     journal: list[str] = []
@@ -783,6 +830,31 @@ def executer(
         passe_payante=False,
     )
     rapport["passes"].append({"paye": False, "etapes": rapport["etapes"], "statut": rapport["statut"]})
+    fournisseur, modele = worker_score.dernier_modele_courtier(t_debut_ts)
+    rapport["fournisseur"] = rapport["fournisseur"] or fournisseur
+    rapport["modele"] = rapport["modele"] or modele
+    rapport["note"] = worker_score.noter(rapport)
+    worker_score.enregistrer(rapport, rapport["note"])
+    # Changement de modèle : la première passe gratuite n'a rien écrit (« lit sans
+    # écrire »). On a noté le modèle fautif ; on repart UNE fois avec un autre — le
+    # mieux noté, sinon l'autre fournisseur gratuit. Worktree et journal conservés.
+    if decider_par_defaut and rapport["statut"] != "termine" and not rapport["fichiers_modifies"]:
+        fautif = worker_score.cle_modele(fournisseur, modele)
+        choix["modele"] = worker_score.meilleur(worker_score.mauvais() | ({fautif} if fautif else set()))
+        choix["provider"] = None if choix["modele"] else (
+            "gemini" if fournisseur == "openrouter" else "openrouter")
+        rapport["passes"].append({"rotation": choix["modele"] or choix["provider"]})
+        rapport["etapes"] = 0
+        rapport["jetons_estimes"] = 0      # budget propre à la seconde passe
+        rapport["arret"] = None
+        t_debut_ts = time.time()
+        _boucle(rapport, worktree=chemin_wt, bornes=bornes, journal=journal, decider=decider,
+                horloge=horloge, t0=horloge(), passe_payante=False)
+        rapport["passes"].append({"paye": False, "etapes": rapport["etapes"], "statut": rapport["statut"]})
+        fournisseur2, modele2 = worker_score.dernier_modele_courtier(t_debut_ts)
+        rapport["fournisseur"], rapport["modele"] = fournisseur2 or fournisseur, modele2 or modele
+        rapport["note"] = worker_score.noter(rapport)
+        worker_score.enregistrer(rapport, rapport["note"])
     etapes_gratuites = rapport["etapes"]
     # Chaque passe a son propre budget d'étapes ; le rapport rend le total.
     rapport["etapes"] = 0

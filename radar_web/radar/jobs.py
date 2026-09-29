@@ -98,6 +98,10 @@ def stop(name, uid=None):
     open(os.path.join(_user_jobs_dir(uid), f"{name}.stop"), "w").close()
 
 
+# Jobs qui écrivent des points de reprise : relancés tels quels après un orphelinage.
+RESUMABLE = {"build_graph"}
+
+
 def reap_orphans():
     """À appeler au démarrage du worker. Le worker est unique et sériel (cf.
     worker.py) : un job encore marqué "running" dans la queue au démarrage
@@ -110,13 +114,20 @@ def reap_orphans():
     orphans = [j for j in q if j["state"] == "running"]
     if not orphans:
         return orphans
+    reprises = []
     for j in orphans:
         p = _status_path(j["name"], j["uid"])
         s = store.load(p, None)
         if s is None or not s.get("running"):
             continue
         s["running"] = False
-        s["message"] = (s.get("message") or "").strip() + " — interrompu par un redéploiement, relance le job."
+        if j["name"] in RESUMABLE:
+            # le job sauvegarde des points de reprise : on le remet en file, il repart
+            # de là (un redéploiement ne doit plus jeter des heures de calcul)
+            s["message"] = (s.get("message") or "").strip() + " — interrompu par un redéploiement, reprise automatique."
+            reprises.append({**j, "state": "queued", "priority": 0})
+        else:
+            s["message"] = (s.get("message") or "").strip() + " — interrompu par un redéploiement, relance le job."
         store.save(p, s)
-    save_queue([j for j in q if j["state"] != "running"])
+    save_queue([j for j in q if j["state"] != "running"] + reprises)
     return orphans

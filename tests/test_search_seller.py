@@ -443,6 +443,29 @@ class SellerInventoryPaginationTestCase(unittest.TestCase):
         self.assertEqual(len(out), 2)
         self.assertTrue(truncated)
 
+    def test_403_page_101_garde_les_articles_lus(self):
+        # Discogs refuse toute page > 100 sur l'inventaire d'un autre compte : les
+        # 100 pages déjà lues doivent être rendues, marquées tronquées (incident du 29/09).
+        base = self._resp(2607)
+
+        def _get(path, params=None, token=""):
+            if (params or {}).get("page", 1) > 100:
+                raise discogs.DiscogsError(
+                    "Erreur Discogs 403 : Pagination above 100 disabled for inventories "
+                    "besides your own")
+            return base(path, params, token)
+        with mock.patch.object(discogs, "get", side_effect=_get), \
+             mock.patch.object(discogs.time, "sleep"):
+            out, truncated = discogs.seller_inventory("x", token="t", max_pages=0)
+        self.assertEqual(len(out), 100)
+        self.assertTrue(truncated)
+
+    def test_403_des_la_premiere_page_leve(self):
+        with mock.patch.object(discogs, "get", side_effect=discogs.DiscogsError(
+                "Erreur Discogs 403 : Pagination above 100 disabled")):
+            with self.assertRaises(discogs.DiscogsError):
+                discogs.seller_inventory("x", token="t", max_pages=0)
+
     def test_on_page_qui_renvoie_false_interrompt(self):
         with mock.patch.object(discogs, "get", side_effect=self._resp(10)), \
              mock.patch.object(discogs.time, "sleep"):

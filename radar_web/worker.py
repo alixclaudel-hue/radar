@@ -196,6 +196,8 @@ def _last_successful_run(name, uid=paths.DEFAULT_UID):
     s = jobs.status(name, uid=uid)
     if not s or s.get("running") or s.get("error") or not s.get("finished_at"):
         return 0.0
+    if s.get("partial"):        # arrêté à mi-chemin : pas « fait », à reprendre
+        return 0.0
     try:
         return datetime.fromisoformat(s["finished_at"]).timestamp()
     except ValueError:
@@ -265,6 +267,19 @@ def _maybe_reco_index_build(force=False):
         print(f"[worker] reco_index check : {e}", file=sys.stderr, flush=True)
 
 
+def _recent_failure(name, uid, cooldown=86400):
+    """Vrai si le dernier passage a échoué il y a moins de `cooldown` s. Sans cela,
+    un job en erreur (ex. compte sans graine) n'a jamais de « dernière réussite » et
+    était réenfilé à chaque contrôle horaire."""
+    s = jobs.status(name, uid=uid) or {}
+    if not s.get("error") or not s.get("finished_at"):
+        return False
+    try:
+        return time.time() - datetime.fromisoformat(s["finished_at"]).timestamp() < cooldown
+    except ValueError:
+        return False
+
+
 def _maybe_auto_maintenance():
     """Enfile canonicalize / profile_labels / build_graph pour CHAQUE utilisateur
     (profil, labels résolus et graphe sont par compte : les invités n'avaient
@@ -284,6 +299,7 @@ def _maybe_auto_maintenance():
                                   ("profile_labels", {"limit": 150}),
                                   ("build_graph", {"mode": "taste"})):
                 if ((uid, name) in queued
+                        or _recent_failure(name, uid)
                         or now - _last_successful_run(name, uid) < AUTO_MAINT_EVERY[name]):
                     continue
                 jobs.launch(name, params, uid=uid, priority=0)
@@ -384,15 +400,44 @@ def _pick(q, last_uid):
 
 
 def _run(job):
+    """Lance le job en sous-processus et le surveille. Rend True s'il a été tué au
+    timeout (le job est alors réenfilé par `main`, il reprend à son point de reprise).
+
+    Préemption DOUCE : si un job de priorité strictement supérieure attend en file
+    (clic utilisateur pendant un entretien de fond), on dépose le fichier `.stop` du
+    job en cours. Il s'arrête à son prochain point de contrôle en sauvegardant son
+    état — on ne le tue jamais. Avant, un clic attendait jusqu'à 6 h derrière un
+    `build_graph`."""
     env = {**os.environ, "CRATE_DATA_DIR": paths.DATA, "RADAR_UID": job["uid"]}
     try:
-        subprocess.run(
+        proc = subprocess.Popen(
             [sys.executable, paths.JOBS_SCRIPT, job["name"], json.dumps(job["params"] or {})],
             cwd=os.path.dirname(paths.JOBS_SCRIPT), env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=JOB_TIMEOUT)
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:                       # noqa: BLE001 — on log et on continue
         print(f"[worker] {job['uid']}/{job['name']} : {type(e).__name__} {e}",
               file=sys.stderr, flush=True)
+        return False
+    debut, stop_pose = time.monotonic(), False
+    while proc.poll() is None:
+        time.sleep(2.0)
+        try:
+            if not stop_pose and any(
+                    j["state"] == "queued" and j.get("priority", 1) > job.get("priority", 1)
+                    for j in jobs.load_queue()):
+                open(os.path.join(jobs._user_jobs_dir(job["uid"]), f"{job['name']}.stop"), "w").close()
+                stop_pose = True
+                print(f"[worker] arrêt doux demandé pour {job['uid']}/{job['name']} "
+                      "(job prioritaire en attente)", file=sys.stderr, flush=True)
+        except Exception as e:                   # noqa: BLE001 — la surveillance ne doit pas tuer le job
+            print(f"[worker] surveillance : {e}", file=sys.stderr, flush=True)
+        if time.monotonic() - debut > JOB_TIMEOUT:
+            proc.kill()
+            proc.wait()
+            print(f"[worker] {job['uid']}/{job['name']} : timeout {JOB_TIMEOUT}s, tué",
+                  file=sys.stderr, flush=True)
+            return True
+    return False
 
 
 def _after_job(job):
@@ -433,9 +478,14 @@ def main():
         job["state"] = "running"
         jobs.save_queue(q)
         print(f"[worker] run {job['uid']}/{job['name']}", file=sys.stderr, flush=True)
-        _run(job)
+        timeout = _run(job)
         jobs.save_queue([j for j in jobs.load_queue() if j["id"] != job["id"]])
         last_uid = job["uid"]
+        # Reprise : un job qui s'est arrêté à mi-chemin (préemption, budget de temps,
+        # timeout) est réenfilé en fond ; il repart de son point de reprise, pas de zéro.
+        st = jobs.status(job["name"], uid=job["uid"]) or {}
+        if (st.get("partial") and not st.get("error")) or timeout:
+            jobs.launch(job["name"], job["params"], uid=job["uid"], priority=0)
         _after_job(job)
 
 

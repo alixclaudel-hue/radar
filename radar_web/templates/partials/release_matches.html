@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 {# F10 (retour utilisateur 28/09) : la « mini-fenêtre » des pressages vinyle doit se
    refermer après un ajout réussi à la wantlist. Le correctif initial (retirer le
    conteneur depuis hx-on::after-request) ne marchait pas : avec hx-swap="outerHTML"
@@ -11,7 +12,7 @@
   <div class="wl-matches__head">
     <span class="small muted">Pressages vinyle Discogs</span>
     <button type="button" class="wl-matches__close" title="Fermer"
-            onclick="this.closest('[data-wl-matches]').remove()">✕</button>
+            onclick="this.closest('[data-wl-matches]').remove()" aria-label="Fermer">{{ icons.close() }}</button>
   </div>
 {% if not rows %}
   <p class="small muted" style="margin:4px 0">Aucun vinyle trouvé sur Discogs pour « {{ a }} — {{ t }} ».</p>
@@ -26,7 +27,7 @@
         {{ (r.label or [])|join(', ') }}{% if r.year %} · {{ r.year }}{% endif %}{% if r.format %} · {{ r.format|join(', ') }}{% endif %}
       </span>
       {% if r.id|string in in_cart %}
-        <span class="small ok">✓ en wantlist</span>
+        <span class="small ok">{{ icons.check() }} en wantlist</span>
       {% else %}
       <form hx-post="/cart/add" hx-target="closest [data-wl-matches]" hx-swap="outerHTML" style="display:inline">
         <input type="hidden" name="rid" value="{{ r.id }}">
@@ -34,7 +35,7 @@
         <input type="hidden" name="artist" value="{{ a }}">
         <input type="hidden" name="label" value="{{ (r.label or [''])[0] }}">
         <input type="hidden" name="thumb" value="{{ r.thumb or '' }}">
-        <button type="submit" class="small">➕ wantlist</button>
+        <button type="submit" class="small">{{ icons.plus() }} wantlist</button>
       </form>
       {% endif %}
     </div>

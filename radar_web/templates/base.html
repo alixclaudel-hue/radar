@@ -13,42 +13,44 @@
 <body>
   {% import "partials/_icons.html" as icons %}
   <div class="wrap">
-    <div class="topbar">
+    {% set cur = active|default('') %}
+    <header class="topbar">
       <a class="brand" href="/">Rada<b>r</b></a>
       {% if me %}<span class="brand-sub">{{ me }} ·
         <form method="post" action="/logout" style="display:inline">
           <button type="submit" class="linklike">déconnexion</button></form></span>
-      {% else %}<span class="brand-sub">nouvelle interface</span>{% endif %}
-      {% set cur = active|default('') %}
+      {% else %}<span class="brand-sub brand-sub--anon">nouvelle interface</span>{% endif %}
+      {# Même balisage pour les deux mises en page (charte §7) : onglets soulignés en haut sur
+         ordinateur, barre fixe en bas sur téléphone. Deux libellés par entrée : le long pour
+         l'ordinateur, le court pour les 4 colonnes d'un téléphone. #}
+      <nav class="nav" aria-label="Navigation principale">
+        <a href="/search" class="{{ 'active' if cur=='search' }}"{{ ' aria-current="page"'|safe if cur=='search' }}><span class="nav__ico">{{ icons.search("ic-nav") }}</span><span class="nav__long">Chercher un disque</span><span class="nav__short">Chercher</span></a>
+        {% if veille_enabled %}<a href="/veille" class="{{ 'active' if cur=='veille' }}"{{ ' aria-current="page"'|safe if cur=='veille' }}><span class="nav__ico">{{ icons.bell("ic-nav") }}</span><span class="nav__long">Nouveautés</span><span class="nav__short">Veille</span></a>{% endif %}
+        <a href="/univers" class="{{ 'active' if cur=='univers' }}"{{ ' aria-current="page"'|safe if cur=='univers' }}><span class="nav__ico">{{ icons.network("ic-nav") }}</span><span class="nav__long">Mes labels &amp; artistes</span><span class="nav__short">Univers</span></a>
+        <a href="/reco-radar" class="{{ 'active' if cur=='reco_radar' }}"{{ ' aria-current="page"'|safe if cur=='reco_radar' }}><span class="nav__ico">{{ icons.compass("ic-nav") }}</span><span class="nav__long">Reco Radar</span><span class="nav__short">Reco</span></a>
+        <a href="/settings" class="{{ 'active' if cur=='settings' }}"{{ ' aria-current="page"'|safe if cur=='settings' }}><span class="nav__ico">{{ icons.sliders("ic-nav") }}</span><span class="nav__long">Réglages</span><span class="nav__short">Réglages</span></a>
+      </nav>
       <div class="topbar-right">
         <details class="profile-menu">
-          <summary class="chip profile-tab {{ 'active' if cur in ('patte','wantlist','tracks_aimees') }}" title="Mon profil">👤 Mon profil</summary>
+          <summary class="chip profile-tab {{ 'active' if cur in ('patte','wantlist','tracks_aimees') }}" title="Mon profil" aria-label="Mon profil">{{ icons.user("ic-lg") }}<span class="profile-tab__txt">Mon profil</span></summary>
           <nav class="profile-menu-list">
-            <a href="/patte" class="{{ 'active' if cur=='patte' }}">🎯 Mes goûts</a>
-            <a href="/wantlist" class="{{ 'active' if cur=='wantlist' }}">{{ icons.cart("ic-sm") }} Ma Wantlist{% if n_cart %} ({{ n_cart }}){% endif %}</a>
-            <a href="/tracks-aimees" class="{{ 'active' if cur=='tracks_aimees' }}">♥ Mes tracks aimées</a>
+            <a href="/patte" class="{{ 'active' if cur=='patte' }}">{{ icons.album() }} Mes goûts</a>
+            <a href="/wantlist" class="{{ 'active' if cur=='wantlist' }}">{{ icons.cart() }} Ma Wantlist{% if n_cart %} ({{ n_cart }}){% endif %}</a>
+            <a href="/tracks-aimees" class="{{ 'active' if cur=='tracks_aimees' }}">{{ icons.heart() }} Mes tracks aimées</a>
             {% if is_owner %}
             {# Lien d'invitation réservé au propriétaire (retour utilisateur 28/09).
                `is_owner` vient de render() ; la route /account/invite revérifie le
                rôle côté serveur (403 sinon), l'UI n'est qu'un confort. #}
             <button type="button" class="pm-link" hx-post="/account/invite"
-                    hx-target="#invite-out" hx-swap="innerHTML">✉️ Inviter quelqu'un</button>
+                    hx-target="#invite-out" hx-swap="innerHTML">{{ icons.mail() }} Inviter quelqu'un</button>
             <div id="invite-out" class="pm-invite"></div>
             {% endif %}
           </nav>
         </details>
       </div>
-    </div>
-    <nav class="nav">
-      <a href="/search"   class="{{ 'active' if cur=='search' }}">🔍 Chercher un disque</a>
-      {% if veille_enabled %}<a href="/veille"   class="{{ 'active' if cur=='veille' }}">📻 Nouveautés</a>{% endif %}
-      <a href="/univers"  class="{{ 'active' if cur=='univers' }}">🌐 Mes labels &amp; artistes</a>
-      <a href="/reco-radar" class="{{ 'active' if cur=='reco_radar' }}">🎯 Reco Radar</a>
-      <a href="/settings" class="{{ 'active' if cur=='settings' }}">🎛️ Réglages</a>
-    </nav>
-    <hr>
+    </header>
     {% if not has_token and active != 'patte' %}
-      <p class="notice warn small">⚠️ Token Discogs manquant — <a href="/patte">Mon profil → Discogs</a>.</p>
+      <p class="notice warn small">{{ icons.warning() }} Token Discogs manquant — <a href="/patte">Mon profil → Discogs</a>.</p>
     {% endif %}
     {% block content %}{% endblock %}
   </div>
@@ -74,7 +76,8 @@
         chip.className = 'vchip';
         chip.appendChild(document.createTextNode(v));
         var x = document.createElement('button');
-        x.type = 'button'; x.className = 'vchip-x'; x.textContent = '✕';
+        x.type = 'button'; x.className = 'vchip-x'; x.setAttribute('aria-label', 'Retirer ' + v);
+        x.innerHTML = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
         x.addEventListener('click', function () {
           hidden.value = vals.filter(function (s) { return s !== v; }).join('\n');
           renderChips(wrap);
@@ -141,6 +144,8 @@
       if (e.key === 'Enter' && e.target.dataset && e.target.dataset.combo === 'chips') {
         e.preventDefault();
         addChip(e.target, e.target.value);
+        var sp = e.target.closest('.combo').querySelector('.lbl-suggest');
+        if (sp) sp.hidden = true;
       }
     });
     if (document.readyState === 'loading')

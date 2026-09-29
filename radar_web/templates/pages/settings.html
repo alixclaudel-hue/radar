@@ -11,14 +11,14 @@
    champs), pas aux valeurs par défaut de l'appli — sert à annuler une fausse manip sur
    le diagramme, pas à repartir de zéro sur des réglages déjà personnalisés. #}
 {% macro reset_btn(pairs) -%}
-<button type="button" class="small" data-reset-fields='{{ pairs | tojson }}' style="margin-left:10px">↺ annuler (dernier enregistrement)</button>
+<button type="button" class="small" data-reset-fields='{{ pairs | tojson }}' style="margin-left:10px">{{ icons.undo() }} annuler (dernier enregistrement)</button>
 {%- endmacro %}
 {# F12 (retour utilisateur 28/09) : un bouton d'enregistrement par groupe de score,
    au lieu d'un unique bouton tout en bas de page. Tous les champs restent dans le
    même <form>, donc chaque bouton enregistre l'ensemble (comportement inchangé
    côté serveur) — il évite juste de devoir défiler jusqu'en bas. #}
 {% macro save_btn() -%}
-<button class="small" type="submit" style="margin-top:8px">💾 Enregistrer</button>
+<button class="small" type="submit" style="margin-top:8px">{{ icons.save() }} Enregistrer</button>
 {%- endmacro %}
 <form method="post" action="/settings">
   <h3>{{ icons.label() }} Score label (reco)
@@ -118,7 +118,7 @@
   </div>
   {{ save_btn() }}
 
-  <h3>🎯 RECOS RADAR
+  <h3>{{ icons.compass() }} RECOS RADAR
     {{ reset_btn([['recos__min_score', sc.recos.min_score],
                   ['recos__max_new_releases', sc.recos.max_new_releases],
                   ['recos__max_tracks', sc.recos.max_tracks]]) }}
@@ -172,7 +172,7 @@
 <hr>
 <h3>Base de labels — export CSV <span class="muted small">· import : Mon profil</span></h3>
 <div class="field" style="max-width:320px"><label>Exporter</label>
-  <a class="small" href="/univers/labels/export">⬇ Exporter la base (CSV)</a></div>
+  <a class="small" href="/univers/labels/export">{{ icons.download() }} Exporter la base (CSV)</a></div>
 
 {% if sellers_enabled %}
 <hr>

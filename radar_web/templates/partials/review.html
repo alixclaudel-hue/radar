@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 <div id="review-panel">
   {% set n_approx = review.labels_approx|length + review.artists_approx|length %}
   {% set n_nf = review.labels_not_found|length + review.artists_not_found|length %}
@@ -12,12 +13,12 @@
         <td class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
         <td style="white-space:nowrap">
           <button class="small" hx-post="/univers/review/label/confirm" hx-target="#review-panel" hx-swap="outerHTML"
-                  hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
+                  hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.check() }} c'est lui</button>
           <button class="small" hx-post="/univers/review/label/reject" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>✗ non</button>
           <button class="small" hx-post="/univers/review/label/delete" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-confirm="Supprimer « {{ r.original }} » de ta base de labels ?"
-                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
+                  hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.trash() }} supprimer</button>
         </td>
       </tr>
       {% endfor %}
@@ -27,12 +28,12 @@
         <td class="small muted">→ {{ r.discogs_name or '?' }}{% if r.discogs_id %} (id {{ r.discogs_id }}){% endif %}</td>
         <td style="white-space:nowrap">
           <button class="small" hx-post="/univers/review/artist/confirm" hx-target="#review-panel" hx-swap="outerHTML"
-                  hx-vals='{"key": {{ r.key|tojson }}}'>✓ c'est lui</button>
+                  hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.check() }} c'est lui</button>
           <button class="small" hx-post="/univers/review/artist/reject" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-vals='{"key": {{ r.key|tojson }}}'>✗ non</button>
           <button class="small" hx-post="/univers/review/artist/delete" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-confirm="Supprimer « {{ r.original }} » de ta base d'artistes ?"
-                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
+                  hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.trash() }} supprimer</button>
         </td>
       </tr>
       {% endfor %}
@@ -53,7 +54,7 @@
         <td style="white-space:nowrap">
           <button class="small" hx-post="/univers/review/label/delete" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-confirm="Supprimer « {{ r.original }} » de ta base de labels ?"
-                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
+                  hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.trash() }} supprimer</button>
         </td>
       </tr>
       {% endfor %}
@@ -63,7 +64,7 @@
         <td style="white-space:nowrap">
           <button class="small" hx-post="/univers/review/artist/delete" hx-target="#review-panel" hx-swap="outerHTML"
                   hx-confirm="Supprimer « {{ r.original }} » de ta base d'artistes ?"
-                  hx-vals='{"key": {{ r.key|tojson }}}'>🗑 supprimer</button>
+                  hx-vals='{"key": {{ r.key|tojson }}}'>{{ icons.trash() }} supprimer</button>
         </td>
       </tr>
       {% endfor %}

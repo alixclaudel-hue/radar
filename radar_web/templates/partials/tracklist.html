@@ -9,7 +9,7 @@
       <code>{{ t.pos or '•' }}</code>
       <span class="tk-title">{{ t.title }}</span>
       <a class="tk-play" href="{{ t.play }}" target="_blank" rel="noopener"
-         title="{{ 'Vidéo Discogs' if t.kind == 'discogs' else 'Meilleure vidéo YouTube' }}">▶</a>
+         title="{{ 'Vidéo Discogs' if t.kind == 'discogs' else 'Meilleure vidéo YouTube' }}">{{ icons.play() }}</a>
       <a class="tk-play" href="{{ t.bc }}" target="_blank" rel="noopener"
          title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
       <a class="tk-play" href="{{ t.bp }}" target="_blank" rel="noopener"

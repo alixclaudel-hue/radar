@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Reco Radar · Radar{% endblock %}
 {% block content %}
-<h1>🎯 Reco Radar</h1>
+<h1>{{ icons.compass() }} Reco Radar</h1>
 <p class="muted small">Une playlist alimentée automatiquement en fond à partir de tes goûts
   (labels suivis, score album ≥ seuil réglé dans <a href="/settings">Réglages</a>) — {{ n_playlist }}/{{ max_tracks }}
   piste{{ 's' if n_playlist > 1 }}, plafond réglable dans Réglages. Clique une ligne pour marquer une piste écoutée :
@@ -17,8 +18,8 @@
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">
-  <a href="/jobs/scan_recos/log" download>⬇ journal scan</a> ·
-  <a href="/jobs/publish_recos/log" download>⬇ journal publication</a>
+  <a href="/jobs/scan_recos/log" download>{{ icons.download() }} journal scan</a> ·
+  <a href="/jobs/publish_recos/log" download>{{ icons.download() }} journal publication</a>
 </p>
 
 {% if not playlist %}

@@ -1,3 +1,4 @@
+{% import "partials/_icons.html" as icons %}
 {% set running = job and (job.running or job.queued) %}
 <div id="djset-panel"{% if running %} hx-get="/patte/djset/panel" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
 
@@ -14,7 +15,7 @@
       <p class="small muted">⏳ {{ job.message or 'scan en cours' }} · {{ job.done or 0 }}/{{ job.total or 0 }} sets</p>
       <div class="progress"><i style="width:{{ [pct, 100] | min }}%"></i></div>
     {% elif job.finished_at %}
-      <p class="small ok">✓ {{ job.message or 'scan terminé' }}</p>
+      <p class="small ok">{{ icons.check() }} {{ job.message or 'scan terminé' }}</p>
     {% endif %}
   {% endif %}
 
@@ -24,7 +25,7 @@
     {% for d in scanned %}
     <div class="inbox-row" style="padding:5px 2px">
       <span class="txt"><b>{{ d.name }}</b>
-        <div class="sub">✓ {{ d.sets }} set{{ 's' if d.sets != 1 }} · {{ d.tracks }} track{{ 's' if d.tracks != 1 }}{% if d.date %} · scanné le {{ d.date }}{% endif %}</div>
+        <div class="sub">{{ icons.check() }} {{ d.sets }} set{{ 's' if d.sets != 1 }} · {{ d.tracks }} track{{ 's' if d.tracks != 1 }}{% if d.date %} · scanné le {{ d.date }}{% endif %}</div>
       </span>
     </div>
     {% endfor %}

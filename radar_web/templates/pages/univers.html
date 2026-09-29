@@ -6,7 +6,7 @@
 
 {% if n_review %}
 <details class="acc" open>
-  <summary>⚠️ À vérifier ({{ n_review }})</summary>
+  <summary>{{ icons.warning() }} À vérifier ({{ n_review }})</summary>
   <div class="acc__body">
     {% include "partials/review.html" %}
   </div>
@@ -14,10 +14,10 @@
 <hr>
 {% endif %}
 
-<div class="nav" style="margin-top:0">
-  <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}">{{ icons.label() }} Base de labels ({{ n_labels }})</a>
-  <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}">{{ icons.artist() }} Base d'artistes ({{ n_artists }})</a>
-  <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}">🎚️ Mes sets ({{ n_sets }})</a>
+<div class="seg seg--full" role="tablist" aria-label="Sections">
+  <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}"{{ ' aria-current="page"'|safe if tab=='labels' }}>{{ icons.label() }}Labels ({{ n_labels }})</a>
+  <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}"{{ ' aria-current="page"'|safe if tab=='artists' }}>{{ icons.artist() }}Artistes ({{ n_artists }})</a>
+  <a href="/univers?tab=sets"    class="{{ 'active' if tab=='sets' }}"{{ ' aria-current="page"'|safe if tab=='sets' }}>{{ icons.tracks() }}Sets ({{ n_sets }})</a>
 </div>
 <hr>
 
@@ -31,7 +31,7 @@
   {% endif %}
 
   <details class="acc"{{ ' open' if n_labels == 0 }}>
-    <summary>➕ Ajouter un label</summary>
+    <summary>{{ icons.plus() }} Ajouter un label</summary>
     <div class="acc__body">
       <form hx-post="/univers/labels/add" hx-target="#add-label-msg" hx-swap="innerHTML"
             hx-on::after-request="this.reset()" class="row" style="align-items:end;max-width:480px">
@@ -50,7 +50,7 @@
   </details>
 
   <details class="acc">
-    <summary>📋 Aperçu de ma base <span class="tag">{{ n_labels }}</span></summary>
+    <summary>{{ icons.tracks() }} Aperçu de ma base <span class="tag">{{ n_labels }}</span></summary>
     <div class="acc__body">
       <div hx-get="/univers/labels/table" hx-trigger="load"></div>
     </div>
@@ -58,7 +58,7 @@
 
   <hr>
   <details class="acc" open>
-    <summary>🕸️ Graphe de labels <span class="tag">{{ label_graphs|length }} sauvegardé{{ 's' if label_graphs|length != 1 }}</span></summary>
+    <summary>{{ icons.network() }} Graphe de labels <span class="tag">{{ label_graphs|length }} sauvegardé{{ 's' if label_graphs|length != 1 }}</span></summary>
     <div class="acc__body">
       <p class="small muted">Relie les labels qui partagent des artistes, d'après le graphe producteur
         (reconstruit automatiquement en fond une fois par mois). Niveau 1 = liens directs avec tes graines,
@@ -140,13 +140,13 @@
             hx-get="/univers/artists/table" hx-target="#atable" hx-swap="innerHTML" hx-include="[name=flt]"> masquer les classés</label></div>
       </div>
       <div id="atable" hx-get="/univers/artists/table" hx-trigger="load"></div>
-      <p style="margin-top:6px"><a class="small" href="/univers/artists/export">⬇ Exporter les artistes classés (CSV)</a></p>
+      <p style="margin-top:6px"><a class="small" href="/univers/artists/export">{{ icons.download() }} Exporter les artistes classés (CSV)</a></p>
     </div>
   </details>
 
   <hr>
   <details class="acc" open>
-    <summary>🕸️ Graphe d'artistes <span class="tag">{{ artist_graphs|length }} sauvegardé{{ 's' if artist_graphs|length != 1 }}</span></summary>
+    <summary>{{ icons.network() }} Graphe d'artistes <span class="tag">{{ artist_graphs|length }} sauvegardé{{ 's' if artist_graphs|length != 1 }}</span></summary>
     <div class="acc__body">
       <p class="small muted">Relie tes artistes-graines aux artistes qu'ils co-créditent, d'après le graphe
         producteur (reconstruit automatiquement en fond une fois par mois). Un seul niveau

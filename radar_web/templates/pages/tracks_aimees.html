@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Mes tracks aimées · Radar{% endblock %}
 {% block content %}
-<h1>♥ Mes tracks aimées</h1>
+<h1>{{ icons.heart(True) }} Mes tracks aimées</h1>
 <p class="muted small">Pistes marquées d'un cœur depuis <a href="/reco-radar">Reco Radar</a> —
   {{ n_liked }} piste{{ 's' if n_liked > 1 }}.</p>
 

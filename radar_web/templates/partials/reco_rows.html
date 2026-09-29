@@ -51,7 +51,7 @@
     </td>
     <td>
       {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
-        <span class="small ok" title="Déjà en wantlist">✓</span>
+        <span class="small ok" title="Déjà en wantlist">{{ icons.check() }}</span>
       {% else %}
       {# On referme d'abord toute mini-fenêtre de pressages déjà ouverte (sinon
          elles s'empilent) ; /cart/add la réaffiche via release_matches.html. #}
@@ -76,7 +76,7 @@
     <td>
       <button type="button" class="small" title="Retirer cette piste de la playlist"
               hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'
-              hx-target="#reco-rows" hx-swap="outerHTML">🗑️</button>
+              hx-target="#reco-rows" hx-swap="outerHTML" aria-label="Supprimer la piste">{{ icons.trash() }}</button>
     </td>
   </tr>
   {% endfor %}

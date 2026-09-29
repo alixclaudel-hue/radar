@@ -17,7 +17,7 @@
   <form hx-post="/search/seller/sync" hx-target="#job-seller_inventory" hx-swap="outerHTML"
         style="display:inline">
     <input type="hidden" name="seller" value="{{ seller_sync.seller }}">
-    <button class="small" type="submit">↻ relire tout le stock</button>
+    <button class="small" type="submit">{{ icons.refresh() }} relire tout le stock</button>
   </form>
   <div id="job-seller_inventory" hx-get="/jobs/seller_inventory/status" hx-trigger="load"></div>
 </div>
@@ -108,7 +108,7 @@
                title="Ajouter au panier chez {{ seller }} (Discogs)" class="ic-btn">{{ icons.cart() }}</a>
             {% endif %}
           {% elif in_cart and (rr.id | string) in in_cart %}
-            <span class="small ok">✓ en wantlist</span>
+            <span class="small ok">{{ icons.check() }} en wantlist</span>
           {% else %}
           {# On referme d'abord toute mini-fenêtre de pressages déjà ouverte : le
              retour de /cart/add la réaffiche au bon endroit (cf. release_matches). #}

@@ -74,7 +74,7 @@
   <div class="gfull" hidden role="dialog" aria-modal="true">
     <div class="gfull__bar">
       <h4>{{ "Graphe d'artistes" if (kind or 'label') == 'artist' else 'Graphe de labels' }}</h4>
-      <button type="button" data-gclose>✕ Fermer</button>
+      <button type="button" data-gclose>{{ icons.close() }} Fermer</button>
     </div>
     <div class="gfull__stage">{{ graph_svg(true) }}</div>
     <div class="gfull__sheet">

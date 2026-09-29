@@ -39,7 +39,7 @@
           <button type="button" title="Supprimer cette track (ne comptera plus dans les notes ni le graphe)"
                   hx-post="/univers/sets/delete" hx-vals='{"rid": "{{ t._rid }}"}'
                   hx-target="#tk-{{ v.vid }}-{{ loop.index }}" hx-swap="outerHTML"
-                  hx-confirm="Supprimer cette track de tes DJ sets ?">🗑️</button>
+                  hx-confirm="Supprimer cette track de tes DJ sets ?" aria-label="Supprimer la track">{{ icons.trash() }}</button>
         </span>
       </div>
     </div>

@@ -61,7 +61,7 @@
           <button class="small" title="retirer de la base"
                   hx-post="/univers/labels/remove" hx-confirm="Retirer « {{ r.disp }} » de ta base ?"
                   hx-target="#labels-table" hx-swap="outerHTML"
-                  hx-vals='{{ {"name": r.disp, "flt": flt, "page": page, "sort": sort, "dir": dir} | tojson }}'>✕</button>
+                  hx-vals='{{ {"name": r.disp, "flt": flt, "page": page, "sort": sort, "dir": dir} | tojson }}' aria-label="Retirer">{{ icons.close() }}</button>
         </td>
       </tr>
       {% endfor %}

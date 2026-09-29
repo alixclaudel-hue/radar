@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}{{ name }} — discographie · Radar{% endblock %}
 {% block content %}
-<p class="small"><a href="/univers?tab={{ 'labels' if kind == 'label' else 'artists' }}">‹ retour à ma base</a></p>
+<a class="backlink" href="/univers?tab={{ 'labels' if kind == 'label' else 'artists' }}">{{ icons.chevron() }} retour à ma base</a>
 <h1>{{ name }}</h1>
 <p class="muted small">Discographie {{ 'du label' if kind == 'label' else "de l'artiste" }} ·
   vinyles uniquement{% if total_raw %} · {{ total_raw }} sortie{{ 's' if total_raw > 1 }} récupérée{{ 's' if total_raw > 1 }}{% endif %} ·
@@ -10,14 +11,12 @@
 {% if error %}<p class="notice warn">{{ error }}</p>{% endif %}
 
 {% if mystyles %}
-<div style="display:flex;flex-wrap:wrap;gap:6px;margin:12px 0">
-  <a class="chip" href="/disco?kind={{ kind }}&key={{ key | urlencode }}"
-     style="{{ 'background:var(--pin);color:var(--paper);border-color:var(--pin)' if not sel }}">tous</a>
+<div class="chip-list mt-2">
+  <a class="chip{{ ' on' if not sel }}" href="/disco?kind={{ kind }}&key={{ key | urlencode }}">tous</a>
   {% for s in mystyles %}
     {% set on = s in sel %}
     {% set nxt = (sel | reject('equalto', s) | list) if on else (sel + [s]) %}
-    <a class="chip" href="/disco?kind={{ kind }}&key={{ key | urlencode }}&styles={{ nxt | join(',') | urlencode }}"
-       style="{{ 'background:var(--pin);color:var(--paper);border-color:var(--pin)' if on }}">{{ s }}</a>
+    <a class="chip{{ ' on' if on }}" href="/disco?kind={{ kind }}&key={{ key | urlencode }}&styles={{ nxt | join(',') | urlencode }}">{{ s }}</a>
   {% endfor %}
 </div>
 <p class="small muted">Filtre : {% if sel %}{{ sel | join(', ') }}{% else %}tous tes styles{% endif %}</p>

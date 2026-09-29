@@ -2,22 +2,22 @@
 {% if not groups %}
   <p class="small muted">Aucune track de set (lance une extraction dans « Mon profil → DJ sets »).</p>
 {% else %}
-<div class="row" style="align-items:end;margin-bottom:8px">
-  <div class="field" style="flex:0 0 220px"><label>DJ</label>
+<div class="formbar">
+  <div class="field"><label>DJ</label>
     <select hx-get="/univers/sets" hx-target="#sets" hx-swap="innerHTML" name="dj" hx-trigger="change" hx-include="[name=mins]">
       <option value="">tous ({{ djs|length }})</option>
       {% for d in djs %}<option value="{{ d }}" {{ 'selected' if d==dj }}>{{ d }}</option>{% endfor %}
     </select></div>
-  <div class="field" style="flex:0 0 110px"><label>Note min</label>
+  <div class="field field--sm"><label>Note min</label>
     <input type="number" step="5" name="mins" value="{{ mins }}"
            hx-get="/univers/sets" hx-target="#sets" hx-swap="innerHTML" hx-trigger="change" hx-include="[name=dj]"></div>
 </div>
 {% for g in groups %}
 <details class="acc" {{ 'open' if dj }}>
-  <summary>🎧 {{ g.dj }} <span class="tag">{{ g.n }} tracks · {{ g.vids|length }} set(s)</span></summary>
+  <summary>{{ icons.tracks() }} {{ g.dj }} <span class="tag">{{ g.n }} tracks · {{ g.vids|length }} set(s)</span></summary>
   <div class="acc__body">
     {% for v in g.vids %}
-    <p style="margin:8px 0 2px"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
+    <p class="mt-2 mb-1"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
       <span class="small muted">· {{ v.tracks|length }} track(s)</span></p>
     {% for t in v.tracks %}
     <div id="tk-{{ v.vid }}-{{ loop.index }}">
@@ -30,7 +30,7 @@
         <span class="tk-card__meta small muted">{{ t.label or '' }}{% if t.style %}{{ ' · ' if t.label }}{{ t.style|join(', ') }}{% endif %}</span>
         <span class="tk-card__actions">
           {% if t.release_id or t.vinyl_release_id %}
-            <a href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener" title="Sur Discogs">💿</a>
+            <a href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener" title="Sur Discogs" aria-label="Sur Discogs">{{ icons.album("ic-lg") }}</a>
           {% endif %}
           <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
           <button type="button" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter à la wantlist"
@@ -39,11 +39,11 @@
           <button type="button" title="Supprimer cette track (ne comptera plus dans les notes ni le graphe)"
                   hx-post="/univers/sets/delete" hx-vals='{"rid": "{{ t._rid }}"}'
                   hx-target="#tk-{{ v.vid }}-{{ loop.index }}" hx-swap="outerHTML"
-                  hx-confirm="Supprimer cette track de tes DJ sets ?">🗑️</button>
+                  hx-confirm="Supprimer cette track de tes DJ sets ?" aria-label="Supprimer la track">{{ icons.trash() }}</button>
         </span>
       </div>
     </div>
-    <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel" style="padding:0 2px 6px 4px"></div>
+    <div id="rm-{{ v.vid }}-{{ loop.index }}" class="rm-panel"></div>
     </div>
     {% endfor %}
     {% endfor %}

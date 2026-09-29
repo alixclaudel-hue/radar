@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Reco Radar · Radar{% endblock %}
 {% block content %}
-<h1>🎯 Reco Radar</h1>
+<h1>Reco Radar</h1>
 <p class="muted small">Une playlist alimentée automatiquement en fond à partir de tes goûts
   (labels suivis, score album ≥ seuil réglé dans <a href="/settings">Réglages</a>) — {{ n_playlist }}/{{ max_tracks }}
   piste{{ 's' if n_playlist > 1 }}, plafond réglable dans Réglages. Clique une ligne pour marquer une piste écoutée :
@@ -17,28 +18,28 @@
 <div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">
-  <a href="/jobs/scan_recos/log" download>⬇ journal scan</a> ·
-  <a href="/jobs/publish_recos/log" download>⬇ journal publication</a>
+  <a href="/jobs/scan_recos/log" download>{{ icons.download() }} journal scan</a> ·
+  <a href="/jobs/publish_recos/log" download>{{ icons.download() }} journal publication</a>
 </p>
 
 {% if not playlist %}
-<p class="muted small" style="margin-top:16px">Playlist vide — elle se remplit toute seule au fil des passages
+<p class="muted small mt-2">Playlist vide — elle se remplit toute seule au fil des passages
   du job de fond (nécessite au moins un label suivi noté, cf. <a href="/patte">Mon profil</a>).</p>
 {% else %}
 <div class="yt-player-wrap"><div id="yt-player"></div></div>
 
 <div class="tbl-wrap">
-<table class="tbl">
+<table class="tbl tbl--cards">
   <thead><tr>
-    <th style="width:52px">#</th>
+    <th class="col-n">#</th>
     <th>Track</th>
     <th>Release / Label</th>
-    <th class="num" style="width:60px">Année</th>
-    <th style="width:64px"></th>
-    <th style="width:34px"></th>
-    <th style="width:34px"></th>
-    <th style="width:34px"></th>
-    <th style="width:34px"></th>
+    <th class="num col-year">Année</th>
+    <th class="col-acts"></th>
+    <th class="col-act"></th>
+    <th class="col-act"></th>
+    <th class="col-act"></th>
+    <th class="col-act"></th>
   </tr></thead>
   {% include "partials/reco_rows.html" %}
 </table>

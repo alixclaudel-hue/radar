@@ -444,7 +444,7 @@ class Ctx:
             score = round(base * (1 + abr * (breadth - 1)) + (c1b if cat1 else 0), 2)
             why = [f"{n}× avec {sn}" for sn, n in sorted(byseed.items(), key=lambda kv: -kv[1])[:3]]
             if cat1:
-                why.insert(0, f"⭐ {cat1}× avec un artiste Cœur")
+                why.insert(0, f"{cat1}× avec un artiste de catégorie 1")
             arts[ck] = {"name": e["name"], "id": e.get("id"), "score": score, "why": why}
         label_tiers = self.label_tier_map()
         labs = {}

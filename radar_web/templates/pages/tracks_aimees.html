@@ -1,18 +1,19 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Mes tracks aimées · Radar{% endblock %}
 {% block content %}
-<h1>♥ Mes tracks aimées</h1>
+<h1>Mes tracks aimées</h1>
 <p class="muted small">Pistes marquées d'un cœur depuis <a href="/reco-radar">Reco Radar</a> —
   {{ n_liked }} piste{{ 's' if n_liked > 1 }}.</p>
 
 {% if not liked %}
-<p class="muted small" style="margin-top:16px">Aucune piste aimée pour l'instant — clique le cœur sur une
+<p class="muted small mt-2">Aucune piste aimée pour l'instant — clique le cœur sur une
   piste dans <a href="/reco-radar">Reco Radar</a>.</p>
 {% else %}
-<p class="small">
+<p class="btnrow">
   {% for b in export_batches %}
-  <a class="tag" target="_blank" rel="noopener"
-     href="https://www.youtube.com/watch_videos?video_ids={{ b.ids }}">⇪ Importer dans YouTube
+  <a class="btn small" target="_blank" rel="noopener"
+     href="https://www.youtube.com/watch_videos?video_ids={{ b.ids }}">{{ icons.external() }} Importer dans YouTube
      ({{ b.start }}-{{ b.end }})</a>
   {% endfor %}
 </p>
@@ -25,11 +26,11 @@
 <div class="tbl-wrap">
 <table class="tbl">
   <thead><tr>
-    <th style="width:52px">#</th>
+    <th class="col-n">#</th>
     <th>Track</th>
     <th>Release / Label</th>
-    <th class="num" style="width:60px">Année</th>
-    <th style="width:34px"></th>
+    <th class="num col-year">Année</th>
+    <th class="col-act"></th>
   </tr></thead>
   {% include "partials/liked_rows.html" %}
 </table>

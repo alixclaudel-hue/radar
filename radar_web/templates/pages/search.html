@@ -4,24 +4,25 @@
 {% block content %}
 
 <h1>Chercher un disque</h1>
-<p class="muted small">Recherche normale (tout le catalogue, label optionnel), sur tes labels suivis, ou dans le stock d'un vendeur.</p>
+<p class="muted small search-lead">Recherche normale (tout le catalogue, label optionnel), sur tes labels suivis, ou dans le stock d'un vendeur.</p>
 
 <form id="search-form" hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
-  <div class="field">
-    <label>Rechercher</label>
-    <div class="seg" id="search-mode">
-      <label><input type="radio" name="_mode" value="normal" {{ 'checked' if not q.seller and not q.base_metric }}>Générale</label>
-      <label><input type="radio" name="_mode" value="labels" {{ 'checked' if q.base_metric }}>Dans mes labels</label>
-      <label><input type="radio" name="_mode" value="seller" {{ 'checked' if q.seller }}>Chez un vendeur</label>
-    </div>
+  <div class="seg seg--full" id="search-mode" role="radiogroup" aria-label="Type de recherche">
+    <label><input type="radio" name="_mode" value="normal" {{ 'checked' if not q.seller and not q.base_metric }}>{{ icons.search() }}Générale</label>
+    <label><input type="radio" name="_mode" value="labels" {{ 'checked' if q.base_metric }}>{{ icons.label() }}Mes labels</label>
+    <label><input type="radio" name="_mode" value="seller" {{ 'checked' if q.seller }}>{{ icons.store() }}Vendeur</label>
   </div>
 
   <div class="field combo" id="mode-normal"{{ ' hidden' if q.seller or q.base_metric }}>
-    <label for="f-label">Label <span class="muted">· optionnel, propositions depuis ta base — laisse vide pour chercher sur tout le catalogue</span></label>
-    <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"
-           data-combo="set" autocomplete="off" role="combobox" aria-autocomplete="list"
-           hx-get="/search/labels" hx-target="#label-suggest" hx-swap="innerHTML"
-           hx-trigger="focus, keyup changed delay:220ms">
+    <label for="f-label">Label <span class="muted">· optionnel</span></label>
+    <div class="input-ico">
+      {{ icons.label() }}
+      <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"
+             data-combo="set" autocomplete="off" role="combobox" aria-autocomplete="list"
+             hx-get="/search/labels" hx-target="#label-suggest" hx-swap="innerHTML"
+             hx-trigger="focus, keyup changed delay:220ms">
+    </div>
+    <p class="small muted field-hint">Propositions depuis ta base — laisse vide pour chercher sur tout le catalogue.</p>
     <div id="label-suggest" class="lbl-suggest" hidden></div>
   </div>
 
@@ -29,10 +30,13 @@
     <label for="f-seller">Vendeur Discogs <span class="muted">· cherche dans son stock en vente</span></label>
     {# R5 (retour utilisateur 28/09) : la barre vendeur propose aussi des noms au
        fil de la frappe (vendeurs suivis + déjà recherchés), comme label/genre/style. #}
-    <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
-           autocomplete="off" data-combo="set" role="combobox" aria-autocomplete="list"
-           hx-get="/suggest/sellers" hx-target="#seller-suggest" hx-swap="innerHTML"
-           hx-trigger="focus, keyup changed delay:220ms">
+    <div class="input-ico">
+      {{ icons.store() }}
+      <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
+             autocomplete="off" data-combo="set" role="combobox" aria-autocomplete="list"
+             hx-get="/suggest/sellers" hx-target="#seller-suggest" hx-swap="innerHTML"
+             hx-trigger="focus, keyup changed delay:220ms">
+    </div>
     <div id="seller-suggest" class="lbl-suggest" hidden></div>
     <p class="small muted">Nom d'utilisateur Discogs. Les filtres ci-dessous s'appliquent alors à
       son stock plutôt qu'au catalogue entier.</p>
@@ -46,13 +50,13 @@
       <label><input type="radio" name="base_metric" value="reco" {{ 'checked' if q.base_metric == 'reco' }}>reco</label>
       <label><input type="radio" name="base_metric" value="owned" {{ 'checked' if q.base_metric == 'owned' }}>collection</label>
     </div>
-    <div class="field" style="max-width:180px;margin-top:10px">
+    <div class="field field--narrow mt-2">
       <label>Note minimale <span class="muted">optionnel</span></label>
       <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
     </div>
-    <div class="field" style="margin-top:10px">
+    <div class="field mt-2">
       <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
-        <button type="button" class="small" id="mins-reset" style="float:right">↺ réinitialiser</button></label>
+        <button type="button" class="small ghost fr" id="mins-reset">{{ icons.undo() }} réinitialiser</button></label>
       <div class="row">
         <div class="field">
           <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
@@ -68,6 +72,20 @@
     </div>
   </div>
 
+  <div class="filters-bar">
+    <button type="button" class="filters-open" id="filters-open" aria-controls="filters" aria-expanded="false">{{ icons.filter() }} Filtres <span class="badge" id="filters-count" hidden>0</span></button>
+    {% if history %}<a class="btn ghost icon" href="#recent" id="recent-open" aria-label="Recherches récentes">{{ icons.clock() }}</a>{% endif %}
+  </div>
+  <div class="chip-list filters-summary" id="filters-summary" aria-live="polite"></div>
+
+  {# Sur téléphone ce bloc devient une feuille qui glisse du bas ; sur ordinateur il reste en
+     ligne. Les champs restent DANS le formulaire : rien ne change pour la requête HTMX. #}
+  <div class="filters" id="filters">
+    <div class="filters__head">
+      <h3>Filtres</h3>
+      <button type="button" class="ghost icon" id="filters-close" aria-label="Fermer les filtres">{{ icons.close() }}</button>
+    </div>
+    <div class="filters__body">
   <div class="row">
     <div class="field combo">
       <label>Genre <span class="muted">tape pour chercher, choisis dans la liste</span></label>
@@ -88,8 +106,8 @@
       <div class="chip-list"></div>
     </div>
   </div>
-  <div class="row" style="align-items:end">
-    <div class="field" style="flex:1">
+  <div class="row row--end">
+    <div class="field field--grow">
       <label>Période <span class="muted" id="yr-label">toutes années</span></label>
       <div class="yrange" id="yrange" data-min="{{ year_min }}" data-max="{{ year_max }}">
         <div class="yrange__rail"><div class="yrange__fill" id="yr-fill"></div></div>
@@ -99,23 +117,32 @@
                min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
       </div>
     </div>
-    <div class="field" style="flex:0 0 90px">
+    <div class="field field--xs">
       <label>Pages/label</label>
       <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}">
     </div>
   </div>
-  <button class="primary" type="submit" style="width:100%;margin-top:10px">Rechercher</button>
-  <span id="busy" class="htmx-indicator"><span class="spinner"></span></span>
+    </div>
+    <div class="filters__foot">
+      <button type="button" class="primary" id="filters-apply">Appliquer</button>
+    </div>
+  </div>
+  <div class="filters-backdrop" id="filters-backdrop" hidden></div>
+
+  <div class="search-submit">
+    <button class="primary" type="submit">{{ icons.search() }} Rechercher</button>
+    <span id="busy" class="htmx-indicator"><span class="spinner"></span></span>
+  </div>
 </form>
 
 <hr>
 {% if history %}
-<details class="acc" {{ 'open' if not last_id }}>
-  <summary>🕘 Recherches récentes <span class="tag">{{ history|length }}</span></summary>
+<details class="acc" id="recent" {{ 'open' if not last_id }}>
+  <summary>{{ icons.clock() }} Recherches récentes <span class="tag">{{ history|length }}</span></summary>
   <div class="acc__body">
     {% for h in history %}
-    <div class="inbox-row" style="padding:6px 2px">
-      <a href="/search?sid={{ h.id }}" class="txt" style="text-decoration:none;color:var(--ink)">
+    <div class="inbox-row inbox-row--tight">
+      <a href="/search?sid={{ h.id }}" class="txt">
         <b>{{ h.summary }}</b>
         <div class="sub">{{ h.ts }} · {{ h.n }} résultat{{ 's' if h.n > 1 }}</div>
       </a>
@@ -172,6 +199,92 @@
       if (out) out.textContent = '0';
     });
   });
+})();
+(function () {
+  // Filtres (charte §7) : sur téléphone, feuille qui glisse du bas ; le bouton porte le
+  // nombre de filtres actifs et les puces en dessous les résument (chacune se retire d'un tap).
+  // Les vraies valeurs restent dans les champs du formulaire : ici on ne fait que les lire.
+  var form = document.getElementById('search-form'),
+      sheet = document.getElementById('filters');
+  if (!form || !sheet) return;
+  var openBtn = document.getElementById('filters-open'),
+      closeBtn = document.getElementById('filters-close'),
+      applyBtn = document.getElementById('filters-apply'),
+      backdrop = document.getElementById('filters-backdrop'),
+      countEl = document.getElementById('filters-count'),
+      sumEl = document.getElementById('filters-summary'),
+      lo = document.getElementById('yr-from'), hi = document.getElementById('yr-to'),
+      yrLabel = document.getElementById('yr-label'),
+      mq = window.matchMedia('(max-width:720px)');
+  var X = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+  function setOpen(o) {
+    sheet.classList.toggle('filters--open', o);
+    backdrop.hidden = !o;
+    document.body.classList.toggle('sheet-on', o);
+    openBtn.setAttribute('aria-expanded', o ? 'true' : 'false');
+    (o ? closeBtn : openBtn).focus();
+  }
+  function list(name) {
+    var h = form.querySelector('input[type=hidden][name="' + name + '"]');
+    return h && h.value ? h.value.split('\n').filter(Boolean) : [];
+  }
+  function dropValue(name, v) {
+    var h = form.querySelector('input[type=hidden][name="' + name + '"]');
+    if (!h) return;
+    h.value = list(name).filter(function (s) { return s !== v; }).join('\n');
+    if (window.radarRenderChips) window.radarRenderChips(h.closest('.combo'));
+    refresh();
+  }
+  function yearActive() { return lo && hi && (+lo.value > +lo.min || +hi.value < +hi.max); }
+  function chip(text, onRemove) {
+    var c = document.createElement('span'); c.className = 'vchip';
+    c.appendChild(document.createTextNode(text));
+    var x = document.createElement('button');
+    x.type = 'button'; x.className = 'vchip-x'; x.innerHTML = X;
+    x.setAttribute('aria-label', 'Retirer ' + text);
+    x.addEventListener('click', onRemove);
+    c.appendChild(x); return c;
+  }
+  function refresh() {
+    var n = 0; sumEl.innerHTML = '';
+    ['genre', 'style'].forEach(function (name) {
+      list(name).forEach(function (v) {
+        n++; sumEl.appendChild(chip(v, function () { dropValue(name, v); }));
+      });
+    });
+    if (yearActive()) {
+      n++;
+      sumEl.appendChild(chip(yrLabel.textContent, function () {
+        lo.value = lo.min; hi.value = hi.max;
+        lo.dispatchEvent(new Event('input', { bubbles: true }));
+        hi.dispatchEvent(new Event('input', { bubbles: true }));
+        refresh();
+      }));
+    }
+    countEl.textContent = n; countEl.hidden = !n;
+  }
+
+  openBtn.addEventListener('click', function () { setOpen(true); });
+  var recentBtn = document.getElementById('recent-open');
+  if (recentBtn) recentBtn.addEventListener('click', function () {
+    var d = document.getElementById('recent'); if (d) d.open = true;   // l'ancre fait défiler jusqu'à lui
+  });
+  closeBtn.addEventListener('click', function () { setOpen(false); });
+  applyBtn.addEventListener('click', function () { setOpen(false); });
+  backdrop.addEventListener('click', function () { setOpen(false); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && sheet.classList.contains('filters--open')) setOpen(false);
+  });
+  form.addEventListener('submit', function () { if (sheet.classList.contains('filters--open')) setOpen(false); });
+  (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(function () {
+    if (!mq.matches && sheet.classList.contains('filters--open')) setOpen(false);
+  });
+  // les puces genre/style sont (re)dessinées par base.html : on les observe plutôt que de les dupliquer
+  var mo = new MutationObserver(refresh);
+  form.querySelectorAll('.combo .chip-list').forEach(function (l) { mo.observe(l, { childList: true }); });   // pas le récap lui-même (boucle infinie)
+  [lo, hi].forEach(function (el) { if (el) el.addEventListener('input', refresh); });
+  refresh();
 })();
 (function () {
   // 3 modes mutuellement exclusifs (retour utilisateur issue #62, 20/09) : le

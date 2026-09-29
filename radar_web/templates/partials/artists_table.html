@@ -6,28 +6,28 @@
     <p class="muted small">Aucun artiste.</p>
   {% else %}
   <div class="tbl-wrap">
-  <table class="tbl">
+  <table class="tbl tbl--stack">
     <thead><tr>
-      <th>Artiste</th><th style="width:90px">Note</th>
-      <th style="width:170px">Catégorie</th><th></th></tr></thead>
+      <th>Artiste</th><th class="col-aff">Note</th>
+      <th class="col-cat">Catégorie</th><th></th></tr></thead>
     <tbody>
     {% for r in rows %}
     <tr>
       <td><a href="/disco?kind=artist&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.name }}</a></td>
-      <td>
-        <div class="progress" style="height:6px"><i style="width:{{ r.note }}%"></i></div>
+      <td class="c-full">
+        <div class="progress progress--sm"><i style="width:{{ r.note }}%"></i></div>
         <span class="small muted">{{ icons.artist() }} {{ r.note }}</span>
       </td>
       <td>
-        <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"
+        <select name="cat" class="select-sm"
                 hx-post="/univers/artist/set" hx-vals='{"name": {{ r.name|tojson }} }'
                 hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
           <option value="" {{ 'selected' if r.cat=='—' }}>—</option>
-          <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Principaux</option>
-          <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Secondaires</option>
+          <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>Catégorie 1</option>
+          <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Catégorie 2</option>
         </select>
       </td>
-      <td class="m small"></td>
+      <td class="m small c-end"></td>
     </tr>
     {% endfor %}
     </tbody>

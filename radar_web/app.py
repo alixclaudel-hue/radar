@@ -685,12 +685,12 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
                 added += 1
         _queue_enrich("artists", names)
         store.save_config(c)
-        return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
+        return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en catégorie {t}.")
     t = tier if tier in ("1", "2") else "2"
     added = _add_labels(c, names, tier=t, replace=bool(replace))
     store.save_config(c)
     total = sum(len(v) for v in c.get("label_categories", {}).values())
-    return HTMLResponse(f"✓ {added} label(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} » (base : {total}).")
+    return HTMLResponse(f"✓ {added} label(s) ajouté(s) en catégorie {t} (base : {total}).")
 
 
 # ============================================================ 🔍 Chercher un disque
@@ -2129,7 +2129,7 @@ def _sort_rows(rows, field, reverse):
     return rows
 
 
-_LABEL_CAT_NAME = {"1": "Cœur", "2": "Aimé"}
+_LABEL_CAT_NAME = {"1": "Cœur", "2": "Aimé"}   # clés INTERNES (valeurs des <select>), jamais affichées : l'UI dit « Catégorie 1 / 2 »
 
 
 @app.get("/univers/labels/table", response_class=HTMLResponse)
@@ -2167,7 +2167,7 @@ def univers_labels_add(request: Request, name: str = Form(""), tier: str = Form(
             lc.setdefault(t, []).append(name)
             _queue_enrich("labels", [name])
             store.save_config(c)
-            ok, msg = True, f"✓ « {name} » ajouté en « {_LABEL_CAT_NAME[t]} »."
+            ok, msg = True, f"✓ « {name} » ajouté en catégorie {t}."
     return HTMLResponse(f"<span class='small {'ok' if ok else 'notice warn'}'>{html.escape(msg)}</span>")
 
 
@@ -2248,7 +2248,7 @@ def _graph_extras(entry, kind):
     else:
         tiers, asc = c.artist_tier_map(), c.ascore
         ga = c.graph_rescore()["artists"]
-        tname = {"1": "Cœur", "2": "Aimé"}
+        tname = {"1": "Catégorie 1", "2": "Catégorie 2"}
         for k in nodes:
             notes[k] = asc.get(k, 0)
             facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "crédits partagés")

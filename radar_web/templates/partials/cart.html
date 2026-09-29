@@ -1,16 +1,16 @@
 {% import "partials/_icons.html" as icons %}
 <div id="cart-list">
-  <div class="btnrow" style="margin-bottom:6px">
+  <div class="btnrow">
     <button class="small" hx-post="/cart/sync" hx-target="#cart-list" hx-swap="outerHTML"
             title="Recharger depuis la wantlist Discogs (récupère les ajouts faits ailleurs que dans Radar)">
-      🔄 synchroniser avec la wantlist Discogs
+      {{ icons.refresh() }} synchroniser avec la wantlist Discogs
     </button>
-    <a class="small" href="https://www.discogs.com/shop/mywants/" target="_blank" rel="noopener"
-       title="Annonces Discogs correspondant à ta wantlist">🛍️ voir sur Discogs</a>
+    <a class="btn small" href="https://www.discogs.com/shop/mywants/" target="_blank" rel="noopener"
+       title="Annonces Discogs correspondant à ta wantlist">{{ icons.store() }} voir sur Discogs</a>
   </div>
   {% if not cart %}
     <p class="muted small">Wantlist vide. Ajoute des vinyles depuis la Recherche ou une discographie
-      (bouton « ➕ wantlist » sur les pochettes), ou synchronise pour récupérer ta wantlist Discogs
+      (bouton « {{ icons.plus() }} wantlist » sur les pochettes), ou synchronise pour récupérer ta wantlist Discogs
       existante.</p>
   {% else %}
     <p class="small muted">{{ cart|length }} vinyle{{ 's' if cart|length > 1 }} dans ta wantlist Discogs
@@ -29,7 +29,7 @@
           <button type="button" class="small" onclick="event.stopPropagation()"
                   hx-post="/cart/remove" hx-vals='{"rid": "{{ x.id }}"}'
                   hx-target="#cart-list" hx-swap="outerHTML"
-                  hx-confirm="Retirer « {{ x.title }} » de la wantlist Discogs ?">✕</button>
+                  hx-confirm="Retirer « {{ x.title }} » de la wantlist Discogs ?" aria-label="Retirer de la wantlist">{{ icons.close() }}</button>
         </div>
         <div class="tracklist" hidden></div>
       </div>

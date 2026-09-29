@@ -1,8 +1,9 @@
 {% extends "base.html" %}
+{% import "partials/_icons.html" as icons %}
 {% block title %}Retours · Radar{% endblock %}
 {% block content %}
 <h1>Mes retours</h1>
-<p class="muted small">Notes laissées avec le bouton 💬, où que tu sois dans l'appli — relayées sur
+<p class="muted small">Notes laissées avec le bouton {{ icons.chat() }}, où que tu sois dans l'appli — relayées sur
   <a href="https://github.com/alixclaudel-hue/radar/issues/62" target="_blank" rel="noopener">l'issue GitHub</a>
   si le token est configuré côté serveur, sinon gardées ici seulement.</p>
 {% include "partials/feedback_list.html" %}
@@ -11,7 +12,7 @@
    autres comptes (cf. app._all_notes) court-circuite toute cette section, sans
    condition recopiée ici. #}
 {% if all_notes is not none %}
-<h2 style="margin-top:1.5rem">Tous les retours (tous les utilisateurs)</h2>
+<h2 class="mt-3">Tous les retours (tous les utilisateurs)</h2>
 <p class="muted small">Vue propriétaire, <b>lecture seule</b> : chaque note est étiquetée de son auteur.
   {{ all_notes|length }} note{{ 's' if all_notes|length != 1 }} au total sur l'ensemble des comptes.
   Pour changer le statut ou supprimer une note d'un autre compte, l'auteur le fait depuis sa propre page.</p>

@@ -1,9 +1,10 @@
-<button type="button" id="fb-toggle" class="fb-toggle" title="Laisser un retour sur cette page">💬{% if n_notes %}<span class="fb-badge">{{ n_notes }}</span>{% endif %}</button>
+{% import "partials/_icons.html" as icons %}
+<button type="button" id="fb-toggle" class="fb-toggle" title="Laisser un retour sur cette page" aria-label="Laisser un retour sur cette page">{{ icons.chat("ic-lg") }}{% if n_notes %}<span class="fb-badge">{{ n_notes }}</span>{% endif %}</button>
 
 <div id="fb-bar" class="fb-bar" hidden>
   <span>Touche l'élément concerné…</span>
   <button type="button" id="fb-general" class="small">note générale</button>
-  <a class="small" href="/feedback">🗒️ historique</a>
+  <a class="small" href="/feedback">{{ icons.tracks() }} historique</a>
   <button type="button" id="fb-cancel" class="small">annuler</button>
 </div>
 

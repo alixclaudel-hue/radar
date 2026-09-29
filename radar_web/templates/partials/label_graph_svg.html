@@ -54,35 +54,35 @@
 
 <div class="lgraph">
   <div class="lgraph__head">
-    <p class="small muted" style="margin:0;flex:1;min-width:0">
+    <p class="small muted lgraph__meta">
       {{ graph.seeds|join(', ') }} · niveau {{ graph.depth }} · {{ graph.nodes|length }}
       {{ 'artistes' if (kind or 'label') == 'artist' else 'labels' }} · {{ graph.edges|length }} liens
       {% if graph.min_shared %}· ≥{{ graph.min_shared }} artiste(s) commun(s){% endif %}
     </p>
-    <button type="button" class="small" data-gopen>⛶ Plein écran</button>
+    <button type="button" class="small" data-gopen>{{ icons.expand() }} Plein écran</button>
   </div>
 
   {{ graph_svg(false) }}
 
-  <p class="small muted" style="text-align:center">
-    <span style="color:var(--pin)">●</span> graine
-    <span style="color:var(--clay)">●</span> niveau 1
-    {% if graph.depth > 1 %}<span style="color:var(--soft)">●</span> niveau 2{% endif %}
+  <p class="small muted legend">
+    <span class="dot dot--pin"></span> graine
+    <span class="dot dot--clay"></span> niveau 1
+    {% if graph.depth > 1 %}<span class="dot dot--soft"></span> niveau 2{% endif %}
     · chiffre sous le nœud = note /100, clic = discographie
   </p>
 
   <div class="gfull" hidden role="dialog" aria-modal="true">
     <div class="gfull__bar">
       <h4>{{ "Graphe d'artistes" if (kind or 'label') == 'artist' else 'Graphe de labels' }}</h4>
-      <button type="button" data-gclose>✕ Fermer</button>
+      <button type="button" data-gclose>{{ icons.close() }} Fermer</button>
     </div>
     <div class="gfull__stage">{{ graph_svg(true) }}</div>
     <div class="gfull__sheet">
       <div class="gcard" data-gcard="">
-        <p class="small muted" style="margin:0">Touche un nœud (ou un nom ci-dessous) pour voir sa fiche.
-          <span style="color:var(--pin)">●</span> graine ·
-          <span style="color:var(--clay)">●</span> niveau 1{% if graph.depth > 1 %} ·
-          <span style="color:var(--soft)">●</span> niveau 2{% endif %}</p>
+        <p class="small muted m-0">Touche un nœud (ou un nom ci-dessous) pour voir sa fiche.
+          <span class="dot dot--pin"></span> graine ·
+          <span class="dot dot--clay"></span> niveau 1{% if graph.depth > 1 %} ·
+          <span class="dot dot--soft"></span> niveau 2{% endif %}</p>
       </div>
       {% for k, n in graph.nodes.items() %}
       {% set inf = (infos or {}).get(k) or {} %}
@@ -95,8 +95,8 @@
         {% if inf.styles %}
         <div class="gcard__chips">{% for s in inf.styles %}<span class="chip">{{ s }}</span>{% endfor %}</div>
         {% endif %}
-        {% if inf.facts %}<p class="small" style="margin:6px 0">{{ inf.facts|join(' · ') }}</p>{% endif %}
-        {% if inf.why %}<p class="small muted" style="margin:6px 0">{{ inf.why|join(' · ') }}</p>{% endif %}
+        {% if inf.facts %}<p class="small my-1">{{ inf.facts|join(' · ') }}</p>{% endif %}
+        {% if inf.why %}<p class="small muted my-1">{{ inf.why|join(' · ') }}</p>{% endif %}
         <a class="chip gcard__go" href="{{ disco_href(k, n.name) }}">Voir la discographie →</a>
       </div>
       {% endfor %}

@@ -15,9 +15,9 @@
   la recherche.
   {% endif %}
   <form hx-post="/search/seller/sync" hx-target="#job-seller_inventory" hx-swap="outerHTML"
-        style="display:inline">
+        class="inline">
     <input type="hidden" name="seller" value="{{ seller_sync.seller }}">
-    <button class="small" type="submit">↻ relire tout le stock</button>
+    <button class="small" type="submit">{{ icons.refresh() }} relire tout le stock</button>
   </form>
   <div id="job-seller_inventory" hx-get="/jobs/seller_inventory/status" hx-trigger="load"></div>
 </div>
@@ -60,14 +60,14 @@
   {% if searched %}<p class="muted small">Labels cherchés ({{ searched|length }}) : {{ searched|join(', ') }}</p>{% endif %}
   {% set pager %}
   {% if total_pages and total_pages > 1 %}
-  <div class="row" style="align-items:center;gap:10px;margin:8px 0">
+  <div class="pager">
     <button type="button" class="small" {{ 'disabled' if page <= 1 }}
             hx-post="/search" hx-include="#search-form" hx-vals='{"page": {{ page - 1 }}}'
-            hx-target="#results" hx-swap="innerHTML">← page précédente</button>
+            hx-target="#results" hx-swap="innerHTML">{{ icons.chevron("ic-left") }} page précédente</button>
     <span class="muted small">page {{ page }} / {{ total_pages }}</span>
     <button type="button" class="small" {{ 'disabled' if page >= total_pages }}
             hx-post="/search" hx-include="#search-form" hx-vals='{"page": {{ page + 1 }}}'
-            hx-target="#results" hx-swap="innerHTML">page suivante →</button>
+            hx-target="#results" hx-swap="innerHTML">page suivante {{ icons.chevron("ic-right") }}</button>
   </div>
   {% endif %}
   {% endset %}
@@ -108,11 +108,11 @@
                title="Ajouter au panier chez {{ seller }} (Discogs)" class="ic-btn">{{ icons.cart() }}</a>
             {% endif %}
           {% elif in_cart and (rr.id | string) in in_cart %}
-            <span class="small ok">✓ en wantlist</span>
+            <span class="small ok">{{ icons.check() }} en wantlist</span>
           {% else %}
           {# On referme d'abord toute mini-fenêtre de pressages déjà ouverte : le
              retour de /cart/add la réaffiche au bon endroit (cf. release_matches). #}
-          <form hx-post="/cart/add" hx-swap="outerHTML" style="display:inline"
+          <form hx-post="/cart/add" hx-swap="outerHTML" class="inline"
                 hx-on::before-request="document.querySelectorAll('.wl-matches').forEach(function(w){w.remove()})">
             <input type="hidden" name="rid" value="{{ rr.id }}">
             <input type="hidden" name="title" value="{{ rr.title }}">
@@ -132,7 +132,7 @@
           {% endif %}
           {% if r.score is not none %}
           {% set v = (voted or {}).get(rr.id) %}
-          <span class="vote" hx-swap="outerHTML" style="margin-left:auto">
+          <span class="vote vote--end" hx-swap="outerHTML">
             {% if v %}
               <span class="small muted {{ 'up' if v == 'up' else 'down' }}">{{ icons.thumbup() if v == 'up' else icons.thumbdown() }} noté</span>
             {% else %}

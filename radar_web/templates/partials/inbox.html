@@ -4,16 +4,16 @@
     <p class="muted small">Rien de nouveau. Lance un scan.</p>
   {% else %}
     {% set noprice_ids = rows | rejectattr('it.price') | map(attribute='it.release_id') | select | map('string') | list %}
-    <div class="row" style="align-items:end"
+    <div class="formbar"
          {% if noprice_ids %}hx-get="/inbox/meta" hx-trigger="load" hx-swap="none"
          hx-vals='{"ids": {{ noprice_ids | join(',') | tojson }}}'{% endif %}>
-      <div class="field" style="flex:0 0 auto"><label>Score min
-        <input type="number" step="5" value="{{ mins }}" style="width:90px"
+      <div class="field field--sm"><label>Score min
+        <input type="number" step="5" value="{{ mins }}"
                hx-get="/inbox/{{ key_ns }}" hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML"
                name="mins" hx-trigger="change"></label></div>
-      <div class="field" style="flex:0 0 auto">
+      <div class="field field--auto">
         <button hx-post="/inbox/{{ key_ns }}/clear" hx-confirm="Marquer toutes les nouveautés comme vues ?"
-                hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML">✓ Tout vu</button>
+                hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML">{{ icons.check() }} Tout vu</button>
       </div>
       <span class="small muted">{{ rows|length }} affichés · {{ n_total }} en attente</span>
     </div>
@@ -40,11 +40,11 @@
           <button type="button" class="small" onclick="event.stopPropagation()"
                   hx-post="/inbox/{{ key_ns }}/dismiss"
                   hx-vals='{"rid": "{{ it.release_id or it.listing_id }}"}'
-                  hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer">✕</button>
+                  hx-target="#inbox-{{ key_ns }}" hx-swap="outerHTML" title="retirer" aria-label="Retirer">{{ icons.close() }}</button>
         </div>
         <div class="tracklist" hidden></div>
         {% if r.score is not none %}
-        <div class="row" style="justify-content:flex-end;align-items:center;padding:2px 2px 8px">
+        <div class="vote-row">
           <span class="vote" hx-swap="outerHTML">
             <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"up","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbup() }}</button>
             <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"album","key":"rid:{{ it.release_id or it.listing_id }}","name":{{ (it.artist ~ ' — ' ~ it.title)|tojson }},"verdict":"down","score":"{{ r.score }}","f_label":"{{ (r.det.label or 0)/100 }}","f_artist":"{{ (r.det.artist or 0)/100 }}","f_style":"{{ (r.det.style or 0)/100 }}"}'>{{ icons.thumbdown() }}</button>

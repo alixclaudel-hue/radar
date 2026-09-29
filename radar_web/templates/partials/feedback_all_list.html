@@ -13,8 +13,8 @@
 {% else %}
   <div class="lrows">
     {% for n in all_notes %}
-    <div class="lrow" style="align-items:flex-start">
-      <div style="flex:1;min-width:0">
+    <div class="lrow lrow--top">
+      <div class="lrow__body">
         <div class="small"><b>{{ n.username }}</b>{% if n.page %} · {{ n.page }}{% endif %}{% if n.target %} · {{ n.target }}{% endif %}</div>
         <div>{{ n.note }}</div>
         <div class="small muted">{{ n.ts }} · {{ n.status|default('nouveau') }}{% if not n.gh_posted %} · non transmis à GitHub{% endif %}</div>

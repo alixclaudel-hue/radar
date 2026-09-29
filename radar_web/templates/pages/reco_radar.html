@@ -2,7 +2,7 @@
 {% import "partials/_icons.html" as icons %}
 {% block title %}Reco Radar · Radar{% endblock %}
 {% block content %}
-<h1>{{ icons.compass() }} Reco Radar</h1>
+<h1>Reco Radar</h1>
 <p class="muted small">Une playlist alimentée automatiquement en fond à partir de tes goûts
   (labels suivis, score album ≥ seuil réglé dans <a href="/settings">Réglages</a>) — {{ n_playlist }}/{{ max_tracks }}
   piste{{ 's' if n_playlist > 1 }}, plafond réglable dans Réglages. Clique une ligne pour marquer une piste écoutée :
@@ -29,7 +29,7 @@
 <div class="yt-player-wrap"><div id="yt-player"></div></div>
 
 <div class="tbl-wrap">
-<table class="tbl">
+<table class="tbl tbl--cards">
   <thead><tr>
     <th style="width:52px">#</th>
     <th>Track</th>

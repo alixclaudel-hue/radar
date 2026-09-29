@@ -3,7 +3,7 @@
 {% else %}
   {% for r in rows %}
   <button type="button" class="lbl-opt" data-v="{{ r.name }}">
-    <span class="lbl-opt__name">{{ '💗 ' if r.tier == '1' else '' }}{{ r.name }}</span>
+    <span class="lbl-opt__name">{{ '♥ ' if r.tier == '1' else '' }}{{ r.name }}</span>
   </button>
   {% endfor %}
 {% endif %}

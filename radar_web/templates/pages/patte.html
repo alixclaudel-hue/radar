@@ -27,7 +27,7 @@
       <div class="field"><label>Token d'accès personnel
         <input type="password" name="token" value="{{ cfg.token or '' }}"></label></div>
       <p class="small muted">Sert aux recommandations de labels.
-        {% if not cfg.token %}<a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">Générer un token sur Discogs ↗</a>{% endif %}</p>
+        {% if not cfg.token %}<a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">Générer un token sur Discogs {{ icons.external() }}</a>{% endif %}</p>
       <div class="btnrow">
         <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-discogs" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
         <button type="button" class="small" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">{{ icons.download() }} Importer collection + wantlist</button>
@@ -151,7 +151,7 @@
 
 <!-- ============ DJ sets (hors du formulaire principal) ============ -->
 <details class="acc" style="margin-top:10px">
-  <summary>🎧 DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
+  <summary>{{ icons.tracks() }} DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
   <div class="acc__body">
     <p class="small muted">Scanne les sets/podcasts YouTube d'un DJ et verse les tracks jouées dans
       ton corpus. Résultats dans <a href="/univers?tab=sets">Mes labels &amp; artistes → Mes sets</a>.</p>
@@ -176,7 +176,7 @@
   <div class="acc__body">
     <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
     <div class="row">
-      <div class="field combo"><label>💗 Cœur (poids {{ sc.taste_tiers['1'] }})
+      <div class="field combo"><label>{{ icons.heart(True) }} Cœur (poids {{ sc.taste_tiers['1'] }})
         <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
                   hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
@@ -199,7 +199,7 @@
 
 <!-- ============ Import CSV (hors du formulaire principal) ============ -->
 <details class="acc" style="margin-top:10px">
-  <summary>📄 Import CSV (labels / artistes aimés)</summary>
+  <summary>{{ icons.tracks() }} Import CSV (labels / artistes aimés)</summary>
   <div class="acc__body">
     <div class="row">
       <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data">

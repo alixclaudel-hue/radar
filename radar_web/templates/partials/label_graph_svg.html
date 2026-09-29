@@ -59,7 +59,7 @@
       {{ 'artistes' if (kind or 'label') == 'artist' else 'labels' }} · {{ graph.edges|length }} liens
       {% if graph.min_shared %}· ≥{{ graph.min_shared }} artiste(s) commun(s){% endif %}
     </p>
-    <button type="button" class="small" data-gopen>⛶ Plein écran</button>
+    <button type="button" class="small" data-gopen>{{ icons.expand() }} Plein écran</button>
   </div>
 
   {{ graph_svg(false) }}

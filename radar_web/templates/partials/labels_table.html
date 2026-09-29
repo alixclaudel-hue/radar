@@ -37,7 +37,7 @@
       <tr>
         <td>
           <a href="/disco?kind=label&key={{ r.key | urlencode }}" title="discographie vinyle">{{ r.disp }}</a>
-          <a href="{{ r.url }}" target="_blank" rel="noopener" class="small muted" title="fiche Discogs">↗</a>
+          <a href="{{ r.url }}" target="_blank" rel="noopener" class="small muted" title="fiche Discogs" aria-label="fiche Discogs">{{ icons.external() }}</a>
         </td>
         <td>
           {% if r.aff is not none %}
@@ -52,7 +52,7 @@
           <select name="cat" style="width:auto;padding:3px 6px;font-size:12px"
                   hx-post="/univers/label/set" hx-vals='{"name": {{ r.disp|tojson }} }'
                   hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
-            <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>💗 Cœur</option>
+            <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>Cœur</option>
             <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
           </select>
           <span class="m small"></span>

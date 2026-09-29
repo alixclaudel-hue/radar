@@ -2,7 +2,7 @@
 {% import "partials/_icons.html" as icons %}
 {% block title %}Mes tracks aimées · Radar{% endblock %}
 {% block content %}
-<h1>{{ icons.heart(True) }} Mes tracks aimées</h1>
+<h1>Mes tracks aimées</h1>
 <p class="muted small">Pistes marquées d'un cœur depuis <a href="/reco-radar">Reco Radar</a> —
   {{ n_liked }} piste{{ 's' if n_liked > 1 }}.</p>
 
@@ -13,7 +13,7 @@
 <p class="small">
   {% for b in export_batches %}
   <a class="tag" target="_blank" rel="noopener"
-     href="https://www.youtube.com/watch_videos?video_ids={{ b.ids }}">⇪ Importer dans YouTube
+     href="https://www.youtube.com/watch_videos?video_ids={{ b.ids }}">{{ icons.external() }} Importer dans YouTube
      ({{ b.start }}-{{ b.end }})</a>
   {% endfor %}
 </p>

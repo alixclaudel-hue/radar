@@ -63,11 +63,11 @@
   <div class="row" style="align-items:center;gap:10px;margin:8px 0">
     <button type="button" class="small" {{ 'disabled' if page <= 1 }}
             hx-post="/search" hx-include="#search-form" hx-vals='{"page": {{ page - 1 }}}'
-            hx-target="#results" hx-swap="innerHTML">← page précédente</button>
+            hx-target="#results" hx-swap="innerHTML">{{ icons.chevron("ic-left") }} page précédente</button>
     <span class="muted small">page {{ page }} / {{ total_pages }}</span>
     <button type="button" class="small" {{ 'disabled' if page >= total_pages }}
             hx-post="/search" hx-include="#search-form" hx-vals='{"page": {{ page + 1 }}}'
-            hx-target="#results" hx-swap="innerHTML">page suivante →</button>
+            hx-target="#results" hx-swap="innerHTML">page suivante {{ icons.chevron("ic-right") }}</button>
   </div>
   {% endif %}
   {% endset %}

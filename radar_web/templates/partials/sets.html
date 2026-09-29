@@ -14,7 +14,7 @@
 </div>
 {% for g in groups %}
 <details class="acc" {{ 'open' if dj }}>
-  <summary>🎧 {{ g.dj }} <span class="tag">{{ g.n }} tracks · {{ g.vids|length }} set(s)</span></summary>
+  <summary>{{ icons.tracks() }} {{ g.dj }} <span class="tag">{{ g.n }} tracks · {{ g.vids|length }} set(s)</span></summary>
   <div class="acc__body">
     {% for v in g.vids %}
     <p style="margin:8px 0 2px"><b><a href="https://www.youtube.com/watch?v={{ v.vid }}" target="_blank" rel="noopener">{{ v.title }}</a></b>
@@ -30,7 +30,7 @@
         <span class="tk-card__meta small muted">{{ t.label or '' }}{% if t.style %}{{ ' · ' if t.label }}{{ t.style|join(', ') }}{% endif %}</span>
         <span class="tk-card__actions">
           {% if t.release_id or t.vinyl_release_id %}
-            <a href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener" title="Sur Discogs">💿</a>
+            <a href="https://www.discogs.com/release/{{ t.vinyl_release_id or t.release_id }}" target="_blank" rel="noopener" title="Sur Discogs" aria-label="Sur Discogs">{{ icons.album("ic-lg") }}</a>
           {% endif %}
           <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t" target="_blank" rel="noopener" title="Sur Bandcamp">{{ icons.bandcamp() }}</a>
           <button type="button" title="Chercher les vinyles Discogs de cette track (plusieurs sorties possibles) et l'ajouter à la wantlist"

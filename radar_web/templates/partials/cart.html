@@ -3,7 +3,7 @@
   <div class="btnrow" style="margin-bottom:6px">
     <button class="small" hx-post="/cart/sync" hx-target="#cart-list" hx-swap="outerHTML"
             title="Recharger depuis la wantlist Discogs (récupère les ajouts faits ailleurs que dans Radar)">
-      🔄 synchroniser avec la wantlist Discogs
+      {{ icons.refresh() }} synchroniser avec la wantlist Discogs
     </button>
     <a class="small" href="https://www.discogs.com/shop/mywants/" target="_blank" rel="noopener"
        title="Annonces Discogs correspondant à ta wantlist">{{ icons.store() }} voir sur Discogs</a>

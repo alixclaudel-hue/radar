@@ -71,11 +71,12 @@ small,.small{ font-size:13px; color:var(--soft); }
 }
 .nav__ico{ display:inline-flex; }
 .nav__short{ display:none; }
-.ic-nav{ width:20px; height:20px; }
+.nav .ic-nav{ width:20px; height:20px; }
 
 @media (max-width:720px){
   .wrap{ padding-bottom:calc(96px + env(safe-area-inset-bottom)); }
-  .topbar{ flex-wrap:wrap; row-gap:0; min-height:56px; margin-bottom:14px; padding-bottom:6px; }
+  .topbar{ flex-wrap:wrap; row-gap:0; min-height:56px; margin-bottom:10px; padding-bottom:0; border-bottom:0; }
+  .search-lead, .field-hint{ display:none; }
   .brand-sub--anon{ display:none; }
   .brand-sub{ order:3; flex-basis:100%; margin-top:-2px; }
   .nav{
@@ -94,7 +95,7 @@ small,.small{ font-size:13px; color:var(--soft); }
     transition:background var(--t-base) var(--ease);
   }
   .nav a.active .nav__ico{ background:var(--pin-50); }
-  .ic-nav{ width:24px; height:24px; }
+  .nav .ic-nav{ width:24px; height:24px; }
   .nav__long{ display:none; }
   .nav__short{ display:inline; }
 }
@@ -366,7 +367,7 @@ a.chip:hover{ border-color:var(--pin); background:var(--pin-50); }
 .profile-tab{ display:inline-flex; align-items:center; gap:7px; white-space:nowrap; font-size:13px; padding:6px 15px; font-weight:600; cursor:pointer; }
 @media (max-width:520px){
   .profile-tab__txt{ display:none; }
-  .profile-tab{ width:40px; height:40px; padding:0; justify-content:center; }
+  .profile-tab{ width:40px; height:40px; padding:0; justify-content:center; border-color:transparent; background:none; }
 }
 .profile-tab.active{ background:var(--pin-50); border-color:transparent; color:var(--pin); }
 /* menu déroulant "Mon profil" (zéro JS, <details>/<summary>) */
@@ -617,7 +618,20 @@ a:focus-visible, summary:focus-visible{
   }
 }
 
-/* bulle de retours au-dessus de la barre de navigation (après sa règle de base : même spécificité) */
+
+/* champ avec pictogramme à l'intérieur (maquette : Label, Vendeur) */
+.input-ico{ position:relative; }
+.input-ico .ic{ position:absolute; left:14px; top:50%; transform:translateY(-50%); width:18px; height:18px; color:var(--soft); pointer-events:none; }
+.input-ico input{ padding-left:42px; }
+.input-ico:focus-within .ic{ color:var(--pin); }
+.field-hint{ margin:4px 0 0; }
+/* écrans très étroits (320 px) : le contrôle segmenté garde ses 3 libellés sur une ligne */
+@media (max-width:359px){ .seg--full label .ic, .seg--full a .ic{ display:none; } }
+/* téléphone : la bulle de retours vit dans la ligne d'en-tête, à gauche de l'icône profil — ni sur
+   « Rechercher » (collant en bas) ni sur la barre de navigation */
 @media (max-width:720px){
-  .fb-toggle{ bottom:calc(84px + env(safe-area-inset-bottom)); }
+  .fb-toggle{
+    top:calc(10px + env(safe-area-inset-top)); bottom:auto; right:62px;
+    width:38px; height:38px; box-shadow:var(--sh-1);
+  }
 }

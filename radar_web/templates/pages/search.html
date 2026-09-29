@@ -4,7 +4,7 @@
 {% block content %}
 
 <h1>Chercher un disque</h1>
-<p class="muted small">Recherche normale (tout le catalogue, label optionnel), sur tes labels suivis, ou dans le stock d'un vendeur.</p>
+<p class="muted small search-lead">Recherche normale (tout le catalogue, label optionnel), sur tes labels suivis, ou dans le stock d'un vendeur.</p>
 
 <form id="search-form" hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
   <div class="seg seg--full" id="search-mode" role="radiogroup" aria-label="Type de recherche">
@@ -14,11 +14,15 @@
   </div>
 
   <div class="field combo" id="mode-normal"{{ ' hidden' if q.seller or q.base_metric }}>
-    <label for="f-label">Label <span class="muted">· optionnel, propositions depuis ta base — laisse vide pour chercher sur tout le catalogue</span></label>
-    <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"
-           data-combo="set" autocomplete="off" role="combobox" aria-autocomplete="list"
-           hx-get="/search/labels" hx-target="#label-suggest" hx-swap="innerHTML"
-           hx-trigger="focus, keyup changed delay:220ms">
+    <label for="f-label">Label <span class="muted">· optionnel</span></label>
+    <div class="input-ico">
+      {{ icons.label() }}
+      <input id="f-label" name="label" placeholder="ex. Aim Records" value="{{ q.label or '' }}"
+             data-combo="set" autocomplete="off" role="combobox" aria-autocomplete="list"
+             hx-get="/search/labels" hx-target="#label-suggest" hx-swap="innerHTML"
+             hx-trigger="focus, keyup changed delay:220ms">
+    </div>
+    <p class="small muted field-hint">Propositions depuis ta base — laisse vide pour chercher sur tout le catalogue.</p>
     <div id="label-suggest" class="lbl-suggest" hidden></div>
   </div>
 
@@ -26,10 +30,13 @@
     <label for="f-seller">Vendeur Discogs <span class="muted">· cherche dans son stock en vente</span></label>
     {# R5 (retour utilisateur 28/09) : la barre vendeur propose aussi des noms au
        fil de la frappe (vendeurs suivis + déjà recherchés), comme label/genre/style. #}
-    <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
-           autocomplete="off" data-combo="set" role="combobox" aria-autocomplete="list"
-           hx-get="/suggest/sellers" hx-target="#seller-suggest" hx-swap="innerHTML"
-           hx-trigger="focus, keyup changed delay:220ms">
+    <div class="input-ico">
+      {{ icons.store() }}
+      <input id="f-seller" name="seller" placeholder="ex. hardwaxberlin" value="{{ q.seller or '' }}"
+             autocomplete="off" data-combo="set" role="combobox" aria-autocomplete="list"
+             hx-get="/suggest/sellers" hx-target="#seller-suggest" hx-swap="innerHTML"
+             hx-trigger="focus, keyup changed delay:220ms">
+    </div>
     <div id="seller-suggest" class="lbl-suggest" hidden></div>
     <p class="small muted">Nom d'utilisateur Discogs. Les filtres ci-dessous s'appliquent alors à
       son stock plutôt qu'au catalogue entier.</p>
@@ -67,6 +74,7 @@
 
   <div class="filters-bar">
     <button type="button" class="filters-open" id="filters-open" aria-controls="filters" aria-expanded="false">{{ icons.filter() }} Filtres <span class="badge" id="filters-count" hidden>0</span></button>
+    {% if history %}<a class="btn ghost icon" href="#recent" id="recent-open" aria-label="Recherches récentes">{{ icons.clock() }}</a>{% endif %}
   </div>
   <div class="chip-list filters-summary" id="filters-summary" aria-live="polite"></div>
 
@@ -129,7 +137,7 @@
 
 <hr>
 {% if history %}
-<details class="acc" {{ 'open' if not last_id }}>
+<details class="acc" id="recent" {{ 'open' if not last_id }}>
   <summary>{{ icons.clock() }} Recherches récentes <span class="tag">{{ history|length }}</span></summary>
   <div class="acc__body">
     {% for h in history %}
@@ -258,6 +266,10 @@
   }
 
   openBtn.addEventListener('click', function () { setOpen(true); });
+  var recentBtn = document.getElementById('recent-open');
+  if (recentBtn) recentBtn.addEventListener('click', function () {
+    var d = document.getElementById('recent'); if (d) d.open = true;   // l'ancre fait défiler jusqu'à lui
+  });
   closeBtn.addEventListener('click', function () { setOpen(false); });
   applyBtn.addEventListener('click', function () { setOpen(false); });
   backdrop.addEventListener('click', function () { setOpen(false); });

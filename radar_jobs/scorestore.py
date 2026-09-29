@@ -139,7 +139,7 @@ def job_scorestore_releases(job, params):
         scorestore.prune_labels(con, label_keys)
         if not label_keys:
             _chain_scorestore_tracks()
-            return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à noter.")
+            return job.finish("Aucun label suivi (catégorie 1 ou 2) — rien à noter.")
 
         # Reprise par rotation (cf. docstring) : un lancement ne traite qu'un
         # lot de labels, jamais l'intégralité. Le curseur persisté est CUMULATIF

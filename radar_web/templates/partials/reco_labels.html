@@ -6,17 +6,17 @@
   {% for r in reco %}
   <div class="lrow">
     <span class="badge small {{ 'clay' if r.aff is none }}"
-          title="score de recommandation /100 (collection + corpus + affinité de style + artistes aimés qui y ont sorti)">{{ icons.label() }} {{ r.score }}</span>
+          title="score de recommandation /100 (collection + corpus + affinité de style + artistes de tes catégories 1 et 2 qui y ont sorti)">{{ icons.label() }} {{ r.score }}</span>
     <a href="/disco?kind=label&key={{ r.key|urlencode }}" class="lrow__name">{{ r.name }}</a>
     <span class="lrow__meta">
       {% if r.owned %}{{ r.owned }} poss.{% endif %}{% if r.want %} · {{ r.want }} want{% endif %}{% if r.corpus %} · corpus {{ r.corpus }}{% endif %}{% if r.artists %} · {{ icons.artist() }}{{ r.artists }}{% endif %}{% if r.aff is not none %} · {{ icons.label() }} {{ r.aff }}% <span title="couverture : part du catalogue classée dans une de tes catégories de style">(couv. {{ r.coverage }}%)</span>{% endif %}
     </span>
     <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
-      <button class="small" title="Ajouter en Cœur">+ Cœur</button></form>
+      <button class="small" title="Ajouter en catégorie 1">+ Catégorie 1</button></form>
     <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
-      <button class="small" title="Ajouter en Aimé">+ Aimé</button></form>
+      <button class="small" title="Ajouter en catégorie 2">+ Catégorie 2</button></form>
     <span class="vote" hx-swap="outerHTML">
       <button class="up" title="j'aime" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"up","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>{{ icons.thumbup() }}</button>
       <button class="down" title="je n'aime pas" hx-post="/feedback" hx-target="closest .vote" hx-vals='{"kind":"label","key":{{ r.key|tojson }},"name":{{ r.name|tojson }},"verdict":"down","score":"{{ r.score }}","f_collection":"{{ r.feat.collection }}","f_corpus":"{{ r.feat.corpus }}","f_artist":"{{ r.feat.artist }}","f_affinity":"{{ r.feat.affinity }}"}'>{{ icons.thumbdown() }}</button>
@@ -36,10 +36,10 @@
     <span class="lrow__meta">{{ r.artists }} artiste{{ 's' if r.artists>1 }} · {{ r.seeds }}</span>
     <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
-      <button class="small" title="Ajouter en Cœur">+ Cœur</button></form>
+      <button class="small" title="Ajouter en catégorie 1">+ Catégorie 1</button></form>
     <form hx-post="/reco/label" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
-      <button class="small" title="Ajouter en Aimé">+ Aimé</button></form>
+      <button class="small" title="Ajouter en catégorie 2">+ Catégorie 2</button></form>
   </div>
   {% endfor %}
 </div>

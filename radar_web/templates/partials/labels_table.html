@@ -54,8 +54,8 @@
           <select name="cat" class="select-sm"
                   hx-post="/univers/label/set" hx-vals='{"name": {{ r.disp|tojson }} }'
                   hx-target="next .m" hx-swap="innerHTML" hx-trigger="change">
-            <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>Cœur</option>
-            <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Aimé</option>
+            <option value="Cœur" {{ 'selected' if r.cat=='Cœur' }}>Catégorie 1</option>
+            <option value="Aimé" {{ 'selected' if r.cat=='Aimé' }}>Catégorie 2</option>
           </select>
           <span class="m small"></span>
         </td>

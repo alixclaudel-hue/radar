@@ -310,7 +310,7 @@ def job_prune_labels(job, params):
     lcats = cfg.get("label_categories", {"1": [], "2": []})
     entries = [(cid, name) for cid in ("1", "2") for name in lcats.get(cid, []) if name and name.strip()]
     if not entries:
-        return job.finish("Aucun label suivi (Cœur ou Aimé) — rien à élaguer.")
+        return job.finish("Aucun label suivi (catégorie 1 ou 2) — rien à élaguer.")
 
     ctx = Ctx(uid=RADAR_UID)
     wmap = ctx.wmap

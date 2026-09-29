@@ -40,7 +40,7 @@
                  hx-trigger="keyup changed delay:350ms"></label>
           <div id="sug-add-label" class="lbl-suggest" hidden></div></div>
         <div class="field field--auto"><label>Catégorie
-          <select name="tier"><option value="1">Cœur</option><option value="2" selected>Aimé</option></select></label></div>
+          <select name="tier"><option value="1">Catégorie 1</option><option value="2" selected>Catégorie 2</option></select></label></div>
         <button class="primary" type="submit">Ajouter</button>
       </form>
       <p id="add-label-msg" class="small mt-1"></p>
@@ -72,10 +72,10 @@
         <script>window._lgSeeds = {aff: {{ top_aff|tojson }}, reco: {{ top_reco|tojson }}};</script>
         <div class="btnrow">
           <button type="button" class="small tonal"
-                  title="Tes labels dont le catalogue colle le plus à tes styles Cœur / Aimés"
+                  title="Tes labels dont le catalogue colle le plus à tes styles des catégories 1 et 2"
                   onclick="var h=document.getElementById('lg-seeds'); h.value=window._lgSeeds.aff; radarRenderChips(h.closest('.combo'));">mes + affinité style</button>
           <button type="button" class="small tonal"
-                  title="Tes labels les mieux notés : collection + corpus + artistes aimés qui y ont sorti + affinité de style"
+                  title="Tes labels les mieux notés : collection + corpus + artistes de tes catégories qui y ont sorti + affinité de style"
                   onclick="var h=document.getElementById('lg-seeds'); h.value=window._lgSeeds.reco; radarRenderChips(h.closest('.combo'));">mes + recommandations</button>
         </div>
         <div class="formbar mt-2">
@@ -113,12 +113,12 @@
 
 {% elif tab == 'artists' %}
   {% if n_artists == 0 %}
-  <p class="muted small">Base vide : c'est ici que se voient les artistes que tu classes Principaux/Secondaires —
-    ils pilotent le score artiste des recherches. Ajoute-les depuis Mon profil (listes Cœur/Aimés) : la résolution
+  <p class="muted small">Base vide : c'est ici que se voient les artistes que tu ranges en catégorie 1 ou 2 —
+    ils pilotent le score artiste des recherches. Ajoute-les depuis Mon profil (catégories 1 et 2) : la résolution
     Discogs se fait automatiquement en fond.</p>
   <p class="small"><a href="/patte">Aller à Mon profil</a></p>
   {% else %}
-  <p class="muted small">Principaux (références) / Secondaires — pilotent le score d'artiste. Règle la catégorie d'un clic.
+  <p class="muted small">Catégorie 1 (références) / catégorie 2 — pilotent le score d'artiste. Règle la catégorie d'un clic.
     Résolution Discogs faite automatiquement en fond à chaque ajout.</p>
   {% endif %}
 
@@ -146,7 +146,7 @@
         producteur (reconstruit automatiquement en fond une fois par mois). Un seul niveau
         de voisinage est possible ici (pas de lien graphe entre deux candidats).</p>
       <form hx-post="/univers/artists/graph/build" hx-target="#artist-graph-out" hx-swap="innerHTML">
-        <div class="field combo"><label>Artistes de départ <span class="muted">tape pour chercher parmi tes Cœur/Aimés</span></label>
+        <div class="field combo"><label>Artistes de départ <span class="muted">tape pour chercher parmi tes artistes classés</span></label>
           <input class="chip-input" data-combo="chips" autocomplete="off" placeholder="ex. ADNY"
                  hx-get="/univers/artists/suggest" hx-target="#sug-ag-seeds" hx-swap="innerHTML"
                  hx-vals='js:{q: event.target.value}' hx-trigger="keyup changed delay:220ms, focus">

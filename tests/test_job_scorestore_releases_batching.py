@@ -134,7 +134,7 @@ class ScorestoreReleasesBatchingTestCase(unittest.TestCase):
         job = self._run()
         names = [c.args[0] for c in self.launch.call_args_list]
         self.assertEqual(names, ["scorestore_tracks"])
-        self.assertEqual(job.finished, "Aucun label suivi (Cœur ou Aimé) — rien à noter.")
+        self.assertEqual(job.finished, "Aucun label suivi (catégorie 1 ou 2) — rien à noter.")
 
     def test_curseur_corrompu_en_base_ne_plante_pas_et_repart_de_zero(self):
         con = scorestore.open_db("owner")

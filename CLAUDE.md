@@ -33,6 +33,7 @@ Tier déduit du mode (`code`/`test`/`pr`/`reasoning` → heavy, le reste → fas
 - **Docs scoring** (générés 11/09, pas de MAJ auto) : `docs/app-overview-scoring-lot1.md` (+ brief/diagramme excalidraw), `docs/app-overview-discogs-dump-py-and-scoring-process.md`.
 - **Mode caveman** (`full`) par défaut pour les réponses conversationnelles ; code/commits/doc/tickets en prose normale.
 - **Vérif par défaut** : smoke test hors-ligne ; « vérifié VPS » / « conditions réelles » seulement si dit explicitement.
+- **Vocabulaire UI** (décision utilisateur 29/09) : les deux niveaux de goût s'appellent « Catégorie 1 » et « Catégorie 2 » — jamais Cœur/Aimés ni Principaux/Secondaires à l'écran. Seul l'affichage change : les valeurs internes `Cœur`/`Aimé` (options des `<select>`, `_LABEL_CAT_NAME`, `/univers/artist/set`) et les clés `"1"`/`"2"` restent, sinon listes déroulantes et serveur ne s'entendent plus. « Mes tracks aimées » (cœur = j'aime une piste) est une autre notion, inchangée.
 
 ## État actuel du projet — résumé
 

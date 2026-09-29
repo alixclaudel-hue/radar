@@ -93,9 +93,17 @@ def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=Non
     daté d'un scan de fond."""
     out, page = [], 1
     while not max_pages or page <= max_pages:
-        d = get(f"/users/{username}/inventory",
-                {"status": "For Sale", "per_page": per_page, "page": page,
-                 "sort": "listed", "sort_order": "desc"}, token=token)
+        try:
+            d = get(f"/users/{username}/inventory",
+                    {"status": "For Sale", "per_page": per_page, "page": page,
+                     "sort": "listed", "sort_order": "desc"}, token=token)
+        except DiscogsError as e:
+            # Discogs refuse (403) toute page > 100 sur l'inventaire d'un autre
+            # compte : on garde les 10 000 plus récents (tri « listed » desc) et
+            # on signale « tronqué » au lieu de perdre toute la lecture.
+            if out and "Pagination above" in str(e):
+                return out, True
+            raise
         for x in d.get("listings", []):
             rel = x.get("release") or {}
             rid = rel.get("id")

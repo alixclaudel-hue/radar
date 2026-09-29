@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar · Charte graphique v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap">
+<style>
+/* ===== Tokens proposés — repris tels quels dans app.css à l'étape 0 ===== */
+:root{
+  --paper:#F4F3EF; --surface:#FFFFFF; --sunken:#ECEBE4;
+  --ink:#121212; --ink-2:#3A3A36; --soft:#62625C;
+  --line:#E3E2DB; --line-strong:#CFCDC3;
+  --pin:#1C4A3E; --pin-600:#123329; --pin-50:#E4EEEA;
+  --clay:#C36B4B; --clay-700:#A8502F; --clay-50:#F8EAE3;
+  --bandcamp:#0E7490;
+  --r-sm:8px; --r-md:12px; --r-lg:18px; --pill:999px;
+  --sh-1:0 1px 2px rgba(18,18,18,.06), 0 1px 1px rgba(18,18,18,.04);
+  --sh-2:0 8px 24px rgba(18,18,18,.10);
+  --ease:cubic-bezier(.2,.7,.2,1); --t-fast:120ms; --t-base:220ms;
+  --f-display:'Syne',system-ui,sans-serif; --f-ui:'Work Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 var(--f-ui);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-display);letter-spacing:-.02em;margin:0}
+a{color:var(--pin)}
+.wrap{max-width:1040px;margin:0 auto;padding:32px clamp(16px,4vw,40px) 96px}
+section{margin-top:64px}
+h2.sec{font-size:26px;font-weight:700;display:flex;align-items:baseline;gap:12px}
+h2.sec small{font:600 11px var(--f-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+.lead{color:var(--ink-2);max-width:62ch}
+.muted{color:var(--soft)}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:20px}
+.kicker{font:600 11px var(--f-ui);letter-spacing:.12em;text-transform:uppercase;color:var(--soft)}
+code{background:var(--sunken);border-radius:6px;padding:1px 6px;font-size:12.5px}
+
+/* icônes : UN seul gabarit */
+.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;vertical-align:-4px}
+.i-16{width:16px;height:16px}.i-24{width:24px;height:24px}
+
+/* boutons */
+.btn{font:600 14px var(--f-ui);display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:var(--r-md);border:1px solid transparent;cursor:pointer;text-decoration:none;transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible,.seg label:focus-within,.tab:focus-visible{outline:2px solid var(--pin);outline-offset:2px}
+.btn.primary{background:var(--pin);color:var(--paper)}.btn.primary:hover{background:var(--pin-600)}
+.btn.secondary{background:var(--surface);color:var(--ink);border-color:var(--line-strong)}.btn.secondary:hover{border-color:var(--ink)}
+.btn.tonal{background:var(--pin-50);color:var(--pin)}.btn.tonal:hover{background:#D5E6E0}
+.btn.ghost{background:transparent;color:var(--ink)}.btn.ghost:hover{background:var(--sunken)}
+.btn.danger{background:var(--clay-50);color:var(--clay-700)}.btn.danger:hover{background:#F2D9CD}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.btn.icon{width:40px;padding:0}.btn.icon.sm{width:32px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+
+/* champs */
+.field label,.lbl{display:block;font:500 13px var(--f-ui);color:var(--ink-2);margin:0 0 6px}
+.input{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--r-md);color:var(--soft);transition:border-color var(--t-fast),box-shadow var(--t-fast)}
+.input:focus-within{border-color:var(--pin);box-shadow:0 0 0 3px var(--pin-50);color:var(--pin)}
+.input input{border:0;outline:0;background:none;font:inherit;color:var(--ink);width:100%}
+.seg{display:flex;gap:4px;padding:4px;background:var(--sunken);border-radius:14px}
+.seg label{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:40px;border-radius:10px;font:600 13.5px var(--f-ui);color:var(--soft);cursor:pointer;transition:all var(--t-fast) var(--ease);margin:0;white-space:nowrap}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--surface);color:var(--pin);box-shadow:var(--sh-1)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:var(--pill);font:500 12.5px var(--f-ui);background:var(--surface);border:1px solid var(--line-strong);color:var(--ink)}
+.chip.on{background:var(--pin-50);border-color:transparent;color:var(--pin);font-weight:600}
+.chip .i{width:14px;height:14px}
+.badge{display:inline-flex;align-items:center;gap:4px;font:700 13px var(--f-display);font-variant-numeric:tabular-nums;padding:2px 10px;border-radius:var(--pill);background:var(--pin);color:var(--paper)}
+.badge.clay{background:var(--clay-700)}.badge.ghost{background:transparent;color:var(--soft);border:1px solid var(--line-strong);font-family:var(--f-ui);font-weight:500}
+
+/* tokens visuels */
+.sw{border-radius:var(--r-md);padding:14px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(0,0,0,.06)}
+.sw b{font:700 15px var(--f-display)}.sw span{font-size:12px;opacity:.85;font-variant-numeric:tabular-nums}
+.ratio{font-size:11.5px;font-weight:600;margin-top:4px}
+table.ct{width:100%;border-collapse:collapse;font-size:13.5px}
+table.ct td,table.ct th{padding:8px 10px;border-top:1px solid var(--line);text-align:left}
+table.ct th{font:600 11px var(--f-ui);letter-spacing:.08em;text-transform:uppercase;color:var(--soft);border-top:0}
+.ok{color:var(--pin);font-weight:600}.ko{color:var(--clay-700);font-weight:600}
+.scale>div{display:flex;align-items:baseline;gap:16px;padding:10px 0;border-top:1px solid var(--line)}
+.scale>div>span:first-child{width:120px;flex:none;font-size:12px;color:var(--soft)}
+.icgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px}
+.icgrid>div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:14px 6px 10px;text-align:center;font-size:11.5px;color:var(--soft)}
+.icgrid .i{width:26px;height:26px;color:var(--ink);display:block;margin:0 auto 8px}
+.icgrid .sig .i{color:var(--pin)}
+.dont{border-left:3px solid var(--clay);padding:2px 0 2px 14px;color:var(--ink-2)}
+
+/* ===== Maquettes téléphone ===== */
+.phones{display:flex;flex-wrap:wrap;gap:28px;justify-content:center;margin-top:24px}
+.phone{width:320px;height:660px;background:var(--paper);border:9px solid var(--ink);border-radius:40px;position:relative;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--sh-2)}
+.phone .cap{position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:90px;height:20px;background:var(--ink);border-radius:0 0 14px 14px;z-index:5}
+.ph-top{display:flex;align-items:center;gap:6px;padding:30px 14px 8px}
+.ph-logo{font:800 24px var(--f-display);letter-spacing:-.04em;margin-right:auto}.ph-logo b{color:var(--pin)}
+.ph-body{flex:1;overflow:hidden;padding:4px 14px 0;display:flex;flex-direction:column;gap:14px}
+.ph-body h1{font-size:26px;font-weight:800;line-height:1.05}
+.ph-sticky{padding:10px 14px;background:linear-gradient(transparent,var(--paper) 30%)}
+.tabbar{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 6px 16px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 10.5px var(--f-ui);color:var(--soft);padding:4px 0;text-decoration:none;border-radius:var(--r-md)}
+.tab .pillbg{display:grid;place-items:center;width:52px;height:30px;border-radius:var(--pill);transition:background var(--t-base) var(--ease)}
+.tab.on{color:var(--pin)}.tab.on .pillbg{background:var(--pin-50)}
+.hscroll{display:flex;gap:8px;overflow:hidden;margin:0 -14px;padding:0 14px}
+.card-h{display:flex;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:10px;box-shadow:var(--sh-1)}
+.cover{width:76px;height:76px;flex:none;border-radius:var(--r-md);background:var(--pin);position:relative;overflow:hidden}
+.cover::before{content:"";position:absolute;inset:14px;border-radius:50%;border:5px solid rgba(244,243,239,.9)}
+.cover.c2{background:var(--clay)}.cover.c3{background:var(--ink-2)}
+.card-h .who{font:600 10.5px var(--f-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+.card-h .ttl{font:700 15px/1.15 var(--f-display)}
+.card-h .meta{font-size:12px;color:var(--soft)}
+.setcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;display:flex;flex-direction:column;gap:12px}
+.setcard h3{font-size:16px;display:flex;align-items:center;gap:8px}
+.slide{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.slide .lbl{margin:0}.slide output{font:700 14px var(--f-display);font-variant-numeric:tabular-nums}
+.slide .rail{grid-column:1/-1;height:6px;border-radius:99px;background:var(--sunken);position:relative;margin:8px 0 4px}
+.slide .rail i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--pin)}
+.slide .rail u{position:absolute;top:50%;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:var(--surface);border:2px solid var(--pin);box-shadow:var(--sh-1);text-decoration:none}
+.savebar{display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);border-radius:var(--r-lg);padding:8px 8px 8px 14px;font-size:12.5px;margin:0 14px 10px;box-shadow:var(--sh-2)}
+.savebar span{flex:1}
+.desk{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh-1)}
+.desk-top{display:flex;align-items:center;gap:28px;padding:0 20px;height:60px;border-bottom:1px solid var(--line)}
+.desk-nav{display:flex;gap:4px;height:100%}
+.desk-nav a{display:flex;align-items:center;gap:8px;padding:0 14px;color:var(--soft);text-decoration:none;font:600 14px var(--f-ui);position:relative}
+.desk-nav a.on{color:var(--pin)}.desk-nav a.on::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--pin)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- Sprite d'icônes : maille 24×24, trait 1.75, extrémités rondes, currentColor. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- signature Radar (déjà dans l'app, conservées) -->
+  <symbol id="i-label" viewBox="0 0 24 24"><path d="M5 11 12 4 19 11"/><path d="M6 10.3V20h12v-9.7"/><circle cx="12" cy="16.2" r="2.1"/></symbol>
+  <symbol id="i-album" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></symbol>
+  <symbol id="i-artist" viewBox="0 0 24 24"><path d="M8 9.6V8a4 4 0 0 1 8 0v1.6"/><rect x="6.3" y="8.8" width="2.3" height="3.6" rx="1.1"/><rect x="15.4" y="8.8" width="2.3" height="3.6" rx="1.1"/><circle cx="12" cy="9.8" r="2.9"/><path d="M5.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M8 8V6a4 4 0 0 1 8 0v2"/><path d="M4.5 8h15l-1.4 10.3a2 2 0 0 1-1.99 1.7H7.9a2 2 0 0 1-2-1.7z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></symbol>
+  <symbol id="i-discogs" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.3"/></symbol>
+  <symbol id="i-tracks" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.6-4.5M4 13a8 8 0 0 0 14.6 4.5"/><path d="M4 4v4h4M20 20v-4h-4"/></symbol>
+  <!-- nouvelles, même grammaire -->
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="i-network" viewBox="0 0 24 24"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="7" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M8.2 7h7.6M7.2 8.9l3.7 7M16.8 8.9l-3.7 7"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.6 8.4-2 5.2-5.2 2 2-5.2z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.9 3.1-6.5 7-6.5s7 2.6 7 6.5"/></symbol>
+  <symbol id="i-store" viewBox="0 0 24 24"><path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12.5V20h13v-7.5"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16l-6 7.5V19l-4-2v-3.5z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12.5h9.4L17.5 7M10 11v5M14 11v5"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5H5V6h5"/></symbol>
+  <symbol id="i-warning" viewBox="0 0 24 24"><path d="M12 4 21.5 20h-19z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7 4 12l5 5"/><path d="M4 12h10a6 6 0 0 1 0 12"/></symbol>
+  <symbol id="i-thumbup" viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.3a2 2 0 0 0 2-1.7l1.4-9a2 2 0 0 0-2-2.3z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></symbol>
+</svg>
+
+<div class="wrap">
+
+<header>
+  <p class="kicker">Refonte Radar Web · Charte graphique v2 · proposition n°1</p>
+  <h1 style="font-size:clamp(40px,8vw,72px);font-weight:800;letter-spacing:-.045em;line-height:.95;margin:14px 0 18px">Rada<span style="color:var(--pin)">r</span> — Sleeve&nbsp;2</h1>
+  <p class="lead" style="font-size:18px">Même veine que l'existant : <b>la pochette de disque</b>. Papier crème, encre noire, vert pin, terre cuite. On garde l'ADN, on change le <b>niveau de finition</b> : un seul système d'icônes, un seul jeu de boutons, des formes qui se répondent, et une ergonomie pensée d'abord pour le pouce.</p>
+</header>
+
+<section>
+  <h2 class="sec">1 · Direction artistique <small>l'idée en trois phrases</small></h2>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="panel"><h3 style="font-size:18px">Une pochette, pas un tableau de bord</h3><p class="muted" style="margin:.5em 0 0">Grands titres Syne, beaucoup d'air, cartes claires sur fond papier. Le contenu (pochettes, scores) est la couleur ; l'interface reste sobre.</p></div>
+    <div class="panel"><h3 style="font-size:18px">Un geste, un composant</h3><p class="muted" style="margin:.5em 0 0">Chaque action a une seule forme : <i>principale</i> (pin plein), <i>secondaire</i> (contour), <i>discrète</i> (icône), <i>destructive</i> (terre cuite). Fini les boutons noirs qui s'inversent au survol.</p></div>
+    <div class="panel"><h3 style="font-size:18px">Le pouce d'abord</h3><p class="muted" style="margin:.5em 0 0">Navigation en barre basse sur téléphone, actions clés au bas de l'écran, cibles ≥ 44 px, filtres dans un panneau plutôt que 12 champs empilés.</p></div>
+  </div>
+  <p class="dont" style="margin-top:20px"><b>Ce qui ne bouge pas :</b> les fonctions, les routes, le parcours (mêmes pages, même ordre, mêmes libellés d'action). La refonte touche <code>app.css</code>, <code>_icons.html</code> et la mise en page des gabarits — aucune ligne de logique Python.</p>
+</section>
+
+<section>
+  <h2 class="sec">2 · Couleurs <small>tokens</small></h2>
+  <p class="lead">Palette actuelle conservée, complétée de ce qui manque : un fond « enfoncé » pour les zones de contrôle, des teintes claires (<code>-50</code>) pour les états sélectionnés, et une terre cuite foncée (<code>-700</code>) pour tout texte, car la terre cuite actuelle est trop pâle pour du petit texte. Les ratios ci-dessous sont <b>calculés dans la page</b> (WCAG).</p>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="sw" style="background:var(--paper)"><b>Paper</b><span>#F4F3EF · fond de page</span></div>
+    <div class="sw" style="background:var(--surface)"><b>Surface</b><span>#FFFFFF · cartes, champs</span></div>
+    <div class="sw" style="background:var(--sunken)"><b>Sunken</b><span>#ECEBE4 · <i>nouveau</i> · contrôles segmentés</span></div>
+    <div class="sw" style="background:var(--ink);color:var(--paper)"><b>Ink</b><span>#121212 · titres, texte</span></div>
+    <div class="sw" style="background:var(--pin);color:var(--paper)"><b>Pin</b><span>#1C4A3E · action, sélection</span></div>
+    <div class="sw" style="background:var(--pin-50);color:var(--pin)"><b>Pin 50</b><span>#E4EEEA · <i>nouveau</i> · état actif</span></div>
+    <div class="sw" style="background:var(--clay);color:#fff"><b>Clay</b><span>#C36B4B · pochettes, gros éléments</span></div>
+    <div class="sw" style="background:var(--clay-700);color:#fff"><b>Clay 700</b><span>#A8502F · <i>nouveau</i> · texte d'alerte</span></div>
+    <div class="sw" style="background:var(--clay-50);color:var(--clay-700)"><b>Clay 50</b><span>#F8EAE3 · <i>nouveau</i> · fond d'alerte</span></div>
+  </div>
+  <div class="panel" style="margin-top:16px;overflow-x:auto">
+    <table class="ct" id="contrast"><thead><tr><th>Paire (texte / fond)</th><th>Ratio</th><th>Verdict</th></tr></thead><tbody></tbody></table>
+  </div>
+  <p class="muted" style="font-size:13px">Règle : la terre cuite claire (<code>--clay</code>) ne porte jamais de petit texte ; le texte d'alerte utilise <code>--clay-700</code>. Le bleu Bandcamp passe de #1DA0C3 à <code>#0E7490</code> pour rester lisible sur papier.</p>
+</section>
+
+<section>
+  <h2 class="sec">3 · Typographie <small>2 familles, inchangées</small></h2>
+  <div class="panel scale" style="margin-top:20px">
+    <div><span>Logo · Syne 800 · 32</span><span style="font:800 32px var(--f-display);letter-spacing:-.04em">Rada<span style="color:var(--pin)">r</span></span></div>
+    <div><span>Titre de page · Syne 800 · 30</span><span style="font:800 30px var(--f-display);letter-spacing:-.03em">Chercher un disque</span></div>
+    <div><span>Section · Syne 700 · 20</span><span style="font:700 20px var(--f-display)">Mes labels &amp; artistes</span></div>
+    <div><span>Titre de carte · Syne 700 · 15</span><span style="font:700 15px var(--f-display)">Selected Ambient Works 85–92</span></div>
+    <div><span>Corps · Work Sans 400 · 15</span><span>Recherche normale, sur tes labels suivis, ou dans le stock d'un vendeur.</span></div>
+    <div><span>Aide · Work Sans 400 · 13</span><span class="muted" style="font-size:13px">Les goûts eux-mêmes se règlent dans Mon profil.</span></div>
+    <div><span>Sur-titre · Work Sans 600 · 11</span><span class="kicker">Artiste · Label · Catalogue</span></div>
+    <div><span>Score · Syne 700 · chiffres tabulaires</span><span class="badge">87</span> <span class="badge clay">42</span> <span class="badge ghost">—</span></div>
+  </div>
+  <p class="muted" style="font-size:13px">Nouveautés : chiffres tabulaires sur tous les scores (les colonnes s'alignent), cassure nette entre titres (Syne) et texte (Work Sans), plus de labels de champ en clés techniques brutes (<code>want_factor</code>, <code>artist_max_vs_mean</code>).</p>
+</section>
+
+<section>
+  <h2 class="sec">4 · Formes &amp; mouvement <small>tokens</small></h2>
+  <div class="grid g3" style="margin-top:20px">
+    <div class="panel"><div class="kicker">Rayons — 3 seulement</div>
+      <div class="row" style="margin-top:12px">
+        <div style="width:56px;height:56px;background:var(--pin-50);border-radius:var(--r-sm)"></div>
+        <div style="width:56px;height:56px;background:var(--pin-50);border-radius:var(--r-md)"></div>
+        <div style="width:56px;height:56px;background:var(--pin-50);border-radius:var(--r-lg)"></div></div>
+      <p class="muted" style="font-size:13px;margin:12px 0 0"><b>8</b> pochettes, badges carrés · <b>12</b> boutons + champs (même hauteur, même rayon) · <b>18</b> cartes et panneaux. La forme <b>pilule</b> est réservée aux puces, aux scores et à la barre de navigation.</p></div>
+    <div class="panel"><div class="kicker">Espacement &amp; ombres</div>
+      <p style="margin:12px 0 6px;font-size:14px">Grille de <b>4 px</b> : 4 · 8 · 12 · 16 · 24 · 32 · 48.</p>
+      <div class="row" style="gap:16px">
+        <div style="width:70px;height:48px;background:var(--surface);border-radius:var(--r-md);box-shadow:var(--sh-1);border:1px solid var(--line)"></div>
+        <div style="width:70px;height:48px;background:var(--surface);border-radius:var(--r-md);box-shadow:var(--sh-2)"></div></div>
+      <p class="muted" style="font-size:13px;margin:12px 0 0">Ombre discrète au repos, ombre nette pour tout ce qui flotte (menus, barre d'enregistrement).</p></div>
+    <div class="panel"><div class="kicker">Mouvement</div>
+      <p style="margin:12px 0 0;font-size:14px"><b>120 ms</b> retours d'état (survol, appui) · <b>220 ms</b> apparitions (panneaux, résultats) · courbe <code>cubic-bezier(.2,.7,.2,1)</code>. Tout est neutralisé si l'utilisateur a demandé « réduire les animations ».</p></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="sec">5 · Icônes <small>un seul système</small></h2>
+  <p class="lead">Aujourd'hui : 13 icônes SVG maison <b>et</b> une trentaine d'emojis (🔍 🌐 🎯 🎛️ 👤 🏷️ ⚠️ 🕘 ✕ ↺ ⌄…) dont le rendu change selon le téléphone. Proposition : <b>zéro emoji</b>, tout en SVG, une seule grammaire.</p>
+  <div class="panel" style="margin-top:16px"><div class="kicker">Spécification</div>
+    <p style="margin:8px 0 0">Maille <b>24×24</b> · trait <b>1,75</b> · extrémités et jointures <b>rondes</b> · pas de remplissage (sauf points) · couleur = <code>currentColor</code> · trois tailles : <b>16</b> (dans un texte) · <b>20</b> (boutons, défaut) · <b>24</b> (navigation). Un pictogramme = un sens, partout.</p></div>
+  <p class="kicker" style="margin:24px 0 10px">Signature Radar — déjà dessinées, conservées (en vert)</p>
+  <div class="icgrid">
+    <div class="sig"><svg class="i"><use href="#i-label"/></svg>label</div>
+    <div class="sig"><svg class="i"><use href="#i-album"/></svg>album</div>
+    <div class="sig"><svg class="i"><use href="#i-artist"/></svg>artiste</div>
+    <div class="sig"><svg class="i"><use href="#i-cart"/></svg>wantlist</div>
+    <div class="sig"><svg class="i"><use href="#i-sliders"/></svg>réglages</div>
+    <div class="sig"><svg class="i"><use href="#i-discogs"/></svg>discogs</div>
+    <div class="sig"><svg class="i"><use href="#i-tracks"/></svg>pistes</div>
+    <div class="sig"><svg class="i"><use href="#i-refresh"/></svg>actualiser</div>
+  </div>
+  <p class="kicker" style="margin:24px 0 10px">À ajouter — remplacent les emojis</p>
+  <div class="icgrid">
+    <div><svg class="i"><use href="#i-search"/></svg>chercher</div>
+    <div><svg class="i"><use href="#i-network"/></svg>mes labels &amp; artistes</div>
+    <div><svg class="i"><use href="#i-compass"/></svg>reco radar</div>
+    <div><svg class="i"><use href="#i-user"/></svg>mon profil</div>
+    <div><svg class="i"><use href="#i-store"/></svg>vendeur</div>
+    <div><svg class="i"><use href="#i-filter"/></svg>filtres</div>
+    <div><svg class="i"><use href="#i-plus"/></svg>ajouter</div>
+    <div><svg class="i"><use href="#i-close"/></svg>fermer</div>
+    <div><svg class="i"><use href="#i-check"/></svg>valider</div>
+    <div><svg class="i"><use href="#i-chevron"/></svg>déplier</div>
+    <div><svg class="i"><use href="#i-play"/></svg>écouter</div>
+    <div><svg class="i"><use href="#i-trash"/></svg>supprimer</div>
+    <div><svg class="i"><use href="#i-external"/></svg>lien externe</div>
+    <div><svg class="i"><use href="#i-warning"/></svg>à vérifier</div>
+    <div><svg class="i"><use href="#i-clock"/></svg>récentes</div>
+    <div><svg class="i"><use href="#i-save"/></svg>enregistrer</div>
+    <div><svg class="i"><use href="#i-undo"/></svg>annuler</div>
+    <div><svg class="i"><use href="#i-thumbup"/></svg>j'aime</div>
+  </div>
+  <p class="muted" style="font-size:13px;margin-top:12px">Ce jeu est un premier tracé à valider ensemble : je peux redessiner n'importe quelle icône qui ne te plaît pas avant de généraliser. Les logos de plateformes (YouTube, Spotify, Bandcamp) restent en couleur de marque, dans une pastille neutre de même taille.</p>
+</section>
+
+<section>
+  <h2 class="sec">6 · Boutons &amp; contrôles <small>composants</small></h2>
+  <div class="panel" style="margin-top:20px">
+    <div class="kicker">Boutons — 40 px (44 px sur téléphone)</div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary"><svg class="i"><use href="#i-search"/></svg>Rechercher</button>
+      <button class="btn secondary"><svg class="i"><use href="#i-refresh"/></svg>Actualiser</button>
+      <button class="btn tonal"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
+      <button class="btn ghost">Annuler</button>
+      <button class="btn danger"><svg class="i"><use href="#i-trash"/></svg>Supprimer</button>
+      <button class="btn secondary icon" aria-label="Fermer"><svg class="i"><use href="#i-close"/></svg></button>
+      <button class="btn primary" disabled>Désactivé</button>
+    </div>
+    <div class="row" style="margin-top:12px"><span class="muted" style="font-size:13px">Petits (32 px) :</span>
+      <button class="btn secondary sm">Relire le stock</button><button class="btn tonal sm"><svg class="i i-16"><use href="#i-undo"/></svg>Annuler</button><button class="btn ghost sm icon" aria-label="Lecture"><svg class="i i-16"><use href="#i-play"/></svg></button></div>
+    <p class="muted" style="font-size:13px;margin:14px 0 0"><b>Un seul bouton principal par écran.</b> Survol : teinte plus foncée (jamais d'inversion noir/blanc). Appui : léger retrait (98 %). Focus clavier : anneau pin de 2 px.</p>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="panel"><div class="kicker" style="margin-bottom:12px">Champ &amp; contrôle segmenté</div>
+      <div class="field"><label>Label</label><div class="input"><svg class="i"><use href="#i-label"/></svg><input placeholder="ex. Aim Records" value="Aim"></div></div>
+      <div class="lbl" style="margin-top:16px">Mode</div>
+      <div class="seg" role="radiogroup">
+        <label><input type="radio" name="d1" checked><svg class="i i-16"><use href="#i-search"/></svg>Catalogue</label>
+        <label><input type="radio" name="d1"><svg class="i i-16"><use href="#i-label"/></svg>Mes labels</label>
+        <label><input type="radio" name="d1"><svg class="i i-16"><use href="#i-store"/></svg>Vendeur</label>
+      </div></div>
+    <div class="panel"><div class="kicker" style="margin-bottom:12px">Puces &amp; scores</div>
+      <div class="row" style="gap:8px"><span class="chip on">Deep House <svg class="i"><use href="#i-close"/></svg></span><span class="chip on">Techno <svg class="i"><use href="#i-close"/></svg></span><span class="chip">1995 – 2005</span><span class="chip"><svg class="i"><use href="#i-filter"/></svg>Filtres</span></div>
+      <div class="row" style="margin-top:16px;gap:8px"><span class="badge"><svg class="i i-16"><use href="#i-label"/></svg>82</span><span class="badge"><svg class="i i-16"><use href="#i-artist"/></svg>74</span><span class="badge clay">38</span><span class="badge ghost">Bandcamp</span></div>
+      <p class="muted" style="font-size:13px;margin:14px 0 0">Puce active = teinte pin claire (fini le vert plein criard) ; sélectionnée <b>et</b> supprimable via la croix.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="sec">7 · Application sur téléphone <small>maquettes des 3 zones que tu as citées</small></h2>
+  <p class="lead">Le changement structurel : la navigation passe en <b>barre basse</b> sur téléphone (même 4 destinations, même ordre) ; « Mon profil » et la wantlist restent en haut à droite comme aujourd'hui. Sur ordinateur : onglets soulignés dans l'en-tête.</p>
+  <div class="phones">
+
+    <!-- Recherche -->
+    <div class="phone"><div class="cap"></div>
+      <div class="ph-top"><span class="ph-logo">Rada<b>r</b></span>
+        <button class="btn ghost icon sm" aria-label="Profil"><svg class="i"><use href="#i-user"/></svg></button>
+        <button class="btn ghost icon sm" aria-label="Wantlist"><svg class="i"><use href="#i-cart"/></svg></button></div>
+      <div class="ph-body">
+        <h1>Chercher<br>un disque</h1>
+        <div class="seg" role="radiogroup">
+          <label><input type="radio" name="p1" checked><svg class="i i-16"><use href="#i-search"/></svg>Catalogue</label>
+          <label><input type="radio" name="p1"><svg class="i i-16"><use href="#i-label"/></svg>Labels</label>
+          <label><input type="radio" name="p1"><svg class="i i-16"><use href="#i-store"/></svg>Vendeur</label></div>
+        <div class="field"><label>Label <span class="muted">· optionnel</span></label><div class="input"><svg class="i"><use href="#i-label"/></svg><input placeholder="ex. Aim Records"></div></div>
+        <div class="row" style="gap:8px;flex-wrap:nowrap">
+          <button class="btn secondary" style="flex:1"><svg class="i"><use href="#i-filter"/></svg>Filtres <span class="badge" style="padding:0 7px;font-size:12px">2</span></button>
+          <button class="btn ghost icon" aria-label="Récentes"><svg class="i"><use href="#i-clock"/></svg></button></div>
+        <div class="row" style="gap:6px"><span class="chip on">Deep House <svg class="i"><use href="#i-close"/></svg></span><span class="chip on">1995–2005 <svg class="i"><use href="#i-close"/></svg></span></div>
+        <p class="muted" style="font-size:12.5px;margin:0">Genre, style, période et pages s'ouvrent dans un panneau qui glisse du bas — la page reste courte.</p>
+      </div>
+      <div class="ph-sticky"><button class="btn primary" style="width:100%;height:46px"><svg class="i"><use href="#i-search"/></svg>Rechercher</button></div>
+      <nav class="tabbar">
+        <a class="tab on" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-search"/></svg></span>Chercher</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-network"/></svg></span>Univers</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-compass"/></svg></span>Reco</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-sliders"/></svg></span>Réglages</a></nav>
+    </div>
+
+    <!-- Résultats / labels-artistes -->
+    <div class="phone"><div class="cap"></div>
+      <div class="ph-top"><span class="ph-logo">Rada<b>r</b></span>
+        <button class="btn ghost icon sm"><svg class="i"><use href="#i-user"/></svg></button>
+        <button class="btn ghost icon sm"><svg class="i"><use href="#i-cart"/></svg></button></div>
+      <div class="ph-body">
+        <h1>Mes labels<br>&amp; artistes</h1>
+        <div class="seg">
+          <label><input type="radio" name="p2" checked><svg class="i i-16"><use href="#i-label"/></svg>Labels</label>
+          <label><input type="radio" name="p2"><svg class="i i-16"><use href="#i-artist"/></svg>Artistes</label>
+          <label><input type="radio" name="p2"><svg class="i i-16"><use href="#i-tracks"/></svg>Sets</label></div>
+        <div class="input"><svg class="i"><use href="#i-warning"/></svg><span style="color:var(--clay-700);font:600 13px var(--f-ui);flex:1">3 à vérifier</span><svg class="i i-16"><use href="#i-chevron"/></svg></div>
+        <div class="card-h"><div class="cover"></div><div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:2px"><span class="who">Aim Records</span><span class="ttl">Deep Lines Vol. 2</span><span class="meta">Cœur · 12 sorties suivies</span>
+          <div class="row" style="gap:6px;margin-top:auto"><span class="badge">86</span><button class="btn ghost icon sm" style="margin-left:auto"><svg class="i"><use href="#i-play"/></svg></button><button class="btn ghost icon sm"><svg class="i"><use href="#i-cart"/></svg></button></div></div></div>
+        <div class="card-h"><div class="cover c2"></div><div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:2px"><span class="who">Rush Hour</span><span class="ttl">Night Currents</span><span class="meta">Aimé · 4 sorties suivies</span>
+          <div class="row" style="gap:6px;margin-top:auto"><span class="badge">71</span><button class="btn ghost icon sm" style="margin-left:auto"><svg class="i"><use href="#i-play"/></svg></button><button class="btn ghost icon sm"><svg class="i"><use href="#i-cart"/></svg></button></div></div></div>
+        <div class="card-h"><div class="cover c3"></div><div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:2px"><span class="who">Kompakt</span><span class="ttl">Grey Room EP</span><span class="meta">Aimé · 2 sorties suivies</span>
+          <div class="row" style="gap:6px;margin-top:auto"><span class="badge clay">48</span><button class="btn ghost icon sm" style="margin-left:auto"><svg class="i"><use href="#i-play"/></svg></button><button class="btn ghost icon sm"><svg class="i"><use href="#i-cart"/></svg></button></div></div></div>
+      </div>
+      <nav class="tabbar" style="margin-top:14px">
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-search"/></svg></span>Chercher</a>
+        <a class="tab on" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-network"/></svg></span>Univers</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-compass"/></svg></span>Reco</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-sliders"/></svg></span>Réglages</a></nav>
+    </div>
+
+    <!-- Réglages -->
+    <div class="phone"><div class="cap"></div>
+      <div class="ph-top"><span class="ph-logo">Rada<b>r</b></span>
+        <button class="btn ghost icon sm"><svg class="i"><use href="#i-user"/></svg></button>
+        <button class="btn ghost icon sm"><svg class="i"><use href="#i-cart"/></svg></button></div>
+      <div class="ph-body" style="gap:12px">
+        <h1>Réglages</h1>
+        <div class="hscroll"><span class="chip on"><svg class="i"><use href="#i-label"/></svg>Label</span><span class="chip"><svg class="i"><use href="#i-album"/></svg>Album</span><span class="chip"><svg class="i"><use href="#i-artist"/></svg>Artiste</span><span class="chip">Rangs</span></div>
+        <div class="setcard">
+          <h3><svg class="i"><use href="#i-label"/></svg>Score label
+            <button class="btn ghost sm" style="margin-left:auto;padding:0 8px"><svg class="i i-16"><use href="#i-undo"/></svg>Annuler</button></h3>
+          <svg viewBox="0 0 200 120" style="width:100%;height:120px;background:var(--paper);border-radius:var(--r-md)"><g transform="translate(100 62)" fill="none" stroke="var(--line-strong)"><polygon points="0,-48 42,-24 42,24 0,48 -42,24 -42,-24"/><polygon points="0,-24 21,-12 21,12 0,24 -21,12 -21,-12"/></g><polygon transform="translate(100 62)" points="0,-40 30,-14 36,20 0,30 -34,18 -28,-16" fill="var(--pin)" fill-opacity=".18" stroke="var(--pin)" stroke-width="2"/></svg>
+          <div class="slide"><span class="lbl">Collection</span><output>1,0</output><div class="rail"><i style="width:62%"></i><u style="left:62%"></u></div></div>
+          <div class="slide"><span class="lbl">Écoute (corpus)</span><output>0,7</output><div class="rail"><i style="width:44%"></i><u style="left:44%"></u></div></div>
+          <div class="slide"><span class="lbl">Affinité de style</span><output>1,4</output><div class="rail"><i style="width:80%"></i><u style="left:80%"></u></div></div>
+        </div>
+      </div>
+      <div class="savebar"><span>Modifications non enregistrées</span><button class="btn primary sm" style="background:var(--paper);color:var(--ink)"><svg class="i i-16"><use href="#i-save"/></svg>Enregistrer</button></div>
+      <nav class="tabbar">
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-search"/></svg></span>Chercher</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-network"/></svg></span>Univers</a>
+        <a class="tab" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-compass"/></svg></span>Reco</a>
+        <a class="tab on" href="#"><span class="pillbg"><svg class="i i-24"><use href="#i-sliders"/></svg></span>Réglages</a></nav>
+    </div>
+  </div>
+
+  <div class="grid g3" style="margin-top:28px">
+    <div class="panel"><h3 style="font-size:16px">Recherche — le haut de page</h3>
+      <p class="muted" style="margin:.5em 0 0;font-size:14px">Aujourd'hui : 3 pastilles + un bloc qui change + 5 champs empilés. Demain : <b>un contrôle segmenté unique</b> (3 modes, icônes), le champ du mode, un bouton « Filtres » avec compteur et <b>puces récapitulatives</b>, et « Rechercher » toujours à portée de pouce. Mêmes champs, mêmes valeurs envoyées.</p></div>
+    <div class="panel"><h3 style="font-size:16px">Labels &amp; artistes</h3>
+      <p class="muted" style="margin:.5em 0 0;font-size:14px">Même contrôle segmenté pour les 3 onglets (fini les pastilles qui passent à la ligne). Les listes deviennent des <b>cartes horizontales</b> compactes : pochette, nom, rang, score, deux actions. Les accordéons « Ajouter / Aperçu / Graphe » gardent leur place.</p></div>
+    <div class="panel"><h3 style="font-size:16px">Réglages</h3>
+      <p class="muted" style="margin:.5em 0 0;font-size:14px">Une carte par score, un <b>sommaire à puces</b> pour sauter d'une section à l'autre, l'étoile en tête puis des <b>curseurs à libellés lisibles</b> (au lieu de 7 champs numériques aux noms techniques), et une <b>barre d'enregistrement</b> qui apparaît dès qu'on modifie quelque chose.</p></div>
+  </div>
+
+  <h3 style="font-size:18px;margin:32px 0 12px">Sur ordinateur</h3>
+  <div class="desk">
+    <div class="desk-top"><span style="font:800 26px var(--f-display);letter-spacing:-.04em">Rada<span style="color:var(--pin)">r</span></span>
+      <nav class="desk-nav"><a class="on" href="#"><svg class="i"><use href="#i-search"/></svg>Chercher un disque</a><a href="#"><svg class="i"><use href="#i-network"/></svg>Mes labels &amp; artistes</a><a href="#"><svg class="i"><use href="#i-compass"/></svg>Reco Radar</a><a href="#"><svg class="i"><use href="#i-sliders"/></svg>Réglages</a></nav>
+      <span style="margin-left:auto" class="row" ><button class="btn ghost sm"><svg class="i"><use href="#i-user"/></svg>Mon profil</button><button class="btn ghost sm icon"><svg class="i"><use href="#i-cart"/></svg></button></span></div>
+    <div style="padding:20px;background:var(--paper);color:var(--soft);font-size:13.5px">Contenu centré, largeur max 1120 px — inchangé. Onglets soulignés au lieu de pastilles, « Mon profil » et la wantlist alignés à droite sur la même ligne.</div>
+  </div>
+</section>
+
+<section>
+  <h2 class="sec">8 · Interactivité <small>sans toucher aux fonctions</small></h2>
+  <div class="grid g2" style="margin-top:20px">
+    <div class="panel"><ul style="margin:0;padding-left:18px;display:grid;gap:8px">
+      <li><b>Retours d'état immédiats</b> : appui, chargement (bouton qui affiche un spinner en place), succès (coche qui apparaît 1,5 s).</li>
+      <li><b>Squelettes de chargement</b> à la place du vide pendant les requêtes htmx (résultats, tables, graphes).</li>
+      <li><b>Notifications discrètes</b> (toast) : « Enregistré », « Ajouté à la wantlist » — plus de paragraphe qui pousse la page.</li>
+    </ul></div>
+    <div class="panel"><ul style="margin:0;padding-left:18px;display:grid;gap:8px">
+      <li><b>Panneaux du bas</b> (bottom sheet) sur téléphone : filtres de recherche, fiche d'un nœud du graphe, choix de pressage.</li>
+      <li><b>Barres collantes</b> : « Rechercher » et « Enregistrer » restent accessibles au pouce.</li>
+      <li><b>Transitions courtes</b> à l'ouverture des accordéons, à l'arrivée des résultats et au changement de mode ; désactivées si « réduire les animations » est actif.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section>
+  <h2 class="sec">9 · Déroulé pas à pas <small>1 étape = 1 PR relisible</small></h2>
+  <div class="panel" style="margin-top:20px">
+    <table class="ct"><thead><tr><th>#</th><th>Étape</th><th>Ce qui change</th></tr></thead><tbody>
+      <tr><td>0</td><td><b>Fondations</b></td><td>Tokens, boutons, champs, puces, cartes dans <code>app.css</code>. Aucune page ne change de structure : l'app change de peau d'un coup, sans casser.</td></tr>
+      <tr><td>1</td><td><b>Icônes</b></td><td>Sprite unique, suppression de tous les emojis-icônes.</td></tr>
+      <tr><td>2</td><td><b>Coque</b></td><td>En-tête, navigation (barre basse mobile / onglets desktop), bouton de retours déplacé (il chevauche l'en-tête sur téléphone).</td></tr>
+      <tr><td>3</td><td><b>Recherche</b></td><td>Haut de page + panneau de filtres + cartes de résultats.</td></tr>
+      <tr><td>4</td><td><b>Labels &amp; artistes</b></td><td>Onglets, listes en cartes, accordéons, panneau « À vérifier ».</td></tr>
+      <tr><td>5</td><td><b>Réglages</b></td><td>Sommaire, cartes par score, curseurs, barre d'enregistrement.</td></tr>
+      <tr><td>6</td><td><b>Reco Radar, Profil, Wantlist</b></td><td>Application du système aux pages restantes.</td></tr>
+      <tr><td>7</td><td><b>Finitions</b></td><td>Squelettes, toasts, transitions, passe d'accessibilité.</td></tr>
+    </tbody></table>
+    <p class="muted" style="font-size:13px;margin:14px 0 0">Vérification à chaque étape : <code>py_compile</code>, suite <code>unittest</code>, balayage de routes CI, et captures d'écran Chromium en 390 px et 1280 px avant/après.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+/* Ratios de contraste WCAG calculés en direct — ce que tu vois est ce qui est mesuré. */
+(function(){
+  function lum(h){h=h.replace('#','');var c=[0,2,4].map(function(i){var v=parseInt(h.substr(i,2),16)/255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*c[0]+.7152*c[1]+.0722*c[2]}
+  function cr(a,b){var x=lum(a),y=lum(b);if(x<y){var t=x;x=y;y=t}return (x+.05)/(y+.05)}
+  var pairs=[
+    ['Ink / Paper','#121212','#F4F3EF'],
+    ['Soft (texte secondaire) / Paper','#62625C','#F4F3EF'],
+    ['Soft / Pin 50','#62625C','#E4EEEA'],
+    ['Paper / Pin (bouton principal)','#F4F3EF','#1C4A3E'],
+    ['Pin / Pin 50 (puce active)','#1C4A3E','#E4EEEA'],
+    ['Clay 700 / Paper (texte d\'alerte)','#A8502F','#F4F3EF'],
+    ['Clay 700 / Clay 50 (bouton destructif)','#A8502F','#F8EAE3'],
+    ['Blanc / Clay 700','#FFFFFF','#A8502F'],
+    ['Blanc / Clay (ancien, petit texte)','#FFFFFF','#C36B4B'],
+    ['Clay / Paper (ancien, texte)','#C36B4B','#F4F3EF'],
+    ['Bandcamp #0E7490 / Paper','#0E7490','#F4F3EF'],
+    ['Bandcamp #1DA0C3 / Paper (ancien)','#1DA0C3','#F4F3EF']
+  ];
+  var tb=document.querySelector('#contrast tbody');
+  pairs.forEach(function(p){
+    var r=cr(p[1],p[2]),v=r>=7?'AAA':r>=4.5?'AA':r>=3?'grand texte / icône seulement':'insuffisant';
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td><span style="display:inline-block;width:22px;height:22px;border-radius:6px;vertical-align:middle;margin-right:8px;font:700 12px var(--f-display);text-align:center;line-height:22px;background:'+p[2]+';color:'+p[1]+';border:1px solid rgba(0,0,0,.08)">A</span>'+p[0]+'</td><td>'+r.toFixed(2)+' : 1</td><td class="'+(r>=4.5?'ok':'ko')+'">'+(r>=4.5?'✓ ':'✗ ')+v+'</td>';
+    tb.appendChild(tr);
+  });
+})();
+</script>
+</body>
+</html>

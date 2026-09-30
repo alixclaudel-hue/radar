@@ -13,6 +13,7 @@ services:
       # ET « présente mais vide » — .env.example laisse la ligne vide à dessein.
       RADAR_DOMAIN: ${RADAR_DOMAIN:-localhost}
       RADAR_OPS_DOMAIN: ${RADAR_OPS_DOMAIN:-ops.localhost}
+      WA_MCP_DOMAIN: ${WA_MCP_DOMAIN:-wa.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

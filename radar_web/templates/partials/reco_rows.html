@@ -86,7 +86,8 @@
          ouverte par le JS de reco_radar.html (data-pl-add). #}
       {% if t.video_id %}
       <button type="button" class="buy-btn" data-pl-add data-vid="{{ t.video_id }}"
-              data-name="{{ t.artist }} - {{ t.title }}" title="Ajouter à une playlist YouTube">{{ icons.plus() }} Playlist</button>
+              data-artist="{{ t.artist }}" data-title="{{ t.title }}"
+              data-name="{{ t.artist }} - {{ t.title }}" title="Ajouter à une playlist YouTube ou Spotify">{{ icons.plus() }} Playlist</button>
       {% endif %}
       <button type="button" class="trk-del" title="Retirer cette piste de la playlist"
               hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'

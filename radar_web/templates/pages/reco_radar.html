@@ -46,8 +46,14 @@
   <div class="pl-dialog__head"><strong>Ajouter à une playlist</strong>
     <button type="button" class="wl-matches__close" data-pl-close aria-label="Fermer">{{ icons.close() }}</button></div>
   <p class="small muted" id="pl-dialog-track"></p>
-  {# Contenu chargé en htmx : liste des playlists du compte YouTube relié dans
-     « Mes goûts » (OAuth Google, cf. googleauth.py), sinon invitation à le relier. #}
+  {# Choix du service, HORS de #pl-dialog-body : le résultat d'un ajout remplace tout
+     le corps, le sélecteur doit survivre pour en tenter un autre. #}
+  <div class="seg" role="radiogroup" aria-label="Service de playlist">
+    <label>{{ icons.youtube() }} YouTube <input type="radio" name="pl-svc" value="yt" checked></label>
+    <label>{{ icons.spotify() }} Spotify <input type="radio" name="pl-svc" value="sp"></label>
+  </div>
+  {# Contenu chargé en htmx : liste des playlists du compte relié dans « Mes goûts »
+     (OAuth Google ou Spotify, cf. googleauth.py / spotifyauth.py), sinon invitation à le relier. #}
   <div id="pl-dialog-body"></div>
 </dialog>
 
@@ -72,14 +78,33 @@
   window.addEventListener('scroll', () => document.querySelectorAll('.buy-menu[open]').forEach(o => { o.open = false; }), { passive: true });
 
   const dlg = document.getElementById('pl-dialog');
+  // Piste dont la fenêtre est ouverte : le changement de service recharge la liste
+  // sans repasser par le bouton de la ligne.
+  let plTrack = null;
+  const plRadio = (v) => dlg.querySelector('input[name="pl-svc"][value="' + v + '"]');
+  const plLoad = () => {
+    if (!plTrack) return;
+    const sp = plRadio('sp').checked;
+    const q = sp
+      ? '/reco-radar/sp-playlists?artist=' + encodeURIComponent(plTrack.artist) +
+        '&title=' + encodeURIComponent(plTrack.title)
+      : '/reco-radar/yt-playlists?video_id=' + encodeURIComponent(plTrack.vid);
+    document.getElementById('pl-dialog-body').innerHTML = '<p class="small muted">Chargement…</p>';
+    htmx.ajax('GET', q, { target: '#pl-dialog-body', swap: 'innerHTML' });
+    try { localStorage.setItem('radar_pl_svc', sp ? 'sp' : 'yt'); } catch (_) {}
+  };
+  dlg.addEventListener('change', (e) => { if (e.target.name === 'pl-svc') plLoad(); });
   document.addEventListener('click', (e) => {
     const add = e.target.closest('[data-pl-add]');
     if (add) {
+      plTrack = { vid: add.dataset.vid, artist: add.dataset.artist, title: add.dataset.title };
       document.getElementById('pl-dialog-track').textContent = add.dataset.name;
-      document.getElementById('pl-dialog-body').innerHTML = '<p class="small muted">Chargement…</p>';
+      // Dernier service utilisé (confort par navigateur, sans incidence si bloqué).
+      let last = 'yt';
+      try { last = localStorage.getItem('radar_pl_svc') === 'sp' ? 'sp' : 'yt'; } catch (_) {}
+      plRadio(last).checked = true;
       dlg.showModal();
-      htmx.ajax('GET', '/reco-radar/yt-playlists?video_id=' + encodeURIComponent(add.dataset.vid),
-                { target: '#pl-dialog-body', swap: 'innerHTML' });
+      plLoad();
     } else if (e.target.closest('[data-pl-close]') || e.target === dlg) dlg.close();
   });
 

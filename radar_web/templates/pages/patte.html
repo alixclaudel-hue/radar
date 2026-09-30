@@ -169,6 +169,26 @@
   </div>
 </details>
 
+<!-- ============ Spotify (hors du formulaire principal) ============ -->
+<details class="acc" {{ 'open' if spotify_msg }}>
+  <summary>{{ icons.spotify() }} Compte Spotify
+    <span class="tag">{% if spotify_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif spotify_configured %}non relié{% else %}non configuré{% endif %}</span></summary>
+  <div class="acc__body">
+    {% if spotify_msg %}<p class="notice small">{{ spotify_msg }}</p>{% endif %}
+    <p class="small muted">Sert à ajouter une piste de Reco Radar à l'une de tes playlists Spotify
+      (bouton « Playlist »). Radar demande l'accès à tes playlists uniquement ; tu peux le
+      révoquer ici à tout moment, ou dans les réglages de ton compte Spotify.</p>
+    {% if not spotify_configured %}
+    <p class="small">La connexion Spotify n'est pas encore configurée sur ce serveur
+      (<code>RADAR_SPOTIFY_CLIENT_ID</code> / <code>RADAR_SPOTIFY_CLIENT_SECRET</code>).</p>
+    {% elif spotify_connected %}
+    <form method="post" action="/oauth/spotify/disconnect"><button class="small danger" type="submit">Délier mon compte Spotify</button></form>
+    {% else %}
+    <a class="btn primary small" href="/oauth/spotify/start">Relier mon compte Spotify</a>
+    {% endif %}
+  </div>
+</details>
+
 <!-- ============ DJ sets (hors du formulaire principal) ============ -->
 <details class="acc">
   <summary>{{ icons.tracks() }} DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>

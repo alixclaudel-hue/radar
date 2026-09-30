@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import googleauth, opslog, websession
+from .radar import googleauth, opslog, spotifyauth, websession
 from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
                     learn, paths, sellers, stores, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
@@ -421,9 +421,16 @@ def patte_page(request: Request, saved: int = 0):
                   "error": "Google n'a pas validé la connexion — réessaie.",
                   "unconfigured": "La connexion Google n'est pas configurée sur ce serveur."
                   }.get(request.query_params.get("google", ""), "")
+    spotify_msg = {"ok": "Compte Spotify relié.", "off": "Compte Spotify délié.",
+                   "refused": "Connexion Spotify refusée ou expirée — réessaie.",
+                   "error": "Spotify n'a pas validé la connexion — réessaie.",
+                   "unconfigured": "La connexion Spotify n'est pas configurée sur ce serveur."
+                   }.get(request.query_params.get("spotify", ""), "")
     return render(request, "pages/patte.html", active="patte",
                   google_msg=google_msg, google_configured=googleauth.configured(),
-                  google_connected=googleauth.is_connected(store.current_uid()), cfg=c.cfg, sc=c.scoring,
+                  google_connected=googleauth.is_connected(store.current_uid()),
+                  spotify_msg=spotify_msg, spotify_configured=spotifyauth.configured(),
+                  spotify_connected=spotifyauth.is_connected(store.current_uid()), cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
@@ -558,6 +565,107 @@ def reco_radar_yt_playlist_add(request: Request, video_id: str = Form(""),
     except googleauth.GoogleError as e:
         return frag(request, "partials/yt_added.html", ok=False, msg=e.message, title="")
     return frag(request, "partials/yt_added.html", ok=True, msg="", title=playlist_title)
+
+
+# --------------------------------------------------------------- Spotify
+# Connexion du compte Spotify (OAuth 2.0) : sert UNIQUEMENT à ajouter une piste de
+# Reco Radar à une playlist du compte de l'utilisateur. Section dans « Mes goûts »
+# (/patte). Jetons stockés par utilisateur (spotifyauth), jamais dans la config JSON.
+
+_SP_PLAYLIST_ID = re.compile(r"^[A-Za-z0-9]{22}$")
+_SP_TRACK_URI = re.compile(r"^spotify:track:[A-Za-z0-9]{22}$")
+
+
+@app.get("/oauth/spotify/start")
+def spotify_start():
+    if not spotifyauth.configured():
+        return RedirectResponse("/patte?spotify=unconfigured", status_code=303)
+    return RedirectResponse(
+        spotifyauth.auth_url(spotifyauth.make_state(store.current_uid())),
+        status_code=303,
+    )
+
+
+@app.get("/oauth/spotify/callback")
+def spotify_callback(code: str = "", state: str = "", error: str = ""):
+    """Retour de Spotify. L’état est signé et lié à l’utilisateur de la session : un
+    code injecté par un tiers (CSRF de connexion) serait refusé ici."""
+    uid = store.current_uid()
+    if error or not code or not spotifyauth.check_state(state, uid):
+        return RedirectResponse("/patte?spotify=refused", status_code=303)
+    try:
+        spotifyauth.exchange_code(uid, code)
+    except spotifyauth.SpotifyError:
+        return RedirectResponse("/patte?spotify=error", status_code=303)
+    return RedirectResponse("/patte?spotify=ok", status_code=303)
+
+
+@app.post("/oauth/spotify/disconnect")
+def spotify_disconnect():
+    spotifyauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?spotify=off", status_code=303)
+
+
+@app.get("/reco-radar/sp-playlists", response_class=HTMLResponse)
+def reco_radar_sp_playlists(
+    request: Request, artist: str = "", title: str = ""
+):
+    """Contenu de la fenêtre « Ajouter à une playlist » (htmx)."""
+    uid = store.current_uid()
+    ctx = {
+        "configured": spotifyauth.configured(),
+        "connected": False,
+        "playlists": [],
+        "error": "",
+        "track_uri": "",
+        "artist": artist,
+        "title": title,
+    }
+    if ctx["configured"] and spotifyauth.is_connected(uid):
+        ctx["connected"] = True
+        try:
+            ctx["track_uri"] = spotifyauth.search_track_uri(uid, artist, title)
+            ctx["playlists"] = spotifyauth.list_playlists(uid)
+        except spotifyauth.SpotifyError as e:
+            ctx["error"] = e.message
+            ctx["connected"] = spotifyauth.is_connected(uid)  # invalid_grant -> déconnecté
+    return frag(request, "partials/sp_playlists.html", **ctx)
+
+
+@app.post("/reco-radar/sp-playlist-add", response_class=HTMLResponse)
+def reco_radar_sp_playlist_add(
+    request: Request,
+    playlist_id: str = Form(""),
+    track_uri: str = Form(""),
+    playlist_title: str = Form(""),
+):
+    if not (
+        _SP_PLAYLIST_ID.match(playlist_id)
+        and _SP_TRACK_URI.match(track_uri)
+    ):
+        return HTMLResponse(
+            '<p class="small warn">Piste ou playlist invalide.</p>',
+            status_code=400,
+        )
+    try:
+        spotifyauth.add_to_playlist(
+            store.current_uid(), playlist_id, track_uri
+        )
+    except spotifyauth.SpotifyError as e:
+        return frag(
+            request,
+            "partials/sp_added.html",
+            ok=False,
+            msg=e.message,
+            title="",
+        )
+    return frag(
+        request,
+        "partials/sp_added.html",
+        ok=True,
+        msg="",
+        title=playlist_title,
+    )
 
 
 def _apply_patte_form(f):

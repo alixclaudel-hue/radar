@@ -149,6 +149,26 @@
 </div>
 {% endif %}
 
+<!-- ============ Google / YouTube (hors du formulaire principal) ============ -->
+<details class="acc" {{ 'open' if google_msg }}>
+  <summary>{{ icons.youtube() }} Compte Google / YouTube
+    <span class="tag">{% if google_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif google_configured %}non relié{% else %}non configuré{% endif %}</span></summary>
+  <div class="acc__body">
+    {% if google_msg %}<p class="notice small">{{ google_msg }}</p>{% endif %}
+    <p class="small muted">Sert à ajouter une piste de Reco Radar à l'une de tes playlists YouTube
+      (bouton « Playlist »). Radar demande l'accès à tes playlists uniquement ; tu peux le
+      révoquer ici à tout moment.</p>
+    {% if not google_configured %}
+    <p class="small">La connexion Google n'est pas encore configurée sur ce serveur
+      (<code>RADAR_GOOGLE_CLIENT_ID</code> / <code>RADAR_GOOGLE_CLIENT_SECRET</code>).</p>
+    {% elif google_connected %}
+    <form method="post" action="/oauth/google/disconnect"><button class="small danger" type="submit">Délier mon compte Google</button></form>
+    {% else %}
+    <a class="btn primary small" href="/oauth/google/start">Relier mon compte Google</a>
+    {% endif %}
+  </div>
+</details>
+
 <!-- ============ DJ sets (hors du formulaire principal) ============ -->
 <details class="acc">
   <summary>{{ icons.tracks() }} DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>

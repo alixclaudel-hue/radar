@@ -699,22 +699,20 @@ h3 small, h3 .small{ font-weight:400; }
   .tbl--cards thead{ display:none; }
   .tbl--cards, .tbl--cards tbody{ display:block; }
   .tbl--cards tbody tr{
-    display:grid; grid-template-columns:44px repeat(5, auto) minmax(0, 1fr); column-gap:4px; row-gap:2px; align-items:center;
+    display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:10px; row-gap:4px; align-items:start;
     padding:12px; margin:0 0 10px; border:1px solid var(--line); border-radius:var(--r-lg);
     background:var(--surface); box-shadow:var(--sh-1);
   }
   .tbl--cards td{ padding:0; min-width:0; }
-  .tbl--cards td:nth-child(1){ grid-column:1; grid-row:1 / 3; align-self:start; }
-  .tbl--cards td:nth-child(2){ grid-column:2 / -1; grid-row:1; font-weight:600; }
-  .tbl--cards td:nth-child(3){ grid-column:2 / -1; grid-row:2; padding-right:44px; font-size:12.5px; color:var(--soft); }
-  .tbl--cards td:nth-child(4){ grid-column:2 / -1; grid-row:2; justify-self:end; font-size:12.5px; }   /* l'année, à droite de la ligne release / label */
-  .tbl--cards td:nth-child(n+5){ grid-row:3; padding-top:8px; white-space:nowrap; }
-  .tbl--cards td:nth-child(5){ grid-column:2; }
-  .tbl--cards td:nth-child(6){ grid-column:3; }
-  .tbl--cards td:nth-child(7){ grid-column:4; }
-  .tbl--cards td:nth-child(8){ grid-column:5; }
-  .tbl--cards td:nth-child(9){ grid-column:6; }
-  .tbl--cards tbody tr.now-playing td:nth-child(3){ color:inherit; }
+  /* ligne 1 : titre (+ score) à gauche, pouces en haut à droite de la carte */
+  .tbl--cards td:nth-child(1){ grid-column:1; grid-row:1; }
+  .tbl--cards td:nth-child(4){ grid-column:2; grid-row:1; justify-self:end; }
+  /* ligne 2 : release / label, année à droite */
+  .tbl--cards td:nth-child(2){ grid-column:1; grid-row:2; font-size:12.5px; color:var(--soft); }
+  .tbl--cards td:nth-child(3){ grid-column:2; grid-row:2; justify-self:end; font-size:12.5px; }
+  /* ligne 3 : actions */
+  .tbl--cards td:nth-child(5){ grid-column:1 / -1; grid-row:3; padding-top:8px; }
+  .tbl--cards tbody tr.now-playing td:nth-child(2){ color:inherit; }
   .tbl-wrap:has(.tbl--cards){ overflow-x:visible; }
 }
 
@@ -759,7 +757,7 @@ a.tag:hover{ background:var(--pin-50); color:var(--pin); }
 .legend{ text-align:center; }
 
 /* largeurs de colonnes (Reco Radar, Tracks aimées, tables de labels) */
-.col-n{ width:52px; } .col-year{ width:60px; } .col-act{ width:34px; } .col-acts{ width:64px; }
+.col-vote{ width:76px; } .col-acts2{ width:250px; } .col-year{ width:60px; } .col-act{ width:34px; } .col-acts{ width:64px; }
 .col-aff{ width:130px; } .col-reco{ width:60px; } .col-own{ width:80px; } .col-cat{ width:150px; }
 .nowrap{ white-space:nowrap; }
 
@@ -822,3 +820,43 @@ input[type=file]::file-selector-button{
   background:var(--sunken); color:var(--ink); font:inherit; font-size:13px; font-weight:600; cursor:pointer;
 }
 input[type=file]::file-selector-button:hover{ border-color:var(--ink); }
+
+/* liste des playlists YouTube dans la fenêtre « Ajouter à une playlist » */
+.pl-list{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow:auto; }
+.pl-list button{ width:100%; justify-content:flex-start; text-align:left; }
+
+/* Reco Radar : cellule titre + score, actions, menu « Achat », fenêtre playlist */
+.trk-main{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.trk-title{ font-weight:600; overflow-wrap:anywhere; min-width:0; }
+.trk-acts{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.buy-menu{ position:relative; display:inline-block; }
+.buy-menu > summary{ list-style:none; }
+.buy-menu > summary::-webkit-details-marker{ display:none; }
+.buy-btn{
+  display:inline-flex; align-items:center; gap:5px; min-height:34px; padding:5px 10px;
+  border:1px solid var(--line-strong); border-radius:var(--pill); background:var(--surface);
+  color:var(--ink); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; line-height:1.2;
+}
+.buy-btn:hover{ border-color:var(--ink); }
+.buy-btn .ic{ width:16px; height:16px; }
+.buy-menu[open] > .buy-btn{ background:var(--pin-50); border-color:transparent; color:var(--pin); }
+/* fixe : le JS pose left/top (un menu absolu serait rogné par .tbl-wrap sur ordinateur) */
+.buy-menu__list{
+  position:fixed; z-index:80; min-width:200px; display:flex; flex-direction:column; gap:2px; padding:6px;
+  background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--sh-2);
+}
+.buy-menu__list form{ margin:0; }
+.buy-menu__list a, .buy-menu__list button, .buy-menu__done{
+  display:flex; align-items:center; gap:8px; width:100%; padding:9px 10px; border:none; border-radius:var(--r-sm);
+  background:transparent; color:var(--ink); font:inherit; font-size:13px; font-weight:400; text-align:left;
+  text-decoration:none; justify-content:flex-start; cursor:pointer;
+}
+.buy-menu__list a:hover, .buy-menu__list button:hover{ background:var(--sunken); }
+.buy-menu__done{ color:var(--soft); cursor:default; }
+.tbl tbody tr.now-playing .buy-menu__list a, .tbl tbody tr.now-playing .buy-menu__list button{ color:var(--ink); }
+.pl-dialog{
+  border:1px solid var(--line); border-radius:var(--r-lg); padding:14px 16px;
+  width:min(420px, calc(100vw - 24px)); background:var(--surface); color:var(--ink);
+}
+.pl-dialog::backdrop{ background:rgba(0,0,0,.4); }
+.pl-dialog__head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }

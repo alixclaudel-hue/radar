@@ -32,11 +32,10 @@
       </nav>
       <div class="topbar-right">
         <details class="profile-menu">
-          <summary class="chip profile-tab {{ 'active' if cur in ('patte','wantlist','tracks_aimees') }}" title="Mon profil" aria-label="Mon profil">{{ icons.user("ic-lg") }}<span class="profile-tab__txt">Mon profil</span></summary>
+          <summary class="chip profile-tab {{ 'active' if cur in ('patte','wantlist') }}" title="Mon profil" aria-label="Mon profil">{{ icons.user("ic-lg") }}<span class="profile-tab__txt">Mon profil</span></summary>
           <nav class="profile-menu-list">
             <a href="/patte" class="{{ 'active' if cur=='patte' }}">{{ icons.album() }} Mes goûts</a>
             <a href="/wantlist" class="{{ 'active' if cur=='wantlist' }}">{{ icons.cart() }} Ma Wantlist{% if n_cart %} ({{ n_cart }}){% endif %}</a>
-            <a href="/tracks-aimees" class="{{ 'active' if cur=='tracks_aimees' }}">{{ icons.heart() }} Mes tracks aimées</a>
             {% if is_owner %}
             {# Lien d'invitation réservé au propriétaire (retour utilisateur 28/09).
                `is_owner` vient de render() ; la route /account/invite revérifie le

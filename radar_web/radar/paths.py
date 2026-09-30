@@ -58,7 +58,6 @@ _PER_USER = {
     "recos_candidates": "recos_candidates.json",
     "recos_history": "recos_playlist_history.json",
     "recos_playlist": "recos_playlist.json",
-    "liked_tracks": "liked_tracks.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

@@ -8,19 +8,21 @@
 <tbody id="reco-rows">
   {% for t in playlist %}
   <tr data-vid="{{ t.video_id }}">
-    <td class="small muted">
-      {{ loop.index }}
+    {#- Retour mobile 29/09 : plus de colonne « # » (le score ne partage plus une
+       cellule étroite avec le titre, d'où la superposition) ; pouces en haut à
+       droite de la carte ; actions regroupées en bas (Achat ▾ · Playlist · 🗑). -#}
+    <td class="trk-main">
+      <span class="trk-title">{{ t.artist }} - {{ t.title }}</span>
       {% if t.album_score is not none %}
       <span class="badge small" title="Score album /100">{{ icons.album() }} {{ t.album_score }}</span>
       {% endif %}
     </td>
-    <td>{{ t.artist }} - {{ t.title }}</td>
     <td>
       {{ t.release_title or '—' }}
       {% if t.label %}<br><a class="small" href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}
     </td>
     <td class="num small muted">{{ t.year or '—' }}</td>
-    <td>
+    <td class="trk-vote">
       {% set v = (voted or {}).get(t.release_id) %}
       <span class="vote" hx-swap="outerHTML">
         {% if v %}
@@ -31,50 +33,45 @@
         {% endif %}
       </span>
     </td>
-    <td>
-      <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t"
-         target="_blank" rel="noopener" class="ic-btn" title="Chercher sur Bandcamp">{{ icons.bandcamp() }}</a>
-      {# F2 (retour utilisateur 28/09) : ouvrir la fiche Discogs du release — prix,
-         autres pressages, et l'état « déjà en wantlist/collection » y sont visibles.
-         Lien construit sur l'id numérique (jamais le slug `uri`, qui peut manquer). #}
-      {% if t.release_id %}
-      <a href="https://www.discogs.com/release/{{ t.release_id }}" target="_blank" rel="noopener"
-         class="ic-btn" title="Ouvrir sur Discogs">{{ icons.discogs() }}</a>
-      {% endif %}
-      {# F9 (retour utilisateur 28/09) : ouvrir la piste sur YouTube pour l'ajouter
-         à une playlist. Pas d'écriture via l'API (OAuth) : on ouvre la vidéo, où
-         « Enregistrer → playlist » est à un clic. #}
+    <td class="trk-acts">
+      {# Menu « Achat » : <details> + positionnement fixe posé par le JS de la page
+         (le .tbl-wrap rogne un menu absolu sur ordinateur). Beatport/Traxsource :
+         redirection navigateur, jamais de scraping (pt 64). #}
+      <details class="buy-menu">
+        <summary class="buy-btn">{{ icons.cart() }} Achat {{ icons.chevron() }}</summary>
+        <div class="buy-menu__list">
+          <a href="/bc/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}&kind=t"
+             target="_blank" rel="noopener">{{ icons.bandcamp() }} Bandcamp</a>
+          <a href="/ts/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}"
+             target="_blank" rel="noopener">{{ icons.traxsource() }} Traxsource</a>
+          <a href="/bp/go?a={{ t.artist|urlencode }}&t={{ t.title|urlencode }}&l={{ (t.label or '')|urlencode }}"
+             target="_blank" rel="noopener">{{ icons.beatport() }} Beatport</a>
+          {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
+          <span class="buy-menu__done" title="Déjà en wantlist">{{ icons.check() }} Discogs · déjà en wantlist</span>
+          {% else %}
+          {# On referme le menu et toute mini-fenêtre de pressages déjà ouverte (sinon
+             elles s'empilent) ; /cart/add la réaffiche via release_matches.html. #}
+          <form hx-post="/cart/add" hx-swap="outerHTML" class="inline"
+                hx-on::before-request="this.closest('details').open=false;document.querySelectorAll('.wl-matches').forEach(function(w){w.remove()})">
+            <input type="hidden" name="rid" value="{{ t.release_id }}">
+            <input type="hidden" name="title" value="{{ t.release_title }}">
+            <input type="hidden" name="artist" value="{{ t.artist }}">
+            <!-- titre de la PISTE : sert à retrouver les pressages vinyle quand la
+                 sortie proposée n'est pas du vinyle (cf. app.py::cart_add) -->
+            <input type="hidden" name="track" value="{{ t.title }}">
+            <input type="hidden" name="label" value="{{ t.label or '' }}">
+            <button type="submit" title="Ajouter le release à la wantlist Discogs">{{ icons.discogs() }} Discogs · wantlist</button>
+          </form>
+          {% endif %}
+        </div>
+      </details>
+      {# Fenêtre « Ajouter à une playlist YouTube » : une seule <dialog> par page,
+         ouverte par le JS de reco_radar.html (data-pl-add). #}
       {% if t.video_id %}
-      <a href="https://www.youtube.com/watch?v={{ t.video_id }}" target="_blank" rel="noopener"
-         class="ic-btn" title="Ouvrir sur YouTube (ajouter à une playlist)">{{ icons.youtube() }}</a>
+      <button type="button" class="buy-btn" data-pl-add data-vid="{{ t.video_id }}"
+              data-name="{{ t.artist }} - {{ t.title }}" title="Ajouter à une playlist YouTube">{{ icons.plus() }} Playlist</button>
       {% endif %}
-    </td>
-    <td>
-      {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
-        <span class="small ok" title="Déjà en wantlist">{{ icons.check() }}</span>
-      {% else %}
-      {# On referme d'abord toute mini-fenêtre de pressages déjà ouverte (sinon
-         elles s'empilent) ; /cart/add la réaffiche via release_matches.html. #}
-      <form hx-post="/cart/add" hx-swap="outerHTML" class="inline"
-            hx-on::before-request="document.querySelectorAll('.wl-matches').forEach(function(w){w.remove()})">
-        <input type="hidden" name="rid" value="{{ t.release_id }}">
-        <input type="hidden" name="title" value="{{ t.release_title }}">
-        <input type="hidden" name="artist" value="{{ t.artist }}">
-        <!-- titre de la PISTE : sert à retrouver les pressages vinyle quand la
-             sortie proposée n'est pas du vinyle (cf. app.py::cart_add) -->
-        <input type="hidden" name="track" value="{{ t.title }}">
-        <input type="hidden" name="label" value="{{ t.label or '' }}">
-        <button type="submit" class="ic-btn" title="Ajouter le release à la wantlist Discogs">{{ icons.cart() }}</button>
-      </form>
-      {% endif %}
-    </td>
-    <td>
-      {% set video_id = t.video_id %}
-      {% set liked = t.video_id in (liked_vids or []) %}
-      {% include "partials/like_button.html" with context %}
-    </td>
-    <td>
-      <button type="button" class="small" title="Retirer cette piste de la playlist"
+      <button type="button" class="ic-btn" title="Retirer cette piste de la playlist"
               hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'
               hx-target="#reco-rows" hx-swap="outerHTML" aria-label="Supprimer la piste">{{ icons.trash() }}</button>
     </td>

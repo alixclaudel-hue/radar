@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import opslog, websession
+from .radar import googleauth, opslog, websession
 from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
                     learn, paths, sellers, stores, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
@@ -416,7 +416,14 @@ def patte_page(request: Request, saved: int = 0):
     st = c.stats()
     # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
     onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
-    return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
+    google_msg = {"ok": "Compte Google relié.", "off": "Compte Google délié.",
+                  "refused": "Connexion Google refusée ou expirée — réessaie.",
+                  "error": "Google n'a pas validé la connexion — réessaie.",
+                  "unconfigured": "La connexion Google n'est pas configurée sur ce serveur."
+                  }.get(request.query_params.get("google", ""), "")
+    return render(request, "pages/patte.html", active="patte",
+                  google_msg=google_msg, google_configured=googleauth.configured(),
+                  google_connected=googleauth.is_connected(store.current_uid()), cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
@@ -434,7 +441,7 @@ def reco_radar_page(request: Request):
                   playlist=playlist, n_playlist=len(playlist), max_tracks=max_tracks,
                   recos_pending=len(load(_pu().recos_candidates, [])),
                   last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"),
-                  in_cart=_cart_ids(), voted=_voted_map(), liked_vids=_liked_ids())
+                  in_cart=_cart_ids(), voted=_voted_map())
 
 
 @app.post("/reco-radar/delete", response_class=HTMLResponse)
@@ -457,7 +464,7 @@ def reco_radar_delete_track(request: Request, video_id: str = Form("")):
             save(_pu().recos_playlist, new_playlist)
             playlist = new_playlist
     return frag(request, "partials/reco_rows.html", playlist=playlist,
-                in_cart=_cart_ids(), voted=_voted_map(), liked_vids=_liked_ids())
+                in_cart=_cart_ids(), voted=_voted_map())
 
 
 @app.post("/reco-radar/mark-played")
@@ -489,86 +496,68 @@ def reco_radar_clear_candidates():
     return RedirectResponse("/reco-radar", status_code=303)
 
 
-def _style_key(s):
-    """Normalisation identité artiste/titre — COPIE VOLONTAIRE de
-    radar_jobs.common.style_key (dédoublonnage de recos_history.json) : la couche
-    web n'importe pas radar_jobs (cf. CLAUDE.md pt17, un seul module de job chargé
-    à la fois par crate_jobs.py), donc on mirrore plutôt que d'importer."""
-    return re.sub(r"\s+", " ", (s or "").lower().replace("-", " ")).strip()
+# --------------------------------------------------------------- Google / YouTube
+# Connexion du compte YouTube (OAuth 2.0) : sert UNIQUEMENT à ajouter une piste de
+# Reco Radar à une playlist du compte de l'utilisateur. Section dans « Mes goûts »
+# (/patte). Jetons stockés par utilisateur (googleauth), jamais dans la config JSON.
+
+_YT_ID = re.compile(r"^[\w-]{1,64}$")
 
 
-def _liked_track_key(t):
-    """Identité (artiste, titre) normalisée d'une piste dict — sert de clé de
-    dédoublonnage pour « Mes tracks aimées » (le video_id YouTube n'est PAS
-    l'identité : deux vidéos différentes peuvent être la même piste)."""
-    return (_style_key(t.get("artist")), _style_key(t.get("title")))
+@app.get("/oauth/google/start")
+def google_start():
+    if not googleauth.configured():
+        return RedirectResponse("/patte?google=unconfigured", status_code=303)
+    return RedirectResponse(googleauth.auth_url(googleauth.make_state(store.current_uid())),
+                            status_code=303)
 
 
-def _liked_ids():
-    """video_id de recos_playlist.json actuellement « aimés » (identité présente
-    dans liked_tracks.json) — même esprit que _cart_ids(), pour préremplir l'état
-    du cœur à chaque ligne de /reco-radar."""
-    liked_keys = {_liked_track_key(t) for t in load(_pu().liked_tracks, [])}
-    playlist = load(_pu().recos_playlist, [])
-    return {t["video_id"] for t in playlist if _liked_track_key(t) in liked_keys}
+@app.get("/oauth/google/callback")
+def google_callback(code: str = "", state: str = "", error: str = ""):
+    """Retour de Google. L'état est signé et lié à l'utilisateur de la session : un
+    code injecté par un tiers (CSRF de connexion) serait refusé ici."""
+    uid = store.current_uid()
+    if error or not code or not googleauth.check_state(state, uid):
+        return RedirectResponse("/patte?google=refused", status_code=303)
+    try:
+        googleauth.exchange_code(uid, code)
+    except googleauth.GoogleError:
+        return RedirectResponse("/patte?google=error", status_code=303)
+    return RedirectResponse("/patte?google=ok", status_code=303)
 
 
-@app.post("/reco-radar/like-toggle", response_class=HTMLResponse)
-def reco_radar_like_toggle(request: Request, video_id: str = Form("")):
-    """Bascule le « j'aime » d'une piste dans liked_tracks.json. Ne lève JAMAIS
-    (même philosophie que discogs_get(), cf. CLAUDE.md pt10) : video_id inconnu ->
-    état neutre. Gère aussi bien le like depuis /reco-radar (piste présente dans
-    recos_playlist.json) que le unlike depuis « Mes tracks aimées » (piste qui a pu
-    entre-temps disparaître de la playlist)."""
-    if not video_id:
-        return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
-
-    playlist = load(_pu().recos_playlist, [])
-    track = next((t for t in playlist if t.get("video_id") == video_id), None)
-    liked = load(_pu().liked_tracks, [])
-
-    if track:
-        artist, title = track.get("artist"), track.get("title")
-    else:
-        matched = next((t for t in liked if t.get("video_id") == video_id), None)
-        if not matched:
-            return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
-        artist, title = matched.get("artist"), matched.get("title")
-
-    key = _liked_track_key({"artist": artist, "title": title})
-    new_liked = [t for t in liked if _liked_track_key(t) != key]
-
-    if len(new_liked) != len(liked):
-        save(_pu().liked_tracks, new_liked)
-        return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
-
-    entry = dict(track) if track else {"video_id": video_id, "artist": artist, "title": title}
-    entry["liked_at"] = datetime.now().isoformat(timespec="seconds")
-    save(_pu().liked_tracks, liked + [entry])
-    return frag(request, "partials/like_button.html", video_id=video_id, liked=True)
+@app.post("/oauth/google/disconnect")
+def google_disconnect():
+    googleauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?google=off", status_code=303)
 
 
-@app.get("/tracks-aimees", response_class=HTMLResponse)
-def tracks_aimees_page(request: Request):
-    """« Mes tracks aimées » : pistes marquées d'un cœur depuis Reco Radar, avec
-    lecteur IFrame et export vers YouTube (watch_videos?video_ids=..., lien public
-    SANS OAuth — cf. RECOS RADAR pt19 CLAUDE.md, pas de playlist créée sur un
-    compte). YouTube limite ce paramètre à 50 identifiants : découpage en lots fait
-    ici en Python (plus simple à tester qu'en Jinja)."""
-    liked = load(_pu().liked_tracks, [])
-    vids = [t.get("video_id") for t in liked if t.get("video_id")]
+@app.get("/reco-radar/yt-playlists", response_class=HTMLResponse)
+def reco_radar_yt_playlists(request: Request, video_id: str = ""):
+    """Contenu de la fenêtre « Ajouter à une playlist » (htmx)."""
+    uid = store.current_uid()
+    ctx = {"video_id": video_id, "configured": googleauth.configured(),
+           "connected": False, "playlists": [], "error": ""}
+    if ctx["configured"] and googleauth.is_connected(uid):
+        ctx["connected"] = True
+        try:
+            ctx["playlists"] = googleauth.list_playlists(uid)
+        except googleauth.GoogleError as e:
+            ctx["error"] = e.message
+            ctx["connected"] = googleauth.is_connected(uid)   # invalid_grant -> déconnecté
+    return frag(request, "partials/yt_playlists.html", **ctx)
 
-    export_batches = []
-    for i in range(0, len(vids), 50):
-        chunk = vids[i:i + 50]
-        export_batches.append({
-            "start": i + 1,
-            "end": min(i + 50, len(vids)),
-            "ids": ",".join(chunk),
-        })
 
-    return render(request, "pages/tracks_aimees.html", active="tracks_aimees",
-                  liked=liked, n_liked=len(liked), export_batches=export_batches)
+@app.post("/reco-radar/yt-playlist-add", response_class=HTMLResponse)
+def reco_radar_yt_playlist_add(request: Request, video_id: str = Form(""),
+                               playlist_id: str = Form(""), playlist_title: str = Form("")):
+    if not (_YT_ID.match(video_id) and _YT_ID.match(playlist_id)):
+        return HTMLResponse('<p class="small warn">Piste ou playlist invalide.</p>', status_code=400)
+    try:
+        googleauth.add_to_playlist(store.current_uid(), playlist_id, video_id)
+    except googleauth.GoogleError as e:
+        return frag(request, "partials/yt_added.html", ok=False, msg=e.message, title="")
+    return frag(request, "partials/yt_added.html", ok=True, msg="", title=playlist_title)
 
 
 def _apply_patte_form(f):

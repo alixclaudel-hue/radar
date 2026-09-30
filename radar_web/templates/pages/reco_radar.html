@@ -31,22 +31,56 @@
 <div class="tbl-wrap">
 <table class="tbl tbl--cards">
   <thead><tr>
-    <th class="col-n">#</th>
     <th>Track</th>
     <th>Release / Label</th>
     <th class="num col-year">Année</th>
-    <th class="col-acts"></th>
-    <th class="col-act"></th>
-    <th class="col-act"></th>
-    <th class="col-act"></th>
-    <th class="col-act"></th>
+    <th class="col-vote"></th>
+    <th class="col-acts2"></th>
   </tr></thead>
   {% include "partials/reco_rows.html" %}
 </table>
 </div>
 
+<dialog id="pl-dialog" class="pl-dialog">
+  <div class="pl-dialog__head"><strong>Ajouter à une playlist</strong>
+    <button type="button" class="wl-matches__close" data-pl-close aria-label="Fermer">{{ icons.close() }}</button></div>
+  <p class="small muted" id="pl-dialog-track"></p>
+  {# Contenu chargé en htmx : liste des playlists du compte YouTube relié dans
+     « Mes goûts » (OAuth Google, cf. googleauth.py), sinon invitation à le relier. #}
+  <div id="pl-dialog-body"></div>
+</dialog>
+
 <script>
 (() => {
+  // Menu « Achat » : la liste est posée en `position:fixed` sous le bouton (le
+  // .tbl-wrap rogne un menu absolu) ; un seul menu ouvert à la fois.
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (!d.matches || !d.matches('.buy-menu') || !d.open) return;
+    document.querySelectorAll('.buy-menu[open]').forEach(o => { if (o !== d) o.open = false; });
+    const b = d.querySelector('summary').getBoundingClientRect();
+    const l = d.querySelector('.buy-menu__list');
+    const w = l.offsetWidth, h = l.offsetHeight;
+    l.style.left = Math.max(8, Math.min(b.left, window.innerWidth - w - 8)) + 'px';
+    l.style.top = (b.bottom + h + 12 > window.innerHeight ? Math.max(8, b.top - h - 6) : b.bottom + 6) + 'px';
+  }, true);
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.buy-menu')) document.querySelectorAll('.buy-menu[open]').forEach(o => { o.open = false; });
+  });
+  window.addEventListener('scroll', () => document.querySelectorAll('.buy-menu[open]').forEach(o => { o.open = false; }), { passive: true });
+
+  const dlg = document.getElementById('pl-dialog');
+  document.addEventListener('click', (e) => {
+    const add = e.target.closest('[data-pl-add]');
+    if (add) {
+      document.getElementById('pl-dialog-track').textContent = add.dataset.name;
+      document.getElementById('pl-dialog-body').innerHTML = '<p class="small muted">Chargement…</p>';
+      dlg.showModal();
+      htmx.ajax('GET', '/reco-radar/yt-playlists?video_id=' + encodeURIComponent(add.dataset.vid),
+                { target: '#pl-dialog-body', swap: 'innerHTML' });
+    } else if (e.target.closest('[data-pl-close]') || e.target === dlg) dlg.close();
+  });
+
   // Le lecteur est piloté par la LISTE VISIBLE (les lignes du DOM), jamais par la
   // playlist interne de l'IFrame. Avant, la file était chargée une seule fois au
   // démarrage (`loadPlaylist`) : après une suppression en place (htmx, sans
@@ -108,7 +142,7 @@
 
   wrap.addEventListener('click', (e) => {
     const r = e.target.closest('#reco-rows tr');
-    if (!r || e.target.closest('button, a, form')) return;
+    if (!r || e.target.closest('button, a, form, summary, details')) return;
     const vid = r.dataset.vid;
     if (!player) { pendingVid = vid; return; }   // lecteur pas encore prêt
     playFromClick(vid);

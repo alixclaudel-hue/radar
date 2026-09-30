@@ -5,10 +5,12 @@
   "policy": {
     "free_first": true,
     "mode_default_models": {
-      "code": "deepseek-flash",
-      "test": "deepseek-flash",
-      "worker": "deepseek-flash",
-      "pr": "deepseek-flash"
+      "general": "gemini:gemini-flash-lite-latest",
+      "diag": "gemini:gemini-flash-lite-latest",
+      "summary": "gemini:gemini-flash-lite-latest",
+      "code": "openrouter:stealth/space-bunny-alpha",
+      "test": "openrouter:stealth/space-bunny-alpha",
+      "pr": "gemini:gemini-3.5-flash-lite"
     },
     "paid_modes": [
       "reasoning"
@@ -25,8 +27,72 @@
       "max_delay": 30.0
     },
     "blocked_ids": [
-      "thinkingmachines/inkling-small:free"
-    ]
+      "thinkingmachines/inkling-small:free",
+      "nvidia/nemotron-3.5-lightning:free",
+      "gemma-4-26b-a4b-it",
+      "gemma-4-31b-it",
+      "thinkingmachines/inkling:free",
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "poolside/laguna-xs-2.1:free"
+    ],
+    "mode_cascades": {
+      "general": [
+        "gemini:gemini-flash-lite-latest",
+        "openrouter:stealth/space-bunny-alpha",
+        "gemini:gemini-3.5-flash-lite",
+        "openrouter:inclusionai/ling-3.0-flash-sante:free",
+        "openrouter:poolside/laguna-s-2.1:free",
+        "openrouter:qwen/qwen3.8-27b:free",
+        "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free"
+      ],
+      "diag": [
+        "gemini:gemini-flash-lite-latest",
+        "openrouter:stealth/space-bunny-alpha",
+        "gemini:gemini-3.5-flash-lite",
+        "openrouter:inclusionai/ling-3.0-flash-sante:free",
+        "openrouter:poolside/laguna-s-2.1:free",
+        "openrouter:qwen/qwen3.8-27b:free",
+        "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free"
+      ],
+      "summary": [
+        "gemini:gemini-flash-lite-latest",
+        "openrouter:stealth/space-bunny-alpha",
+        "gemini:gemini-3.5-flash-lite",
+        "openrouter:inclusionai/ling-3.0-flash-sante:free",
+        "openrouter:poolside/laguna-s-2.1:free",
+        "openrouter:qwen/qwen3.8-27b:free",
+        "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free"
+      ],
+      "code": [
+        "openrouter:stealth/space-bunny-alpha",
+        "gemini:gemini-3.5-flash-lite",
+        "openrouter:poolside/laguna-s-2.1:free",
+        "openrouter:qwen/qwen3.8-27b:free",
+        "openrouter:inclusionai/ling-3.0-flash-sante:free",
+        "gemini:gemini-flash-lite-latest"
+      ],
+      "test": [
+        "openrouter:stealth/space-bunny-alpha",
+        "gemini:gemini-3.5-flash-lite",
+        "openrouter:poolside/laguna-s-2.1:free",
+        "openrouter:qwen/qwen3.8-27b:free",
+        "openrouter:inclusionai/ling-3.0-flash-sante:free",
+        "gemini:gemini-flash-lite-latest"
+      ],
+      "pr": [
+        "gemini:gemini-3.5-flash-lite",
+        "gemini:gemini-flash-lite-latest",
+        "openrouter:stealth/space-bunny-alpha",
+        "openrouter:inclusionai/ling-3.0-flash-sante:free"
+      ]
+    },
+    "mode_excluded": {
+      "diag": [
+        "cohere/north-mini-code:free",
+        "gemini:gemini-robotics-er-2-preview",
+        "gemini:gemini-3-flash-preview"
+      ]
+    }
   },
   "providers": {
     "openrouter": {

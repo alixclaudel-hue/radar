@@ -74,3 +74,4 @@ discogs_profile/
 # expédiée sur la branche `telemetry` par telemetry_ship.py — jamais sur une branche de code
 .claude/telemetry.jsonl
 .claude/telemetry.jsonl.1
+.bench_runs/

@@ -64,10 +64,12 @@
           {% if t.release_id and (t.release_id|string) in (in_cart or []) %}
           <span class="buy-menu__done" title="Déjà en wantlist">{{ icons.check() }} Discogs · déjà en wantlist</span>
           {% else %}
-          {# On referme le menu et toute mini-fenêtre de pressages déjà ouverte (sinon
-             elles s'empilent) ; /cart/add la réaffiche via release_matches.html. #}
+          {# On retire toute mini-fenêtre de pressages déjà ouverte (sinon elles
+             s'empilent). Le menu reste OUVERT pendant la requête : le retour de
+             /cart/add (✓, erreur, pressages) s'y affiche ; base.html sort les
+             pressages du menu puis le referme. #}
           <form hx-post="/cart/add" hx-swap="outerHTML" class="inline"
-                hx-on::before-request="this.closest('details').open=false;document.querySelectorAll('.wl-matches').forEach(function(w){w.remove()})">
+                hx-on::before-request="document.querySelectorAll('.wl-matches').forEach(function(w){w.remove()})">
             <input type="hidden" name="rid" value="{{ t.release_id }}">
             <input type="hidden" name="title" value="{{ t.release_title }}">
             <input type="hidden" name="artist" value="{{ t.artist }}">

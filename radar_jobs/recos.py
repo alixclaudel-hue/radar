@@ -16,6 +16,7 @@ from radar_jobs.common import (
     RECOS_CANDIDATES_PATH, RECOS_HISTORY_PATH, RECOS_PLAYLIST_PATH, RECOS_SEARCH_BUDGET_PATH,
     save_json, style_key,
 )
+from radar_jobs.recos_diversity import DiversityTracker, dominant_reason
 from radar_jobs.sources import discogs_get
 from radar_jobs.tracks import _is_continuous_mix, _release_identity_key, _strip_discogs_suffix
 
@@ -235,6 +236,10 @@ def job_scan_recos(job, params):
     now = datetime.now().isoformat(timespec="seconds")
     job.st["total"] = min(len(rows), max_new)
     n_added, n_owned, n_want = 0, 0, 0
+    # Le tri par score seul laisserait un même artiste ou label occuper toute la
+    # fournée ; les pistes écartées ne sont pas marquées vues, elles restent donc
+    # éligibles au prochain scan.
+    diversity = DiversityTracker(candidates + playlist)
     for (artist, title, score, detail_json, release_id, release_title, label, year,
          release_artist) in rows:
         if job.stopped() or n_added >= max_new or len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
@@ -251,6 +256,10 @@ def job_scan_recos(job, params):
                 or _release_identity_key(release_artist, release_title) in want_keys):
             n_want += 1
             continue
+        if not diversity.allows(artist, label):
+            diversity.reject()
+            continue
+        diversity.add(artist, label)
         known_tracks.add(k)
         detail = json.loads(detail_json) if detail_json else {}
         candidates.append({
@@ -259,14 +268,18 @@ def job_scan_recos(job, params):
             "album_score": score, "added_at": now,
             "d_label": detail.get("label"), "d_artist": detail.get("artist"),
             "d_style": detail.get("style"),
+            # "why" : raison dominante du score, exposée pour l'affichage /reco-radar.
+            "why": dominant_reason(detail.get("artist"), detail.get("label"), detail.get("style")),
         })
         n_added += 1
         job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
     owned_note = f" {n_owned} piste(s) écartée(s) (album déjà en collection Discogs/Bandcamp)." if n_owned else ""
     want_note = f" {n_want} piste(s) écartée(s) (déjà en wantlist)." if n_want else ""
+    div_note = (f" {diversity.rejected_count} piste(s) écartée(s) (quota artiste/label)."
+                if diversity.rejected_count else "")
     job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
-               f"file : {len(candidates)}.{owned_note}{want_note}")
+               f"file : {len(candidates)}.{owned_note}{want_note}{div_note}")
 
 
 def _publish_recos_last_message():

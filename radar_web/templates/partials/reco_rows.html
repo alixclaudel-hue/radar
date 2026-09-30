@@ -8,20 +8,34 @@
 <tbody id="reco-rows">
   {% for t in playlist %}
   <tr data-vid="{{ t.video_id }}">
-    {#- Retour mobile 29/09 : plus de colonne « # » (le score ne partage plus une
-       cellule étroite avec le titre, d'où la superposition) ; pouces en haut à
-       droite de la carte ; actions regroupées en bas (Achat ▾ · Playlist · 🗑). -#}
+    {#- Carte pensée pour le pouce (retour utilisateur 30/09) : titre + artiste en
+       tête, pouces en haut à droite, une ligne « release · label · année » avec le
+       score à droite, puis les actions en pied (deux gros boutons + corbeille à
+       l'écart pour ne pas la toucher par erreur). Sur ordinateur, mêmes cellules
+       en colonnes de tableau. -#}
     <td class="trk-main">
-      <span class="trk-title">{{ t.artist }} - {{ t.title }}</span>
+      <div class="trk-lines">
+        <span class="trk-title">{{ t.title }}</span>
+        <span class="trk-artist">{{ t.artist }}</span>
+      </div>
+    </td>
+    <td class="trk-rel">
+      <div class="trk-lines">
+        <span class="trk-release">{{ t.release_title or '—' }}</span>
+        {% if t.label or t.year %}
+        <span class="trk-sub">
+          {% if t.label %}<a class="trk-label" href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}
+          {% if t.year %}<span class="trk-year-inline">{% if t.label %}· {% endif %}{{ t.year }}</span>{% endif %}
+        </span>
+        {% endif %}
+      </div>
+    </td>
+    <td class="num small muted trk-year">{{ t.year or '—' }}</td>
+    <td class="trk-score">
       {% if t.album_score is not none %}
-      <span class="badge small" title="Score album /100">{{ icons.album() }} {{ t.album_score }}</span>
+      <span class="badge" title="Score album /100">{{ icons.album() }} {{ t.album_score }}</span>
       {% endif %}
     </td>
-    <td>
-      {{ t.release_title or '—' }}
-      {% if t.label %}<br><a class="small" href="/disco?kind=label&key={{ t.label | urlencode }}">{{ t.label }}</a>{% endif %}
-    </td>
-    <td class="num small muted">{{ t.year or '—' }}</td>
     <td class="trk-vote">
       {% set v = (voted or {}).get(t.release_id) %}
       <span class="vote" hx-swap="outerHTML">
@@ -34,6 +48,7 @@
       </span>
     </td>
     <td class="trk-acts">
+     <div class="trk-btns">
       {# Menu « Achat » : <details> + positionnement fixe posé par le JS de la page
          (le .tbl-wrap rogne un menu absolu sur ordinateur). Beatport/Traxsource :
          redirection navigateur, jamais de scraping (pt 64). #}
@@ -71,9 +86,10 @@
       <button type="button" class="buy-btn" data-pl-add data-vid="{{ t.video_id }}"
               data-name="{{ t.artist }} - {{ t.title }}" title="Ajouter à une playlist YouTube">{{ icons.plus() }} Playlist</button>
       {% endif %}
-      <button type="button" class="ic-btn" title="Retirer cette piste de la playlist"
+      <button type="button" class="trk-del" title="Retirer cette piste de la playlist"
               hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'
               hx-target="#reco-rows" hx-swap="outerHTML" aria-label="Supprimer la piste">{{ icons.trash() }}</button>
+     </div>
     </td>
   </tr>
   {% endfor %}

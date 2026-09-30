@@ -83,6 +83,7 @@ et/ou appels courtier `run_in_background`), les autres attendent leur prérequis
 | Raisonnement que le gratuit rate | courtier `--mode reasoning` | payant, plafonné |
 | Balayage large de fichiers, conclusion seule utile | agent projet `explore-leger` (`model: haiku`) | lecture seule, contexte frais, modèle léger — l'agent intégré `Explore` hérite du modèle de session (sonnet) et n'est pas modifiable |
 | Tâche à nombreux appels d'outils (explorer + modifier + tester) | **ouvrier `scripts/ai_worker.py`**, un par tâche du WBS | **0 jeton Claude** : boucle bornée pilotée par un modèle gratuit via le courtier, worktree isolé, rend un diff à relire |
+| Chantier de plusieurs livrables (code, tests, doc) où le choix du modèle compte | agent **`delegation-orchestrateur`** (`model: opus`) | découpe, attribue chaque tâche au modèle mesuré le meilleur pour sa nature (grille du banc du 30/09 : `mode_default_models`/`mode_cascades` de `config/ai_models.json`), règle `--effort` selon la difficulté, vérifie et escalade ; ne produit rien lui-même, tout sort du courtier ou d'un ouvrier |
 | Jugement : architecture, sécurité, arbitrage produit, relecture finale, commit, merge | fil principal | non délégable (RÈGLE N°1) |
 
 **L'exécutant est l'ouvrier `ai_worker.py`, pas un sous-agent Claude.** Un

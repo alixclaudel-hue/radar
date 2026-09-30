@@ -395,6 +395,11 @@ _PRESERVED_POLICY_FIELDS = (
     "max_candidates",
     "retry",
     "blocked_ids",
+    # Routage mesuré par le banc (30/09) : sans report, le refresh mensuel
+    # effaçait sans bruit les défauts et cascades décidés par l'utilisateur.
+    "mode_default_models",
+    "mode_cascades",
+    "mode_excluded",
 )
 
 

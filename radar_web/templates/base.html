@@ -56,6 +56,20 @@
 
   {% include "partials/_feedback_widget.html" %}
   <script src="/static/feedback.js" defer></script>
+  <script>
+  /* Menu « Achat ▾ » : le retour de /cart/add (✓, erreur ou mini-fenêtre de pressages)
+     arrive DANS le <details>. Un <details> fermé n'affiche rien, même en
+     position:fixed — le résultat était donc invisible et l'ajout semblait « ne pas
+     marcher ». On sort la mini-fenêtre du menu (elle est déjà fixe) puis on le ferme ;
+     un simple message (✓/erreur) reste visible, menu ouvert. */
+  document.addEventListener('htmx:afterSwap', function () {
+    document.querySelectorAll('details.buy-menu .wl-matches').forEach(function (w) {
+      var d = w.closest('details.buy-menu');
+      document.body.appendChild(w);
+      d.open = false;
+    });
+  });
+  </script>
 
   <script>
   /* Combobox générique : tout contrôle [data-combo] dans un .combo, avec un

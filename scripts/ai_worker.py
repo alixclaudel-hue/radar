@@ -431,6 +431,24 @@ def executer_outil(racine: str, outil: str, args: dict) -> str | dict:
 # Appel au modèle
 # ---------------------------------------------------------------------------
 
+def _modele_par_defaut() -> str | None:
+    """Modèle worker imposé par `config/ai_models.json`, ou `None`.
+
+    Décision utilisateur du 30/09 : sans ce choix explicite, le routeur gratuit
+    retombait sur Nemotron 550B, soit 10 à 140 s par étape — intenable pour une
+    boucle d'outils. Absent ou illisible, le courtier reprend la main.
+    """
+    try:
+        with open(os.path.join(_RACINE_DEPOT, "config", "ai_models.json"),
+                  encoding="utf-8") as fichier:
+            donnees = json.load(fichier)
+        politique = donnees.get("policy") or {}
+        modeles = politique.get("mode_default_models") or {}
+        return modeles.get("worker") or None
+    except (OSError, ValueError):
+        return None
+
+
 def _decider_courtier(
     prompt: str,
     *,
@@ -814,7 +832,13 @@ def executer(
         "modele": worker_score.meilleur(worker_score.mauvais()), "provider": None}
     if decider is None:
         def decider(prompt: str):  # noqa: E306 — closure sur le courtier par défaut
-            return _decider_courtier(prompt, modele=choix["modele"], provider=choix["provider"])
+            modele = choix["modele"] or _modele_par_defaut()
+            return _decider_courtier(
+                prompt,
+                modele=modele,
+                provider=choix["provider"],
+                allow_paid=bool(modele and not choix["modele"]),
+            )
     t_debut_ts = time.time()
 
     t0 = horloge()

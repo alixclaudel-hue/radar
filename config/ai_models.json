@@ -4,6 +4,12 @@
   "generated_by": "scripts/ai/refresh_models.py",
   "policy": {
     "free_first": true,
+    "mode_default_models": {
+      "code": "deepseek-flash",
+      "test": "deepseek-flash",
+      "worker": "deepseek-flash",
+      "pr": "deepseek-flash"
+    },
     "paid_modes": [
       "reasoning"
     ],

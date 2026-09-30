@@ -1106,6 +1106,12 @@ def main(argv: list[str] | None = None) -> int:
         health_state=health_state,
         max_candidates=args.max_candidates,
     )
+    # Modèle par défaut du mode (décision utilisateur 30/09) : les modèles gratuits de code/test étaient trop lents en boucle d'ouvrier (Nemotron 550B, 10 à 140 s par appel). Le modèle rapide passe en tête ; le reste de la cascade gratuite reste derrière lui en repli, et le plafond journalier s'applique.
+    if not args.model and not args.provider:
+        par_defaut = (cat_mod.policy(catalogue).get('mode_default_models') or {}).get(mode)
+        if par_defaut:
+            en_tete = router.order_candidates(catalogue, mode=mode, tier=tier, prompt_tokens=max(1, len(full_prompt) // 4), explicit_model=par_defaut, allow_paid=True, escalate=args.escalate, quota_state=quota_state, health_state=health_state, max_candidates=args.max_candidates)
+            candidats = list(en_tete) + [c for c in candidats if c not in en_tete]
     if not candidats:
         raisons = router.explain(
             catalogue,

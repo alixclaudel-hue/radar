@@ -698,21 +698,33 @@ h3 small, h3 .small{ font-weight:400; }
 
   .tbl--cards thead{ display:none; }
   .tbl--cards, .tbl--cards tbody{ display:block; }
+  /* Carte de piste (thumb-first) :
+     ligne 1  titre + artiste            |  pouces (en haut à droite)
+     ligne 2  release · label · année    |  score
+     ligne 3  [ Achat ▾ ] [ + Playlist ] [🗑] — cibles ≥ 44 px */
   .tbl--cards tbody tr{
-    display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:10px; row-gap:4px; align-items:start;
-    padding:12px; margin:0 0 10px; border:1px solid var(--line); border-radius:var(--r-lg);
+    display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:12px; row-gap:6px; align-items:start;
+    padding:14px; margin:0 0 12px; border:1px solid var(--line); border-radius:var(--r-lg);
     background:var(--surface); box-shadow:var(--sh-1);
   }
   .tbl--cards td{ padding:0; min-width:0; }
-  /* ligne 1 : titre (+ score) à gauche, pouces en haut à droite de la carte */
-  .tbl--cards td:nth-child(1){ grid-column:1; grid-row:1; }
-  .tbl--cards td:nth-child(4){ grid-column:2; grid-row:1; justify-self:end; }
-  /* ligne 2 : release / label, année à droite */
-  .tbl--cards td:nth-child(2){ grid-column:1; grid-row:2; font-size:12.5px; color:var(--soft); }
-  .tbl--cards td:nth-child(3){ grid-column:2; grid-row:2; justify-self:end; font-size:12.5px; }
-  /* ligne 3 : actions */
-  .tbl--cards td:nth-child(5){ grid-column:1 / -1; grid-row:3; padding-top:8px; }
-  .tbl--cards tbody tr.now-playing td:nth-child(2){ color:inherit; }
+  .tbl--cards td.trk-main{ grid-column:1; grid-row:1; }
+  .tbl--cards td.trk-vote{ grid-column:2; grid-row:1; justify-self:end; }
+  .tbl--cards td.trk-rel{ grid-column:1; grid-row:2; }
+  .tbl--cards td.trk-score{ grid-column:2; grid-row:2; justify-self:end; align-self:center; }
+  .tbl--cards td.trk-year{ display:none; }
+  .tbl--cards .trk-year-inline{ display:inline; }
+  .tbl--cards td.trk-acts{
+    grid-column:1 / -1; grid-row:3; margin-top:6px; padding-top:12px; border-top:1px solid var(--line);
+  }
+  .tbl--cards .trk-btns{ display:grid; grid-template-columns:1fr 1fr 46px; gap:8px; align-items:stretch; }
+  .tbl--cards .buy-menu{ display:block; }
+  .tbl--cards .buy-btn{ width:100%; min-height:46px; justify-content:center; font-size:14px; }
+  .tbl--cards .trk-del{ min-height:46px; }
+  .tbl--cards .trk-title{ font-size:16px; line-height:1.28; }
+  .tbl--cards .vote{ gap:6px; }
+  .tbl--cards .vote button{ padding:9px 12px; }
+  .tbl--cards .vote .ic{ width:19px; height:19px; }
   .tbl-wrap:has(.tbl--cards){ overflow-x:visible; }
 }
 
@@ -757,7 +769,7 @@ a.tag:hover{ background:var(--pin-50); color:var(--pin); }
 .legend{ text-align:center; }
 
 /* largeurs de colonnes (Reco Radar, Tracks aimées, tables de labels) */
-.col-vote{ width:76px; } .col-acts2{ width:250px; } .col-year{ width:60px; } .col-act{ width:34px; } .col-acts{ width:64px; }
+.col-score{ width:84px; } .col-vote{ width:76px; } .col-acts2{ width:290px; } .col-year{ width:60px; } .col-act{ width:34px; } .col-acts{ width:64px; }
 .col-aff{ width:130px; } .col-reco{ width:60px; } .col-own{ width:80px; } .col-cat{ width:150px; }
 .nowrap{ white-space:nowrap; }
 
@@ -825,10 +837,68 @@ input[type=file]::file-selector-button:hover{ border-color:var(--ink); }
 .pl-list{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow:auto; }
 .pl-list button{ width:100%; justify-content:flex-start; text-align:left; }
 
+/* Reco Radar : cellules de la ligne de piste, actions, menu « Achat », fenêtre playlist */
+.trk-lines{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; }
+.trk-title{ font-weight:700; overflow-wrap:anywhere; }
+.trk-artist{ font-size:13px; color:var(--soft); overflow-wrap:anywhere; }
+.trk-release{ color:var(--ink-2); overflow-wrap:anywhere; }
+.trk-sub{ font-size:12.5px; color:var(--soft); overflow-wrap:anywhere; }
+.trk-year-inline{ display:none; }
+.trk-score .badge{ font-size:13px; padding:2px 10px; }
+.trk-btns{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.trk-del{
+  display:inline-flex; align-items:center; justify-content:center; padding:0 10px; min-height:34px;
+  border:1px solid transparent; background:transparent; color:var(--clay-700); border-radius:var(--r-md);
+}
+.trk-del:hover{ background:var(--clay-50); border-color:transparent; }
+.trk-del .ic{ width:19px; height:19px; }
+.buy-menu{ position:relative; display:inline-block; }
+.buy-menu > summary{ list-style:none; }
+.buy-menu > summary::-webkit-details-marker{ display:none; }
+.buy-btn{
+  display:inline-flex; align-items:center; gap:6px; min-height:34px; padding:5px 12px;
+  border:1px solid var(--line-strong); border-radius:var(--r-md); background:var(--surface);
+  color:var(--ink); font:inherit; font-size:13px; font-weight:600; cursor:pointer; line-height:1.2;
+}
+.buy-btn:hover{ border-color:var(--ink); }
+.buy-btn .ic{ width:17px; height:17px; }
+.buy-menu[open] > .buy-btn{ background:var(--pin-50); border-color:transparent; color:var(--pin); }
+/* fixe : le JS pose left/top (un menu absolu serait rogné par .tbl-wrap sur ordinateur) */
+.buy-menu__list{
+  position:fixed; z-index:80; min-width:210px; display:flex; flex-direction:column; gap:2px; padding:6px;
+  background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--sh-2);
+}
+.buy-menu__list form{ margin:0; }
+.buy-menu__list a, .buy-menu__list button, .buy-menu__done{
+  display:flex; align-items:center; gap:10px; width:100%; min-height:44px; padding:8px 12px; border:none;
+  border-radius:var(--r-sm); background:transparent; color:var(--ink); font:inherit; font-size:14px;
+  font-weight:500; text-align:left; text-decoration:none; justify-content:flex-start; cursor:pointer;
+}
+.buy-menu__list a:hover, .buy-menu__list button:hover{ background:var(--sunken); }
+.buy-menu__done{ color:var(--soft); cursor:default; }
+/* carte en lecture : fond pin, on garde lisibles texte, score et menu */
+.tbl tbody tr.now-playing .trk-artist, .tbl tbody tr.now-playing .trk-release,
+.tbl tbody tr.now-playing .trk-sub, .tbl tbody tr.now-playing .trk-year{ color:inherit; opacity:.88; }
+.tbl tbody tr.now-playing td.trk-acts{ border-top-color:rgba(255,255,255,.22); }
+.tbl tbody tr.now-playing .trk-score .badge{ background:var(--paper); color:var(--pin); }
+.tbl tbody tr.now-playing .trk-del{ color:var(--paper); }
+.tbl tbody tr.now-playing .trk-del:hover{ background:rgba(255,255,255,.14); }
+.tbl tbody tr.now-playing .buy-menu__list a, .tbl tbody tr.now-playing .buy-menu__list button{ color:var(--ink); }
+.pl-dialog{
+  border:1px solid var(--line); border-radius:var(--r-lg); padding:14px 16px;
+  width:min(420px, calc(100vw - 24px)); background:var(--surface); color:var(--ink);
+}
+.pl-dialog::backdrop{ background:rgba(0,0,0,.4); }
+.pl-dialog__head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+/* liste des playlists YouTube dans la fenêtre « Ajouter à une playlist » */
+.pl-list{ list-style:none; margin:8px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:50vh; overflow:auto; }
+.pl-list button{ width:100%; justify-content:flex-start; text-align:left; }
+
 /* Reco Radar : cellule titre + score, actions, menu « Achat », fenêtre playlist */
 .trk-main{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
 .trk-title{ font-weight:600; overflow-wrap:anywhere; min-width:0; }
-.trk-acts{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.trk-btns{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
 .buy-menu{ position:relative; display:inline-block; }
 .buy-menu > summary{ list-style:none; }
 .buy-menu > summary::-webkit-details-marker{ display:none; }

@@ -84,7 +84,7 @@ class RecoRadarRowsTest(unittest.TestCase):
     def test_score_en_pastille_plus_de_colonne_score(self):
         html = self._page()
         self.assertNotIn(">Score<", html)
-        self.assertIn('<span class="badge small" title="Score album /100">', html)
+        self.assertIn('<span class="badge" title="Score album /100">', html)
         self.assertIn("84", html)
 
     def test_suppression_renvoie_le_tableau_sans_redirection(self):

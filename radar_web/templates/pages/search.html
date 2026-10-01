@@ -304,6 +304,12 @@
       var s = document.getElementById('f-seller');
       if (s) s.value = '';
     }
+    // Un champ masqué reste posté : sans ça, le label restauré de la dernière
+    // recherche filtrait en silence le stock du vendeur (0 résultat affiché).
+    if (mode !== 'normal') {
+      var l = document.getElementById('f-label');
+      if (l) l.value = '';
+    }
     if (mode !== 'labels') {
       document.querySelectorAll('input[name="base_metric"]').forEach(function (r) { r.checked = false; });
     } else if (!document.querySelector('input[name="base_metric"]:checked')) {

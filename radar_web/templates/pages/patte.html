@@ -17,11 +17,11 @@
 
   {% if onboarding %}<p class="step-label">Étape 1 sur 3</p>{% endif %}
   <!-- ============ Discogs ============ -->
-  <details class="acc" {{ 'open' if not cfg.token }}>
+  <details class="acc" {{ 'open' if not (cfg.token or discogs_connected) }}>
     <summary>
       <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>
       Discogs
-      <span class="tag">{% if cfg.token %}<span class="ok">{{ icons.check() }} connecté</span>{% else %}token manquant{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants{% if coll.fetched_at %} · importé {{ coll.fetched_at.replace('T',' ')[:16] }}{% endif %}</span>
+      <span class="tag">{% if cfg.token or discogs_connected %}<span class="ok">{{ icons.check() }} connecté</span>{% else %}token manquant{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants{% if coll.fetched_at %} · importé {{ coll.fetched_at.replace('T',' ')[:16] }}{% endif %}</span>
     </summary>
     <div class="acc__body">
       <div class="field"><label>Token d'accès personnel
@@ -148,6 +148,26 @@
      href="/search{% if (cats.get('1') or cats.get('2')) %}?style={{ ((cats.get('1') or cats.get('2'))[0]) | urlencode }}{% endif %}">{{ icons.search() }} Chercher un disque</a>
 </div>
 {% endif %}
+
+<!-- ============ Connexion Discogs OAuth (hors du formulaire principal) ============ -->
+<details class="acc" {{ 'open' if discogs_msg }}>
+  <summary>Connexion directe à Discogs
+    <span class="tag">{% if discogs_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif discogs_configured %}non relié{% else %}non configuré{% endif %}</span></summary>
+  <div class="acc__body">
+    {% if discogs_msg %}<p class="notice small">{{ discogs_msg }}</p>{% endif %}
+    <p class="small muted">Autorise Radar sur Discogs en un clic, sans copier de token : sa
+      collection et ta wantlist sont lues avec ton compte. Tu peux révoquer l'accès ici ou
+      dans les réglages Discogs. Le token personnel ci-dessus reste un repli.</p>
+    {% if not discogs_configured %}
+    <p class="small">La connexion Discogs n'est pas encore configurée sur ce serveur
+      (<code>RADAR_DISCOGS_CONSUMER_KEY</code> / <code>RADAR_DISCOGS_CONSUMER_SECRET</code>).</p>
+    {% elif discogs_connected %}
+    <form method="post" action="/oauth/discogs/disconnect"><button class="small danger" type="submit">Délier mon compte Discogs</button></form>
+    {% else %}
+    <a class="btn primary small" href="/oauth/discogs/start">Se connecter avec Discogs</a>
+    {% endif %}
+  </div>
+</details>
 
 <!-- ============ Google / YouTube (hors du formulaire principal) ============ -->
 <details class="acc" {{ 'open' if google_msg }}>

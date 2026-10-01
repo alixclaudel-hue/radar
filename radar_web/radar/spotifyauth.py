@@ -331,12 +331,13 @@ def _title_matches(n_name: str, wanted: str) -> bool:
 
 
 def _artist_matches(item: Dict[str, Any], wanted: str) -> bool:
-    """Au moins un artiste du résultat correspond à l'artiste demandé."""
+    """Au moins un artiste du résultat correspond à l'artiste demandé (mot entier)."""
+    wanted_words = set(wanted.split())
     for artist in item.get("artists") or []:
         n = _normalize((artist or {}).get("name", ""))
         if not n:
             continue
-        if n == wanted or n in wanted or wanted in n:
+        if n == wanted or wanted_words & set(n.split()):
             return True
     return False
 

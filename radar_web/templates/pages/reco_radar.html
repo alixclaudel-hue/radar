@@ -78,24 +78,6 @@
 
 <script>
 (() => {
-  // Menu « Achat » : la liste est posée en `position:fixed` sous le bouton (le
-  // .tbl-wrap rogne un menu absolu) ; un seul menu ouvert à la fois.
-  const NAV_H = window.innerWidth <= 720 ? 84 : 0;   // barre de navigation fixe du bas sur téléphone
-  document.addEventListener('toggle', (e) => {
-    const d = e.target;
-    if (!d.matches || !d.matches('.buy-menu') || !d.open) return;
-    document.querySelectorAll('.buy-menu[open]').forEach(o => { if (o !== d) o.open = false; });
-    const b = d.querySelector('summary').getBoundingClientRect();
-    const l = d.querySelector('.buy-menu__list');
-    const w = l.offsetWidth, h = l.offsetHeight;
-    l.style.left = Math.max(8, Math.min(b.left, window.innerWidth - w - 8)) + 'px';
-    l.style.top = (b.bottom + h + 12 > window.innerHeight - NAV_H ? Math.max(8, b.top - h - 6) : b.bottom + 6) + 'px';
-  }, true);
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.buy-menu')) document.querySelectorAll('.buy-menu[open]').forEach(o => { o.open = false; });
-  });
-  window.addEventListener('scroll', () => document.querySelectorAll('.buy-menu[open]').forEach(o => { o.open = false; }), { passive: true });
-
   const dlg = document.getElementById('pl-dialog');
   // Piste dont la fenêtre est ouverte : le changement de service recharge la liste
   // sans repasser par le bouton de la ligne.

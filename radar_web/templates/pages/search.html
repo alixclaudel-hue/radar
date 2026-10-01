@@ -42,17 +42,8 @@
   </div>
 
   <div class="acc__body" id="mode-labels"{{ ' hidden' if not q.base_metric }}>
-    <p class="small muted">Recherche sur mes labels les mieux classés (12 max).</p>
-    <label>Classer par</label>
-    <div class="seg">
-      <label><input type="radio" name="base_metric" value="aff" {{ 'checked' if q.base_metric == 'aff' }}>affinité</label>
-      <label><input type="radio" name="base_metric" value="reco" {{ 'checked' if q.base_metric == 'reco' }}>reco</label>
-      <label><input type="radio" name="base_metric" value="owned" {{ 'checked' if q.base_metric == 'owned' }}>collection</label>
-    </div>
-    <div class="field field--narrow mt-2">
-      <label>Note minimale <span class="muted">optionnel</span></label>
-      <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
-    </div>
+    <p class="small muted">Recherche sur mes labels les mieux classés par affinité (12 max).</p>
+    <input type="hidden" name="base_metric" value="aff">
   </div>
 
   <div class="filters-bar">
@@ -321,12 +312,6 @@
     if (mode !== 'normal') {
       var l = document.getElementById('f-label');
       if (l) l.value = '';
-    }
-    if (mode !== 'labels') {
-      document.querySelectorAll('input[name="base_metric"]').forEach(function (r) { r.checked = false; });
-    } else if (!document.querySelector('input[name="base_metric"]:checked')) {
-      var aff = document.querySelector('input[name="base_metric"][value="aff"]');
-      if (aff) aff.checked = true;
     }
   }
   radios.forEach(function (r) { r.addEventListener('change', function () { switchMode(r.value); }); });

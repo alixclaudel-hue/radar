@@ -58,12 +58,12 @@ class SearchModesTestCase(unittest.TestCase):
         self.assertIn('value="boutique"', html)
 
     def test_mode_mes_labels_actif_si_dernier_historique_base_metric(self):
-        self._set_last_search({"seller": "", "label": "", "base_metric": "reco"})
+        self._set_last_search({"seller": "", "label": "", "base_metric": "aff"})
         html = self.client.get("/search?sid=abc123").text
         self.assertIn('id="mode-normal" hidden', html)
         self.assertIn('id="mode-seller" hidden', html)
         self.assertNotIn('id="mode-labels" hidden', html)
-        self.assertIn('value="reco" checked', html)
+        self.assertIn('name="base_metric" value="aff"', html)
 
 
 if __name__ == "__main__":

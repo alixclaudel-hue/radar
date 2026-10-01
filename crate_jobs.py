@@ -37,6 +37,8 @@ JOBS = {
     "scan_veille": "search",
     "scan_recos": "recos",
     "publish_recos": "recos",
+    "scan_recos_decouverte": "recos",
+    "publish_recos_decouverte": "recos",
     "scorestore_releases": "scorestore",
     "scorestore_tracks": "scorestore",
     "prune_labels": "curation",

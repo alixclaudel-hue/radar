@@ -843,6 +843,8 @@ input[type=file]::file-selector-button:hover{ border-color:var(--ink); }
 .trk-artist{ font-size:13px; color:var(--soft); overflow-wrap:anywhere; }
 .trk-release{ color:var(--ink-2); overflow-wrap:anywhere; }
 .trk-sub{ font-size:12.5px; color:var(--soft); overflow-wrap:anywhere; }
+.trk-why{ display:inline-flex; align-items:flex-start; gap:4px; font-size:12px; color:var(--pin); overflow-wrap:anywhere; }
+.trk-why .ic{ width:14px; height:14px; margin-top:1px; }
 .trk-year-inline{ display:none; }
 .trk-score .badge{ font-size:13px; padding:2px 10px; }
 .trk-btns{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
@@ -878,7 +880,7 @@ input[type=file]::file-selector-button:hover{ border-color:var(--ink); }
 .buy-menu__done{ color:var(--soft); cursor:default; }
 /* carte en lecture : fond pin, on garde lisibles texte, score et menu */
 .tbl tbody tr.now-playing .trk-artist, .tbl tbody tr.now-playing .trk-release,
-.tbl tbody tr.now-playing .trk-sub, .tbl tbody tr.now-playing .trk-year{ color:inherit; opacity:.88; }
+.tbl tbody tr.now-playing .trk-sub, .tbl tbody tr.now-playing .trk-why, .tbl tbody tr.now-playing .trk-year{ color:inherit; opacity:.88; }
 .tbl tbody tr.now-playing td.trk-acts{ border-top-color:rgba(255,255,255,.22); }
 .tbl tbody tr.now-playing .trk-score .badge{ background:var(--paper); color:var(--pin); }
 .tbl tbody tr.now-playing .trk-del{ color:var(--paper); }

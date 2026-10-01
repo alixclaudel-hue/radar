@@ -58,6 +58,9 @@ _PER_USER = {
     "recos_candidates": "recos_candidates.json",
     "recos_history": "recos_playlist_history.json",
     "recos_playlist": "recos_playlist.json",
+    # mode Découverte de Reco Radar : file et playlist distinctes, historique commun
+    "recos_playlist_decouverte": "recos_playlist_decouverte.json",
+    "recos_candidates_decouverte": "recos_candidates_decouverte.json",
 }
 _SHARED = {
     "lookup_cache": "lookup_cache.json",

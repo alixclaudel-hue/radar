@@ -338,6 +338,28 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         self.assertFalse(meta["partial"])
         self.assertIn("4 disque(s)", job.finished)
 
+    def test_snapshot_intermediaire_en_premiere_lecture_seulement(self):
+        """Première lecture : un snapshot `reading` est écrit toutes les 3 pages
+        pour que /search affiche au fil de l'eau ; avec un inventaire complet
+        déjà présent, rien d'intermédiaire (jamais un morceau par-dessus)."""
+        vus = []
+
+        def _fake(username, token="", max_pages=0, per_page=100, on_page=None,
+                  on_batch=None):
+            for page in (1, 2, 3):
+                on_batch(LISTINGS[:page], page)
+                vus.append(scat.inv_meta("boutique").get("reading"))
+            return LISTINGS, False
+
+        with mock.patch.object(discogs, "seller_inventory", side_effect=_fake):
+            search.job_seller_inventory(FakeJob(), {"seller": "boutique"})
+        self.assertEqual(vus, [None, None, True])
+        self.assertFalse(scat.inv_meta("boutique")["reading"])     # final
+        vus.clear()
+        with mock.patch.object(discogs, "seller_inventory", side_effect=_fake):
+            search.job_seller_inventory(FakeJob(), {"seller": "boutique"})
+        self.assertEqual(vus, [False, False, False])               # complet gardé
+
     def test_arobase_et_espaces_normalises(self):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
@@ -351,7 +373,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         doit couper la pagination au lieu de lire tout le stock."""
         pages = 5
 
-        def _fake(username, token="", max_pages=0, per_page=100, on_page=None):
+        def _fake(username, token="", max_pages=0, per_page=100, on_page=None, on_batch=None):
             got = []
             for page in range(1, pages + 1):
                 got.extend(LISTINGS)

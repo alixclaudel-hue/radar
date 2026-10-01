@@ -864,6 +864,13 @@ def executer(
     # mieux noté, sinon l'autre fournisseur gratuit. Worktree et journal conservés.
     if decider_par_defaut and rapport["statut"] != "termine" and not rapport["fichiers_modifies"]:
         fautif = worker_score.cle_modele(fournisseur, modele)
+        if fautif is None and choix["modele"]:
+            # Le modèle forcé n'a jamais été tenté par le courtier (cascade vide
+            # dès le routage : `-m` ne correspondait à aucun candidat, donc aucun
+            # reçu à relire) : sans ce repli, la rotation retombait sur EXACTEMENT
+            # le même modèle fautif — constaté le 01/10, deux passes identiques
+            # en échec « code 1 ».
+            fautif = choix["modele"]
         choix["modele"] = worker_score.meilleur(worker_score.mauvais() | ({fautif} if fautif else set()))
         choix["provider"] = None if choix["modele"] else (
             "gemini" if fournisseur == "openrouter" else "openrouter")

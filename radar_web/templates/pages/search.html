@@ -4,7 +4,7 @@
 {% block content %}
 
 <h1>Chercher un disque</h1>
-<p class="muted small search-lead">Recherche normale (tout le catalogue, label optionnel), sur tes labels suivis, ou dans le stock d'un vendeur.</p>
+<p class="muted small search-lead">Choisis d'abord OÙ chercher (tout le catalogue, tes labels, ou le stock d'un vendeur) : les filtres qui suivent s'appliquent à cette recherche-là, et chaque mode garde ses propres filtres.</p>
 
 <form id="search-form" hx-post="/search" hx-target="#results" hx-indicator="#busy" hx-swap="innerHTML">
   <div class="seg seg--full" id="search-mode" role="radiogroup" aria-label="Type de recherche">
@@ -38,8 +38,7 @@
              hx-trigger="focus, keyup changed delay:220ms">
     </div>
     <div id="seller-suggest" class="lbl-suggest" hidden></div>
-    <p class="small muted">Nom d'utilisateur Discogs. Les filtres ci-dessous s'appliquent alors à
-      son stock plutôt qu'au catalogue entier.</p>
+    <p class="small muted">Nom d'utilisateur Discogs.</p>
   </div>
 
   <div class="acc__body" id="mode-labels"{{ ' hidden' if not q.base_metric }}>
@@ -54,26 +53,10 @@
       <label>Note minimale <span class="muted">optionnel</span></label>
       <input name="base_min" inputmode="numeric" placeholder="ex. 70" value="{{ q.base_min or '' }}">
     </div>
-    <div class="field mt-2">
-      <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
-        <button type="button" class="small ghost fr" id="mins-reset">{{ icons.undo() }} réinitialiser</button></label>
-      <div class="row">
-        <div class="field">
-          <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
-          <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
-                 value="{{ q.label_min or 0 }}">
-        </div>
-        <div class="field">
-          <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
-          <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
-                 value="{{ q.artist_min or 0 }}">
-        </div>
-      </div>
-    </div>
   </div>
 
   <div class="filters-bar">
-    <button type="button" class="filters-open" id="filters-open" aria-controls="filters" aria-expanded="false">{{ icons.filter() }} Filtres <span class="badge" id="filters-count" hidden>0</span></button>
+    <button type="button" class="filters-open" id="filters-open" aria-controls="filters" aria-expanded="false">{{ icons.filter() }} Filtres <span class="muted" id="filters-mode-btn"></span> <span class="badge" id="filters-count" hidden>0</span></button>
     {% if history %}<a class="btn ghost icon" href="#recent" id="recent-open" aria-label="Recherches récentes">{{ icons.clock() }}</a>{% endif %}
   </div>
   <div class="chip-list filters-summary" id="filters-summary" aria-live="polite"></div>
@@ -82,10 +65,11 @@
      ligne. Les champs restent DANS le formulaire : rien ne change pour la requête HTMX. #}
   <div class="filters" id="filters">
     <div class="filters__head">
-      <h3>Filtres</h3>
+      <h3>Filtres <span class="tag" id="filters-mode">Générale</span></h3>
       <button type="button" class="ghost icon" id="filters-close" aria-label="Fermer les filtres">{{ icons.close() }}</button>
     </div>
     <div class="filters__body">
+  <p class="notice small" id="filters-scope"></p>
   <div class="row">
     <div class="field combo">
       <label>Genre <span class="muted">tape pour chercher, choisis dans la liste</span></label>
@@ -117,10 +101,28 @@
                min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
       </div>
     </div>
-    <div class="field field--xs">
+    <div class="field field--xs" data-modes="normal labels">
       <label>Pages/label</label>
       <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}">
     </div>
+  </div>
+  <div class="field">
+    <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
+      <button type="button" class="small ghost fr" id="mins-reset">{{ icons.undo() }} réinitialiser</button></label>
+    <div class="row">
+      <div class="field">
+        <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
+        <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
+               value="{{ q.label_min or 0 }}">
+      </div>
+      <div class="field">
+        <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
+        <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
+               value="{{ q.artist_min or 0 }}">
+      </div>
+    </div>
+    <p class="small muted" data-modes="seller">Chez un vendeur, la plupart des labels et artistes te sont inconnus
+      (score 0) : un seuil les masque tous. Laisse à 0 pour voir tout son stock, trié par score.</p>
   </div>
     </div>
     <div class="filters__foot">
@@ -262,6 +264,15 @@
         refresh();
       }));
     }
+    [['label-min', 'Label'], ['artist-min', 'Artiste']].forEach(function (m) {
+      var inp = document.getElementById(m[0]);
+      if (inp && +inp.value > 0) {
+        n++;
+        sumEl.appendChild(chip('Score ' + m[1] + ' ≥ ' + inp.value, function () {
+          inp.value = 0; inp.dispatchEvent(new Event('input', { bubbles: true })); refresh();
+        }));
+      }
+    });
     countEl.textContent = n; countEl.hidden = !n;
   }
 
@@ -283,7 +294,8 @@
   // les puces genre/style sont (re)dessinées par base.html : on les observe plutôt que de les dupliquer
   var mo = new MutationObserver(refresh);
   form.querySelectorAll('.combo .chip-list').forEach(function (l) { mo.observe(l, { childList: true }); });   // pas le récap lui-même (boucle infinie)
-  [lo, hi].forEach(function (el) { if (el) el.addEventListener('input', refresh); });
+  [lo, hi, document.getElementById('label-min'), document.getElementById('artist-min')]
+    .forEach(function (el) { if (el) el.addEventListener('input', refresh); });
   refresh();
 })();
 (function () {
@@ -317,7 +329,57 @@
       if (aff) aff.checked = true;
     }
   }
-  radios.forEach(function (r) { r.addEventListener('change', function () { apply(r.value); }); });
+  radios.forEach(function (r) { r.addEventListener('change', function () { switchMode(r.value); }); });
+
+  // Filtres PAR MODE : genre, style, période, pages et seuils de score ne sont pas
+  // partagés entre les trois modes. Chaque mode garde les siens ; ceux de la dernière
+  // recherche appartiennent au mode dans lequel elle a été faite, les autres modes
+  // partent de zéro. Avant, ces champs restaient postés (même masqués) et les seuils
+  // d'une recherche « Mes labels » écartaient en silence le stock d'un vendeur.
+  var form = document.getElementById('search-form');
+  var NAMES = ['genre', 'style', 'year_from', 'year_to', 'pages', 'label_min', 'artist_min'];
+  var LABELS = { normal: 'Générale', labels: 'Mes labels', seller: 'Vendeur' };
+  var SCOPE = {
+    normal: 'ils s\'appliquent à la recherche dans tout le catalogue (label optionnel).',
+    labels: 'ils s\'appliquent aux sorties de tes labels les mieux classés.',
+    seller: 'ils s\'appliquent au stock du vendeur indiqué, et à lui seul. Les autres modes ont les leurs.'
+  };
+  function field(n) { return form.querySelector('[name="' + n + '"]'); }
+  function defaults() {
+    return { genre: '', style: '', year_from: field('year_from').min, year_to: field('year_to').max,
+             pages: '2', label_min: '0', artist_min: '0' };
+  }
+  function read() { var o = {}; NAMES.forEach(function (n) { o[n] = field(n).value; }); return o; }
+  function write(o) {
+    NAMES.forEach(function (n) { field(n).value = o[n]; });
+    ['genre', 'style'].forEach(function (n) {
+      var c = field(n).closest('.combo');
+      if (c && window.radarRenderChips) window.radarRenderChips(c);
+    });
+    // les curseurs redessinent leur libellé et le récap des filtres sur « input »
+    ['year_from', 'year_to', 'label_min', 'artist_min'].forEach(function (n) {
+      field(n).dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+  function mark(mode) {
+    var t = document.getElementById('filters-mode'), b = document.getElementById('filters-mode-btn'),
+        sc = document.getElementById('filters-scope');
+    if (t) t.textContent = LABELS[mode];
+    if (b) b.textContent = '· ' + LABELS[mode];
+    if (sc) sc.innerHTML = 'Filtres du mode <b>' + LABELS[mode] + '</b> — ' + SCOPE[mode];
+    document.querySelectorAll('[data-modes]').forEach(function (el) {
+      el.hidden = el.dataset.modes.split(' ').indexOf(mode) < 0;
+    });
+  }
+  var saved = {}, current = (document.querySelector('#search-mode input:checked') || {}).value || 'normal';
+  function switchMode(mode) {
+    if (mode === current) return;
+    saved[current] = read();
+    apply(mode);
+    write(saved[mode] || defaults());
+    current = mode; mark(mode);
+  }
+  mark(current);
 })();
 </script>
 {% endblock %}

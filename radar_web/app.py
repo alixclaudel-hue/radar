@@ -1093,7 +1093,7 @@ def _local_rows_to_raw(rows, genres):
     return out
 
 
-def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
+def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range, dropped=None):
     """Articles « For Sale » d'un vendeur -> mêmes lignes que `_local_rows_to_raw`,
     et (lignes, n_hors_dump, n_non_vinyle). `listings` vient du snapshot complet
     écrit par le job `seller_inventory` (point 68), pas d'un appel API : les
@@ -1114,8 +1114,15 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
     Filtre vinyle comme le reste de /search (`search_local(vinyl_only=True)`, cf.
     point 48 de CLAUDE.md) : cet écran répond à « quel disque acheter ». Le
     référentiel tranche quand il connaît la sortie, sinon repli sur l'heuristique
-    de format de `sellers.is_12in`."""
+    de format de `sellers.is_12in`.
+
+    Un champ INCONNU ne disqualifie pas : sans style, sans genre, sans année (ou
+    sortie absente du référentiel), le disque est gardé — mieux vaut un disque de
+    trop qu'un disque caché chez un vendeur dont le stock est déjà petit. Seul ce
+    qui est connu ET différent écarte. `dropped` (dict facultatif) reçoit le
+    nombre d'écartés par filtre (« style », « genre », « label », « année »)."""
     from .radar import sellers as scat
+    dropped = dropped if dropped is not None else {}
     needs_ref = bool(genres or styles or label.strip() or year_range)
     out, n_off_dump, n_not_vinyl = [], 0, 0
     con = dd.connect_readonly() if dd.available() else None
@@ -1126,8 +1133,7 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
             ref = dd.lookup_release(rid, con) if con else None
             if ref is None:
                 if needs_ref:
-                    n_off_dump += 1
-                    continue
+                    n_off_dump += 1          # gardé : on ne peut pas le juger
                 if not scat.is_12in(it.get("format")):
                     n_not_vinyl += 1
                     continue
@@ -1142,15 +1148,19 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
                 continue
             row_styles = (ref.get("styles") or "").split(", ") if ref.get("styles") else []
             row_genres = (ref.get("genres") or "").split(", ") if ref.get("genres") else []
-            if styles and not any(x in row_styles for x in styles):
+            if styles and row_styles and not any(x in row_styles for x in styles):
+                dropped["style"] = dropped.get("style", 0) + 1
                 continue
-            if genres and not any(g in row_genres for g in genres):
+            if genres and row_genres and not any(g in row_genres for g in genres):
+                dropped["genre"] = dropped.get("genre", 0) + 1
                 continue
             if label_key and normalize_label(ref.get("label") or "") != label_key:
+                dropped["label"] = dropped.get("label", 0) + 1
                 continue
             if year_range:
                 yr = ref.get("year")
-                if not yr or not (year_range[0] <= yr <= year_range[1]):
+                if yr and not (year_range[0] <= yr <= year_range[1]):
+                    dropped["année"] = dropped.get("année", 0) + 1
                     continue
             title = (f"{ref['artist']} - {ref['title']}" if ref.get("artist")
                      else (ref.get("title") or ""))
@@ -1222,15 +1232,18 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
             # recherche tant que le job tourne (un job planté laisse `reading`
             # figé, d'où le contrôle de l'état réel).
             js = jobs.status("seller_inventory") or {}
-            seller_sync["reading"] = bool(js.get("running") or js.get("queued")) \
-                and not js.get("error")
+            seller_sync["reading"] = bool(js.get("running") or js.get("queued"))
         if not inv:  # rien de lu encore
             # Jamais lu : on lance la lecture et on le dit, plutôt que de renvoyer
             # un échantillon tronqué qui donnerait de faux « aucun résultat ».
             jobs.launch("seller_inventory", {"seller": seller})
             # `reading` : le gabarit relance la recherche tout seul (sauf en
             # erreur, sinon boucle) jusqu'à l'arrivée des premiers disques.
-            seller_sync["reading"] = not (jobs.status("seller_inventory") or {}).get("error")
+            # Actif = en file ou en cours, JAMAIS « pas d'erreur » : un statut
+            # d'erreur resté d'une lecture précédente (autre vendeur) coupait la
+            # relance et obligeait à cliquer « rechercher » une 2ᵉ fois.
+            js = jobs.status("seller_inventory") or {}
+            seller_sync["reading"] = bool(js.get("running") or js.get("queued"))
             return frag(request, "partials/results.html", results=[], seller=seller,
                         empty_reason="seller_sync", seller_sync=seller_sync,
                         has_token=True)
@@ -1238,8 +1251,9 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
                     if str(rid).isdigit()]
         yb = _year_bounds(year_from, year_to)
         year_range = None if (yb[0] <= SEARCH_MIN_YEAR and yb[1] >= int(time.strftime("%Y"))) else yb
+        seller_dropped = {}
         raw, n_off_dump, n_not_vinyl = _seller_rows_to_raw(
-            listings, dd, genres, styles, label, year_range)
+            listings, dd, genres, styles, label, year_range, seller_dropped)
         bits = [f"{len(listings)} disque(s) en vente chez {seller}"]
         if meta.get("fetched_at"):
             bits.append(f"inventaire lu le {meta['fetched_at'][:16].replace('T', ' à ')}")
@@ -1248,7 +1262,8 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
         if n_not_vinyl:
             bits.append(f"{n_not_vinyl} hors vinyle 12\"/LP")
         if n_off_dump:
-            bits.append(f"{n_off_dump} absent(s) du référentiel local, donc non filtrable(s)")
+            bits.append(f"{n_off_dump} absent(s) du référentiel local, gardé(s) sans pouvoir être filtré(s)")
+        bits += [f"{n} écarté(s) par {k}" for k, n in seller_dropped.items()]
         seller_note = " · ".join(bits)
         if dd.available():
             dump_date = dd.get_meta().get("dump_date")
@@ -1315,6 +1330,8 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     n_matches = len(scored)
+    if seller_note and n_before_thresholds > n_matches:
+        seller_note += f" · {n_before_thresholds - n_matches} écarté(s) par les seuils de score"
     # pagination (100/page) : montrer TOUS les matches plutôt que tronquer au
     # premier écran — cf. diagnostic utilisateur, un plafond fixe (48) masquait
     # la quasi-totalité des correspondances sur une recherche large.

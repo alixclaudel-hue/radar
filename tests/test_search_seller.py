@@ -186,12 +186,14 @@ class SearchSellerTestCase(unittest.TestCase):
         self.assertIn("Techno Two", html)
         self.assertNotIn("Deep One", html)
 
-    def test_sortie_hors_referentiel_ecartee_des_qu_un_filtre_porte_dessus(self):
-        """On ne peut pas affirmer qu'une sortie inconnue du référentiel passe un
-        filtre de style : elle est écartée, et le nombre est annoncé."""
+    def test_sortie_hors_referentiel_gardee_malgre_un_filtre(self):
+        """Champ inconnu = pas disqualifiant : une sortie absente du référentiel
+        est gardée (et signalée) au lieu d'être cachée ; seul un style connu ET
+        différent écarte, avec le décompte par filtre."""
         html, _ = self._post(style="Deep House")
-        self.assertNotIn("Sortie Toute Neuve", html)
-        self.assertIn("non filtrable", html)
+        self.assertIn("Sortie Toute Neuve", html)
+        self.assertIn("gardé(s) sans pouvoir être filtré(s)", html)
+        self.assertIn("1 écarté(s) par style", html)       # « Techno Two »
 
     def test_lecture_interrompue_signalee(self):
         """Un snapshot partiel (lecture arrêtée) ne doit jamais être présenté

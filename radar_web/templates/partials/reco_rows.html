@@ -17,6 +17,12 @@
       <div class="trk-lines">
         <span class="trk-title">{{ t.title }}</span>
         <span class="trk-artist">{{ t.artist }}</span>
+        {#- « Pourquoi » : seulement en Découverte, où l'artiste est inconnu de
+           l'utilisateur et la raison du choix est l'information utile (« 3× avec
+           X »). En Approfondir, `why` ne vaut que artist/label/style : rien à montrer. -#}
+        {% if t.mode == 'decouverte' and t.why %}
+        <span class="trk-why">{{ icons.network() }} {{ t.why }}</span>
+        {% endif %}
       </div>
     </td>
     <td class="trk-rel">
@@ -90,7 +96,7 @@
               data-name="{{ t.artist }} - {{ t.title }}" title="Ajouter à une playlist YouTube ou Spotify">{{ icons.plus() }} Playlist</button>
       {% endif %}
       <button type="button" class="trk-del" title="Retirer cette piste de la playlist"
-              hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}}'
+              hx-post="/reco-radar/delete" hx-vals='{"video_id": {{ t.video_id|tojson }}, "mode": {{ (mode or "approfondir")|tojson }}}'
               hx-target="#reco-rows" hx-swap="outerHTML" aria-label="Supprimer la piste">{{ icons.trash() }}</button>
      </div>
     </td>

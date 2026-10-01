@@ -3,10 +3,23 @@
 {% block title %}Reco Radar · Radar{% endblock %}
 {% block content %}
 <h1>Reco Radar</h1>
-<p class="muted small">Une playlist alimentée automatiquement en fond à partir de tes goûts
-  (labels suivis, score album ≥ seuil réglé dans <a href="/settings">Réglages</a>) — {{ n_playlist }}/{{ max_tracks }}
-  piste{{ 's' if n_playlist > 1 }}, plafond réglable dans Réglages. Clique une ligne pour marquer une piste écoutée :
-  elle est purgée à minuit (heure de Paris), ce qui laisse la place à de nouvelles.</p>
+{# Deux playlists, une visible à la fois : liens (zéro JS) sur le composant
+   .seg déjà utilisé par /search, l'onglet courant marqué aria-current. #}
+<nav class="seg seg--full" aria-label="Mode de playlist">
+  <a href="/reco-radar?mode=approfondir"{% if mode != 'decouverte' %} class="active" aria-current="page"{% endif %}>{{ icons.album() }} Approfondir</a>
+  <a href="/reco-radar?mode=decouverte"{% if mode == 'decouverte' %} class="active" aria-current="page"{% endif %}>{{ icons.compass() }} Découverte</a>
+</nav>
+{% if mode == 'decouverte' %}
+<p class="muted small">Des artistes que tu n'écoutes pas encore, choisis parce qu'ils ont souvent
+  travaillé avec ceux que tu aimes (Catégorie 1 et 2) — un artiste par piste, pour varier.
+  {{ n_playlist }}/{{ max_tracks }} piste{{ 's' if n_playlist > 1 }}.</p>
+{% else %}
+<p class="muted small">Ton écosystème en profondeur : les sorties de tes labels et artistes suivis
+  (score album ≥ seuil réglé dans <a href="/settings">Réglages</a>) — {{ n_playlist }}/{{ max_tracks }}
+  piste{{ 's' if n_playlist > 1 }}, plafond réglable dans Réglages.</p>
+{% endif %}
+<p class="muted small">Clique une ligne pour marquer une piste écoutée : elle est purgée à minuit
+  (heure de Paris), ce qui laisse la place à de nouvelles.</p>
 
 <p class="small">
   <span class="tag">{{ recos_pending }} candidat{{ 's' if recos_pending > 1 }} en attente</span>
@@ -15,16 +28,22 @@
 </p>
 <p class="small muted">Le scan des labels suivis et l'alimentation de la playlist tournent en fond automatiquement —
   rien à déclencher ici (pour forcer un scan, passer par le VPS).</p>
-<div id="job-scan_recos" hx-get="/jobs/scan_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-<div id="job-publish_recos" hx-get="/jobs/publish_recos/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+<div id="job-scan_recos{{ job_sfx }}" hx-get="/jobs/scan_recos{{ job_sfx }}/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+<div id="job-publish_recos{{ job_sfx }}" hx-get="/jobs/publish_recos{{ job_sfx }}/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
 <p class="small muted">
-  <a href="/jobs/scan_recos/log" download>{{ icons.download() }} journal scan</a> ·
-  <a href="/jobs/publish_recos/log" download>{{ icons.download() }} journal publication</a>
+  <a href="/jobs/scan_recos{{ job_sfx }}/log" download>{{ icons.download() }} journal scan</a> ·
+  <a href="/jobs/publish_recos{{ job_sfx }}/log" download>{{ icons.download() }} journal publication</a>
 </p>
 
 {% if not playlist %}
+{% if mode == 'decouverte' %}
+<p class="muted small mt-2">Playlist vide — elle se remplit toute seule au fil des passages
+  du job de fond. Il faut que ton graphe d'artistes ait été construit (entretien mensuel)
+  et que tu aies des artistes en Catégorie 1 ou 2, cf. <a href="/univers">Mes labels &amp; artistes</a>.</p>
+{% else %}
 <p class="muted small mt-2">Playlist vide — elle se remplit toute seule au fil des passages
   du job de fond (nécessite au moins un label suivi noté, cf. <a href="/patte">Mon profil</a>).</p>
+{% endif %}
 {% else %}
 <div class="yt-player-wrap"><div id="yt-player"></div></div>
 

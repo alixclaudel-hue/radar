@@ -28,13 +28,21 @@ Les modes deviennent des **fonctions de sélection** sur ces champs, pas des job
 
 ## 3. Mode Découverte
 
-**Définition** : artiste absent du corpus ET (proche d'un artiste aimé OU sortie sur un label voisin d'un label aimé).
+> **Révisé le 30/09 (décisions 6 à 8, §8)** : la découverte se définit par la **distance dans les graphes** (1 ou 2 sauts) depuis ce qui est connu, pas par « artiste inconnu ». Le texte d'origine ci-dessous reste valable pour le score et la diversité, pas pour l'éligibilité.
 
-Éligibilité (filtres durs) :
-1. `artist_known = false` pour tous les crédités principaux.
-2. `proximity_artist >= s_a` **ou** `proximity_label >= s_l` (seuils à calibrer, cf. §6).
-3. Pas possédé, pas dans l'historique (déjà en place).
-4. Style dans le top des affinités de style (évite « proche par le graphe » mais hors genre : co-crédits ≠ goût).
+**Définition** : une piste est « découverte » si **au moins une** des deux voies la retient.
+
+- **Voie artiste** : artiste **ni en Catégorie 1/2, ni dans le corpus** (ni collection/wantlist/achats Bandcamp), situé à **1 ou 2 sauts** d'un artiste connu dans le graphe de co-crédits (`job_build_graph`, `radar_jobs/graph.py`). 1 saut = déjà calculé (`Ctx.graph_rescore()["artists"]`, avec `why` « N× avec X ») ; 2 sauts = à construire.
+- **Voie label** : label **pas en Catégorie 1/2**, situé à **1 ou 2 sauts** d'un label Catégorie 1/2 dans le graphe label↔label (`catalog_labelgraph.neighbors_for`, artistes partagés et sous-labels). 1 saut = déjà agrégé dans `Ctx._compute_label_db_signal` ; 2 sauts = second passage de `neighbors_for` sur les voisins directs.
+- Un artiste connu sur un label voisin passe par la voie label. Tout ce qui n'est retenu par aucune voie reste en Approfondir (partition par piste, jamais les deux).
+
+**Lien fort au 2ᵉ saut (décision 8)** : un voisin de voisin n'est retenu que s'il est relié par **≥ 2 co-crédits** ou par **≥ 2 chemins distincts** depuis les graines — sinon un artiste croisé une fois sur une compilation remonterait. Expansion bornée (nb d'artistes et de co-crédits développés par voisin), calculée dans le passage mensuel de `build_graph`, jamais dans le scan horaire.
+
+Pondération : 1 saut > 2 sauts ; graine Catégorie 1 > Catégorie 2 (`scoring.graph.tier_w`) ; voie artiste > voie label (décision 2) ; bonus de convergence si les deux voies retiennent la piste.
+
+Éligibilité (filtres durs, en plus) :
+1. Pas possédé, pas dans l'historique (déjà en place).
+2. Style dans le top des affinités de style (évite « proche par le graphe » mais hors genre : co-crédits ≠ goût).
 
 Score de découverte (proposition, à valider sur données réelles) :
 
@@ -101,7 +109,29 @@ Tests à écrire : `select_for_mode` (connu/inconnu, alias), diversité, migrati
 3. **Quota YouTube 50/50** entre les deux modes, report du reliquat.
 4. **Approfondir : A + B** (diversité/explication + axe profondeur), formule `album_score` inchangée.
 5. **La wantlist compte comme « connu ».**
+6. **Découverte = proximité dans les graphes, pas « artiste inconnu »** : voie label (voisins des labels Catégorie 1/2) et voie artiste (artistes hors Catégorie 1/2 et hors corpus, voisins des artistes connus).
+7. **Portée : 1 ou 2 sauts** dans les deux graphes.
+8. **Lien fort exigé au 2ᵉ saut** (≥ 2 co-crédits ou ≥ 2 chemins), expansion bornée.
+
+Prochaine étape (§6.1, avant tout code de sélection) : script de mesure hors ligne — volume de pistes « découverte » dans `track_scores` à 1 saut puis à 2 sauts, top 30, et part des voisins dont les sorties ne sont jamais notées par scorestore (à élargir sinon).
 
 ## 9. Limites de cette proposition
 
 Les poids et seuils sont des hypothèses, non calibrés sur tes données. Je n'ai pas lu le code des pouces ni le calcul de `proximity` dans `graph_rescore` : leur extraction séparée du score direct est supposée faisable. Rien n'a été exécuté ni vérifié dans un navigateur.
+
+## 10. Mesures du 01/10 et décisions 9-10
+
+Mesures (compte owner, `scripts/reco_modes_measure.py` puis `scripts/reco_modes_widths.py`) : sans filtre, le 1er saut couvre déjà 460 k labels et 153 k artistes ; la voie label donne 0 piste par construction (scorestore ne note que les labels Catégorie 1/2) ; les graines labels sont polluées (5 479 labels en Catégorie 1 dont « Not On Label », Columbia, CBS, BMG…) et le poids brut favorise les majors. Voie artiste saine : K=10 voisins par graine, ≥ 3 co-crédits → ~550 artistes.
+
+9. **Découverte = voie artiste seule** (K=10, n ≥ 3). La voie label (et le 2ᵉ saut) est **abandonnée**. Le tri des 5 500 labels Catégorie 1 est un chantier séparé, plus tard.
+10. **Pour chaque utilisateur** (boucle worker `all_uids()`, comme le mode actuel).
+
+## 11. Conception retenue (étape 1)
+
+- `radar_web/radar/discovery.py` : `discovery_artists(ctx, k=10, min_n=3)` — inverse `ctx.graph["edges"]` (artiste voisin → graines `co` avec `n`), garde par graine de `artist_tier_map()` ses K voisins de plus fort `n` (≥ min_n), exclut les artistes connus (Catégorie 1/2, corpus, collection). Score et `why` repris de `ctx.graph_rescore()["artists"]`. Fonction pure, testable hors ligne.
+- `discogs_dump.releases_for_artists(artist_ids, per_artist)` : sorties du dump d'un lot d'artistes (via `release_artists`), même forme de ligne que `search_local`, tous formats.
+- **Source = dump au scan, pas scorestore** : `scorestore_releases` élague tout label hors Catégorie 1/2 (`prune_labels`), il effacerait les sorties Découverte. Scan en deux temps : note des sorties (`album_score`), puis tracklists (`tracks_for_release`) des meilleures seulement.
+- Tri Découverte : proximité de l'artiste dominante (décision 2) puis affinité (`album_score`). Diversité : 1 piste par artiste, 2 par label.
+- Fichiers : Approfondir garde `recos_playlist.json` / `recos_candidates.json` (aucune migration) ; Découverte = `recos_playlist_decouverte.json` / `recos_candidates_decouverte.json`. Historique commun.
+- Jobs : `scan_recos_decouverte`, `publish_recos_decouverte` (noms distincts : dédoublonnage de la file worker par `(uid, nom)`). Budget YouTube 80/jour partagé : 40 par mode, le reliquat d'un mode sans candidats passe à l'autre.
+- Web : `/reco-radar?mode=approfondir|decouverte` (défaut approfondir), onglets, ligne « pourquoi » sur la carte ; les actions (supprimer, écoutée, vider la file, playlist YouTube) portent le mode.

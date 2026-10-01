@@ -79,6 +79,9 @@ SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
+# mode Découverte de Reco Radar : file et playlist distinctes (historique et budget communs)
+RECOS_CANDIDATES_DECOUVERTE_PATH = os.path.join(USER_DIR, "recos_candidates_decouverte.json")
+RECOS_PLAYLIST_DECOUVERTE_PATH = os.path.join(USER_DIR, "recos_playlist_decouverte.json")
 RECOS_SEARCH_BUDGET_PATH = os.path.join(USER_DIR, "recos_search_budget.json")
 
 

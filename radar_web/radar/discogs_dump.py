@@ -1426,3 +1426,139 @@ def suggest_labels(prefix, limit=12):
         if len(out) >= limit:
             break
     return out
+
+
+def releases_for_artists(artist_ids, per_artist=15, con=None):
+    """Renvoie les sorties les plus récentes pour chaque artiste, sans filtre de format.
+
+    Les artistes sont traités dans l'ordre fourni et les couples
+    release/artiste sont dédoublonnés pour qu'une sortie ne soit pas répétée
+    lorsqu'elle associate plusieurs rôles au même artiste. La fenêtre SQLite
+    permet de conserver au maximum ``per_artist`` lignes par artiste.
+    """
+    try:
+        iterator = iter(artist_ids)
+    except TypeError:
+        return []
+
+    ordered_ids = []
+    seen_ids = set()
+
+    for raw_id in iterator:
+        if isinstance(raw_id, bool) or raw_id is None:
+            continue
+
+        if isinstance(raw_id, int):
+            artist_id = raw_id
+        elif isinstance(raw_id, str):
+            value = raw_id.strip()
+            if not value:
+                continue
+            try:
+                artist_id = int(value, 10)
+            except ValueError:
+                continue
+        else:
+            continue
+
+        if artist_id not in seen_ids:
+            seen_ids.add(artist_id)
+            ordered_ids.append(artist_id)
+
+    try:
+        if per_artist <= 0:
+            return []
+    except TypeError:
+        return []
+
+    if not ordered_ids:
+        return []
+
+    owns_connection = con is None
+    if owns_connection:
+        if not available():
+            return []
+        con = connect_readonly()
+        if con is None:
+            return []
+
+    try:
+        if not _has_table(con, "release_artists"):
+            return []
+
+        rows_by_artist = {}
+        placeholders = ",".join("?" for _ in range(400))
+
+        for start in range(0, len(ordered_ids), 400):
+            batch = ordered_ids[start:start + 400]
+            batch_placeholders = ",".join("?" for _ in batch)
+            query = f"""
+                WITH pairs AS (
+                    SELECT DISTINCT release_id, artist_id
+                    FROM release_artists
+                    WHERE artist_id IN ({batch_placeholders})
+                ),
+                ranked AS (
+                    SELECT
+                        pairs.artist_id,
+                        r.id,
+                        r.title,
+                        r.artist,
+                        r.label,
+                        r.catno,
+                        r.year,
+                        r.genres,
+                        r.styles,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY pairs.artist_id
+                            ORDER BY
+                                r.year IS NULL,
+                                r.year DESC,
+                                r.id DESC
+                        ) AS rn
+                    FROM pairs
+                    JOIN releases AS r ON r.id = pairs.release_id
+                )
+                SELECT
+                    id,
+                    title,
+                    artist,
+                    label,
+                    catno,
+                    year,
+                    genres,
+                    styles,
+                    artist_id
+                FROM ranked
+                WHERE rn <= ?
+                ORDER BY
+                    artist_id,
+                    year IS NULL,
+                    year DESC,
+                    id DESC
+            """
+            cursor = con.execute(query, (*batch, per_artist))
+
+            for row in cursor:
+                release = {
+                    "id": row[0],
+                    "title": row[1],
+                    "artist": row[2],
+                    "label": row[3],
+                    "catno": row[4],
+                    "year": row[5],
+                    "genres": row[6],
+                    "styles": row[7],
+                    "artist_id": row[8],
+                }
+                rows_by_artist.setdefault(release["artist_id"], []).append(release)
+
+        result = []
+        for artist_id in ordered_ids:
+            result.extend(rows_by_artist.get(artist_id, []))
+        return result
+    except sqlite3.OperationalError:
+        return []
+    finally:
+        if owns_connection:
+            con.close()

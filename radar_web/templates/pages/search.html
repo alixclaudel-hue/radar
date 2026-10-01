@@ -60,7 +60,6 @@
       <button type="button" class="ghost icon" id="filters-close" aria-label="Fermer les filtres">{{ icons.close() }}</button>
     </div>
     <div class="filters__body">
-  <p class="notice small" id="filters-scope"></p>
   <div class="row">
     <div class="field combo">
       <label>Genre <span class="muted">tape pour chercher, choisis dans la liste</span></label>
@@ -324,11 +323,6 @@
   var form = document.getElementById('search-form');
   var NAMES = ['genre', 'style', 'year_from', 'year_to', 'pages', 'label_min', 'artist_min'];
   var LABELS = { normal: 'Générale', labels: 'Mes labels', seller: 'Vendeur' };
-  var SCOPE = {
-    normal: 'ils s\'appliquent à la recherche dans tout le catalogue (label optionnel).',
-    labels: 'ils s\'appliquent aux sorties de tes labels les mieux classés.',
-    seller: 'ils s\'appliquent au stock du vendeur indiqué, et à lui seul. Les autres modes ont les leurs.'
-  };
   function field(n) { return form.querySelector('[name="' + n + '"]'); }
   function defaults() {
     return { genre: '', style: '', year_from: field('year_from').min, year_to: field('year_to').max,
@@ -347,11 +341,9 @@
     });
   }
   function mark(mode) {
-    var t = document.getElementById('filters-mode'), b = document.getElementById('filters-mode-btn'),
-        sc = document.getElementById('filters-scope');
+    var t = document.getElementById('filters-mode'), b = document.getElementById('filters-mode-btn');
     if (t) t.textContent = LABELS[mode];
     if (b) b.textContent = '· ' + LABELS[mode];
-    if (sc) sc.innerHTML = 'Filtres du mode <b>' + LABELS[mode] + '</b> — ' + SCOPE[mode];
     document.querySelectorAll('[data-modes]').forEach(function (el) {
       el.hidden = el.dataset.modes.split(' ').indexOf(mode) < 0;
     });

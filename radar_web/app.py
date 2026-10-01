@@ -1215,11 +1215,22 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
                               "(Mon profil → Discogs) : son stock n'est lisible que par l'API.")
         inv, meta = sellers.load_inventory(seller), sellers.inv_meta(seller)
         seller_sync = {"seller": seller, "fetched_at": meta.get("fetched_at"),
-                       "n_items": meta.get("n_items"), "partial": meta.get("partial")}
-        if not inv:
+                       "n_items": meta.get("n_items"), "partial": meta.get("partial"),
+                       "reading": False}
+        if meta.get("reading"):
+            # Snapshot intermédiaire : on affiche ce qui est lu et on relance la
+            # recherche tant que le job tourne (un job planté laisse `reading`
+            # figé, d'où le contrôle de l'état réel).
+            js = jobs.status("seller_inventory") or {}
+            seller_sync["reading"] = bool(js.get("running") or js.get("queued")) \
+                and not js.get("error")
+        if not inv:  # rien de lu encore
             # Jamais lu : on lance la lecture et on le dit, plutôt que de renvoyer
             # un échantillon tronqué qui donnerait de faux « aucun résultat ».
             jobs.launch("seller_inventory", {"seller": seller})
+            # `reading` : le gabarit relance la recherche tout seul (sauf en
+            # erreur, sinon boucle) jusqu'à l'arrivée des premiers disques.
+            seller_sync["reading"] = not (jobs.status("seller_inventory") or {}).get("error")
             return frag(request, "partials/results.html", results=[], seller=seller,
                         empty_reason="seller_sync", seller_sync=seller_sync,
                         has_token=True)

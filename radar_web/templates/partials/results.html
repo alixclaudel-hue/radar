@@ -3,16 +3,20 @@
    (point 68). Le suivi du job s'auto-rafraîchit tout seul via /jobs/…/status. #}
 {% set seller_block %}
 {% if seller_sync %}
-<div class="notice small">
-  {% if seller_sync.fetched_at %}
+<div class="notice small"{% if seller_sync.reading %} hx-post="/search" hx-include="#search-form"
+     hx-trigger="every 4s" hx-target="#results" hx-swap="innerHTML"{% endif %}>
+  {% if seller_sync.reading %}
+  Lecture du stock de <b>{{ seller_sync.seller }}</b> en cours : {{ seller_sync.n_items or 0 }} disque(s) lus
+  pour l'instant, les résultats ci-dessous se complètent au fil de la lecture.
+  {% elif seller_sync.fetched_at %}
   Inventaire de <b>{{ seller_sync.seller }}</b> : {{ seller_sync.n_items }} disque(s),
   lu le {{ seller_sync.fetched_at[:16].replace('T', ' à ') }}{% if seller_sync.partial %}
   — <b>incomplet</b> (lecture interrompue){% endif %}.
   {% else %}
   Lecture du stock de <b>{{ seller_sync.seller }}</b> en cours : tout son inventaire est lu
   page par page (~100 disques toutes les 1,1 s), une seule fois — les recherches suivantes
-  filtrent ce stock instantanément. Tu peux fermer cette page, le job continue, puis relancer
-  la recherche.
+  filtrent ce stock instantanément. Les résultats s'afficheront ici dès que la lecture est finie
+  (tu peux aussi fermer la page : le job continue).
   {% endif %}
   <form hx-post="/search/seller/sync" hx-target="#job-seller_inventory" hx-swap="outerHTML"
         class="inline">

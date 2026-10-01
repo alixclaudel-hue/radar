@@ -309,6 +309,31 @@ def job_seller_inventory(job, params):
     max_pages = int(params.get("max_pages", 0) or 0)
     job.msg(f"{seller} : lecture du stock en vente…")
 
+    def _snap(listings):
+        snap = {}
+        for it in listings:
+            rid = it.get("release_id")
+            if not rid:
+                continue
+            snap[str(rid)] = {k: it.get(k) for k in
+                              ("listing_id", "price", "currency", "condition",
+                               "sleeve", "listed", "artist", "format", "title")}
+        return snap
+
+    # Première lecture seulement : un snapshot complet déjà présent ne doit
+    # jamais être remplacé par un morceau. Les résultats s'affichent ainsi au
+    # fil de la lecture (`reading` : /search sait que ça continue).
+    first_read = not scat.load_inventory(seller)
+
+    def _on_batch(listings, page):
+        if first_read and page % 3 == 0:
+            snap = _snap(listings)
+            scat.save_inventory(seller, snap)
+            scat.set_inv_meta(seller, {
+                "fetched_at": datetime.now().isoformat(timespec="seconds"),
+                "n_items": len(snap), "n_listings": len(listings),
+                "n_pages": page, "partial": True, "reading": True})
+
     def _on_page(n_items, page, pages):
         job.tick(f"{seller} : page {page}/{pages} · {n_items} article(s) lus", total=pages)
         job.sub(done=n_items, label=f"{seller} — articles lus")
@@ -316,26 +341,21 @@ def job_seller_inventory(job, params):
 
     try:
         listings, truncated = dgs.seller_inventory(seller, token=token,
-                                                   max_pages=max_pages, on_page=_on_page)
+                                                   max_pages=max_pages, on_page=_on_page,
+                                                   on_batch=_on_batch)
     except dgs.DiscogsError as e:
         return job.finish(error=f"Vendeur « {seller} » : {e}")
 
-    snap = {}
-    for it in listings:
-        rid = it.get("release_id")
-        if not rid:
-            continue
-        snap[str(rid)] = {k: it.get(k) for k in
-                          ("listing_id", "price", "currency", "condition",
-                           "sleeve", "listed", "artist", "format", "title")}
-    if truncated and scat.load_inventory(seller):
+    snap = _snap(listings)
+    if truncated and not first_read:
         return job.finish(f"{seller} : lecture interrompue à {len(snap)} disque(s) — "
                           "l'inventaire complet déjà enregistré est conservé.")
     scat.save_inventory(seller, snap)
     scat.set_inv_meta(seller, {
         "fetched_at": datetime.now().isoformat(timespec="seconds"),
         "n_items": len(snap), "n_listings": len(listings),
-        "n_pages": job.st.get("done", 0), "partial": bool(truncated)})
+        "n_pages": job.st.get("done", 0), "partial": bool(truncated),
+        "reading": False})
     suffix = " (lecture interrompue : stock incomplet)" if truncated else ""
     return job.finish(f"{seller} : {len(snap)} disque(s) en vente sur "
                       f"{len(listings)} annonce(s).{suffix}")

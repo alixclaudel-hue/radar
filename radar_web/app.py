@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import googleauth, opslog, spotifyauth, websession
+from .radar import discogsauth, googleauth, opslog, spotifyauth, websession
 from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
                     learn, paths, sellers, stores, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
@@ -250,7 +250,8 @@ def account_invite(request: Request):
 
 # --------------------------------------------------------------------- helpers
 def render(request, tpl, **ctx):
-    ctx.setdefault("has_token", bool(store.read_config().get("token")))
+    ctx.setdefault("has_token", bool(store.read_config().get("token"))
+                   or discogsauth.is_connected(store.current_uid()))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
     ctx.setdefault("n_cart", len(load(_pu().cart, [])))
@@ -415,7 +416,7 @@ def patte_page(request: Request, saved: int = 0):
            ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
     st = c.stats()
     # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
-    onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
+    onboarding = not (c.cfg.get("token") or discogsauth.is_connected(store.current_uid())) and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
     google_msg = {"ok": "Compte Google relié.", "off": "Compte Google délié.",
                   "refused": "Connexion Google refusée ou expirée — réessaie.",
                   "error": "Google n'a pas validé la connexion — réessaie.",
@@ -426,7 +427,14 @@ def patte_page(request: Request, saved: int = 0):
                    "error": "Spotify n'a pas validé la connexion — réessaie.",
                    "unconfigured": "La connexion Spotify n'est pas configurée sur ce serveur."
                    }.get(request.query_params.get("spotify", ""), "")
+    discogs_msg = {"ok": "Compte Discogs relié.", "off": "Compte Discogs délié.",
+                   "refused": "Connexion Discogs refusée ou expirée — réessaie.",
+                   "error": "Discogs n'a pas validé la connexion — réessaie.",
+                   "unconfigured": "La connexion Discogs n'est pas configurée sur ce serveur."
+                   }.get(request.query_params.get("discogs", ""), "")
     return render(request, "pages/patte.html", active="patte",
+                  discogs_msg=discogs_msg, discogs_configured=discogsauth.configured(),
+                  discogs_connected=discogsauth.is_connected(store.current_uid()),
                   google_msg=google_msg, google_configured=googleauth.configured(),
                   google_connected=googleauth.is_connected(store.current_uid()),
                   spotify_msg=spotify_msg, spotify_configured=spotifyauth.configured(),
@@ -534,6 +542,38 @@ def reco_radar_clear_candidates(mode: str = Form("approfondir")):
 # (/patte). Jetons stockés par utilisateur (googleauth), jamais dans la config JSON.
 
 _YT_ID = re.compile(r"^[\w-]{1,64}$")
+
+
+@app.get("/oauth/discogs/start")
+def discogs_start():
+    if not discogsauth.configured():
+        return RedirectResponse("/patte?discogs=unconfigured", status_code=303)
+    try:
+        url = discogsauth.start(store.current_uid())
+    except discogsauth.DiscogsError:
+        return RedirectResponse("/patte?discogs=error", status_code=303)
+    return RedirectResponse(url, status_code=303)
+
+
+@app.get("/oauth/discogs/callback")
+def discogs_callback(oauth_token: str = "", oauth_verifier: str = "", denied: str = ""):
+    """Retour de Discogs. OAuth 1.0a n'a pas de `state` : le jeton de requête, gardé côté
+    serveur pour CET utilisateur de la session, joue ce rôle — un retour forgé ou celui
+    d'un autre compte ne correspond à aucun pending et est refusé."""
+    uid = store.current_uid()
+    if denied or not oauth_token or not oauth_verifier:
+        return RedirectResponse("/patte?discogs=refused", status_code=303)
+    try:
+        ok = discogsauth.complete(uid, oauth_token, oauth_verifier)
+    except discogsauth.DiscogsError:
+        return RedirectResponse("/patte?discogs=error", status_code=303)
+    return RedirectResponse("/patte?discogs=" + ("ok" if ok else "refused"), status_code=303)
+
+
+@app.post("/oauth/discogs/disconnect")
+def discogs_disconnect():
+    discogsauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?discogs=off", status_code=303)
 
 
 @app.get("/oauth/google/start")
@@ -911,7 +951,8 @@ def search_replay(request: Request, sid: str):
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
                 searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
-                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")),
+                dump_date=entry.get("dump_date"), has_token=(bool(Ctx().cfg.get("token", ""))
+                           or discogsauth.is_connected(store.current_uid())),
                 n_matches=entry.get("n_matches"), page=1, total_pages=1)
 
 

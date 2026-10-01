@@ -20,32 +20,45 @@ def _check(r):
         raise DiscogsError(f"Erreur Discogs {r.status_code} : {r.text[:200]}")
 
 
-def get(path, params=None, token=""):
+def _auth(params, token):
+    """(params, headers) d'un appel. Un token explicite (personnel, ou celui qu'on est en
+    train de tester dans /patte) passe en `?token=`. Sans token, on prend la connexion
+    OAuth du compte de la requête : jamais celle d'un autre — hors requête web l'uid est
+    None et l'appel reste anonyme plutôt que de retomber sur le propriétaire."""
     params = dict(params or {})
+    headers = {"User-Agent": UA}
     if token:
         params["token"] = token
-    r = requests.get(f"{BASE}{path}", params=params,
-                     headers={"User-Agent": UA}, timeout=20)
+        return params, headers
+    from . import discogsauth, store   # import tardif : discogsauth importe websession
+    uid = store.current_uid()
+    cred = discogsauth.credential(uid) if uid else None
+    if cred:
+        _, tok, secret = cred.split(":", 2)
+        try:
+            headers["Authorization"] = discogsauth.authorization_header((tok, secret))
+        except discogsauth.DiscogsError:
+            pass   # app Discogs non configurée sur ce serveur : appel anonyme
+    return params, headers
+
+
+def get(path, params=None, token=""):
+    params, headers = _auth(params, token)
+    r = requests.get(f"{BASE}{path}", params=params, headers=headers, timeout=20)
     _check(r)
     return r.json()
 
 
 def put(path, params=None, token=""):
-    params = dict(params or {})
-    if token:
-        params["token"] = token
-    r = requests.put(f"{BASE}{path}", params=params,
-                     headers={"User-Agent": UA}, timeout=20)
+    params, headers = _auth(params, token)
+    r = requests.put(f"{BASE}{path}", params=params, headers=headers, timeout=20)
     _check(r)
     return r.json() if r.text else {}
 
 
 def delete(path, params=None, token=""):
-    params = dict(params or {})
-    if token:
-        params["token"] = token
-    r = requests.delete(f"{BASE}{path}", params=params,
-                        headers={"User-Agent": UA}, timeout=20)
+    params, headers = _auth(params, token)
+    r = requests.delete(f"{BASE}{path}", params=params, headers=headers, timeout=20)
     _check(r)
 
 

@@ -91,28 +91,6 @@
                min="{{ year_min }}" max="{{ year_max }}" value="{{ q.year_to or year_max }}" step="1">
       </div>
     </div>
-    <div class="field field--xs" data-modes="normal labels">
-      <label>Pages/label</label>
-      <input name="pages" inputmode="numeric" value="{{ q.pages or 2 }}">
-    </div>
-  </div>
-  <div class="field">
-    <label>Score minimum <span class="muted">· ne garde que les albums qui passent les seuils réglés (0 = pas de seuil)</span>
-      <button type="button" class="small ghost fr" id="mins-reset">{{ icons.undo() }} réinitialiser</button></label>
-    <div class="row">
-      <div class="field">
-        <label>{{ icons.label() }} Label <b id="label-min-out">{{ q.label_min or 0 }}</b></label>
-        <input type="range" id="label-min" name="label_min" min="0" max="100" step="1"
-               value="{{ q.label_min or 0 }}">
-      </div>
-      <div class="field">
-        <label>{{ icons.artist() }} Artiste <b id="artist-min-out">{{ q.artist_min or 0 }}</b></label>
-        <input type="range" id="artist-min" name="artist_min" min="0" max="100" step="1"
-               value="{{ q.artist_min or 0 }}">
-      </div>
-    </div>
-    <p class="small muted" data-modes="seller">Chez un vendeur, la plupart des labels et artistes te sont inconnus
-      (score 0) : un seuil les masque tous. Laisse à 0 pour voir tout son stock, trié par score.</p>
   </div>
     </div>
     <div class="filters__foot">
@@ -178,22 +156,7 @@
   draw();
 })();
 (function () {
-  var ids = ['label-min', 'artist-min'];
-  ids.forEach(function (id) {
-    var inp = document.getElementById(id), out = document.getElementById(id + '-out');
-    if (inp && out) inp.addEventListener('input', function () { out.textContent = inp.value; });
-  });
-  var reset = document.getElementById('mins-reset');
-  if (reset) reset.addEventListener('click', function () {
-    ids.forEach(function (id) {
-      var inp = document.getElementById(id), out = document.getElementById(id + '-out');
-      if (inp) inp.value = 0;
-      if (out) out.textContent = '0';
-    });
-  });
-})();
-(function () {
-  // Filtres (charte §7) : sur téléphone, feuille qui glisse du bas ; le bouton porte le
+  // Filtres (charte §7) : feuille qui glisse du bas, à toute taille d'écran ; le bouton porte le
   // nombre de filtres actifs et les puces en dessous les résument (chacune se retire d'un tap).
   // Les vraies valeurs restent dans les champs du formulaire : ici on ne fait que les lire.
   var form = document.getElementById('search-form'),
@@ -206,8 +169,7 @@
       countEl = document.getElementById('filters-count'),
       sumEl = document.getElementById('filters-summary'),
       lo = document.getElementById('yr-from'), hi = document.getElementById('yr-to'),
-      yrLabel = document.getElementById('yr-label'),
-      mq = window.matchMedia('(max-width:720px)');
+      yrLabel = document.getElementById('yr-label');
   var X = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
   function setOpen(o) {
@@ -254,15 +216,6 @@
         refresh();
       }));
     }
-    [['label-min', 'Label'], ['artist-min', 'Artiste']].forEach(function (m) {
-      var inp = document.getElementById(m[0]);
-      if (inp && +inp.value > 0) {
-        n++;
-        sumEl.appendChild(chip('Score ' + m[1] + ' ≥ ' + inp.value, function () {
-          inp.value = 0; inp.dispatchEvent(new Event('input', { bubbles: true })); refresh();
-        }));
-      }
-    });
     countEl.textContent = n; countEl.hidden = !n;
   }
 
@@ -278,14 +231,10 @@
     if (e.key === 'Escape' && sheet.classList.contains('filters--open')) setOpen(false);
   });
   form.addEventListener('submit', function () { if (sheet.classList.contains('filters--open')) setOpen(false); });
-  (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(function () {
-    if (!mq.matches && sheet.classList.contains('filters--open')) setOpen(false);
-  });
   // les puces genre/style sont (re)dessinées par base.html : on les observe plutôt que de les dupliquer
   var mo = new MutationObserver(refresh);
   form.querySelectorAll('.combo .chip-list').forEach(function (l) { mo.observe(l, { childList: true }); });   // pas le récap lui-même (boucle infinie)
-  [lo, hi, document.getElementById('label-min'), document.getElementById('artist-min')]
-    .forEach(function (el) { if (el) el.addEventListener('input', refresh); });
+  [lo, hi].forEach(function (el) { if (el) el.addEventListener('input', refresh); });
   refresh();
 })();
 (function () {

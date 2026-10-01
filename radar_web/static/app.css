@@ -595,28 +595,34 @@ a:focus-visible, summary:focus-visible{
 .search-submit .htmx-indicator{ position:absolute; right:16px; top:50%; transform:translateY(-50%); pointer-events:none; }
 .search-submit .spinner{ border-color:rgba(255,255,255,.35); border-top-color:#fff; }
 .search-submit .primary{ flex:1; padding-top:.65rem; padding-bottom:.65rem; }
-.filters-bar, .filters-summary, .filters__head, .filters__foot, .filters-backdrop{ display:none; }
+.filters-bar{ display:flex; gap:8px; margin:6px 0 0; }
+.filters-open{ flex:1; }
 .filters-open .badge{ padding:0 8px; font-size:12px; }
+.filters-summary{ display:flex; flex-wrap:wrap; margin:8px 0 0; }
+.filters{
+  position:fixed; left:0; right:0; bottom:0; z-index:80; max-height:86vh;
+  display:flex; flex-direction:column; background:var(--paper);
+  border-radius:var(--r-lg) var(--r-lg) 0 0; box-shadow:0 -10px 40px rgba(18,18,18,.25);
+  transform:translateY(105%); visibility:hidden;
+  transition:transform var(--t-base) var(--ease), visibility 0s linear var(--t-base);
+}
+.filters--open{ transform:none; visibility:visible; transition-delay:0s; }
+.filters__head{ display:flex; align-items:center; justify-content:space-between; padding:12px 12px 0 18px; }
+.filters__head h3{ margin:0; font-size:18px; }
+.filters__body{ overflow-y:auto; padding:8px 18px; -webkit-overflow-scrolling:touch; }
+.filters__foot{ display:block; padding:10px 18px calc(12px + env(safe-area-inset-bottom)); background:var(--surface); border-top:1px solid var(--line); }
+.filters__foot .primary{ width:100%; padding-top:.65rem; padding-bottom:.65rem; }
+.filters-backdrop{ display:block; position:fixed; inset:0; z-index:79; background:rgba(18,18,18,.45); }
+.filters-backdrop[hidden]{ display:none; }
+body.sheet-on{ overflow:hidden; }
+/* Au-delà du mobile, la feuille devient un panneau ancré en bas à droite plutôt
+   qu'en pleine largeur (même mécanique d'ouverture, juste la taille qui change). */
+@media (min-width:721px){
+  .filters{ left:auto; right:24px; bottom:24px; max-width:480px; width:calc(100% - 48px);
+            border-radius:var(--r-lg); max-height:70vh; }
+}
 @media (max-width:720px){
-  .filters-bar{ display:flex; gap:8px; margin:6px 0 0; }
-  .filters-open{ flex:1; }
-  .filters-summary{ display:flex; margin:8px 0 0; }
-  .filters{
-    position:fixed; left:0; right:0; bottom:0; z-index:80; max-height:86vh;
-    display:flex; flex-direction:column; background:var(--paper);
-    border-radius:var(--r-lg) var(--r-lg) 0 0; box-shadow:0 -10px 40px rgba(18,18,18,.25);
-    transform:translateY(105%); visibility:hidden;
-    transition:transform var(--t-base) var(--ease), visibility 0s linear var(--t-base);
-  }
-  .filters--open{ transform:none; visibility:visible; transition-delay:0s; }
-  .filters__head{ display:flex; align-items:center; justify-content:space-between; padding:12px 12px 0 18px; }
-  .filters__head h3{ margin:0; font-size:18px; }
-  .filters__body{ overflow-y:auto; padding:8px 18px; -webkit-overflow-scrolling:touch; }
   .filters .row > *{ flex-basis:100%; }
-  .filters__foot{ display:block; padding:10px 18px calc(12px + env(safe-area-inset-bottom)); background:var(--surface); border-top:1px solid var(--line); }
-  .filters__foot .primary{ width:100%; padding-top:.65rem; padding-bottom:.65rem; }
-  .filters-backdrop{ display:block; position:fixed; inset:0; z-index:79; background:rgba(18,18,18,.45); }
-  body.sheet-on{ overflow:hidden; }
   .search-submit{
     position:sticky; bottom:calc(72px + env(safe-area-inset-bottom)); z-index:5;
     margin:10px -2px 0; padding:12px 2px 8px;

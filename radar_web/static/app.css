@@ -434,6 +434,23 @@ a.chip:hover{ border-color:var(--pin); background:var(--pin-50); }
 }
 .tracklist .tk-play:hover{ background:var(--pin); color:var(--paper); border-color:var(--pin); }
 
+/* Bouton fusionné Bandcamp/Traxsource/Beatport (une seule piste, 3 plateformes) :
+   <details> natif, zéro JS, même principe que le menu "Mon profil" (pt 63). */
+.tk-shops{ position:relative; flex:0 0 auto; }
+.tk-shops summary{ list-style:none; cursor:pointer; }
+.tk-shops summary::-webkit-details-marker{ display:none; }
+.tk-shops[open] summary{ background:var(--pin); color:var(--paper); border-color:var(--pin); }
+.tk-shops__menu{
+  position:absolute; right:0; top:calc(100% + 4px); z-index:5; min-width:150px;
+  background:var(--paper); border:1px solid var(--line); border-radius:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,.12); padding:4px; display:flex; flex-direction:column;
+}
+.tk-shops__menu a{
+  display:flex; align-items:center; gap:7px; padding:6px 8px; border-radius:6px;
+  color:var(--ink); text-decoration:none; font-size:12px; white-space:nowrap;
+}
+.tk-shops__menu a:hover{ background:var(--line); }
+
 .notice{ background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:14px 16px; }
 .notice.warn{ border-color:var(--clay); background:var(--clay-50); }
 

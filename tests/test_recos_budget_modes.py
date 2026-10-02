@@ -102,7 +102,7 @@ class TestsBudgetRecos(unittest.TestCase):
         self.assertFalse(os.path.exists(self.budget_path))
         self.assertEqual(recos._recos_budget_today(), (0, {}))
         self.assertEqual(recos._recos_searches_used_today(), 0)
-        self.assertEqual(recos._recos_searches_allowance("approfondir"), 80)
+        self.assertEqual(recos._recos_searches_allowance("approfondir", recos.RECOS_DAILY_SEARCH_BUDGET), 80)
 
     def test_ancien_format_sans_by_mode_est_relu(self):
         """L'ancien format journalier reste compatible avec la répartition vide."""
@@ -154,7 +154,7 @@ class TestsBudgetRecos(unittest.TestCase):
         })
         self.etat[self.candidats_decouverte_path] = [{"id": 1}]
 
-        self.assertEqual(recos._recos_searches_allowance("approfondir"), 0)
+        self.assertEqual(recos._recos_searches_allowance("approfondir", recos.RECOS_DAILY_SEARCH_BUDGET), 0)
 
     def test_allowance_recupere_le_reliquat_du_mode_inactif(self):
         """Une file Découverte vide permet à Approfondir de récupérer son reliquat."""
@@ -165,7 +165,7 @@ class TestsBudgetRecos(unittest.TestCase):
         })
         self.etat[self.candidats_decouverte_path] = []
 
-        self.assertEqual(recos._recos_searches_allowance("approfondir"), 40)
+        self.assertEqual(recos._recos_searches_allowance("approfondir", recos.RECOS_DAILY_SEARCH_BUDGET), 40)
 
     def test_allowance_est_plafonnee_par_le_compteur_total(self):
         """L'allocation ne dépasse jamais le budget total restant."""
@@ -176,7 +176,7 @@ class TestsBudgetRecos(unittest.TestCase):
         })
         self.etat[self.candidats_decouverte_path] = [{"id": 1}]
 
-        self.assertEqual(recos._recos_searches_allowance("approfondir"), 2)
+        self.assertEqual(recos._recos_searches_allowance("approfondir", recos.RECOS_DAILY_SEARCH_BUDGET), 2)
 
     def test_allowance_ne_devient_pas_negative(self):
         """Un budget déjà consommé au-delà du plafond produit zéro."""
@@ -187,7 +187,7 @@ class TestsBudgetRecos(unittest.TestCase):
         })
         self.etat[self.candidats_decouverte_path] = [{"id": 1}]
 
-        self.assertEqual(recos._recos_searches_allowance("approfondir"), 0)
+        self.assertEqual(recos._recos_searches_allowance("approfondir", recos.RECOS_DAILY_SEARCH_BUDGET), 0)
 
     def test_mode_paths_lit_les_constantes_a_le_nom_moment(self):
         """La résolution des chemins utilise les constantes patchées à l'appel."""

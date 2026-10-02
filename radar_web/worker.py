@@ -13,7 +13,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from .radar import (catalog_labelgraph, discogs_dump, features, jobs, paths, recoindex,
@@ -65,6 +65,13 @@ MIDNIGHT_PURGE_CHECK_EVERY = 600
 _last_midnight_purge_check = 0.0
 _last_midnight_purge_date = None
 PARIS_TZ = ZoneInfo("Europe/Paris")
+# Référence persistée sur disque (pas seulement en mémoire) : un redémarrage
+# du conteneur worker (chaque déploiement) remettait sinon _last_midnight_purge_date
+# à None, et le premier check après restart posait silencieusement la référence
+# au jour courant sans jamais purger — une purge due pendant la coupure était
+# perdue pour toujours. Même convention de sous-dossier ops/ que
+# paths.DATA/ops/actions.jsonl (opslog.py).
+_MIDNIGHT_PURGE_STATE_PATH = os.path.join(paths.DATA, "ops", "recos_purge_state.json")
 
 
 def _maybe_weekly_scan():
@@ -372,18 +379,35 @@ def _maybe_recos_midnight_purge():
     purgée n'est jamais réajoutée automatiquement (dédup permanente inchangée,
     cf. CLAUDE.md pt 19).
 
-    Purge aussi la playlist Découverte (01/10)."""
+    Purge aussi la playlist Découverte (01/10). Référence de date persistée
+    sur disque (_MIDNIGHT_PURGE_STATE_PATH) : survit à un redémarrage du
+    conteneur worker (chaque déploiement) sans perdre une purge due pendant
+    la coupure (sinon le premier check après restart posait silencieusement
+    la référence au jour courant sans jamais purger)."""
     global _last_midnight_purge_check, _last_midnight_purge_date
     if time.time() - _last_midnight_purge_check < MIDNIGHT_PURGE_CHECK_EVERY:
         return
     _last_midnight_purge_check = time.time()
     today = datetime.now(PARIS_TZ).date()
     if _last_midnight_purge_date is None:
-        _last_midnight_purge_date = today   # référence initiale, pas de purge au démarrage
-        return
-    if today == _last_midnight_purge_date:
+        state = store.load(_MIDNIGHT_PURGE_STATE_PATH, {})
+        persisted = state.get("date")
+        if not persisted:
+            # Tout premier démarrage historique, jamais purgé : référence
+            # initiale, pas de purge au démarrage.
+            _last_midnight_purge_date = today
+            store.save(_MIDNIGHT_PURGE_STATE_PATH, {"date": _last_midnight_purge_date.isoformat()})
+            return
+        _last_midnight_purge_date = date.fromisoformat(persisted)
+        if _last_midnight_purge_date >= today:
+            return
+        # Date persistée antérieure à aujourd'hui : une purge est due
+        # (restart survenu après minuit Paris sans qu'elle ait eu lieu) —
+        # on l'exécute immédiatement, pas de `return` ici.
+    elif today == _last_midnight_purge_date:
         return
     _last_midnight_purge_date = today
+    store.save(_MIDNIGHT_PURGE_STATE_PATH, {"date": _last_midnight_purge_date.isoformat()})
     for uid in _recos_uids():
         for attr in ("recos_playlist", "recos_playlist_decouverte"):
             path = getattr(paths.user_paths(uid), attr)

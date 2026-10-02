@@ -24,8 +24,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .radar import opslog, websession
-from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
-                    learn, paths, sellers, store, vocab, volumo, ytcache)
+from .radar import (accounts, artistgraph, bandcamp, beatport, discogs, features, jobs,
+                    labelgraph, learn, paths, sellers, store, traxsource, vocab, volumo,
+                    ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 from .radar.textmatch import best_video_uri
@@ -1641,8 +1642,10 @@ def tracklist(request: Request, rid: int):
             q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
             play, kind = "/yt/first?q=" + quote_plus(q), "yt"
         bc = "/bc/go?" + urlencode({"a": tart, "t": ttl, "l": label1, "kind": "t"})
+        tx = traxsource.search_url(tart, ttl)
+        bp = beatport.search_url(tart, ttl)
         rows.append({"pos": (t.get("position") or "").strip(), "title": ttl,
-                     "play": play, "kind": kind, "bc": bc})
+                     "play": play, "kind": kind, "bc": bc, "tx": tx, "bp": bp})
     return frag(request, "partials/tracklist.html", tracks=rows)
 
 

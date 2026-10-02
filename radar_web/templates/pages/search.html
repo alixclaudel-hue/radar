@@ -34,7 +34,6 @@
   </div>
 
   <div class="acc__body" id="mode-labels"{{ ' hidden' if not q.base_metric }}>
-    <p class="small muted">Recherche sur mes labels les mieux classés (12 max).</p>
     <label>Classer par</label>
     <div class="seg">
       <label><input type="radio" name="base_metric" value="aff" {{ 'checked' if q.base_metric == 'aff' }}>affinité</label>

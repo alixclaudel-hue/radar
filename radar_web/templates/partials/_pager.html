@@ -1,15 +1,16 @@
+{% import "partials/_icons.html" as icons %}
 {# Boutons « précédent / suivant » d'une table paginée chargée en htmx.
    url/target : la route qui rend la table et le conteneur à remplacer.
    vals : dict des paramètres à conserver d'une page à l'autre (filtres…). #}
 {% macro pager(url, target, page, pages, vals={}) %}
-<div class="row" style="justify-content:center;gap:8px;margin-top:8px">
+<div class="pager">
   {% if page > 1 %}
   <button class="small" hx-get="{{ url }}" hx-target="{{ target }}" hx-swap="outerHTML"
-          hx-vals='{{ dict(vals, page=page - 1) | tojson }}'>‹ précédent</button>
+          hx-vals='{{ dict(vals, page=page - 1) | tojson }}'>{{ icons.chevron("ic-left") }} précédent</button>
   {% endif %}
   {% if page < pages %}
   <button class="small" hx-get="{{ url }}" hx-target="{{ target }}" hx-swap="outerHTML"
-          hx-vals='{{ dict(vals, page=page + 1) | tojson }}'>suivant ›</button>
+          hx-vals='{{ dict(vals, page=page + 1) | tojson }}'>suivant {{ icons.chevron("ic-right") }}</button>
   {% endif %}
 </div>
 {% endmacro %}

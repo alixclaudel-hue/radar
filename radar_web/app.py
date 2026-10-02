@@ -23,10 +23,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import opslog, websession
-from .radar import (accounts, artistgraph, bandcamp, beatport, discogs, features, jobs,
-                    labelgraph, learn, paths, sellers, store, traxsource, vocab, volumo,
-                    ytcache)
+from .radar import discogsauth, googleauth, opslog, spotifyauth, websession
+from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
+                    learn, paths, sellers, stores, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
 from .radar.store import load, normalize_label, save
 from .radar.textmatch import best_video_uri
@@ -251,7 +250,8 @@ def account_invite(request: Request):
 
 # --------------------------------------------------------------------- helpers
 def render(request, tpl, **ctx):
-    ctx.setdefault("has_token", bool(store.read_config().get("token")))
+    ctx.setdefault("has_token", bool(store.read_config().get("token"))
+                   or discogsauth.is_connected(store.current_uid()))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
     ctx.setdefault("n_cart", len(load(_pu().cart, [])))
@@ -416,48 +416,91 @@ def patte_page(request: Request, saved: int = 0):
            ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
     st = c.stats()
     # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
-    onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
-    return render(request, "pages/patte.html", active="patte", cfg=c.cfg, sc=c.scoring,
+    onboarding = not (c.cfg.get("token") or discogsauth.is_connected(store.current_uid())) and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
+    google_msg = {"ok": "Compte Google relié.", "off": "Compte Google délié.",
+                  "refused": "Connexion Google refusée ou expirée — réessaie.",
+                  "error": "Google n'a pas validé la connexion — réessaie.",
+                  "unconfigured": "La connexion Google n'est pas configurée sur ce serveur."
+                  }.get(request.query_params.get("google", ""), "")
+    spotify_msg = {"ok": "Compte Spotify relié.", "off": "Compte Spotify délié.",
+                   "refused": "Connexion Spotify refusée ou expirée — réessaie.",
+                   "error": "Spotify n'a pas validé la connexion — réessaie.",
+                   "unconfigured": "La connexion Spotify n'est pas configurée sur ce serveur."
+                   }.get(request.query_params.get("spotify", ""), "")
+    discogs_msg = {"ok": "Compte Discogs relié.", "off": "Compte Discogs délié.",
+                   "refused": "Connexion Discogs refusée ou expirée — réessaie.",
+                   "error": "Discogs n'a pas validé la connexion — réessaie.",
+                   "unconfigured": "La connexion Discogs n'est pas configurée sur ce serveur."
+                   }.get(request.query_params.get("discogs", ""), "")
+    return render(request, "pages/patte.html", active="patte",
+                  discogs_msg=discogs_msg, discogs_configured=discogsauth.configured(),
+                  discogs_connected=discogsauth.is_connected(store.current_uid()),
+                  google_msg=google_msg, google_configured=googleauth.configured(),
+                  google_connected=googleauth.is_connected(store.current_uid()),
+                  spotify_msg=spotify_msg, spotify_configured=spotifyauth.configured(),
+                  spotify_connected=spotifyauth.is_connected(store.current_uid()), cfg=c.cfg, sc=c.scoring,
                   cats=c.cfg.get("taste_categories", {}), coll=c.collection,
                   pl_urls=pl_urls, pl_meta=load(_pu().youtube_meta, {}),
                   sp_urls=sp_urls, sp_meta=load(_pu().spotify_meta, {}),
                   src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding)
 
 
+RECO_MODES = ("approfondir", "decouverte")
+
+def _reco_mode(mode):
+    """Renvoie mode s'il est dans RECO_MODES, sinon "approfondir" (une valeur inconnue
+    retombe sur le mode historique pour qu'un vieux lien ne casse jamais la page)."""
+    return mode if mode in RECO_MODES else "approfondir"
+
+def _reco_files(mode):
+    """Approfondir garde les fichiers d'origine, aucune migration."""
+    pu = _pu()
+    if mode == "decouverte":
+        return (pu.recos_playlist_decouverte, pu.recos_candidates_decouverte)
+    return (pu.recos_playlist, pu.recos_candidates)
+
+
 @app.get("/reco-radar", response_class=HTMLResponse)
-def reco_radar_page(request: Request):
+def reco_radar_page(request: Request, mode: str = "approfondir"):
     """Playlist RECOS RADAR — interne à Radar (recos_playlist.json, alimentée par les
     jobs scan_recos/publish_recos), lue via l'API IFrame Player YouTube côté client :
-    aucune playlist n'est créée sur un compte YouTube (cf. CLAUDE.md)."""
-    playlist = load(_pu().recos_playlist, [])
+    aucune playlist n'est créée sur un compte YouTube (cf. CLAUDE.md). Deux playlists,
+    une visible à la fois (onglets)."""
+    mode = _reco_mode(mode)
+    pl_path, cand_path = _reco_files(mode)
+    playlist = load(pl_path, [])
+    sfx = "_decouverte" if mode == "decouverte" else ""
     max_tracks = int(_cfg().get("scoring", {}).get("recos", {}).get("max_tracks", RECOS_MAX_TRACKS))
     return render(request, "pages/reco_radar.html", active="reco_radar",
                   playlist=playlist, n_playlist=len(playlist), max_tracks=max_tracks,
-                  recos_pending=len(load(_pu().recos_candidates, [])),
-                  last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"),
-                  in_cart=_cart_ids(), voted=_voted_map(), liked_vids=_liked_ids())
+                  recos_pending=len(load(cand_path, [])),
+                  last_scan=_last_import("scan_recos" + sfx), last_publish=_last_import("publish_recos" + sfx),
+                  in_cart=_cart_ids(), voted=_voted_map(), mode=mode, job_sfx=sfx)
 
 
 @app.post("/reco-radar/delete", response_class=HTMLResponse)
-def reco_radar_delete_track(request: Request, video_id: str = Form("")):
+def reco_radar_delete_track(request: Request, video_id: str = Form(""), mode: str = Form("approfondir")):
     """Retire UNE piste de la playlist RECOS RADAR à la main (retour utilisateur
     2026-09-10). N'efface pas recos_history.json : la vidéo reste marquée « déjà
     proposée » et ne sera pas réajoutée automatiquement par un futur scan.
 
     Renvoie le tableau des pistes à jour (htmx, plus de rechargement complet de la
     page — retour utilisateur 2026-09-18). Le tbody ENTIER est rendu, pas seulement
-    la ligne retirée, pour que la numérotation (#) reste juste. Le lecteur IFrame,
-    lui, garde la liste de vidéos chargée au démarrage : la page l'apparie aux
-    lignes par identifiant de vidéo et non par position, justement pour survivre à
-    ces suppressions (cf. le script de pages/reco_radar.html)."""
-    playlist = load(_pu().recos_playlist, [])
+    la ligne retirée, pour que la numérotation (#) reste juste. Le lecteur IFrame est
+    piloté par la liste VISIBLE (cf. le script de pages/reco_radar.html, correctif
+    issue #62) : les lignes portent l'identifiant de la vidéo (`data-vid`) et non
+    leur position, et le JS relit l'ordre du DOM après ce swap — une piste retirée
+    n'existe alors plus dans sa file et ne peut pas continuer à jouer."""
+    mode = _reco_mode(mode)
+    pl_path = _reco_files(mode)[0]
+    playlist = load(pl_path, [])
     if video_id:
         new_playlist = [t for t in playlist if t.get("video_id") != video_id]
         if len(new_playlist) != len(playlist):
-            save(_pu().recos_playlist, new_playlist)
+            save(pl_path, new_playlist)
             playlist = new_playlist
     return frag(request, "partials/reco_rows.html", playlist=playlist,
-                in_cart=_cart_ids(), voted=_voted_map(), liked_vids=_liked_ids())
+                in_cart=_cart_ids(), voted=_voted_map(), mode=mode)
 
 
 @app.post("/reco-radar/mark-played")
@@ -465,110 +508,229 @@ def reco_radar_mark_played(video_id: str = Form("")):
     """Marque une piste comme écoutée aujourd'hui (clic sur la ligne, cf. JS
     reco_radar.html) — purgée à minuit heure de Paris par le worker
     (_maybe_recos_midnight_purge), qui remplace l'éviction FIFO comme mécanisme
-    de renouvellement de la playlist (retour utilisateur 2026-09-14)."""
+    de renouvellement de la playlist (retour utilisateur 2026-09-14).
+    Cherche dans les deux playlists, le JS n'a pas à connaître le mode."""
     if video_id:
-        playlist = load(_pu().recos_playlist, [])
-        changed = False
-        for t in playlist:
-            if t.get("video_id") == video_id and not t.get("played"):
-                t["played"] = True
-                changed = True
-        if changed:
-            save(_pu().recos_playlist, playlist)
+        for m in RECO_MODES:
+            pl_path = _reco_files(m)[0]
+            playlist = load(pl_path, [])
+            changed = False
+            for t in playlist:
+                if t.get("video_id") == video_id and not t.get("played"):
+                    t["played"] = True
+                    changed = True
+            if changed:
+                save(pl_path, playlist)
     return Response(status_code=204)
 
 
 @app.post("/reco-radar/clear-candidates")
-def reco_radar_clear_candidates():
+def reco_radar_clear_candidates(mode: str = Form("approfondir")):
     """Vide UNIQUEMENT la file d'attente des candidats prêts à être recherchés sur
     YouTube (recos_candidates.json) — ni la playlist publiée, ni l'historique, sans
     relancer de scan. Distinct de « Forcer (tout rescanner) » qui vide aussi cette
     file mais relance ensuite job_scan_recos pour la reconstruire depuis
     radar/scorestore.py (Lot 5, cf. CLAUDE.md point 43)."""
-    save(_pu().recos_candidates, [])
-    return RedirectResponse("/reco-radar", status_code=303)
+    mode = _reco_mode(mode)
+    save(_reco_files(mode)[1], [])
+    return RedirectResponse(f"/reco-radar?mode={mode}", status_code=303)
 
 
-def _style_key(s):
-    """Normalisation identité artiste/titre — COPIE VOLONTAIRE de
-    radar_jobs.common.style_key (dédoublonnage de recos_history.json) : la couche
-    web n'importe pas radar_jobs (cf. CLAUDE.md pt17, un seul module de job chargé
-    à la fois par crate_jobs.py), donc on mirrore plutôt que d'importer."""
-    return re.sub(r"\s+", " ", (s or "").lower().replace("-", " ")).strip()
+# --------------------------------------------------------------- Google / YouTube
+# Connexion du compte YouTube (OAuth 2.0) : sert UNIQUEMENT à ajouter une piste de
+# Reco Radar à une playlist du compte de l'utilisateur. Section dans « Mes goûts »
+# (/patte). Jetons stockés par utilisateur (googleauth), jamais dans la config JSON.
+
+_YT_ID = re.compile(r"^[\w-]{1,64}$")
 
 
-def _liked_track_key(t):
-    """Identité (artiste, titre) normalisée d'une piste dict — sert de clé de
-    dédoublonnage pour « Mes tracks aimées » (le video_id YouTube n'est PAS
-    l'identité : deux vidéos différentes peuvent être la même piste)."""
-    return (_style_key(t.get("artist")), _style_key(t.get("title")))
+@app.get("/oauth/discogs/start")
+def discogs_start():
+    if not discogsauth.configured():
+        return RedirectResponse("/patte?discogs=unconfigured", status_code=303)
+    try:
+        url = discogsauth.start(store.current_uid())
+    except discogsauth.DiscogsError:
+        return RedirectResponse("/patte?discogs=error", status_code=303)
+    return RedirectResponse(url, status_code=303)
 
 
-def _liked_ids():
-    """video_id de recos_playlist.json actuellement « aimés » (identité présente
-    dans liked_tracks.json) — même esprit que _cart_ids(), pour préremplir l'état
-    du cœur à chaque ligne de /reco-radar."""
-    liked_keys = {_liked_track_key(t) for t in load(_pu().liked_tracks, [])}
-    playlist = load(_pu().recos_playlist, [])
-    return {t["video_id"] for t in playlist if _liked_track_key(t) in liked_keys}
+@app.get("/oauth/discogs/callback")
+def discogs_callback(oauth_token: str = "", oauth_verifier: str = "", denied: str = ""):
+    """Retour de Discogs. OAuth 1.0a n'a pas de `state` : le jeton de requête, gardé côté
+    serveur pour CET utilisateur de la session, joue ce rôle — un retour forgé ou celui
+    d'un autre compte ne correspond à aucun pending et est refusé."""
+    uid = store.current_uid()
+    if denied or not oauth_token or not oauth_verifier:
+        return RedirectResponse("/patte?discogs=refused", status_code=303)
+    try:
+        ok = discogsauth.complete(uid, oauth_token, oauth_verifier)
+    except discogsauth.DiscogsError:
+        return RedirectResponse("/patte?discogs=error", status_code=303)
+    return RedirectResponse("/patte?discogs=" + ("ok" if ok else "refused"), status_code=303)
 
 
-@app.post("/reco-radar/like-toggle", response_class=HTMLResponse)
-def reco_radar_like_toggle(request: Request, video_id: str = Form("")):
-    """Bascule le « j'aime » d'une piste dans liked_tracks.json. Ne lève JAMAIS
-    (même philosophie que discogs_get(), cf. CLAUDE.md pt10) : video_id inconnu ->
-    état neutre. Gère aussi bien le like depuis /reco-radar (piste présente dans
-    recos_playlist.json) que le unlike depuis « Mes tracks aimées » (piste qui a pu
-    entre-temps disparaître de la playlist)."""
-    if not video_id:
-        return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
-
-    playlist = load(_pu().recos_playlist, [])
-    track = next((t for t in playlist if t.get("video_id") == video_id), None)
-    liked = load(_pu().liked_tracks, [])
-
-    if track:
-        artist, title = track.get("artist"), track.get("title")
-    else:
-        matched = next((t for t in liked if t.get("video_id") == video_id), None)
-        if not matched:
-            return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
-        artist, title = matched.get("artist"), matched.get("title")
-
-    key = _liked_track_key({"artist": artist, "title": title})
-    new_liked = [t for t in liked if _liked_track_key(t) != key]
-
-    if len(new_liked) != len(liked):
-        save(_pu().liked_tracks, new_liked)
-        return frag(request, "partials/like_button.html", video_id=video_id, liked=False)
-
-    entry = dict(track) if track else {"video_id": video_id, "artist": artist, "title": title}
-    entry["liked_at"] = datetime.now().isoformat(timespec="seconds")
-    save(_pu().liked_tracks, liked + [entry])
-    return frag(request, "partials/like_button.html", video_id=video_id, liked=True)
+@app.post("/oauth/discogs/disconnect")
+def discogs_disconnect():
+    discogsauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?discogs=off", status_code=303)
 
 
-@app.get("/tracks-aimees", response_class=HTMLResponse)
-def tracks_aimees_page(request: Request):
-    """« Mes tracks aimées » : pistes marquées d'un cœur depuis Reco Radar, avec
-    lecteur IFrame et export vers YouTube (watch_videos?video_ids=..., lien public
-    SANS OAuth — cf. RECOS RADAR pt19 CLAUDE.md, pas de playlist créée sur un
-    compte). YouTube limite ce paramètre à 50 identifiants : découpage en lots fait
-    ici en Python (plus simple à tester qu'en Jinja)."""
-    liked = load(_pu().liked_tracks, [])
-    vids = [t.get("video_id") for t in liked if t.get("video_id")]
+@app.get("/oauth/google/start")
+def google_start():
+    if not googleauth.configured():
+        return RedirectResponse("/patte?google=unconfigured", status_code=303)
+    return RedirectResponse(googleauth.auth_url(googleauth.make_state(store.current_uid())),
+                            status_code=303)
 
-    export_batches = []
-    for i in range(0, len(vids), 50):
-        chunk = vids[i:i + 50]
-        export_batches.append({
-            "start": i + 1,
-            "end": min(i + 50, len(vids)),
-            "ids": ",".join(chunk),
-        })
 
-    return render(request, "pages/tracks_aimees.html", active="tracks_aimees",
-                  liked=liked, n_liked=len(liked), export_batches=export_batches)
+@app.get("/oauth/google/callback")
+def google_callback(code: str = "", state: str = "", error: str = ""):
+    """Retour de Google. L'état est signé et lié à l'utilisateur de la session : un
+    code injecté par un tiers (CSRF de connexion) serait refusé ici."""
+    uid = store.current_uid()
+    if error or not code or not googleauth.check_state(state, uid):
+        return RedirectResponse("/patte?google=refused", status_code=303)
+    try:
+        googleauth.exchange_code(uid, code)
+    except googleauth.GoogleError:
+        return RedirectResponse("/patte?google=error", status_code=303)
+    return RedirectResponse("/patte?google=ok", status_code=303)
+
+
+@app.post("/oauth/google/disconnect")
+def google_disconnect():
+    googleauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?google=off", status_code=303)
+
+
+@app.get("/reco-radar/yt-playlists", response_class=HTMLResponse)
+def reco_radar_yt_playlists(request: Request, video_id: str = ""):
+    """Contenu de la fenêtre « Ajouter à une playlist » (htmx)."""
+    uid = store.current_uid()
+    ctx = {"video_id": video_id, "configured": googleauth.configured(),
+           "connected": False, "playlists": [], "error": ""}
+    if ctx["configured"] and googleauth.is_connected(uid):
+        ctx["connected"] = True
+        try:
+            ctx["playlists"] = googleauth.list_playlists(uid)
+        except googleauth.GoogleError as e:
+            ctx["error"] = e.message
+            ctx["connected"] = googleauth.is_connected(uid)   # invalid_grant -> déconnecté
+    return frag(request, "partials/yt_playlists.html", **ctx)
+
+
+@app.post("/reco-radar/yt-playlist-add", response_class=HTMLResponse)
+def reco_radar_yt_playlist_add(request: Request, video_id: str = Form(""),
+                               playlist_id: str = Form(""), playlist_title: str = Form("")):
+    if not (_YT_ID.match(video_id) and _YT_ID.match(playlist_id)):
+        return HTMLResponse('<p class="small warn">Piste ou playlist invalide.</p>', status_code=400)
+    try:
+        googleauth.add_to_playlist(store.current_uid(), playlist_id, video_id)
+    except googleauth.GoogleError as e:
+        return frag(request, "partials/yt_added.html", ok=False, msg=e.message, title="")
+    return frag(request, "partials/yt_added.html", ok=True, msg="", title=playlist_title)
+
+
+# --------------------------------------------------------------- Spotify
+# Connexion du compte Spotify (OAuth 2.0) : sert UNIQUEMENT à ajouter une piste de
+# Reco Radar à une playlist du compte de l'utilisateur. Section dans « Mes goûts »
+# (/patte). Jetons stockés par utilisateur (spotifyauth), jamais dans la config JSON.
+
+_SP_PLAYLIST_ID = re.compile(r"^[A-Za-z0-9]{22}$")
+_SP_TRACK_URI = re.compile(r"^spotify:track:[A-Za-z0-9]{22}$")
+
+
+@app.get("/oauth/spotify/start")
+def spotify_start():
+    if not spotifyauth.configured():
+        return RedirectResponse("/patte?spotify=unconfigured", status_code=303)
+    return RedirectResponse(
+        spotifyauth.auth_url(spotifyauth.make_state(store.current_uid())),
+        status_code=303,
+    )
+
+
+@app.get("/oauth/spotify/callback")
+def spotify_callback(code: str = "", state: str = "", error: str = ""):
+    """Retour de Spotify. L’état est signé et lié à l’utilisateur de la session : un
+    code injecté par un tiers (CSRF de connexion) serait refusé ici."""
+    uid = store.current_uid()
+    if error or not code or not spotifyauth.check_state(state, uid):
+        return RedirectResponse("/patte?spotify=refused", status_code=303)
+    try:
+        spotifyauth.exchange_code(uid, code)
+    except spotifyauth.SpotifyError:
+        return RedirectResponse("/patte?spotify=error", status_code=303)
+    return RedirectResponse("/patte?spotify=ok", status_code=303)
+
+
+@app.post("/oauth/spotify/disconnect")
+def spotify_disconnect():
+    spotifyauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?spotify=off", status_code=303)
+
+
+@app.get("/reco-radar/sp-playlists", response_class=HTMLResponse)
+def reco_radar_sp_playlists(
+    request: Request, artist: str = "", title: str = ""
+):
+    """Contenu de la fenêtre « Ajouter à une playlist » (htmx)."""
+    uid = store.current_uid()
+    ctx = {
+        "configured": spotifyauth.configured(),
+        "connected": False,
+        "playlists": [],
+        "error": "",
+        "track_uri": "",
+        "artist": artist,
+        "title": title,
+    }
+    if ctx["configured"] and spotifyauth.is_connected(uid):
+        ctx["connected"] = True
+        try:
+            ctx["track_uri"] = spotifyauth.search_track_uri(uid, artist, title)
+            ctx["playlists"] = spotifyauth.list_playlists(uid)
+        except spotifyauth.SpotifyError as e:
+            ctx["error"] = e.message
+            ctx["connected"] = spotifyauth.is_connected(uid)  # invalid_grant -> déconnecté
+    return frag(request, "partials/sp_playlists.html", **ctx)
+
+
+@app.post("/reco-radar/sp-playlist-add", response_class=HTMLResponse)
+def reco_radar_sp_playlist_add(
+    request: Request,
+    playlist_id: str = Form(""),
+    track_uri: str = Form(""),
+    playlist_title: str = Form(""),
+):
+    if not (
+        _SP_PLAYLIST_ID.match(playlist_id)
+        and _SP_TRACK_URI.match(track_uri)
+    ):
+        return HTMLResponse(
+            '<p class="small warn">Piste ou playlist invalide.</p>',
+            status_code=400,
+        )
+    try:
+        spotifyauth.add_to_playlist(
+            store.current_uid(), playlist_id, track_uri
+        )
+    except spotifyauth.SpotifyError as e:
+        return frag(
+            request,
+            "partials/sp_added.html",
+            ok=False,
+            msg=e.message,
+            title="",
+        )
+    return frag(
+        request,
+        "partials/sp_added.html",
+        ok=True,
+        msg="",
+        title=playlist_title,
+    )
 
 
 def _apply_patte_form(f):
@@ -685,12 +847,12 @@ async def patte_import_csv(request: Request, kind: str = "labels", file: UploadF
                 added += 1
         _queue_enrich("artists", names)
         store.save_config(c)
-        return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} ».")
+        return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en catégorie {t}.")
     t = tier if tier in ("1", "2") else "2"
     added = _add_labels(c, names, tier=t, replace=bool(replace))
     store.save_config(c)
     total = sum(len(v) for v in c.get("label_categories", {}).values())
-    return HTMLResponse(f"✓ {added} label(s) ajouté(s) en « {'Cœur' if t == '1' else 'Aimés'} » (base : {total}).")
+    return HTMLResponse(f"✓ {added} label(s) ajouté(s) en catégorie {t} (base : {total}).")
 
 
 # ============================================================ 🔍 Chercher un disque
@@ -789,7 +951,8 @@ def search_replay(request: Request, sid: str):
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
                 searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
-                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")),
+                dump_date=entry.get("dump_date"), has_token=(bool(Ctx().cfg.get("token", ""))
+                           or discogsauth.is_connected(store.current_uid())),
                 n_matches=entry.get("n_matches"), page=1, total_pages=1)
 
 
@@ -897,6 +1060,29 @@ def suggest_genres(request: Request, q: str = ""):
     return _suggest_vocab(request, vocab.GENRES, q, "genres")
 
 
+@app.get("/suggest/sellers", response_class=HTMLResponse)
+def suggest_sellers(request: Request, q: str = ""):
+    """R5 (retour utilisateur 28/09) : propositions pour la barre « Vendeur
+    Discogs » — alimentée par tes vendeurs suivis (config) et ceux déjà
+    recherchés (historique). Aucun appel API : on n'auto-complète que ce que tu
+    connais déjà, pour éviter de taper un nom approximatif."""
+    c = _cfg()
+    pool = [str(s) for s in c.get("sellers", []) if str(s).strip()]
+    seen = {s.lower() for s in pool}
+    for e in load(_pu().search_hist, []):
+        s = str((e.get("params") or {}).get("seller") or "").strip()
+        if s and s.lower() not in seen:
+            seen.add(s.lower())
+            pool.append(s)
+    term = (q or "").strip().lower()
+    hits = [s for s in pool if term in s.lower()] if term else pool
+    rows = [{"v": s} for s in hits[:60]]
+    header = (f"{len(hits)} vendeur" + ("s" if len(hits) > 1 else "") if term
+              else "Tes vendeurs connus / déjà recherchés")
+    return frag(request, "partials/suggest.html", rows=rows, header=header,
+                empty="Aucun vendeur connu ne correspond — saisis le nom exact Discogs.")
+
+
 _DISCOGS_SUGGEST_CACHE = _TtlCache(ttl=300, maxlen=200)    # (type, terme) -> lignes
 
 
@@ -973,7 +1159,7 @@ def _local_rows_to_raw(rows, genres):
     return out
 
 
-def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
+def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range, dropped=None):
     """Articles « For Sale » d'un vendeur -> mêmes lignes que `_local_rows_to_raw`,
     et (lignes, n_hors_dump, n_non_vinyle). `listings` vient du snapshot complet
     écrit par le job `seller_inventory` (point 68), pas d'un appel API : les
@@ -994,8 +1180,15 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
     Filtre vinyle comme le reste de /search (`search_local(vinyl_only=True)`, cf.
     point 48 de CLAUDE.md) : cet écran répond à « quel disque acheter ». Le
     référentiel tranche quand il connaît la sortie, sinon repli sur l'heuristique
-    de format de `sellers.is_12in`."""
+    de format de `sellers.is_12in`.
+
+    Un champ INCONNU ne disqualifie pas : sans style, sans genre, sans année (ou
+    sortie absente du référentiel), le disque est gardé — mieux vaut un disque de
+    trop qu'un disque caché chez un vendeur dont le stock est déjà petit. Seul ce
+    qui est connu ET différent écarte. `dropped` (dict facultatif) reçoit le
+    nombre d'écartés par filtre (« style », « genre », « label », « année »)."""
     from .radar import sellers as scat
+    dropped = dropped if dropped is not None else {}
     needs_ref = bool(genres or styles or label.strip() or year_range)
     out, n_off_dump, n_not_vinyl = [], 0, 0
     con = dd.connect_readonly() if dd.available() else None
@@ -1006,8 +1199,7 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
             ref = dd.lookup_release(rid, con) if con else None
             if ref is None:
                 if needs_ref:
-                    n_off_dump += 1
-                    continue
+                    n_off_dump += 1          # gardé : on ne peut pas le juger
                 if not scat.is_12in(it.get("format")):
                     n_not_vinyl += 1
                     continue
@@ -1022,15 +1214,19 @@ def _seller_rows_to_raw(listings, dd, genres, styles, label, year_range):
                 continue
             row_styles = (ref.get("styles") or "").split(", ") if ref.get("styles") else []
             row_genres = (ref.get("genres") or "").split(", ") if ref.get("genres") else []
-            if styles and not any(x in row_styles for x in styles):
+            if styles and row_styles and not any(x in row_styles for x in styles):
+                dropped["style"] = dropped.get("style", 0) + 1
                 continue
-            if genres and not any(g in row_genres for g in genres):
+            if genres and row_genres and not any(g in row_genres for g in genres):
+                dropped["genre"] = dropped.get("genre", 0) + 1
                 continue
             if label_key and normalize_label(ref.get("label") or "") != label_key:
+                dropped["label"] = dropped.get("label", 0) + 1
                 continue
             if year_range:
                 yr = ref.get("year")
-                if not yr or not (year_range[0] <= yr <= year_range[1]):
+                if yr and not (year_range[0] <= yr <= year_range[1]):
+                    dropped["année"] = dropped.get("année", 0) + 1
                     continue
             title = (f"{ref['artist']} - {ref['title']}" if ref.get("artist")
                      else (ref.get("title") or ""))
@@ -1095,11 +1291,25 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
                               "(Mon profil → Discogs) : son stock n'est lisible que par l'API.")
         inv, meta = sellers.load_inventory(seller), sellers.inv_meta(seller)
         seller_sync = {"seller": seller, "fetched_at": meta.get("fetched_at"),
-                       "n_items": meta.get("n_items"), "partial": meta.get("partial")}
-        if not inv:
+                       "n_items": meta.get("n_items"), "partial": meta.get("partial"),
+                       "reading": False}
+        if meta.get("reading"):
+            # Snapshot intermédiaire : on affiche ce qui est lu et on relance la
+            # recherche tant que le job tourne (un job planté laisse `reading`
+            # figé, d'où le contrôle de l'état réel).
+            js = jobs.status("seller_inventory") or {}
+            seller_sync["reading"] = bool(js.get("running") or js.get("queued"))
+        if not inv:  # rien de lu encore
             # Jamais lu : on lance la lecture et on le dit, plutôt que de renvoyer
             # un échantillon tronqué qui donnerait de faux « aucun résultat ».
             jobs.launch("seller_inventory", {"seller": seller})
+            # `reading` : le gabarit relance la recherche tout seul (sauf en
+            # erreur, sinon boucle) jusqu'à l'arrivée des premiers disques.
+            # Actif = en file ou en cours, JAMAIS « pas d'erreur » : un statut
+            # d'erreur resté d'une lecture précédente (autre vendeur) coupait la
+            # relance et obligeait à cliquer « rechercher » une 2ᵉ fois.
+            js = jobs.status("seller_inventory") or {}
+            seller_sync["reading"] = bool(js.get("running") or js.get("queued"))
             return frag(request, "partials/results.html", results=[], seller=seller,
                         empty_reason="seller_sync", seller_sync=seller_sync,
                         has_token=True)
@@ -1107,8 +1317,9 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
                     if str(rid).isdigit()]
         yb = _year_bounds(year_from, year_to)
         year_range = None if (yb[0] <= SEARCH_MIN_YEAR and yb[1] >= int(time.strftime("%Y"))) else yb
+        seller_dropped = {}
         raw, n_off_dump, n_not_vinyl = _seller_rows_to_raw(
-            listings, dd, genres, styles, label, year_range)
+            listings, dd, genres, styles, label, year_range, seller_dropped)
         bits = [f"{len(listings)} disque(s) en vente chez {seller}"]
         if meta.get("fetched_at"):
             bits.append(f"inventaire lu le {meta['fetched_at'][:16].replace('T', ' à ')}")
@@ -1117,7 +1328,8 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
         if n_not_vinyl:
             bits.append(f"{n_not_vinyl} hors vinyle 12\"/LP")
         if n_off_dump:
-            bits.append(f"{n_off_dump} absent(s) du référentiel local, donc non filtrable(s)")
+            bits.append(f"{n_off_dump} absent(s) du référentiel local, gardé(s) sans pouvoir être filtré(s)")
+        bits += [f"{n} écarté(s) par {k}" for k, n in seller_dropped.items()]
         seller_note = " · ".join(bits)
         if dd.available():
             dump_date = dd.get_meta().get("dump_date")
@@ -1184,6 +1396,8 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
         scored = [x for x in scored if all(
             v is None or ((x["detail"].get(k) or 0) >= v) for k, v in mins.items())]
     n_matches = len(scored)
+    if seller_note and n_before_thresholds > n_matches:
+        seller_note += f" · {n_before_thresholds - n_matches} écarté(s) par les seuils de score"
     # pagination (100/page) : montrer TOUS les matches plutôt que tronquer au
     # premier écran — cf. diagnostic utilisateur, un plafond fixe (48) masquait
     # la quasi-totalité des correspondances sur une recherche large.
@@ -1642,10 +1856,13 @@ def tracklist(request: Request, rid: int):
             q = " ".join(x for x in (tart, ttl, label1, str(year)) if x)
             play, kind = "/yt/first?q=" + quote_plus(q), "yt"
         bc = "/bc/go?" + urlencode({"a": tart, "t": ttl, "l": label1, "kind": "t"})
-        tx = traxsource.search_url(tart, ttl)
-        bp = beatport.search_url(tart, ttl)
+        # Boutiques DJ protégées par Cloudflare : on ne scrape pas, on redirige le
+        # navigateur de l'utilisateur (cf. radar/stores.py). Mêmes paramètres que
+        # Bandcamp pour rester homogène.
+        shop_q = urlencode({"a": tart, "t": ttl, "l": label1})
         rows.append({"pos": (t.get("position") or "").strip(), "title": ttl,
-                     "play": play, "kind": kind, "bc": bc, "tx": tx, "bp": bp})
+                     "play": play, "kind": kind, "bc": bc,
+                     "bp": "/bp/go?" + shop_q, "ts": "/ts/go?" + shop_q})
     return frag(request, "partials/tracklist.html", tracks=rows)
 
 
@@ -1677,6 +1894,24 @@ def bc_go(a: str = "", t: str = "", l: str = "", kind: str = "t"):
     except Exception:                       # noqa: BLE001 — repli toujours possible
         pass
     return RedirectResponse(bandcamp.search_url(a, t, kind), status_code=302)
+
+
+@app.get("/bp/go")
+def bp_go(a: str = "", t: str = "", l: str = ""):
+    """Redirige vers la recherche Beatport (artiste, titre, label).
+
+    Aucun scraping : Beatport est derrière Cloudflare et un appel serveur depuis
+    le VPS serait challengé (IP datacenter + navigateur headless). On redirige le
+    navigateur de l'utilisateur, dont l'IP résidentielle et la session passent la
+    protection — cf. docstring de `radar/stores.py`."""
+    return RedirectResponse(stores.beatport_search_url(a, t, l), status_code=302)
+
+
+@app.get("/ts/go")
+def ts_go(a: str = "", t: str = "", l: str = ""):
+    """Redirige vers la recherche Traxsource (artiste, titre, label). Même
+    logique anti-Cloudflare que `/bp/go`."""
+    return RedirectResponse(stores.traxsource_search_url(a, t, l), status_code=302)
 
 
 @app.get("/release/stores", response_class=HTMLResponse)
@@ -2085,7 +2320,7 @@ def _sort_rows(rows, field, reverse):
     return rows
 
 
-_LABEL_CAT_NAME = {"1": "Cœur", "2": "Aimé"}
+_LABEL_CAT_NAME = {"1": "Cœur", "2": "Aimé"}   # clés INTERNES (valeurs des <select>), jamais affichées : l'UI dit « Catégorie 1 / 2 »
 
 
 @app.get("/univers/labels/table", response_class=HTMLResponse)
@@ -2123,7 +2358,7 @@ def univers_labels_add(request: Request, name: str = Form(""), tier: str = Form(
             lc.setdefault(t, []).append(name)
             _queue_enrich("labels", [name])
             store.save_config(c)
-            ok, msg = True, f"✓ « {name} » ajouté en « {_LABEL_CAT_NAME[t]} »."
+            ok, msg = True, f"✓ « {name} » ajouté en catégorie {t}."
     return HTMLResponse(f"<span class='small {'ok' if ok else 'notice warn'}'>{html.escape(msg)}</span>")
 
 
@@ -2204,7 +2439,7 @@ def _graph_extras(entry, kind):
     else:
         tiers, asc = c.artist_tier_map(), c.ascore
         ga = c.graph_rescore()["artists"]
-        tname = {"1": "Cœur", "2": "Aimé"}
+        tname = {"1": "Catégorie 1", "2": "Catégorie 2"}
         for k in nodes:
             notes[k] = asc.get(k, 0)
             facts = _graph_link_facts(deg.get(k, 0), weight.get(k, 0), "crédits partagés")

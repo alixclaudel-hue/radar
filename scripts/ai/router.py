@@ -413,12 +413,30 @@ def order_candidates(
         # diagnostic — mais la liste des candidats, elle, se restreint ici.
         retenus = [(c, i) for c, i in retenus if c.provider == provider]
 
+    # Cascade hiérarchique et retraits PAR MODE (banc approfondi du 30/09,
+    # décision utilisateur) : le meilleur modèle n'est pas le même pour corriger
+    # du code et pour diagnostiquer un journal. Un retrait ne vise qu'un mode
+    # (ex. modèles qui prennent un leurre pour la cause en `diag`) et ne
+    # s'applique jamais à un modèle demandé explicitement par `-m`.
+    exclus_mode = set(_ids_du_mode(policy.get("mode_excluded"), mode))
+    if exclus_mode and not explicit_model:
+        retenus = [(c, i) for c, i in retenus if not _designe(c, exclus_mode)]
+    cascade = _ids_du_mode(policy.get("mode_cascades"), mode)
+
+    def rang_cascade(candidat: Candidate) -> int:
+        for position, ident in enumerate(cascade):
+            if _designe(candidat, {ident}):
+                return position
+        return len(cascade)
+
     def cle(item: tuple[Candidate, dict]):
         candidat, info = item
         commun = (
             # Un modèle qui vient d'échouer au contrat de ce mode passe derrière
             # ceux qui n'ont pas échoué, sans être exclu : c'est un rang, pas un veto.
             health.contract_failures(health_state, candidat.provider, candidat.model, mode),
+            # Ensuite l'ordre mesuré du mode ; hors liste = derrière, ordre habituel.
+            rang_cascade(candidat),
             info.get("provider_rank", 1000),
             _tier_rank(candidat.entry, tier),
             _rank(candidat.entry),
@@ -430,6 +448,22 @@ def order_candidates(
 
     retenus.sort(key=cle)
     return [candidat for candidat, _ in retenus[:plafond_candidats]]
+
+
+def _ids_du_mode(table, mode: str) -> list[str]:
+    """Liste d'identifiants d'une table `{mode: [ids]}` de la politique ; vide
+    si la table ou le mode est absent (configuration tolérante)."""
+    if not isinstance(table, dict):
+        return []
+    valeur = table.get(mode) or []
+    return [str(m) for m in valeur] if isinstance(valeur, list) else []
+
+
+def _designe(candidat: Candidate, ids: set[str]) -> bool:
+    """Un identifiant désigne le candidat sous sa forme nue (`modele`) ou
+    complète (`fournisseur:modele`) : la forme complète lève l'ambiguïté des
+    modèles servis par deux fournisseurs (gemma chez Gemini et OpenRouter)."""
+    return candidat.model in ids or f"{candidat.provider}:{candidat.model}" in ids
 
 
 def explain(

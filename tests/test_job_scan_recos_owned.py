@@ -39,6 +39,7 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
             "RECOS_PLAYLIST_PATH": os.path.join(tmp, "recos_playlist.json"),
             "COLLECTION_CACHE_PATH": os.path.join(tmp, "collection_cache.json"),
             "CORPUS_PATH": os.path.join(tmp, "taste_corpus.json"),
+            "CART_PATH": os.path.join(tmp, "cart.json"),
         }
         patchers = [mock.patch.object(recos, name, path)
                     for name, path in self.paths.items()]
@@ -130,6 +131,22 @@ class ScanRecosOwnedTestCase(unittest.TestCase):
         self._collection(n_collection=42, label_counts={"drop music": 3})
         _, candidates = self._run()
         self.assertEqual(len(candidates), 3)
+
+    def _cart(self, rows):
+        recos.save_json(self.paths["CART_PATH"], rows)
+
+    def test_wantlist_ecartee_par_release_id_et_par_identite(self):
+        # F11 (retour utilisateur 23/09) : une sortie déjà en wantlist ne doit plus
+        # être proposée — 111 par release_id, 222 par identité artiste+titre.
+        self._cart([{"id": 111, "artist": "Soichi Terada", "title": "Asakusa Light"}])
+        job, candidates = self._run()
+        self.assertEqual([c["release_id"] for c in candidates], [333])
+        self.assertIn("déjà en wantlist", job.finished)
+
+    def test_wantlist_vide_n_ecarte_rien(self):
+        self._cart([])
+        _, candidates = self._run()
+        self.assertEqual(sorted(c["release_id"] for c in candidates), [111, 222, 333])
 
 
 class ReleaseIdentityKeyTestCase(unittest.TestCase):

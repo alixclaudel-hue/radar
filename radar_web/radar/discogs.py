@@ -20,32 +20,45 @@ def _check(r):
         raise DiscogsError(f"Erreur Discogs {r.status_code} : {r.text[:200]}")
 
 
-def get(path, params=None, token=""):
+def _auth(params, token):
+    """(params, headers) d'un appel. Un token explicite (personnel, ou celui qu'on est en
+    train de tester dans /patte) passe en `?token=`. Sans token, on prend la connexion
+    OAuth du compte de la requête : jamais celle d'un autre — hors requête web l'uid est
+    None et l'appel reste anonyme plutôt que de retomber sur le propriétaire."""
     params = dict(params or {})
+    headers = {"User-Agent": UA}
     if token:
         params["token"] = token
-    r = requests.get(f"{BASE}{path}", params=params,
-                     headers={"User-Agent": UA}, timeout=20)
+        return params, headers
+    from . import discogsauth, store   # import tardif : discogsauth importe websession
+    uid = store.current_uid()
+    cred = discogsauth.credential(uid) if uid else None
+    if cred:
+        _, tok, secret = cred.split(":", 2)
+        try:
+            headers["Authorization"] = discogsauth.authorization_header((tok, secret))
+        except discogsauth.DiscogsError:
+            pass   # app Discogs non configurée sur ce serveur : appel anonyme
+    return params, headers
+
+
+def get(path, params=None, token=""):
+    params, headers = _auth(params, token)
+    r = requests.get(f"{BASE}{path}", params=params, headers=headers, timeout=20)
     _check(r)
     return r.json()
 
 
 def put(path, params=None, token=""):
-    params = dict(params or {})
-    if token:
-        params["token"] = token
-    r = requests.put(f"{BASE}{path}", params=params,
-                     headers={"User-Agent": UA}, timeout=20)
+    params, headers = _auth(params, token)
+    r = requests.put(f"{BASE}{path}", params=params, headers=headers, timeout=20)
     _check(r)
     return r.json() if r.text else {}
 
 
 def delete(path, params=None, token=""):
-    params = dict(params or {})
-    if token:
-        params["token"] = token
-    r = requests.delete(f"{BASE}{path}", params=params,
-                        headers={"User-Agent": UA}, timeout=20)
+    params, headers = _auth(params, token)
+    r = requests.delete(f"{BASE}{path}", params=params, headers=headers, timeout=20)
     _check(r)
 
 
@@ -65,7 +78,7 @@ def remove_from_wantlist(token, username, release_id):
     delete(f"/users/{username}/wants/{release_id}", token=token)
 
 
-def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=None):
+def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=None, on_batch=None):
     """([{release_id, price, currency, condition, sleeve, artist, format, listing_id}],
     tronque) — articles « For Sale » d'un vendeur, pagination suivie jusqu'à
     `max_pages`. `tronque` dit que le vendeur a encore du stock au-delà, pour que
@@ -81,6 +94,10 @@ def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=Non
     l'avancement ; renvoyer `False` interrompt la pagination proprement (bouton
     « arrêter » du job) et marque le résultat comme tronqué.
 
+    `on_batch(out, page)` reçoit la liste en cours après chaque page : le job
+    s'en sert pour enregistrer un snapshot intermédiaire que /search affiche au
+    fil de la lecture.
+
     Un compte inconnu ou sans boutique lève `DiscogsError` via `_check` (404) —
     pas de retour vide silencieux, l'utilisateur doit savoir qu'il s'est trompé de
     nom. Les champs `artist`/`format` viennent de la réponse, sans appel
@@ -93,9 +110,17 @@ def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=Non
     daté d'un scan de fond."""
     out, page = [], 1
     while not max_pages or page <= max_pages:
-        d = get(f"/users/{username}/inventory",
-                {"status": "For Sale", "per_page": per_page, "page": page,
-                 "sort": "listed", "sort_order": "desc"}, token=token)
+        try:
+            d = get(f"/users/{username}/inventory",
+                    {"status": "For Sale", "per_page": per_page, "page": page,
+                     "sort": "listed", "sort_order": "desc"}, token=token)
+        except DiscogsError as e:
+            # Discogs refuse (403) toute page > 100 sur l'inventaire d'un autre
+            # compte : on garde les 10 000 plus récents (tri « listed » desc) et
+            # on signale « tronqué » au lieu de perdre toute la lecture.
+            if out and "Pagination above" in str(e):
+                return out, True
+            raise
         for x in d.get("listings", []):
             rel = x.get("release") or {}
             rid = rel.get("id")
@@ -110,6 +135,8 @@ def seller_inventory(username, token="", max_pages=10, per_page=100, on_page=Non
                         "artist": rel.get("artist"), "format": rel.get("format"),
                         "title": rel.get("title")})
         pages = d.get("pagination", {}).get("pages", 1)
+        if on_batch:
+            on_batch(out, page)
         if on_page and on_page(len(out), page, pages) is False:
             return out, page < pages
         if page >= pages:

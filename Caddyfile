@@ -20,3 +20,18 @@
 {$RADAR_OPS_DOMAIN:ops.localhost} {
 	reverse_proxy radar-ops:8610
 }
+
+# Connecteur claude.ai WhatsApp, LECTURE SEULE : serveur MCP hors radar
+# (~/whatsapp-mcp, service systemd de l'hôte) qui écoute sur la passerelle du
+# réseau Docker (172.18.0.1:8703, ouverte à ce seul réseau par ufw). Seul le
+# chemin secret passe, le reste est un 404 muet. Le secret vit dans .env
+# (WA_MCP_SECRET, jamais dans git) ; absent, le défaut ne correspond à aucun
+# chemin servi par le MCP, donc tout est refusé. Pas de directive `log` : le
+# chemin secret n'est jamais écrit dans un journal.
+{$WA_MCP_DOMAIN:wa.localhost} {
+	@mcp path /{$WA_MCP_SECRET:secret-absent}/mcp /{$WA_MCP_SECRET:secret-absent}/mcp/*
+	handle @mcp {
+		reverse_proxy 172.18.0.1:8703
+	}
+	respond 404
+}

@@ -1,0 +1,7 @@
+{% import "partials/_icons.html" as icons -%}
+{% if ok %}
+<p class="small ok">{{ icons.check() }} Ajoutée à « {{ title }} ».</p>
+{% else %}
+<p class="small warn">{{ msg }}</p>
+{% endif %}
+<p><button type="button" class="small" data-pl-close>Fermer</button></p>

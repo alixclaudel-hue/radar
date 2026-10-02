@@ -7,17 +7,22 @@ import os
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
 import requests
-
 from radar_web.radar import textmatch, ytcache
 from radar_jobs.common import (
-    cfg_load, COLLECTION_CACHE_PATH, CORPUS_PATH, JOBS_USER_DIR, load_json, RADAR_UID,
-    RECOS_CANDIDATES_PATH, RECOS_HISTORY_PATH, RECOS_PLAYLIST_PATH, RECOS_SEARCH_BUDGET_PATH,
+    CART_PATH, cfg_load, COLLECTION_CACHE_PATH, CORPUS_PATH, JOBS_USER_DIR, load_json, RADAR_UID,
+    RECOS_CANDIDATES_PATH, RECOS_CANDIDATES_DECOUVERTE_PATH, RECOS_HISTORY_PATH,
+    RECOS_PLAYLIST_PATH, RECOS_PLAYLIST_DECOUVERTE_PATH, RECOS_SEARCH_BUDGET_PATH,
     save_json, style_key,
 )
+from radar_jobs.recos_diversity import DiversityTracker, dominant_reason
 from radar_jobs.sources import discogs_get
-from radar_jobs.tracks import _is_continuous_mix, _release_identity_key, _strip_discogs_suffix
+from radar_jobs.tracks import (
+    _is_continuous_mix,
+    _release_identity_key,
+    _strip_discogs_suffix,
+    _track_credit_artist,
+)
 
 
 # Le quota gratuit YouTube Data API se remet à zéro à MINUIT HEURE DU PACIFIQUE
@@ -88,20 +93,23 @@ def _recos_searches_used_today():
     (RADAR_RECOS_SCAN=1) pouvait épuiser le quota YouTube dès la matinée
     (diagnostic VPS 2026-09-15). Lu ici (job_publish_recos) plutôt que dans le
     worker pour valoir aussi sur un lancement manuel (bouton ▶)."""
-    today = datetime.now(YT_QUOTA_TZ).date().isoformat()
-    d = load_json(RECOS_SEARCH_BUDGET_PATH, {})
-    return int(d.get("count", 0)) if d.get("date") == today else 0
+    count, _ = _recos_budget_today()
+    return count
 
 
-def _recos_searches_record(n):
-    """Ajoute `n` recherches au compteur du jour (reparti de 0 si le fichier
-    date d'un jour différent, toujours en heure du Pacifique)."""
+def _recos_searches_record(n, mode="approfondir"):
+    """Ajoute `n` recherches au compteur total et à celui du mode (reparti de 0
+    si le fichier date d'un jour différent, toujours en heure du Pacifique)."""
     if not n:
         return
+
     today = datetime.now(YT_QUOTA_TZ).date().isoformat()
-    d = load_json(RECOS_SEARCH_BUDGET_PATH, {})
-    count = int(d.get("count", 0)) if d.get("date") == today else 0
-    save_json(RECOS_SEARCH_BUDGET_PATH, {"date": today, "count": count + n})
+    count, by_mode = _recos_budget_today()
+    by_mode[mode] = by_mode.get(mode, 0) + int(n)
+    save_json(
+        RECOS_SEARCH_BUDGET_PATH,
+        {"date": today, "count": count + int(n), "by_mode": by_mode},
+    )
 
 
 def _owned_releases():
@@ -120,6 +128,23 @@ def _owned_releases():
         if str(r.get("release_id") or "").isdigit():
             ids.add(int(r["release_id"]))
         k = _release_identity_key(r.get("artist"), r.get("title"))
+        if k:
+            keys.add(k)
+    return ids, keys
+
+
+def _wantlist_releases():
+    """(ids, clés d'identité) des sorties déjà en wantlist (cart.json) — F11
+    (retour utilisateur 23/09) : ne jamais recommander une piste qu'on a déjà
+    mise de côté, comme on le fait déjà pour la collection Discogs et les achats
+    Bandcamp. Vide tant que la wantlist n'a jamais été synchronisée : le filtre
+    est alors sans effet, jamais bloquant."""
+    ids, keys = set(), set()
+    for x in load_json(CART_PATH, []):
+        rid = str(x.get("id") or "").strip()
+        if rid.isdigit():
+            ids.add(int(rid))
+        k = _release_identity_key(x.get("artist"), x.get("title"))
         if k:
             keys.add(k)
     return ids, keys
@@ -214,9 +239,14 @@ def job_scan_recos(job, params):
                      for c in candidates + playlist}
                     | _recos_history_track_keys(_recos_history_load()))
     owned_ids, owned_keys = _owned_releases()
+    want_ids, want_keys = _wantlist_releases()
     now = datetime.now().isoformat(timespec="seconds")
     job.st["total"] = min(len(rows), max_new)
-    n_added, n_owned = 0, 0
+    n_added, n_owned, n_want = 0, 0, 0
+    # Le tri par score seul laisserait un même artiste ou label occuper toute la
+    # fournée ; les pistes écartées ne sont pas marquées vues, elles restent donc
+    # éligibles au prochain scan.
+    diversity = DiversityTracker(candidates + playlist)
     for (artist, title, score, detail_json, release_id, release_title, label, year,
          release_artist) in rows:
         if job.stopped() or n_added >= max_new or len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
@@ -229,6 +259,14 @@ def job_scan_recos(job, params):
                 or _release_identity_key(release_artist, release_title) in owned_keys):
             n_owned += 1
             continue
+        if (release_id in want_ids
+                or _release_identity_key(release_artist, release_title) in want_keys):
+            n_want += 1
+            continue
+        if not diversity.allows(artist, label):
+            diversity.reject()
+            continue
+        diversity.add(artist, label)
         known_tracks.add(k)
         detail = json.loads(detail_json) if detail_json else {}
         candidates.append({
@@ -237,21 +275,26 @@ def job_scan_recos(job, params):
             "album_score": score, "added_at": now,
             "d_label": detail.get("label"), "d_artist": detail.get("artist"),
             "d_style": detail.get("style"),
+            # "why" : raison dominante du score, exposée pour l'affichage /reco-radar.
+            "why": dominant_reason(detail.get("artist"), detail.get("label"), detail.get("style")),
         })
         n_added += 1
         job.tick(f"{artist} — {title} ({score})")
     save_json(RECOS_CANDIDATES_PATH, candidates)
     owned_note = f" {n_owned} piste(s) écartée(s) (album déjà en collection Discogs/Bandcamp)." if n_owned else ""
+    want_note = f" {n_want} piste(s) écartée(s) (déjà en wantlist)." if n_want else ""
+    div_note = (f" {diversity.rejected_count} piste(s) écartée(s) (quota artiste/label)."
+                if diversity.rejected_count else "")
     job.finish(f"+{n_added} piste(s) candidate(s) sur {len(rows)} précalculée(s) — "
-               f"file : {len(candidates)}.{owned_note}")
+               f"file : {len(candidates)}.{owned_note}{want_note}{div_note}")
 
 
-def _publish_recos_last_message():
+def _publish_recos_last_message(name="publish_recos"):
     """Dernier message connu de publish_recos (ex. « Quota YouTube épuisé ») — affiché
     dans le message « file pleine » de scan_recos pour éviter à l'utilisateur d'avoir
     à ouvrir un second journal pour comprendre pourquoi la file ne se vide pas
     (retour utilisateur 2026-09-10 : « scan sauté » sans explication de la cause)."""
-    s = load_json(os.path.join(JOBS_USER_DIR, "publish_recos.status.json"), {})
+    s = load_json(os.path.join(JOBS_USER_DIR, f"{name}.status.json"), {})
     return (s.get("message") or "").strip()
 
 
@@ -320,13 +363,21 @@ def job_publish_recos(job, params):
 
     Playlist PLEINE : on sort avant toute recherche — le budget du jour n'est
     pas gaspillé et aucune piste existante n'est retirée ni remplacée (demande
-    utilisateur 2026-09-28)."""
-    candidates = load_json(RECOS_CANDIDATES_PATH, [])
+    utilisateur 2026-09-28).
+
+    Paramétré par `params["mode"]` ("approfondir" par défaut, ou "decouverte") :
+    file et playlist propres au mode (`_mode_paths`), historique commun. Le budget
+    YouTube de 80/jour est partagé : `_recos_searches_allowance(mode)` réserve la
+    moitié à chaque mode, le reliquat d'un mode sans candidats passe à l'autre."""
+    mode = (params or {}).get("mode", "approfondir")
+    candidates_path, playlist_path = _mode_paths(mode)
+    candidates = load_json(candidates_path, [])
     if not candidates:
         return job.finish("Aucun candidat en attente.")
 
     budget_used = _recos_searches_used_today()
-    playlist = load_json(RECOS_PLAYLIST_PATH, [])
+    allowance = _recos_searches_allowance(mode)
+    playlist = load_json(playlist_path, [])
     cfg = cfg_load()
     token = cfg.get("token", "")
     keys = ytcache.youtube_keys(cfg)
@@ -344,7 +395,7 @@ def job_publish_recos(job, params):
             f"lancée ; plus d'ajout tant qu'une piste n'est pas marquée écoutée "
             f"(clic sur une ligne, purge à minuit heure de Paris).")
 
-    if budget_used >= RECOS_DAILY_SEARCH_BUDGET and not token:
+    if allowance <= 0 and not token:
         # Sans token Discogs, le budget épuisé ne laisse rien à faire : les vidéos
         # attachées aux sorties (`_discogs_release_video`) sont le seul chemin qui
         # ne dépend pas du quota de RECHERCHE, et il demande ce token. Avec token,
@@ -396,8 +447,8 @@ def job_publish_recos(job, params):
                 # (2) Repli : recherche YouTube, sous budget.
                 if not vid:
                     if (quota_hit or rate_hit
-                            or budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET):
-                        if budget_used + searched >= RECOS_DAILY_SEARCH_BUDGET:
+                            or searched >= allowance):
+                        if searched >= allowance:
                             daily_hit = True
                         remaining.append(c)
                         continue
@@ -479,7 +530,7 @@ def job_publish_recos(job, params):
             job.tick(f"{c['artist']} — {c['title']} : ajoutée "
                      f"({'vidéo Discogs' if via_discogs else 'recherche YouTube'})")
             save_json(RECOS_HISTORY_PATH, list(history.values()))
-            save_json(RECOS_PLAYLIST_PATH, playlist)
+            save_json(playlist_path, playlist)
     finally:
         # `finally`, pas juste en fin de fonction (BUG 1, diagnostic VPS 16/09) :
         # une exception non rattrapée ci-dessus (ex. RuntimeError d'une erreur
@@ -492,9 +543,9 @@ def job_publish_recos(job, params):
         # de l'exception (il n'a pas pu être classé) : perte limitée à 1
         # candidat sur un aléa réellement anormal, pas au run entier.
         save_json(RECOS_HISTORY_PATH, list(history.values()))
-        save_json(RECOS_PLAYLIST_PATH, playlist)
-        save_json(RECOS_CANDIDATES_PATH, remaining)
-        _recos_searches_record(searched)
+        save_json(playlist_path, playlist)
+        save_json(candidates_path, remaining)
+        _recos_searches_record(searched, mode)
     note = ""
     if daily_hit:
         note += (f" Budget quotidien atteint ({budget_used + searched}/"
@@ -508,3 +559,307 @@ def job_publish_recos(job, params):
               f"(0 recherche YouTube), {added - from_discogs} par recherche." if added else "")
     job.finish(f"+{added} piste(s) ajoutée(s) — playlist : {len(playlist)}/{max_tracks}, "
                f"{len(remaining)} en attente.{origin}{note}")
+
+
+def _mode_paths(mode):
+    """Renvoie les deux fichiers du mode demandé, avec « Approfondir » comme
+    valeur de repli afin qu'un paramètre absent ou inconnu ne redirige jamais
+    une publication vers une file accidentalement partagée avec « Découverte »."""
+    if mode == "decouverte":
+        return RECOS_CANDIDATES_DECOUVERTE_PATH, RECOS_PLAYLIST_DECOUVERTE_PATH
+    return RECOS_CANDIDATES_PATH, RECOS_PLAYLIST_PATH
+
+
+def _other_mode(mode):
+    """Renvoie le mode opposé afin que le budget puisse inspecter la file qui
+    détermine si la moitié réservée à l'autre mode peut être récupérée."""
+    return "decouverte" if mode == "approfondir" else "approfondir"
+
+
+def _recos_budget_today():
+    """Retourne le compteur journalier total et sa répartition par mode.
+
+    Le fichier peut être antérieur à l'ouverture du mode Découverte : son
+    allocation est alors conservée comme vide afin que la répartition puisse être
+    reconstruite au fur et à mesure des prochaines recherches."""
+    today = datetime.now(YT_QUOTA_TZ).date().isoformat()
+    data = load_json(RECOS_SEARCH_BUDGET_PATH, {})
+    if data.get("date") != today:
+        return 0, {}
+
+    count = int(data.get("count", 0))
+    raw_by_mode = data.get("by_mode")
+    by_mode = {
+        str(mode): int(value)
+        for mode, value in raw_by_mode.items()
+    } if isinstance(raw_by_mode, dict) else {}
+    return count, by_mode
+
+
+def _recos_searches_allowance(mode):
+    """Calcule le nombre de recherches encore autorisées pour ce mode.
+
+    Chaque mode reçoit normalement la moitié du budget quotidien. Sa moitié peut
+    toutefois être empruntée lorsque l'autre file est vide : un seul mode actif
+    doit alors pouvoir consommer tout le reliquat sans dépasser le plafond global.
+    """
+    count, by_mode = _recos_budget_today()
+    remaining = RECOS_DAILY_SEARCH_BUDGET - count
+    mode_allowance = RECOS_DAILY_SEARCH_BUDGET // 2 - by_mode.get(mode, 0)
+    other_candidates_path, _ = _mode_paths(_other_mode(mode))
+
+    if load_json(other_candidates_path, []):
+        return max(0, min(remaining, mode_allowance))
+    return max(0, remaining)
+
+
+def job_publish_recos_decouverte(job, params):
+    """Publie la file Découverte via le même pipeline de recherche et de gestion
+    du quota que la file Approfondir, sans dupliquer les règles sensibles."""
+    return job_publish_recos(job, {**(params or {}), "mode": "decouverte"})
+
+
+def job_scan_recos_decouverte(job, params):
+    """Ajoute à la file Découverte la meilleure piste disponible sur des sorties
+    proches d'artistes voisins.
+
+    Les sorties sont d'abord triées selon la proximité du graphe et le score
+    musical, puis leurs tracklists locales sont consultées uniquement pour les
+    meilleures. Cela évite les accès réseau tout en empêchant une sortie proche
+    mais sans piste utilisable de consommer le budget des suivantes.
+
+    Source = dump local (releases_for_artists) et non scorestore, car scorestore
+    élague les labels hors Catégorie 1/2 et effacerait les sorties Découverte.
+    """
+    from radar_web.radar import discogs_dump as dd
+    from radar_web.radar.scoring import Ctx, real_tracks
+    from radar_web.radar.discovery import discovery_artists
+
+    params = params or {}
+    cfg = cfg_load()
+    rc = cfg.get("scoring", {}).get("recos", {})
+    max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
+    per_artist = int(params.get("per_artist", 15))
+    force = bool(params.get("force"))
+    cap = RECOS_DAILY_SEARCH_BUDGET // 2
+
+    ctx = Ctx(uid=RADAR_UID)
+    arts = discovery_artists(ctx)
+    if not arts:
+        if not (ctx.graph or {}).get("edges"):
+            return job.finish(
+                "Graphe d'artistes pas encore construit — lance build_graph "
+                "(mode Découverte)."
+            )
+        return job.finish(
+            "Aucun artiste voisin à découvrir (tous déjà connus ou co-crédits "
+            "insuffisants)."
+        )
+
+    if not dd.available():
+        return job.finish(
+            error="Référentiel Discogs local absent — mode Découverte impossible."
+        )
+    if not dd.tracks_available():
+        return job.finish(
+            error="Tracklists du dump local indisponibles — mode Découverte sauté "
+                  "(pas de repli API Discogs)."
+        )
+
+    candidates = [] if force else load_json(RECOS_CANDIDATES_DECOUVERTE_PATH, [])
+    if len(candidates) >= cap:
+        last = _publish_recos_last_message("publish_recos_decouverte")
+        cause = f" Dernière publication : {last}" if last else ""
+        return job.finish(
+            f"File Découverte pleine ({len(candidates)} en attente, quota YouTube ~"
+            f"{cap} recherches/jour) — scan sauté, laisse la publication rattraper "
+            f"le retard.{cause}"
+        )
+
+    approfondir_candidates_path, approfondir_playlist_path = _mode_paths("approfondir")
+    decouverte_candidates_path, decouverte_playlist_path = _mode_paths("decouverte")
+    playlist_decouverte = load_json(decouverte_playlist_path, [])
+    playlist_approfondir = load_json(approfondir_playlist_path, [])
+    known_tracks = (
+        {
+            (style_key(c.get("artist")), style_key(c.get("title")))
+            for c in (
+                candidates
+                + load_json(approfondir_candidates_path, [])
+                + playlist_decouverte
+                + playlist_approfondir
+            )
+        }
+        | _recos_history_track_keys(_recos_history_load())
+    )
+
+    by_id = {
+        int(a["id"]): a
+        for a in arts.values()
+        if a.get("id")
+    }
+    rows = dd.releases_for_artists(list(by_id), per_artist=per_artist)
+    owned_ids, owned_keys = _owned_releases()
+    want_ids, want_keys = _wantlist_releases()
+    n_owned, n_want = 0, 0
+    eligible_rows = []
+
+    for row in rows:
+        release_id = int(row["id"])
+        if (release_id in owned_ids
+                or _release_identity_key(row.get("artist"), row.get("title")) in owned_keys):
+            n_owned += 1
+            continue
+        if (release_id in want_ids
+                or _release_identity_key(row.get("artist"), row.get("title")) in want_keys):
+            n_want += 1
+            continue
+        eligible_rows.append(row)
+
+    proximity_values = [float(a.get("score") or 0.0) for a in by_id.values()]
+    prox_max = max(proximity_values) if proximity_values else 0.0
+    if prox_max <= 0:
+        prox_max = 1.0
+
+    scored = []
+    for row in eligible_rows:
+        styles = row["styles"].split(", ") if row.get("styles") else []
+        title = (
+            f"{row['artist']} - {row['title']}"
+            if row.get("artist")
+            else (row.get("title") or "")
+        )
+        score, detail = ctx.album_score({
+            "label": [row["label"]] if row.get("label") else [],
+            "title": title,
+            "style": styles,
+        })
+
+        artist_id = int(row["artist_id"]) if row.get("artist_id") else None
+        artist = by_id.get(artist_id, {})
+        proximity = float(artist.get("score") or 0.0)
+        disco = 0.6 * (proximity / prox_max) * 100 + 0.4 * (score or 0)
+        scored.append((disco, row, artist, detail))
+
+    scored.sort(key=lambda item: item[0], reverse=True)
+
+    diversity = DiversityTracker(
+        candidates + playlist_decouverte,
+        max_per_artist=1,
+        max_per_label=2,
+    )
+    job.st["total"] = min(len(scored), max_new)
+    n_added = 0
+    main_con = tracks_con = None
+    try:
+        main_con = dd.connect_readonly()
+        tracks_con = dd.connect_tracks_readonly()
+        for _, row, artist_info, _ in scored:
+            if job.stopped() or n_added >= max_new or len(candidates) >= cap:
+                break
+
+            tracks = dd.tracks_for_release(
+                row["id"],
+                con=tracks_con,
+                main_con=main_con,
+            )
+            if tracks is None:
+                continue
+
+            best_track = None
+            styles = row["styles"].split(", ") if row.get("styles") else []
+            # La sortie a été trouvée VIA l'artiste voisin, mais sa tracklist peut
+            # appartenir à un artiste déjà connu (le voisin n'y est que remixeur) :
+            # seules les pistes où il figure sont candidates, sinon la Découverte
+            # proposerait l'original d'un artiste de Catégorie 1.
+            target = style_key(_strip_discogs_suffix(artist_info.get("name") or ""))
+            if not target:
+                # Sortie rattachée à aucun artiste voisin connu : rien à faire
+                # découvrir, et sans nom le filtre ci-dessous laisserait tout passer.
+                continue
+            for track in real_tracks(tracks):
+                ttl = (track.get("title") or "").strip()
+                if not ttl or _is_continuous_mix(ttl):
+                    continue
+
+                art = _track_credit_artist(track, row.get("artist") or "")
+                if not art:
+                    continue
+                if target not in style_key(art) and target not in style_key(ttl):
+                    continue
+
+                key = (style_key(art), style_key(ttl))
+                if key in known_tracks:
+                    continue
+
+                track_score, track_detail = ctx.album_score({
+                    "label": [row["label"]] if row.get("label") else [],
+                    "title": f"{art} - {ttl}",
+                    "style": styles,
+                })
+                current_score = track_score if track_score is not None else -1
+                best_score = (
+                    best_track[3]
+                    if best_track is not None and best_track[3] is not None
+                    else -1
+                )
+                if best_track is None or current_score > best_score:
+                    best_track = (art, ttl, key, track_score, track_detail)
+
+            if best_track is None:
+                continue
+
+            art, ttl, key, track_score, track_detail = best_track
+            # Diversité comptée sur l'artiste voisin (celui qu'on fait découvrir),
+            # pas sur le crédit de la piste qui varie (feat., &, remix).
+            div_artist = artist_info.get("name") or art
+            if not diversity.allows(div_artist, row.get("label")):
+                diversity.reject()
+                continue
+
+            diversity.add(div_artist, row.get("label"))
+            known_tracks.add(key)
+            why = artist_info.get("why") or []
+            candidates.append({
+                "artist": art,
+                "title": ttl,
+                "release_id": row["id"],
+                "release_title": row["title"] or "",
+                "label": row.get("label"),
+                "year": row.get("year"),
+                "album_score": track_score,
+                "added_at": datetime.now().isoformat(timespec="seconds"),
+                "d_label": track_detail.get("label") if isinstance(track_detail, dict) else None,
+                "d_artist": track_detail.get("artist") if isinstance(track_detail, dict) else None,
+                "d_style": track_detail.get("style") if isinstance(track_detail, dict) else None,
+                "why": " · ".join(why[:2]),
+                "mode": "decouverte",
+                "proximity": artist_info.get("score"),
+            })
+            n_added += 1
+            job.tick(f"{art} — {ttl}")
+
+        save_json(RECOS_CANDIDATES_DECOUVERTE_PATH, candidates)
+    finally:
+        if main_con is not None:
+            main_con.close()
+        if tracks_con is not None:
+            tracks_con.close()
+
+    owned_note = (
+        f" {n_owned} piste(s) écartée(s) (album déjà en collection Discogs/Bandcamp)."
+        if n_owned else ""
+    )
+    want_note = (
+        f" {n_want} piste(s) écartée(s) (déjà en wantlist)."
+        if n_want else ""
+    )
+    div_note = (
+        f" {diversity.rejected_count} piste(s) écartée(s) (quota artiste/label)."
+        if diversity.rejected_count else ""
+    )
+    job.finish(
+        f"+{n_added} piste(s) candidate(s) Découverte sur {len(scored)} sortie(s) "
+        f"de {len(by_id)} artiste(s) voisin(s) — file : {len(candidates)}."
+        f"{owned_note}{want_note}{div_note}"
+    )

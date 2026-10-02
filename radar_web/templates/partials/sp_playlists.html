@@ -1,0 +1,29 @@
+{#- Contenu de la fenêtre « Ajouter à une playlist » de /reco-radar, onglet Spotify
+   (chargé en htmx par le JS de la page). États : Spotify non configuré côté serveur,
+   compte non relié, piste introuvable sur Spotify, compte relié (liste des playlists
+   MODIFIABLES : propres ou collaboratives). -#}
+{% if not configured %}
+<p class="small">La connexion Spotify n'est pas encore configurée sur ce serveur.</p>
+{% elif not connected %}
+{% if error %}<p class="small warn">{{ error }}</p>{% endif %}
+<p class="small">Relie ton compte Spotify pour choisir la playlist où ajouter la piste.</p>
+<p><a class="btn primary small" href="/oauth/spotify/start">Relier mon compte Spotify</a>
+  <a class="small" href="/patte">Gérer dans Mes goûts</a></p>
+{% elif error %}
+<p class="small warn">{{ error }}</p>
+{% elif not track_uri %}
+{#- On n'ajoute jamais « un » résultat approché : mieux vaut un échec explicite qu'une mauvaise piste. -#}
+<p class="small warn">Piste introuvable sur Spotify : rien n'est ajouté.</p>
+<p class="small muted">Elle est peut-être absente du catalogue (sortie Bandcamp, white label) ou nommée autrement.</p>
+{% elif not playlists %}
+<p class="small muted">Aucune playlist modifiable sur ce compte Spotify — crée-en une dans Spotify puis réessaie.</p>
+{% else %}
+<ul class="pl-list">
+  {% for p in playlists %}
+  <li>
+    <button type="button" hx-post="/reco-radar/sp-playlist-add" hx-target="#pl-dialog-body" hx-swap="innerHTML"
+            hx-vals='{"track_uri": {{ track_uri|tojson }}, "playlist_id": {{ p.id|tojson }}, "playlist_title": {{ p.name|tojson }}}'>{{ p.name or "(sans titre)" }}</button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

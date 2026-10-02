@@ -1,0 +1,24 @@
+{#- Contenu de la fenêtre « Ajouter à une playlist » de /reco-radar (chargé en htmx
+   par le JS de la page). Trois états : Google non configuré côté serveur, compte
+   non relié, compte relié (liste des playlists). -#}
+{% if not configured %}
+<p class="small">La connexion Google n'est pas encore configurée sur ce serveur.</p>
+{% elif not connected %}
+{% if error %}<p class="small warn">{{ error }}</p>{% endif %}
+<p class="small">Relie ton compte YouTube pour choisir la playlist où ajouter la piste.</p>
+<p><a class="btn primary small" href="/oauth/google/start">Relier mon compte YouTube</a>
+  <a class="small" href="/patte">Gérer dans Mes goûts</a></p>
+{% elif error %}
+<p class="small warn">{{ error }}</p>
+{% elif not playlists %}
+<p class="small muted">Aucune playlist sur ce compte YouTube — crée-en une sur YouTube puis réessaie.</p>
+{% else %}
+<ul class="pl-list">
+  {% for p in playlists %}
+  <li>
+    <button type="button" hx-post="/reco-radar/yt-playlist-add" hx-target="#pl-dialog-body" hx-swap="innerHTML"
+            hx-vals='{"video_id": {{ video_id|tojson }}, "playlist_id": {{ p.id|tojson }}, "playlist_title": {{ p.title|tojson }}}'>{{ p.title }}</button>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}

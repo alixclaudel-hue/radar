@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar — Aperçu « Strong White & Acacia » (v4)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap">
+<style>
+/* Aperçu autonome : ne touche pas à l'application. */
+:root{
+  color-scheme: light;
+  /* Fonds */
+  --bg:#F5F3EF; --bg-2:#ECE8E1; --bg-sunk:#E2DDD4;
+  /* Surfaces */
+  --surface:#FBFAF7; --field:#FFFFFF; --surface-hover:#F1EEE8;
+  /* Textes */
+  --text:#2B2A28; --text-soft:#5E5A54; --text-faint:#8C867D; --on-primary:#FBFAF7;
+  /* Primaire : acacia huilé */
+  --primary:#8A6A47; --primary-hover:#725636; --primary-soft:#EDE4D6;
+  /* Secondaire : sauge + terre cuite */
+  --secondary:#6F7A68; --secondary-soft:#E3E7DE; --clay:#B0805A;
+  /* États */
+  --success:#5F7A5A; --warn-soft:#F1E6D0; --danger:#A3473A; --danger-soft:#F1DDD8;
+  /* Bordures */
+  --border:#E0DBD2; --border-strong:#C9C2B6; --bandcamp:#1DA0C3;
+  /* Espacement / rayons / ombres */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px; --sp-7:56px;
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --shadow-sm:0 1px 2px rgba(43,42,40,.06);
+  --shadow-md:0 6px 18px rgba(43,42,40,.08);
+  --shadow-lg:0 20px 48px rgba(43,42,40,.16);
+  --font-display:'Syne',sans-serif; --font-body:'Work Sans',system-ui,sans-serif; --font-mono:'Space Mono',ui-monospace,monospace;
+  --fs-xs:12px; --fs-sm:13px; --fs-md:15px; --fs-lg:18px; --fs-xl:26px; --fs-2xl:40px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:400 var(--fs-md)/1.6 var(--font-body);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--font-display);font-weight:800;letter-spacing:-.03em;line-height:1.1;margin:0 0 var(--sp-3)}
+h1{font-size:var(--fs-2xl)} h2{font-size:var(--fs-xl)} h3{font-size:var(--fs-lg);letter-spacing:-.02em}
+a{color:var(--primary);text-underline-offset:3px;text-decoration-color:var(--border-strong)}
+a:hover{color:var(--primary-hover);text-decoration-color:var(--primary)}
+.muted{color:var(--text-soft)} .small{font-size:var(--fs-xs);color:var(--text-soft)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+/* ===== Header clair ===== */
+.app-header{position:sticky;top:0;z-index:10;background:rgba(251,250,247,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.app-header__in{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,40px);height:64px;display:flex;align-items:center;gap:var(--sp-5)}
+.brand{display:flex;align-items:center;gap:10px;font:800 24px var(--font-display);letter-spacing:-.05em;color:var(--text);text-decoration:none}
+.disc{width:24px;height:24px;border-radius:50%;flex:none;
+  background:radial-gradient(circle,var(--primary) 0 24%,var(--text) 25% 32%,transparent 33%),
+  repeating-radial-gradient(circle,#4a4640 0 2px,#2B2A28 2px 4px);transition:transform .6s ease}
+.brand:hover .disc{transform:rotate(200deg)}
+.nav-main{display:flex;gap:var(--sp-1);flex:1;overflow-x:auto;scrollbar-width:none}
+.nav-main a{padding:8px 14px;border-radius:var(--r-pill);color:var(--text-soft);text-decoration:none;font-size:var(--fs-sm);font-weight:500;white-space:nowrap;transition:.15s ease}
+.nav-main a:hover{background:var(--bg-2);color:var(--text)}
+.nav-main a.active{background:var(--primary-soft);color:var(--primary-hover);font-weight:600}
+.profile{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-sm);font-weight:500;color:var(--text-soft)}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--primary);color:var(--on-primary);display:grid;place-items:center;font:700 14px var(--font-display)}
+
+.wrap{max-width:1180px;margin:0 auto;padding:var(--sp-6) clamp(16px,4vw,40px) var(--sp-7)}
+.page-header{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-6)}
+.page-header p{margin:0;max-width:52ch}
+section{margin-bottom:var(--sp-7)}
+.section-label{display:flex;align-items:center;gap:var(--sp-3);font:700 var(--fs-xs) var(--font-mono);text-transform:uppercase;letter-spacing:.14em;color:var(--text-faint);margin-bottom:var(--sp-4)}
+.section-label::after{content:"";flex:1;height:1px;background:var(--border)}
+
+/* ===== Boutons ===== */
+.btn,button{font:600 var(--fs-sm) var(--font-body);height:42px;padding:0 var(--sp-4);border-radius:var(--r-sm);border:1px solid var(--border-strong);background:var(--field);color:var(--text);cursor:pointer;box-shadow:var(--shadow-sm);display:inline-flex;align-items:center;gap:var(--sp-2);transition:.15s ease}
+.btn:hover,button:hover{background:var(--surface-hover);border-color:var(--text-faint)}
+.btn:active,button:active{transform:translateY(1px)}
+.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.secondary-solid{background:var(--secondary);border-color:var(--secondary);color:var(--on-primary)}
+.ghost{border-color:transparent;background:transparent;box-shadow:none;color:var(--primary)}
+.ghost:hover{background:var(--primary-soft);border-color:transparent}
+.danger{color:var(--danger);border-color:var(--danger)}
+.danger:hover{background:var(--danger);color:var(--on-primary);border-color:var(--danger)}
+.small-btn{height:32px;padding:0 var(--sp-3);font-size:var(--fs-xs)}
+button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.row{display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center}
+
+/* ===== Champs ===== */
+label{display:block;font:500 var(--fs-sm) var(--font-body);color:var(--text-soft);margin-bottom:6px}
+input,select,textarea{font:inherit;width:100%;height:42px;padding:0 var(--sp-3);border:1px solid var(--border-strong);border-radius:var(--r-sm);background:var(--field);color:var(--text);transition:.15s ease}
+input::placeholder{color:var(--text-faint)}
+input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.field{margin-bottom:var(--sp-4)}
+
+/* ===== Panneaux / cartes ===== */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);padding:var(--sp-5)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--sp-5)}
+@media(min-width:820px){.grid3{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-sm);overflow:hidden;transition:.18s ease}
+.card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.cover{aspect-ratio:1;position:relative;background:linear-gradient(140deg,#8A6A47,#6b5236)}
+.cover.c2{background:linear-gradient(140deg,#7d8875,#5c6655)} .cover.c3{background:linear-gradient(140deg,#b0805a,#8a6444)}
+.cover::after{content:"";position:absolute;top:50%;left:50%;width:46%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle,var(--bg) 0 8%,var(--text) 9% 30%,transparent 31%),repeating-radial-gradient(circle,#4a4640 0 2px,#2B2A28 2px 4px);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+.score{position:absolute;top:10px;right:10px;z-index:2;min-width:44px;height:44px;padding:0 8px;border-radius:var(--r-pill);background:var(--surface);color:var(--text);box-shadow:var(--shadow-md);display:grid;place-items:center;font:800 17px var(--font-display)}
+.cm-row{position:absolute;left:10px;bottom:10px;display:flex;gap:6px;z-index:2;flex-wrap:wrap}
+.cm{font:700 var(--fs-xs) var(--font-mono);color:var(--text);background:rgba(251,250,247,.94);border-radius:var(--r-pill);padding:2px 9px}
+.cm.star{color:var(--clay)}
+.card .body{padding:var(--sp-4);display:flex;flex-direction:column;gap:var(--sp-1)}
+.artist{font:700 var(--fs-xs) var(--font-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint)}
+.title{font:800 var(--fs-lg)/1.15 var(--font-display);letter-spacing:-.02em}
+.catno{font:400 var(--fs-xs) var(--font-mono);color:var(--text-soft)}
+.card .foot{display:flex;justify-content:space-between;align-items:center;margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--border)}
+
+/* ===== Puces & badges ===== */
+.chip{display:inline-flex;align-items:center;gap:4px;font:600 var(--fs-xs) var(--font-body);padding:3px 11px;border-radius:var(--r-pill);background:var(--primary-soft);color:var(--primary-hover)}
+.chip.sage{background:var(--secondary-soft);color:#4d574a} .chip.clay{background:var(--warn-soft);color:#8a5b38} .chip.neutral{background:var(--bg-2);color:var(--text-soft)}
+.badge{background:var(--text);color:var(--surface);font:700 var(--fs-xs) var(--font-mono);padding:2px 10px;border-radius:var(--r-pill)}
+
+/* ===== Notices ===== */
+.notice{border:1px solid var(--border);border-radius:var(--r-md);padding:var(--sp-3) var(--sp-4);font-size:var(--fs-sm);background:var(--surface)}
+.notice.warn{background:var(--warn-soft);border-color:#E4D3AE}
+.notice.ok{background:var(--secondary-soft);border-color:#CBD3C4;color:#3f5a3b}
+.notice.err{background:var(--danger-soft);border-color:#E3C0B8;color:var(--danger)}
+.stack>*+*{margin-top:var(--sp-3)}
+
+/* ===== Onglets ===== */
+.tabs{display:flex;gap:var(--sp-5);border-bottom:1px solid var(--border)}
+.tabs a{padding:var(--sp-3) 0;text-decoration:none;color:var(--text-soft);font-size:var(--fs-sm);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:var(--text)}
+.tabs a.active{color:var(--primary);border-color:var(--primary);font-weight:600}
+
+/* ===== Tableau ===== */
+.tbl-wrap{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);box-shadow:var(--shadow-sm)}
+.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.tbl th{background:var(--bg-2);color:var(--text-soft);text-align:left;font:700 var(--fs-xs) var(--font-mono);text-transform:uppercase;letter-spacing:.08em;padding:var(--sp-3);border-bottom:1px solid var(--border)}
+.tbl td{padding:var(--sp-3);border-bottom:1px solid var(--border);height:46px}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover{background:var(--surface-hover)}
+.tbl .num{text-align:right;font-family:var(--font-mono)}
+.progress{height:6px;background:var(--bg-sunk);border-radius:var(--r-pill);overflow:hidden;width:110px}
+.progress i{display:block;height:100%;background:var(--primary)}
+
+/* ===== Modale ===== */
+.modal-bg{background:rgba(43,42,40,.4);border-radius:var(--r-md);padding:var(--sp-6);display:grid;place-items:center}
+.modal{background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);width:min(460px,100%);overflow:hidden}
+.modal__head{display:flex;justify-content:space-between;align-items:center;padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--border)}
+.modal__head h3{margin:0}
+.modal__body{padding:var(--sp-5)}
+.modal__foot{display:flex;justify-content:flex-end;gap:var(--sp-2);padding:var(--sp-4) var(--sp-5);background:var(--bg);border-top:1px solid var(--border)}
+
+/* ===== Loader ===== */
+.spinner{display:inline-block;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle,var(--primary) 0 22%,transparent 23%),repeating-radial-gradient(circle,#4a4640 0 2px,#2B2A28 2px 4px);animation:spin 1s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spinner{animation:none}.disc,.card,.btn,button{transition:none}}
+
+/* ===== Palette ===== */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--sp-4)}
+.sw{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;background:var(--surface);font-size:var(--fs-xs)}
+.sw i{display:block;height:56px;border-bottom:1px solid var(--border)}
+.sw div{padding:var(--sp-2) var(--sp-3);font-family:var(--font-mono);color:var(--text-soft)}
+.sw b{display:block;font:600 var(--fs-sm) var(--font-body);color:var(--text)}
+
+/* ===== Footer ===== */
+.app-footer{border-top:1px solid var(--border);background:var(--surface);padding:var(--sp-5) 0;text-align:center;font:400 var(--fs-xs) var(--font-mono);color:var(--text-faint)}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header__in">
+    <a class="brand" href="#"><span class="disc"></span>Radar</a>
+    <nav class="nav-main">
+      <a href="#" class="active">🔍 Chercher</a>
+      <a href="#">📻 Nouveautés</a>
+      <a href="#">🌐 Labels &amp; artistes</a>
+      <a href="#">🎯 Reco Radar</a>
+      <a href="#">🎛️ Réglages</a>
+    </nav>
+    <div class="profile"><span class="avatar">M</span> Mon profil ▾</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="page-header">
+    <div>
+      <h1>Chercher un disque</h1>
+      <p class="muted">Filtre par label, style, année et score : Radar trie le reste.</p>
+    </div>
+    <div class="row"><button class="btn">Historique</button><button class="btn primary">Rechercher</button></div>
+  </div>
+
+  <section>
+    <div class="section-label">Palette « Strong White &amp; Acacia »</div>
+    <div class="swatches">
+      <div class="sw"><i style="background:#F5F3EF"></i><div><b>Fond</b>#F5F3EF</div></div>
+      <div class="sw"><i style="background:#ECE8E1"></i><div><b>Fond atténué</b>#ECE8E1</div></div>
+      <div class="sw"><i style="background:#E2DDD4"></i><div><b>Fond enfoncé</b>#E2DDD4</div></div>
+      <div class="sw"><i style="background:#FBFAF7"></i><div><b>Surface</b>#FBFAF7</div></div>
+      <div class="sw"><i style="background:#FFFFFF"></i><div><b>Champs</b>#FFFFFF</div></div>
+      <div class="sw"><i style="background:#2B2A28"></i><div><b>Texte</b>#2B2A28</div></div>
+      <div class="sw"><i style="background:#5E5A54"></i><div><b>Texte soft</b>#5E5A54</div></div>
+      <div class="sw"><i style="background:#8C867D"></i><div><b>Texte discret</b>#8C867D</div></div>
+      <div class="sw"><i style="background:#8A6A47"></i><div><b>Primaire acacia</b>#8A6A47</div></div>
+      <div class="sw"><i style="background:#725636"></i><div><b>Primaire hover</b>#725636</div></div>
+      <div class="sw"><i style="background:#EDE4D6"></i><div><b>Primaire soft</b>#EDE4D6</div></div>
+      <div class="sw"><i style="background:#6F7A68"></i><div><b>Secondaire sauge</b>#6F7A68</div></div>
+      <div class="sw"><i style="background:#E3E7DE"></i><div><b>Sauge soft</b>#E3E7DE</div></div>
+      <div class="sw"><i style="background:#B0805A"></i><div><b>Terre cuite</b>#B0805A</div></div>
+      <div class="sw"><i style="background:#A3473A"></i><div><b>Danger</b>#A3473A</div></div>
+      <div class="sw"><i style="background:#E0DBD2"></i><div><b>Bordure</b>#E0DBD2</div></div>
+      <div class="sw"><i style="background:#C9C2B6"></i><div><b>Bordure forte</b>#C9C2B6</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Typographie</div>
+    <div class="panel stack">
+      <h1>Syne 800 — titre de page</h1>
+      <h2>Syne 800 — titre de section</h2>
+      <h3>Syne 800 — titre de carte</h3>
+      <p>Work Sans 15px pour le texte courant. <a href="#">Un lien acacia</a>, sobre et lisible.</p>
+      <p style="font:400 13px var(--font-mono)">Space Mono — catnos, scores : <span class="catno">RH-2019-04 · 12" · 33 RPM</span></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Boutons</div>
+    <div class="panel stack">
+      <div class="row">
+        <button class="btn primary">Primaire</button>
+        <button class="btn secondary-solid">Secondaire plein</button>
+        <button class="btn">Neutre</button>
+        <button class="btn ghost">Ghost</button>
+        <button class="btn danger">Danger</button>
+        <button class="btn" disabled>Désactivé</button>
+      </div>
+      <div class="row">
+        <button class="btn primary small-btn">Small</button>
+        <button class="btn small-btn">Small</button>
+        <button class="btn small-btn ghost">✕ retirer</button>
+        <span class="spinner"></span><span class="small">chargement…</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Formulaire</div>
+    <div class="panel">
+      <div class="row" style="align-items:flex-end">
+        <div class="field" style="flex:2 1 260px;margin:0"><label>Label</label><input placeholder="ex. Aim Records"></div>
+        <div class="field" style="flex:1 1 160px;margin:0"><label>Catégorie</label><select><option>Cœur</option><option>Aimé</option></select></div>
+        <button class="btn primary">Ajouter</button>
+      </div>
+      <div class="row" style="margin-top:16px"><span class="chip">Techno ✕</span><span class="chip sage">House ✕</span><span class="chip clay">Jazz ✕</span><span class="chip neutral">Vinyle</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Cartes de résultats (3 par ligne)</div>
+    <div class="grid3">
+      <article class="card">
+        <div class="cover"><span class="score">87</span><div class="cm-row"><span class="cm star">★ 4.52</span><span class="cm">dès 18 €</span></div></div>
+        <div class="body">
+          <span class="artist">Soichi Terada</span>
+          <span class="title">Sunrise Sunset</span>
+          <span class="catno">Rush Hour · RH-113 · 2019</span>
+          <div class="foot"><span class="chip">House</span><button class="btn small-btn">＋ Wantlist</button></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="cover c2"><span class="score">74</span><div class="cm-row"><span class="cm">12 en vente</span></div></div>
+        <div class="body">
+          <span class="artist">Bellaire</span>
+          <span class="title">Some Jazz to Make Love On</span>
+          <span class="catno">Fresh Kills · FK-004 · 2016</span>
+          <div class="foot"><span class="chip sage">Deep House</span><button class="btn small-btn">＋ Wantlist</button></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="cover c3"><span class="score">68</span><div class="cm-row"><span class="cm star">★ 4.10</span></div></div>
+        <div class="body">
+          <span class="artist">Chris Cramer</span>
+          <span class="title">High Life</span>
+          <span class="catno">Lobster Theremin · LT-77 · 2021</span>
+          <div class="foot"><span class="chip clay">Techno</span><button class="btn small-btn">＋ Wantlist</button></div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Onglets + tableau</div>
+    <div class="tabs" style="margin-bottom:20px">
+      <a href="#" class="active">Base de labels (312)</a><a href="#">Artistes (148)</a><a href="#">Mes sets</a>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead><tr><th>Label</th><th>Affinité</th><th class="num">Possédés</th><th>Catégorie</th></tr></thead>
+        <tbody>
+          <tr><td><b>Rush Hour</b></td><td><div class="progress"><i style="width:82%"></i></div></td><td class="num">24</td><td><span class="chip">Cœur</span></td></tr>
+          <tr><td><b>Fresh Kills</b></td><td><div class="progress"><i style="width:61%"></i></div></td><td class="num">7</td><td><span class="chip sage">Aimé</span></td></tr>
+          <tr><td><b>Lobster Theremin</b></td><td><div class="progress"><i style="width:44%"></i></div></td><td class="num">3</td><td><span class="chip sage">Aimé</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Notices</div>
+    <div class="stack">
+      <div class="notice warn">⚠️ Token Discogs manquant — <a href="#">Mon profil → Discogs</a>.</div>
+      <div class="notice ok">✓ Réglages enregistrés.</div>
+      <div class="notice err">✕ Impossible de joindre Discogs, réessaie dans un instant.</div>
+      <div class="notice">ℹ️ Notice neutre d'information.</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-label">Modale</div>
+    <div class="modal-bg">
+      <div class="modal">
+        <div class="modal__head"><h3>Pressages vinyle</h3><button class="btn small-btn ghost">✕</button></div>
+        <div class="modal__body"><p class="muted" style="margin:0">Choisis le pressage à ajouter à ta wantlist.</p></div>
+        <div class="modal__foot"><button class="btn">Annuler</button><button class="btn primary">Ajouter</button></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">Radar · <a href="#">Retours</a></footer>
+</body>
+</html>

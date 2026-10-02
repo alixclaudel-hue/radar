@@ -186,12 +186,14 @@ class SearchSellerTestCase(unittest.TestCase):
         self.assertIn("Techno Two", html)
         self.assertNotIn("Deep One", html)
 
-    def test_sortie_hors_referentiel_ecartee_des_qu_un_filtre_porte_dessus(self):
-        """On ne peut pas affirmer qu'une sortie inconnue du référentiel passe un
-        filtre de style : elle est écartée, et le nombre est annoncé."""
+    def test_sortie_hors_referentiel_gardee_malgre_un_filtre(self):
+        """Champ inconnu = pas disqualifiant : une sortie absente du référentiel
+        est gardée (et signalée) au lieu d'être cachée ; seul un style connu ET
+        différent écarte, avec le décompte par filtre."""
         html, _ = self._post(style="Deep House")
-        self.assertNotIn("Sortie Toute Neuve", html)
-        self.assertIn("non filtrable", html)
+        self.assertIn("Sortie Toute Neuve", html)
+        self.assertIn("gardé(s) sans pouvoir être filtré(s)", html)
+        self.assertIn("1 écarté(s) par style", html)       # « Techno Two »
 
     def test_lecture_interrompue_signalee(self):
         """Un snapshot partiel (lecture arrêtée) ne doit jamais être présenté
@@ -268,6 +270,9 @@ class SearchSellerTestCase(unittest.TestCase):
         self.assertIn("Ajouter à la wantlist", html)
         self.assertIn('hx-post="/cart/add"', html)
         self.assertNotIn("discogs.com/sell/item", html)
+        # Retour utilisateur 28/09 : le label mène à sa page /disco, comme dans la
+        # playlist reco (avant, c'était du texte mort côté recherche).
+        self.assertIn('/disco?kind=label&key=Aim', html)
 
 
 class FakeJob:
@@ -335,6 +340,28 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         self.assertFalse(meta["partial"])
         self.assertIn("4 disque(s)", job.finished)
 
+    def test_snapshot_intermediaire_en_premiere_lecture_seulement(self):
+        """Première lecture : un snapshot `reading` est écrit toutes les 3 pages
+        pour que /search affiche au fil de l'eau ; avec un inventaire complet
+        déjà présent, rien d'intermédiaire (jamais un morceau par-dessus)."""
+        vus = []
+
+        def _fake(username, token="", max_pages=0, per_page=100, on_page=None,
+                  on_batch=None):
+            for page in (1, 2, 3):
+                on_batch(LISTINGS[:page], page)
+                vus.append(scat.inv_meta("boutique").get("reading"))
+            return LISTINGS, False
+
+        with mock.patch.object(discogs, "seller_inventory", side_effect=_fake):
+            search.job_seller_inventory(FakeJob(), {"seller": "boutique"})
+        self.assertEqual(vus, [None, None, True])
+        self.assertFalse(scat.inv_meta("boutique")["reading"])     # final
+        vus.clear()
+        with mock.patch.object(discogs, "seller_inventory", side_effect=_fake):
+            search.job_seller_inventory(FakeJob(), {"seller": "boutique"})
+        self.assertEqual(vus, [False, False, False])               # complet gardé
+
     def test_arobase_et_espaces_normalises(self):
         job = FakeJob()
         with mock.patch.object(discogs, "seller_inventory",
@@ -348,7 +375,7 @@ class JobSellerInventoryTestCase(unittest.TestCase):
         doit couper la pagination au lieu de lire tout le stock."""
         pages = 5
 
-        def _fake(username, token="", max_pages=0, per_page=100, on_page=None):
+        def _fake(username, token="", max_pages=0, per_page=100, on_page=None, on_batch=None):
             got = []
             for page in range(1, pages + 1):
                 got.extend(LISTINGS)
@@ -439,6 +466,29 @@ class SellerInventoryPaginationTestCase(unittest.TestCase):
             out, truncated = discogs.seller_inventory("x", token="t", max_pages=2)
         self.assertEqual(len(out), 2)
         self.assertTrue(truncated)
+
+    def test_403_page_101_garde_les_articles_lus(self):
+        # Discogs refuse toute page > 100 sur l'inventaire d'un autre compte : les
+        # 100 pages déjà lues doivent être rendues, marquées tronquées (incident du 29/09).
+        base = self._resp(2607)
+
+        def _get(path, params=None, token=""):
+            if (params or {}).get("page", 1) > 100:
+                raise discogs.DiscogsError(
+                    "Erreur Discogs 403 : Pagination above 100 disabled for inventories "
+                    "besides your own")
+            return base(path, params, token)
+        with mock.patch.object(discogs, "get", side_effect=_get), \
+             mock.patch.object(discogs.time, "sleep"):
+            out, truncated = discogs.seller_inventory("x", token="t", max_pages=0)
+        self.assertEqual(len(out), 100)
+        self.assertTrue(truncated)
+
+    def test_403_des_la_premiere_page_leve(self):
+        with mock.patch.object(discogs, "get", side_effect=discogs.DiscogsError(
+                "Erreur Discogs 403 : Pagination above 100 disabled")):
+            with self.assertRaises(discogs.DiscogsError):
+                discogs.seller_inventory("x", token="t", max_pages=0)
 
     def test_on_page_qui_renvoie_false_interrompt(self):
         with mock.patch.object(discogs, "get", side_effect=self._resp(10)), \

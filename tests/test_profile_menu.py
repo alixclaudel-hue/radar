@@ -1,7 +1,7 @@
 """Menu déroulant Mon profil topbar — migration wantlist (issue #62) :
 
-- Le menu déroulant du profil (dans la topbar) contient maintenant trois liens :
-  /patte, /wantlist et /tracks-aimees.
+- Le menu déroulant du profil (dans la topbar) contient deux liens :
+  /patte et /wantlist.
 - L'ancien lien séparé avec la class "chip cart-tab" a été supprimé.
 - La structure du menu est maintenant un <details> avec un <summary>.
 
@@ -40,7 +40,7 @@ class ProfileMenuTest(unittest.TestCase):
         html = self._page()
         self.assertIn("href=\"/patte\"", html)
         self.assertIn("href=\"/wantlist\"", html)
-        self.assertIn("href=\"/tracks-aimees\"", html)
+        self.assertNotIn("/tracks-aimees", html)
 
     def test_ancien_lien_cart_tab_supprime(self):
         html = self._page()

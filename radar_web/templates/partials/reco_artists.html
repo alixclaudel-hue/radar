@@ -1,5 +1,5 @@
 {% import "partials/_icons.html" as icons %}
-<div class="section-title"><h3>Recommandations — artistes proches de tes Principaux / Secondaires</h3></div>
+<div class="section-title"><h3>Recommandations — artistes proches de tes catégories 1 et 2</h3></div>
 {% if not reco %}
   <p class="small muted">Le graphe producteur se construit automatiquement en fond (une fois par mois) — reviens plus tard si rien ne s'affiche encore.</p>
 {% else %}
@@ -11,12 +11,12 @@
           title="note d'artiste /100 (proximité graphe = {{ r.prox }})">{{ icons.artist() }} {{ r.note }}</span>
     <a href="/disco?kind=artist&key={{ r.key|urlencode }}" class="lrow__name">{{ r.name }}</a>
     <span class="lrow__meta">{{ r.why }}</span>
-    <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">
+    <form hx-post="/reco/artist" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="1">
-      <button class="small">+ Principal</button></form>
-    <form hx-post="/reco/artist" hx-swap="outerHTML" style="display:inline">
+      <button class="small">+ Catégorie 1</button></form>
+    <form hx-post="/reco/artist" hx-swap="outerHTML" class="inline">
       <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="tier" value="2">
-      <button class="small">+ Secondaire</button></form>
+      <button class="small">+ Catégorie 2</button></form>
   </div>
   {% endfor %}
 </div>

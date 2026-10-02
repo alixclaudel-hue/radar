@@ -1,6 +1,7 @@
 """Graphe producteurs/artistes (étape 4b) : `build_graph`, `resolve_artists`.
 """
 
+import os
 import re
 import sqlite3
 import time
@@ -274,8 +275,17 @@ def job_build_graph(job, params):
     token = cfg.get("token", "")
     pages = int(params.get("pages", 2))
     mode = params.get("mode", "top")
-    incremental = bool(params.get("incremental"))
-    gsc = (cfg.get("scoring") or {}).get("graph", {})   # cf. DEFAULT_SCORING["graph"] côté appli
+    incremental = params.get("incremental")
+    if incremental is None:
+        # Reprise par défaut : le graphe est une image du dump, pas un calcul à refaire.
+        # S'il existe déjà (complet OU partiel après un arrêt), on ne traite que les
+        # graines qui manquent — sans quoi un timeout ou un redéploiement relançait
+        # 6 h de calcul depuis zéro à chaque fois (incident du 29/09). `full=1` force
+        # une reconstruction complète.
+        incremental = (mode == "taste" and not params.get("full")
+                       and os.path.exists(PRODUCER_GRAPH_PATH))
+    incremental = bool(incremental)
+    gsc =(cfg.get("scoring") or {}).get("graph", {})   # cf. DEFAULT_SCORING["graph"] côté appli
     max_credits = int(params.get("max_credits", gsc.get("max_credits", 6)))  # > N = compilation
     role_main = float(gsc.get("role_main", 1.0))
     role_remix = float(gsc.get("role_remix", 0.7))
@@ -350,7 +360,9 @@ def job_build_graph(job, params):
     if incremental and prev_seeds and not seeds:
         return job.finish("Graphe déjà à jour — aucun nouvel artiste résolu depuis le dernier build.")
     if len(seeds) < 2 and not (incremental and prev_seeds):
-        return job.finish(error=f"Trop peu de graines ({len(seeds)}).")
+        # pas une erreur : un compte sans goût renseigné n'a simplement rien à
+        # cartographier, et une erreur le faisait réenfiler toutes les heures.
+        return job.finish(f"Rien à construire : {len(seeds)} graine(s), il en faut au moins 2.")
 
     # en incrémental : on repart des arêtes existantes et on ajoute celles des nouvelles graines
     art_edges = prev.get("edges", {}) if incremental else {}
@@ -363,10 +375,33 @@ def job_build_graph(job, params):
             + (" (mise à jour)" if incremental and prev_seeds else " — graphe global"))
     n_resolved = 0
 
+    faits = dict(prev_seeds) if incremental else {}   # graines réellement traitées
+
+    def _sauver(partiel, graines):
+        """Écrit le graphe. `partiel` : point de reprise (toutes les 25 graines et à
+        l'arrêt) — `seeds` ne liste alors que les graines faites, pour que la reprise
+        traite exactement les autres. Les graines ne figurent jamais comme candidats."""
+        save_json(PRODUCER_GRAPH_PATH, {
+            "built_at": datetime.now().isoformat(timespec="seconds"),
+            "mode": mode,
+            "n_resolved_seeds": len(graines),
+            "seeds": dict(graines),
+            "edges": {k: v for k, v in art_edges.items() if k not in graines},
+            "label_edges": lab_edges,
+            "partial": partiel,
+        })
+
+    # Budget de temps : le job rend la main (et libère le worker pour un clic
+    # utilisateur) au lieu de tenir des heures ; la reprise se fait au passage suivant.
+    budget = float(params.get("budget_s") or os.environ.get("RADAR_GRAPH_BUDGET_S", 2700))
+    t_boucle = time.monotonic()
+    interrompu = False
+
     con = dd.connect_readonly()
     try:
         for i, (sk, name, rid) in enumerate(seeds):
-            if job.stopped():
+            if job.stopped() or time.monotonic() - t_boucle > budget:
+                interrompu = True
                 break
             if not rid:
                 dn, did, _status, _cands = dd.resolve_name(name, "artist", con) if con else (None, None, None, [])
@@ -386,6 +421,7 @@ def job_build_graph(job, params):
                     time.sleep(1.1)
             if not rid:
                 job.tick(f"{name} — introuvable")
+                faits[sk] = name
                 continue
             n_resolved += 1
             if con:
@@ -396,9 +432,19 @@ def job_build_graph(job, params):
                                                 rw_by_role, art_edges, lab_edges)
                 time.sleep(1.1)
             job.tick(f"{name} — {n_rels} sortie(s)")
+            faits[sk] = name
+            if len(faits) % 25 == 0:
+                _sauver(True, faits)
     finally:
         if con:
             con.close()
+
+    if interrompu:
+        _sauver(True, faits)
+        job.st["partial"] = True
+        return job.finish(f"partiel : {len(faits)}/{len(seed_names)} graines, "
+                          "reprise au prochain passage")
+    job.st["partial"] = False
 
     if not art_edges or (n_resolved == 0 and not (incremental and prev_seeds)):
         return job.finish(error=f"Graphe vide : {n_resolved}/{len(seeds)} graines résolues.")
@@ -407,13 +453,8 @@ def job_build_graph(job, params):
         if sk in seed_set:
             del art_edges[sk]
     total_seeds = len(seed_names)
-    save_json(PRODUCER_GRAPH_PATH, {
-        "built_at": datetime.now().isoformat(timespec="seconds"),
-        "mode": mode,
-        "n_resolved_seeds": total_seeds,
-        "seeds": seed_names, "edges": art_edges, "label_edges": lab_edges,
-    })
-    tag = "mise à jour" if incremental and prev_seeds else mode
+    _sauver(False, seed_names)
+    tag ="mise à jour" if incremental and prev_seeds else mode
     job.finish(f"{tag} · +{n_resolved} graine(s) traitée(s), {total_seeds} au total → "
                f"{len(art_edges)} artistes liés, {len(lab_edges)} labels.")
 

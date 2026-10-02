@@ -33,6 +33,13 @@ from radar_jobs.tracks import (
 YT_QUOTA_TZ = ZoneInfo("America/Los_Angeles")
 RECOS_MAX_TRACKS = 5  # repli si scoring.recos.max_tracks absent (curseur /settings, 10/09)
 RECOS_DAILY_SEARCH_BUDGET = 80
+# Un compte avec sa PROPRE clé YouTube (cfg["youtube_api_key"], réglages /patte)
+# protège le pot commun : la cascade ytcache.youtube_keys essaie cette clé en
+# premier, donc il consomme SON quota à lui (10 000 unités/jour) avant de
+# retomber sur la clé partagée de l'app — il peut donc avoir un budget plus
+# généreux sans mettre en danger les comptes qui n'ont que la clé partagée
+# (décision utilisateur 02/10/2026, objectif « maximiser les ajouts quotidiens »).
+RECOS_DAILY_SEARCH_BUDGET_OWN_KEY = 160
 # marge sous le quota gratuit YouTube Data API : évite que scan_recos empile plus
 # de candidats que publish_recos ne peut en chercher sur YouTube en une journée
 # (retour utilisateur du 09/09 : file à 417 candidats, quota épuisé dès la 1re
@@ -197,6 +204,7 @@ def job_scan_recos(job, params):
     from radar_web.radar import scorestore
 
     cfg = cfg_load()
+    daily_budget = _recos_daily_budget(cfg)
     rc = cfg.get("scoring", {}).get("recos", {})
     min_score = float(params.get("min_score", rc.get("min_score", 60)))
     max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
@@ -222,11 +230,11 @@ def job_scan_recos(job, params):
                            f"mieux notées (job séparé, cf. CLAUDE.md point 42).")
 
     candidates = [] if force else load_json(RECOS_CANDIDATES_PATH, [])
-    if len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
+    if len(candidates) >= daily_budget:
         last = _publish_recos_last_message()
         cause = f" Dernière publication : {last}" if last else ""
         return job.finish(f"File déjà pleine ({len(candidates)} en attente, quota YouTube ~"
-                           f"{RECOS_DAILY_SEARCH_BUDGET} recherches/jour) — scan sauté, "
+                           f"{daily_budget} recherches/jour) — scan sauté, "
                            f"laisse la publication rattraper le retard.{cause}")
     # inclut aussi TOUT ce qui a déjà été publié un jour (recos_history.json,
     # jamais purgé), pas seulement la playlist ou la file d'attente courantes :
@@ -249,7 +257,7 @@ def job_scan_recos(job, params):
     diversity = DiversityTracker(candidates + playlist)
     for (artist, title, score, detail_json, release_id, release_title, label, year,
          release_artist) in rows:
-        if job.stopped() or n_added >= max_new or len(candidates) >= RECOS_DAILY_SEARCH_BUDGET:
+        if job.stopped() or n_added >= max_new or len(candidates) >= daily_budget:
             break
         title = (title or "").strip()
         k = (style_key(artist), style_key(title))
@@ -375,10 +383,11 @@ def job_publish_recos(job, params):
     if not candidates:
         return job.finish("Aucun candidat en attente.")
 
-    budget_used = _recos_searches_used_today()
-    allowance = _recos_searches_allowance(mode)
-    playlist = load_json(playlist_path, [])
     cfg = cfg_load()
+    daily_budget = _recos_daily_budget(cfg)
+    budget_used = _recos_searches_used_today()
+    allowance = _recos_searches_allowance(mode, daily_budget)
+    playlist = load_json(playlist_path, [])
     token = cfg.get("token", "")
     keys = ytcache.youtube_keys(cfg)
     rc = cfg.get("scoring", {}).get("recos", {})
@@ -403,7 +412,7 @@ def job_publish_recos(job, params):
         # par recherche (coût assumé : jusqu'à RECOS_DISCOGS_LOOKUPS_PER_RUN appels
         # Discogs, cadencés à 1,1 s, par lancement).
         return job.finish(f"Budget quotidien de recherches YouTube atteint ({budget_used}/"
-                           f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
+                           f"{daily_budget}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
 
     # historique permanent (jamais purgé) : {video_id: entrée} + identité de piste
     # (artiste/titre) déjà publiée par le passé, même si elle n'est plus dans la
@@ -549,7 +558,7 @@ def job_publish_recos(job, params):
     note = ""
     if daily_hit:
         note += (f" Budget quotidien atteint ({budget_used + searched}/"
-                 f"{RECOS_DAILY_SEARCH_BUDGET}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
+                 f"{daily_budget}) — reprendra à la remise à zéro du quota YouTube (9h à Paris).")
     if rate_hit:
         note += " YouTube limite le débit — reprendra au prochain lancement."
     if len(playlist) >= max_tracks and remaining:
@@ -596,16 +605,29 @@ def _recos_budget_today():
     return count, by_mode
 
 
-def _recos_searches_allowance(mode):
+def _recos_daily_budget(cfg):
+    """Plafond quotidien de recherches YouTube applicable à CE compte.
+
+    RECOS_DAILY_SEARCH_BUDGET_OWN_KEY (160) si le compte a sa propre clé
+    YouTube dans ses réglages (cfg["youtube_api_key"]) — elle protège le pot
+    commun, cf. le commentaire de la constante — sinon RECOS_DAILY_SEARCH_BUDGET
+    (80), pour ne pas épuiser plus vite la clé partagée de l'app."""
+    if (cfg.get("youtube_api_key") or "").strip():
+        return RECOS_DAILY_SEARCH_BUDGET_OWN_KEY
+    return RECOS_DAILY_SEARCH_BUDGET
+
+
+def _recos_searches_allowance(mode, daily_budget):
     """Calcule le nombre de recherches encore autorisées pour ce mode.
 
-    Chaque mode reçoit normalement la moitié du budget quotidien. Sa moitié peut
-    toutefois être empruntée lorsque l'autre file est vide : un seul mode actif
-    doit alors pouvoir consommer tout le reliquat sans dépasser le plafond global.
+    Chaque mode reçoit normalement la moitié du budget quotidien du compte
+    (`daily_budget`, cf. `_recos_daily_budget`). Sa moitié peut toutefois être
+    empruntée lorsque l'autre file est vide : un seul mode actif doit alors
+    pouvoir consommer tout le reliquat sans dépasser le plafond global.
     """
     count, by_mode = _recos_budget_today()
-    remaining = RECOS_DAILY_SEARCH_BUDGET - count
-    mode_allowance = RECOS_DAILY_SEARCH_BUDGET // 2 - by_mode.get(mode, 0)
+    remaining = daily_budget - count
+    mode_allowance = daily_budget // 2 - by_mode.get(mode, 0)
     other_candidates_path, _ = _mode_paths(_other_mode(mode))
 
     if load_json(other_candidates_path, []):
@@ -641,7 +663,7 @@ def job_scan_recos_decouverte(job, params):
     max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
     per_artist = int(params.get("per_artist", 15))
     force = bool(params.get("force"))
-    cap = RECOS_DAILY_SEARCH_BUDGET // 2
+    cap = _recos_daily_budget(cfg) // 2
 
     ctx = Ctx(uid=RADAR_UID)
     arts = discovery_artists(ctx)

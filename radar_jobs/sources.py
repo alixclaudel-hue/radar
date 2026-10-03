@@ -5,7 +5,9 @@ des titres YouTube, Spotify, Bandcamp (Subsonic).
 import hashlib
 import os
 import re
+import secrets
 import time
+import urllib.parse
 
 import requests
 
@@ -21,13 +23,38 @@ SUBSONIC_BASE = "https://bandcamp.com/api/subsonic/rest"
 
 # ============================================================= Discogs
 
+def _discogs_oauth_header(credential):
+    """En-tête OAuth 1.0a PLAINTEXT pour un jeton `oauth:<jeton>:<secret>` (compte relié
+    via /patte). La clé consommateur est celle de l'app du propriétaire. None si l'env
+    n'est pas configuré : l'appel échoue alors comme tout échec Discogs ({})."""
+    key = os.environ.get("RADAR_DISCOGS_CONSUMER_KEY", "")
+    secret = os.environ.get("RADAR_DISCOGS_CONSUMER_SECRET", "")
+    _, _, rest = credential.partition(":")
+    tok, _, tok_secret = rest.partition(":")
+    if not (key and secret and tok and tok_secret):
+        return None
+    q = lambda v: urllib.parse.quote(v, safe="")
+    return ('OAuth oauth_consumer_key="%s", oauth_token="%s", '
+            'oauth_signature_method="PLAINTEXT", oauth_timestamp="%d", '
+            'oauth_nonce="%s", oauth_signature="%s&%s"'
+            % (q(key), q(tok), time.time(), secrets.token_hex(8), q(secret), q(tok_secret)))
+
+
 def discogs_get(token, path, params=None):
     p = dict(params or {})
-    p["token"] = token
+    headers = {"User-Agent": DISCOGS_UA}
+    if isinstance(token, str) and token.startswith("oauth:"):
+        # Jamais en paramètre d'URL : le secret finirait dans les journaux.
+        auth = _discogs_oauth_header(token)
+        if auth is None:
+            return {}
+        headers["Authorization"] = auth
+    else:
+        p["token"] = token
     for attempt in range(5):
         try:
             r = requests.get(f"https://api.discogs.com{path}", params=p,
-                             headers={"User-Agent": DISCOGS_UA}, timeout=25)
+                             headers=headers, timeout=25)
         except requests.RequestException:
             time.sleep(3)
             continue

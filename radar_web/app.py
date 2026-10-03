@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .radar import googleauth, opslog, spotifyauth, websession
+from .radar import discogsauth, googleauth, opslog, spotifyauth, websession
 from .radar import (accounts, artistgraph, bandcamp, discogs, features, jobs, labelgraph,
                     learn, paths, sellers, stores, store, vocab, volumo, ytcache)
 from .radar.scoring import Ctx, real_tracks, track_row_id, yt_search_url
@@ -250,7 +250,8 @@ def account_invite(request: Request):
 
 # --------------------------------------------------------------------- helpers
 def render(request, tpl, **ctx):
-    ctx.setdefault("has_token", bool(store.read_config().get("token")))
+    ctx.setdefault("has_token", bool(store.read_config().get("token"))
+                   or discogsauth.is_connected(store.current_uid()))
     ctx.setdefault("me", (accounts.get(store.current_uid()) or {}).get("username"))
     ctx.setdefault("is_owner", store.current_uid() == paths.DEFAULT_UID)
     ctx.setdefault("n_cart", len(load(_pu().cart, [])))
@@ -415,7 +416,7 @@ def patte_page(request: Request, saved: int = 0):
            ("fetch_collection", "ingest_youtube", "ingest_spotify", "ingest_bandcamp", "ingest_djsets")}
     st = c.stats()
     # X1 : compte tout neuf (ni token, ni disque, ni titre analysé) -> flux d'accueil en 3 étapes
-    onboarding = not c.cfg.get("token") and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
+    onboarding = not (c.cfg.get("token") or discogsauth.is_connected(store.current_uid())) and not st.get("tracks") and not (c.collection.get("n_collection") or 0)
     google_msg = {"ok": "Compte Google relié.", "off": "Compte Google délié.",
                   "refused": "Connexion Google refusée ou expirée — réessaie.",
                   "error": "Google n'a pas validé la connexion — réessaie.",
@@ -426,7 +427,14 @@ def patte_page(request: Request, saved: int = 0):
                    "error": "Spotify n'a pas validé la connexion — réessaie.",
                    "unconfigured": "La connexion Spotify n'est pas configurée sur ce serveur."
                    }.get(request.query_params.get("spotify", ""), "")
+    discogs_msg = {"ok": "Compte Discogs relié.", "off": "Compte Discogs délié.",
+                   "refused": "Connexion Discogs refusée ou expirée — réessaie.",
+                   "error": "Discogs n'a pas validé la connexion — réessaie.",
+                   "unconfigured": "La connexion Discogs n'est pas configurée sur ce serveur."
+                   }.get(request.query_params.get("discogs", ""), "")
     return render(request, "pages/patte.html", active="patte",
+                  discogs_msg=discogs_msg, discogs_configured=discogsauth.configured(),
+                  discogs_connected=discogsauth.is_connected(store.current_uid()),
                   google_msg=google_msg, google_configured=googleauth.configured(),
                   google_connected=googleauth.is_connected(store.current_uid()),
                   spotify_msg=spotify_msg, spotify_configured=spotifyauth.configured(),
@@ -437,22 +445,41 @@ def patte_page(request: Request, saved: int = 0):
                   src=c.corpus_by_source(), st=st, saved=saved, last=last, onboarding=onboarding)
 
 
+RECO_MODES = ("approfondir", "decouverte")
+
+def _reco_mode(mode):
+    """Renvoie mode s'il est dans RECO_MODES, sinon "approfondir" (une valeur inconnue
+    retombe sur le mode historique pour qu'un vieux lien ne casse jamais la page)."""
+    return mode if mode in RECO_MODES else "approfondir"
+
+def _reco_files(mode):
+    """Approfondir garde les fichiers d'origine, aucune migration."""
+    pu = _pu()
+    if mode == "decouverte":
+        return (pu.recos_playlist_decouverte, pu.recos_candidates_decouverte)
+    return (pu.recos_playlist, pu.recos_candidates)
+
+
 @app.get("/reco-radar", response_class=HTMLResponse)
-def reco_radar_page(request: Request):
+def reco_radar_page(request: Request, mode: str = "approfondir"):
     """Playlist RECOS RADAR — interne à Radar (recos_playlist.json, alimentée par les
     jobs scan_recos/publish_recos), lue via l'API IFrame Player YouTube côté client :
-    aucune playlist n'est créée sur un compte YouTube (cf. CLAUDE.md)."""
-    playlist = load(_pu().recos_playlist, [])
+    aucune playlist n'est créée sur un compte YouTube (cf. CLAUDE.md). Deux playlists,
+    une visible à la fois (onglets)."""
+    mode = _reco_mode(mode)
+    pl_path, cand_path = _reco_files(mode)
+    playlist = load(pl_path, [])
+    sfx = "_decouverte" if mode == "decouverte" else ""
     max_tracks = int(_cfg().get("scoring", {}).get("recos", {}).get("max_tracks", RECOS_MAX_TRACKS))
     return render(request, "pages/reco_radar.html", active="reco_radar",
                   playlist=playlist, n_playlist=len(playlist), max_tracks=max_tracks,
-                  recos_pending=len(load(_pu().recos_candidates, [])),
-                  last_scan=_last_import("scan_recos"), last_publish=_last_import("publish_recos"),
-                  in_cart=_cart_ids(), voted=_voted_map())
+                  recos_pending=len(load(cand_path, [])),
+                  last_scan=_last_import("scan_recos" + sfx), last_publish=_last_import("publish_recos" + sfx),
+                  in_cart=_cart_ids(), voted=_voted_map(), mode=mode, job_sfx=sfx)
 
 
 @app.post("/reco-radar/delete", response_class=HTMLResponse)
-def reco_radar_delete_track(request: Request, video_id: str = Form("")):
+def reco_radar_delete_track(request: Request, video_id: str = Form(""), mode: str = Form("approfondir")):
     """Retire UNE piste de la playlist RECOS RADAR à la main (retour utilisateur
     2026-09-10). N'efface pas recos_history.json : la vidéo reste marquée « déjà
     proposée » et ne sera pas réajoutée automatiquement par un futur scan.
@@ -464,14 +491,16 @@ def reco_radar_delete_track(request: Request, video_id: str = Form("")):
     issue #62) : les lignes portent l'identifiant de la vidéo (`data-vid`) et non
     leur position, et le JS relit l'ordre du DOM après ce swap — une piste retirée
     n'existe alors plus dans sa file et ne peut pas continuer à jouer."""
-    playlist = load(_pu().recos_playlist, [])
+    mode = _reco_mode(mode)
+    pl_path = _reco_files(mode)[0]
+    playlist = load(pl_path, [])
     if video_id:
         new_playlist = [t for t in playlist if t.get("video_id") != video_id]
         if len(new_playlist) != len(playlist):
-            save(_pu().recos_playlist, new_playlist)
+            save(pl_path, new_playlist)
             playlist = new_playlist
     return frag(request, "partials/reco_rows.html", playlist=playlist,
-                in_cart=_cart_ids(), voted=_voted_map())
+                in_cart=_cart_ids(), voted=_voted_map(), mode=mode)
 
 
 @app.post("/reco-radar/mark-played")
@@ -479,28 +508,32 @@ def reco_radar_mark_played(video_id: str = Form("")):
     """Marque une piste comme écoutée aujourd'hui (clic sur la ligne, cf. JS
     reco_radar.html) — purgée à minuit heure de Paris par le worker
     (_maybe_recos_midnight_purge), qui remplace l'éviction FIFO comme mécanisme
-    de renouvellement de la playlist (retour utilisateur 2026-09-14)."""
+    de renouvellement de la playlist (retour utilisateur 2026-09-14).
+    Cherche dans les deux playlists, le JS n'a pas à connaître le mode."""
     if video_id:
-        playlist = load(_pu().recos_playlist, [])
-        changed = False
-        for t in playlist:
-            if t.get("video_id") == video_id and not t.get("played"):
-                t["played"] = True
-                changed = True
-        if changed:
-            save(_pu().recos_playlist, playlist)
+        for m in RECO_MODES:
+            pl_path = _reco_files(m)[0]
+            playlist = load(pl_path, [])
+            changed = False
+            for t in playlist:
+                if t.get("video_id") == video_id and not t.get("played"):
+                    t["played"] = True
+                    changed = True
+            if changed:
+                save(pl_path, playlist)
     return Response(status_code=204)
 
 
 @app.post("/reco-radar/clear-candidates")
-def reco_radar_clear_candidates():
+def reco_radar_clear_candidates(mode: str = Form("approfondir")):
     """Vide UNIQUEMENT la file d'attente des candidats prêts à être recherchés sur
     YouTube (recos_candidates.json) — ni la playlist publiée, ni l'historique, sans
     relancer de scan. Distinct de « Forcer (tout rescanner) » qui vide aussi cette
     file mais relance ensuite job_scan_recos pour la reconstruire depuis
     radar/scorestore.py (Lot 5, cf. CLAUDE.md point 43)."""
-    save(_pu().recos_candidates, [])
-    return RedirectResponse("/reco-radar", status_code=303)
+    mode = _reco_mode(mode)
+    save(_reco_files(mode)[1], [])
+    return RedirectResponse(f"/reco-radar?mode={mode}", status_code=303)
 
 
 # --------------------------------------------------------------- Google / YouTube
@@ -509,6 +542,38 @@ def reco_radar_clear_candidates():
 # (/patte). Jetons stockés par utilisateur (googleauth), jamais dans la config JSON.
 
 _YT_ID = re.compile(r"^[\w-]{1,64}$")
+
+
+@app.get("/oauth/discogs/start")
+def discogs_start():
+    if not discogsauth.configured():
+        return RedirectResponse("/patte?discogs=unconfigured", status_code=303)
+    try:
+        url = discogsauth.start(store.current_uid())
+    except discogsauth.DiscogsError:
+        return RedirectResponse("/patte?discogs=error", status_code=303)
+    return RedirectResponse(url, status_code=303)
+
+
+@app.get("/oauth/discogs/callback")
+def discogs_callback(oauth_token: str = "", oauth_verifier: str = "", denied: str = ""):
+    """Retour de Discogs. OAuth 1.0a n'a pas de `state` : le jeton de requête, gardé côté
+    serveur pour CET utilisateur de la session, joue ce rôle — un retour forgé ou celui
+    d'un autre compte ne correspond à aucun pending et est refusé."""
+    uid = store.current_uid()
+    if denied or not oauth_token or not oauth_verifier:
+        return RedirectResponse("/patte?discogs=refused", status_code=303)
+    try:
+        ok = discogsauth.complete(uid, oauth_token, oauth_verifier)
+    except discogsauth.DiscogsError:
+        return RedirectResponse("/patte?discogs=error", status_code=303)
+    return RedirectResponse("/patte?discogs=" + ("ok" if ok else "refused"), status_code=303)
+
+
+@app.post("/oauth/discogs/disconnect")
+def discogs_disconnect():
+    discogsauth.disconnect(store.current_uid())
+    return RedirectResponse("/patte?discogs=off", status_code=303)
 
 
 @app.get("/oauth/google/start")
@@ -886,7 +951,8 @@ def search_replay(request: Request, sid: str):
         return frag(request, "partials/results.html", results=[])
     return frag(request, "partials/results.html", results=entry.get("results", []),
                 searched=entry.get("searched", []), voted=_voted_map(), in_cart=_cart_ids(),
-                dump_date=entry.get("dump_date"), has_token=bool(Ctx().cfg.get("token", "")),
+                dump_date=entry.get("dump_date"), has_token=(bool(Ctx().cfg.get("token", ""))
+                           or discogsauth.is_connected(store.current_uid())),
                 n_matches=entry.get("n_matches"), page=1, total_pages=1)
 
 

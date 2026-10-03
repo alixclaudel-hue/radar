@@ -63,6 +63,12 @@ def noter(rapport: dict) -> dict:
 def cle_modele(fournisseur: str | None, modele: str | None) -> str | None:
     if not modele:
         return None
+    # Idempotent : `modele` porte parfois déjà le préfixe fournisseur (reçu relu
+    # tel quel). Sans ce garde-fou, `worker-scores.jsonl` accumule des clés
+    # doublées (« gemini:gemini:x ») qu'aucun candidat du routeur ne reconnaît
+    # plus jamais — constaté le 01/10, cascade vide à chaque rotation.
+    if fournisseur and modele.startswith(f"{fournisseur}:"):
+        return modele
     return f"{fournisseur}:{modele}" if fournisseur else modele
 
 

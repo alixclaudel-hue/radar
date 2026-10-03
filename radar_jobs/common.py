@@ -79,6 +79,9 @@ SELLERS_NEW_PATH = os.path.join(USER_DIR, "seller_new.json")
 RECOS_CANDIDATES_PATH = os.path.join(USER_DIR, "recos_candidates.json")
 RECOS_HISTORY_PATH = os.path.join(USER_DIR, "recos_playlist_history.json")
 RECOS_PLAYLIST_PATH = os.path.join(USER_DIR, "recos_playlist.json")
+# mode Découverte de Reco Radar : file et playlist distinctes (historique et budget communs)
+RECOS_CANDIDATES_DECOUVERTE_PATH = os.path.join(USER_DIR, "recos_candidates_decouverte.json")
+RECOS_PLAYLIST_DECOUVERTE_PATH = os.path.join(USER_DIR, "recos_playlist_decouverte.json")
 RECOS_SEARCH_BUDGET_PATH = os.path.join(USER_DIR, "recos_search_budget.json")
 
 
@@ -107,7 +110,25 @@ def load_json(path, default):
 def save_json(path, data):
     """Écriture atomique partagée avec l'appli web (nom temporaire unique :
     worker et web écrivent les mêmes fichiers, cf. store.save)."""
+    if path == CONFIG_PATH and str((data or {}).get("token", "")).startswith("oauth:"):
+        # Le jeton OAuth n'est injecté qu'en mémoire par cfg_load() : plusieurs jobs
+        # font cfg_load() puis save_json(CONFIG_PATH, cfg), il ne doit jamais
+        # atterrir dans la config. On remet le token personnel du fichier s'il y en a un.
+        data = dict(data)
+        prev = str(load_json(path, {}).get("token", ""))
+        if prev and not prev.startswith("oauth:"):
+            data["token"] = prev
+        else:
+            data.pop("token")
     store.save(path, data)
+
+
+def _discogs_oauth_credential():
+    """Jeton OAuth du compte courant (users/<uid>/discogs_oauth.json), ou None."""
+    d = load_json(os.path.join(USER_DIR, "discogs_oauth.json"), {})
+    if d.get("access_token") and d.get("access_secret"):
+        return f"oauth:{d['access_token']}:{d['access_secret']}"
+    return None
 
 
 def cfg_load():
@@ -116,6 +137,10 @@ def cfg_load():
     Les secrets du .env n'amorcent QUE le compte propriétaire : un job lancé pour
     un invité ne doit jamais tourner avec le token Discogs du propriétaire."""
     d = load_json(CONFIG_PATH, {})
+    # Compte relié à Discogs : OAuth prime sur un éventuel token personnel collé.
+    cred = _discogs_oauth_credential()
+    if cred:
+        d["token"] = cred
     if RADAR_UID != "owner":
         return d
     for key, env in (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY"),

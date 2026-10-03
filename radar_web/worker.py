@@ -13,7 +13,7 @@ import os
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from .radar import (catalog_labelgraph, discogs_dump, features, jobs, paths, recoindex,
@@ -65,6 +65,13 @@ MIDNIGHT_PURGE_CHECK_EVERY = 600
 _last_midnight_purge_check = 0.0
 _last_midnight_purge_date = None
 PARIS_TZ = ZoneInfo("Europe/Paris")
+# Référence persistée sur disque (pas seulement en mémoire) : un redémarrage
+# du conteneur worker (chaque déploiement) remettait sinon _last_midnight_purge_date
+# à None, et le premier check après restart posait silencieusement la référence
+# au jour courant sans jamais purger — une purge due pendant la coupure était
+# perdue pour toujours. Même convention de sous-dossier ops/ que
+# paths.DATA/ops/actions.jsonl (opslog.py).
+_MIDNIGHT_PURGE_STATE_PATH = os.path.join(paths.DATA, "ops", "recos_purge_state.json")
 
 
 def _maybe_weekly_scan():
@@ -321,7 +328,10 @@ def _maybe_recos_scan():
     0/240). Sûr désormais côté quota YouTube : RECOS_DAILY_SEARCH_BUDGET est un
     vrai compteur journalier persistant appliqué DANS job_publish_recos (cf.
     radar_jobs.recos._recos_searches_used_today), pas seulement une limite de
-    longueur de file — 24 ticks/jour ne peuvent plus dépasser le budget."""
+    longueur de file — 24 ticks/jour ne peuvent plus dépasser le budget.
+
+    Mode Découverte (01/10) : même logique, jobs scan_recos_decouverte /
+    publish_recos_decouverte, file recos_candidates_decouverte."""
     global _last_recos_check
     if os.environ.get("RADAR_RECOS_SCAN") != "1":
         return
@@ -334,13 +344,20 @@ def _maybe_recos_scan():
         # tout le temps de son exécution (worker.main() ne la retire qu'après
         # _run()) : ce test couvre donc aussi un job déjà en cours.
         queued = {(j["uid"], j["name"]) for j in jobs.load_queue()}
+        # Approfondir puis Découverte : noms de jobs distincts, donc dédoublonnage
+        # indépendant par (uid, nom) — un scan Découverte en file ne bloque pas Approfondir.
+        modes = (
+            ("scan_recos", "publish_recos", "recos_candidates"),
+            ("scan_recos_decouverte", "publish_recos_decouverte", "recos_candidates_decouverte"),
+        )
         for uid in _recos_uids():
-            if (uid, "scan_recos") in queued or (uid, "publish_recos") in queued:
-                continue
-            pending = store.load(paths.user_paths(uid).recos_candidates, [])
-            name = "publish_recos" if pending else "scan_recos"
-            jobs.launch(name, {}, uid=uid, priority=0)
-            print(f"[worker] {name} enfilé ({uid})", file=sys.stderr, flush=True)
+            for scan_name, pub_name, attr in modes:
+                if (uid, scan_name) in queued or (uid, pub_name) in queued:
+                    continue
+                pending = store.load(getattr(paths.user_paths(uid), attr), [])
+                name = pub_name if pending else scan_name
+                jobs.launch(name, {}, uid=uid, priority=0)
+                print(f"[worker] {name} enfilé ({uid})", file=sys.stderr, flush=True)
     except Exception as e:                       # noqa: BLE001
         print(f"[worker] recos check : {e}", file=sys.stderr, flush=True)
 
@@ -360,26 +377,46 @@ def _maybe_recos_midnight_purge():
     cliquées ('played') dans la journée (retour utilisateur 2026-09-14, remplace
     l'éviction FIFO par ancienneté). Ne touche pas recos_history.json : une piste
     purgée n'est jamais réajoutée automatiquement (dédup permanente inchangée,
-    cf. CLAUDE.md pt 19)."""
+    cf. CLAUDE.md pt 19).
+
+    Purge aussi la playlist Découverte (01/10). Référence de date persistée
+    sur disque (_MIDNIGHT_PURGE_STATE_PATH) : survit à un redémarrage du
+    conteneur worker (chaque déploiement) sans perdre une purge due pendant
+    la coupure (sinon le premier check après restart posait silencieusement
+    la référence au jour courant sans jamais purger)."""
     global _last_midnight_purge_check, _last_midnight_purge_date
     if time.time() - _last_midnight_purge_check < MIDNIGHT_PURGE_CHECK_EVERY:
         return
     _last_midnight_purge_check = time.time()
     today = datetime.now(PARIS_TZ).date()
     if _last_midnight_purge_date is None:
-        _last_midnight_purge_date = today   # référence initiale, pas de purge au démarrage
-        return
-    if today == _last_midnight_purge_date:
+        state = store.load(_MIDNIGHT_PURGE_STATE_PATH, {})
+        persisted = state.get("date")
+        if not persisted:
+            # Tout premier démarrage historique, jamais purgé : référence
+            # initiale, pas de purge au démarrage.
+            _last_midnight_purge_date = today
+            store.save(_MIDNIGHT_PURGE_STATE_PATH, {"date": _last_midnight_purge_date.isoformat()})
+            return
+        _last_midnight_purge_date = date.fromisoformat(persisted)
+        if _last_midnight_purge_date >= today:
+            return
+        # Date persistée antérieure à aujourd'hui : une purge est due
+        # (restart survenu après minuit Paris sans qu'elle ait eu lieu) —
+        # on l'exécute immédiatement, pas de `return` ici.
+    elif today == _last_midnight_purge_date:
         return
     _last_midnight_purge_date = today
+    store.save(_MIDNIGHT_PURGE_STATE_PATH, {"date": _last_midnight_purge_date.isoformat()})
     for uid in _recos_uids():
-        path = paths.user_paths(uid).recos_playlist
-        playlist = store.load(path, [])
-        kept = [t for t in playlist if not t.get("played")]
-        if len(kept) != len(playlist):
-            store.save(path, kept)
-            print(f"[worker] purge minuit RECOS ({uid}) : {len(playlist) - len(kept)} piste(s) "
-                  "écoutée(s) retirée(s)", file=sys.stderr, flush=True)
+        for attr in ("recos_playlist", "recos_playlist_decouverte"):
+            path = getattr(paths.user_paths(uid), attr)
+            playlist = store.load(path, [])
+            kept = [t for t in playlist if not t.get("played")]
+            if len(kept) != len(playlist):
+                store.save(path, kept)
+                print(f"[worker] purge minuit RECOS ({uid}) [{attr}] : {len(playlist) - len(kept)} piste(s) "
+                      "écoutée(s) retirée(s)", file=sys.stderr, flush=True)
 
 
 def _pick(q, last_uid):

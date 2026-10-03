@@ -235,6 +235,36 @@ def access_token(uid: str) -> str:
     return tokens["access_token"]
 
 
+def search_public_playlist(uid: str, query: str) -> Optional[Dict[str, str]]:
+    """Cherche une playlist Spotify PUBLIQUE par son nom exact (endpoint /search, type=playlist) avec le token OAuth de uid. Renvoie {'id':..., 'title':..., 'url': 'https://open.spotify.com/playlist/'+id} pour le MEILLEUR résultat, ou None si aucun résultat (y compris si l'item est null, ce qui arrive chez Spotify). Lève SpotifyError sur erreur HTTP."""
+    token = access_token(uid)
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "q": query,
+        "type": "playlist",
+        "limit": 1,
+    }
+    resp = _http("GET", f"{API_BASE}/search", headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+    if resp.status_code != 200:
+        raise SpotifyError(f"Erreur Spotify search: {resp.text}")
+    try:
+        data = resp.json()
+    except ValueError as e:
+        raise SpotifyError("Réponse Spotify inattendue") from e
+    items = data.get("playlists", {}).get("items", [])
+    items = [i for i in items if i is not None]
+    if not items:
+        return None
+    item = items[0]
+    playlist_id = item["id"]
+    title = item["name"]
+    return {
+        "id": playlist_id,
+        "title": title,
+        "url": f"https://open.spotify.com/playlist/{playlist_id}",
+    }
+
+
 def _is_modifiable(item: Dict[str, Any], user_id: str) -> bool:
     """Une playlist n'est proposée que si l'utilisateur peut y écrire."""
     owner = item.get("owner") or {}

@@ -262,6 +262,33 @@ def access_token(uid: str) -> str:
     return tokens["access_token"]
 
 
+def search_public_playlist(uid: str, query: str) -> Optional[Dict[str, str]]:
+    """Cherche une playlist YouTube PUBLIQUE par son nom exact (API search.list, type=playlist) avec le token OAuth de uid. Renvoie {'id':..., 'title':..., 'url': 'https://www.youtube.com/playlist?list='+id} pour le MEILLEUR résultat, ou None si aucun résultat. Lève GoogleError sur erreur HTTP (réutilise _raise_google_error)."""
+    token = access_token(uid)
+    headers = {"Authorization": f"Bearer {token}"}
+    params = {
+        "part": "snippet",
+        "type": "playlist",
+        "q": query,
+        "maxResults": 1,
+    }
+    resp = _http("GET", "https://www.googleapis.com/youtube/v3/search", headers=headers, params=params, timeout=REQUEST_TIMEOUT)
+    if resp.status_code != 200:
+        _raise_google_error(resp)
+    data = resp.json()
+    items = data.get("items", [])
+    if not items:
+        return None
+    item = items[0]
+    playlist_id = item["id"]["playlistId"]
+    title = item["snippet"]["title"]
+    return {
+        "id": playlist_id,
+        "title": title,
+        "url": f"https://www.youtube.com/playlist?list={playlist_id}",
+    }
+
+
 def list_playlists(uid: str) -> List[Dict[str, str]]:
     """Liste les playlists YouTube de l'utilisateur (max 200)."""
     token = access_token(uid)

@@ -144,8 +144,11 @@ def cfg_load():
     if RADAR_UID != "owner":
         return d
     for key, env in (("token", "DISCOGS_TOKEN"), ("youtube_api_key", "YOUTUBE_API_KEY"),
-                     ("spotify_client_id", "SPOTIFY_CLIENT_ID"),
-                     ("spotify_client_secret", "SPOTIFY_CLIENT_SECRET"),
+                     # Même app Spotify que l'OAuth (/patte, spotifyauth.py) — un seul
+                     # couple d'identifiants à gérer côté .env (retour utilisateur 03/10 :
+                     # le champ Client ID/Secret de /patte est retiré de l'UI).
+                     ("spotify_client_id", "RADAR_SPOTIFY_CLIENT_ID"),
+                     ("spotify_client_secret", "RADAR_SPOTIFY_CLIENT_SECRET"),
                      ("bandcamp_sub_user", "BANDCAMP_SUB_USER"),
                      ("bandcamp_sub_pass", "BANDCAMP_SUB_PASS")):
         if not d.get(key) and os.environ.get(env):

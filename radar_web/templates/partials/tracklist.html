@@ -10,9 +10,11 @@
       <span class="tk-title">{{ t.title }}</span>
       <a class="tk-play" href="{{ t.play }}" target="_blank" rel="noopener"
          title="{{ 'Vidéo Discogs' if t.kind == 'discogs' else 'Meilleure vidéo YouTube' }}">{{ icons.play() }}</a>
-      <details class="tk-shops">
-        <summary class="tk-play" title="Chercher sur Bandcamp / Beatport / Traxsource">{{ icons.bandcamp() }}</summary>
-        <div class="tk-shops__menu">
+      {# Menu « Achat » : même <details class="buy-menu"> que Reco Radar (pt 63),
+         positionnement posé par le JS partagé de base.html. #}
+      <details class="buy-menu">
+        <summary class="buy-btn">{{ icons.cart() }} Achat {{ icons.chevron() }}</summary>
+        <div class="buy-menu__list">
           <a href="{{ t.bc }}" target="_blank" rel="noopener">{{ icons.bandcamp() }} Bandcamp</a>
           <a href="{{ t.bp }}" target="_blank" rel="noopener">{{ icons.beatport() }} Beatport</a>
           <a href="{{ t.ts }}" target="_blank" rel="noopener">{{ icons.traxsource() }} Traxsource</a>

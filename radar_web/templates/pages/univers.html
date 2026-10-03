@@ -4,6 +4,15 @@
 {% block content %}
 <h1>Mes labels &amp; artistes</h1>
 
+{% if n_review %}
+<details class="acc" open>
+  <summary>{{ icons.warning() }} À vérifier ({{ n_review }})</summary>
+  <div class="acc__body">
+    {% include "partials/review.html" %}
+  </div>
+</details>
+{% endif %}
+
 <div class="seg seg--full" role="tablist" aria-label="Sections">
   <a href="/univers?tab=labels"  class="{{ 'active' if tab=='labels' }}"{{ ' aria-current="page"'|safe if tab=='labels' }}>{{ icons.label() }}Labels ({{ n_labels }})</a>
   <a href="/univers?tab=artists" class="{{ 'active' if tab=='artists' }}"{{ ' aria-current="page"'|safe if tab=='artists' }}>{{ icons.artist() }}Artistes ({{ n_artists }})</a>
@@ -171,14 +180,5 @@
   <p class="small muted">Scan des DJ sets dans « <a href="/patte">Mon profil</a> → DJ sets à scanner ». {{ n_sets }} tracks extraites.</p>
   <div id="sets" class="mt-2" hx-get="/univers/sets" hx-trigger="load"></div>
 
-{% endif %}
-
-{% if n_review %}
-<details class="acc mt-3">
-  <summary>{{ icons.warning() }} À vérifier ({{ n_review }})</summary>
-  <div class="acc__body">
-    {% include "partials/review.html" %}
-  </div>
-</details>
 {% endif %}
 {% endblock %}

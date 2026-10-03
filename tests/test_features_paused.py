@@ -93,7 +93,7 @@ class FeaturesPausedTestCase(unittest.TestCase):
         # les autres entrées de nav et sections de Réglages sont toujours là.
         for href in ('href="/search"', 'href="/univers"', 'href="/reco-radar"'):
             self.assertIn(href, r.text)
-        self.assertIn("Référentiel Discogs local", r.text)
+        self.assertIn("Score label (reco)", r.text)
 
     def test_la_boucle_hebdo_du_worker_ignore_RADAR_SELLER_SCAN(self):
         # Le worker n'enfile PAS via VALID_JOBS : sans cette garde, la boucle

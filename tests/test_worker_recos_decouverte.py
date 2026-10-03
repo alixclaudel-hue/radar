@@ -117,19 +117,13 @@ class TestWorkerRecosDecouverte(unittest.TestCase):
     @mock.patch.object(workermod.store, 'load', side_effect=lambda path, default: [{'played': True}, {'title': 't'}] if path == 'pd-owner' else [])
     @mock.patch.object(workermod.paths, 'user_paths', side_effect=lambda uid: types.SimpleNamespace(recos_playlist='p-' + uid, recos_playlist_decouverte='pd-' + uid))
     def test_midnight_purge(self, mock_user_paths, mock_store_load, mock_store_save, mock_all_uids):
-        """6. Test _maybe_recos_midnight_purge sauvegarde correctement les pistes non jouées
-        (et persiste aussi la nouvelle référence de date sur disque, cf. _MIDNIGHT_PURGE_STATE_PATH)."""
+        """6. Test _maybe_recos_midnight_purge sauvegarde correctement les pistes non jouées."""
         workermod._last_midnight_purge_check = 0.0
         workermod._last_midnight_purge_date = datetime.date(2000, 1, 1)
 
         workermod._maybe_recos_midnight_purge()
 
-        mock_store_save.assert_any_call('pd-owner', [{'title': 't'}])
-        today = workermod.datetime.now(workermod.PARIS_TZ).date()
-        mock_store_save.assert_any_call(
-            workermod._MIDNIGHT_PURGE_STATE_PATH, {'date': today.isoformat()}
-        )
-        self.assertEqual(mock_store_save.call_count, 2)
+        mock_store_save.assert_called_once_with('pd-owner', [{'title': 't'}])
 
 
 if __name__ == '__main__':

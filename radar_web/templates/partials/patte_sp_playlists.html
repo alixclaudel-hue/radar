@@ -1,0 +1,49 @@
+{#- Rubrique « Playlists » de /patte, bloc Spotify (htmx, auto-rechargé après
+   chaque action). Toujours remonter le même conteneur #sp-playlists. -#}
+{% import "partials/_icons.html" as icons %}
+<div id="sp-playlists">
+  {% if error %}<p class="small warn">{{ error }}</p>{% endif %}
+  {% if not configured %}
+  <p class="small muted">La connexion Spotify n'est pas encore configurée sur ce serveur.</p>
+  {% elif not connected %}
+  <p class="small muted">Relie ton compte Spotify (ci-dessus) pour piocher dans tes propres playlists.</p>
+  {% elif not mine %}
+  <p class="small muted">Aucune playlist sur ce compte Spotify.</p>
+  {% else %}
+  <p class="small">Tes playlists</p>
+  <ul class="pl-list">
+    {% for p in mine %}
+    <li>
+      {% if p.id in current_ids %}
+      <span class="small ok">{{ icons.check() }} {{ p.title }}</span>
+      {% else %}
+      <button type="button" class="small" hx-post="/patte/playlists/sp/add" hx-target="#sp-playlists" hx-swap="outerHTML"
+              hx-vals='{"playlist_id": {{ p.id|tojson }}, "title": {{ p.title|tojson }}}'>{{ icons.plus() }} {{ p.title }}</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <p class="small">Playlists à scanner</p>
+  {% if not current %}
+  <p class="small muted">Aucune pour l'instant.</p>
+  {% else %}
+  <ul class="pl-list">
+    {% for u in current %}
+    <li>
+      {{ sp_meta.get(u | sp_id, {}).get('title') or u }}
+      <button type="button" class="small ghost" hx-post="/patte/playlists/sp/remove" hx-target="#sp-playlists" hx-swap="outerHTML"
+              hx-vals='{"playlist_id": {{ (u | sp_id)|tojson }}}'>{{ icons.trash() }} Retirer</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <form class="formbar" hx-post="/patte/playlists/sp/add-public" hx-target="#sp-playlists" hx-swap="outerHTML"
+        hx-on::after-request="this.reset()">
+    <div class="field"><label>Ajouter une playlist publique <span class="muted">· URL ou nom exact</span>
+      <input name="value" placeholder="https://open.spotify.com/playlist/… ou « nom exact »" required></label></div>
+    <button type="submit" class="small tonal">{{ icons.plus() }} Ajouter</button>
+  </form>
+</div>

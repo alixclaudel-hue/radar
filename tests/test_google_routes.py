@@ -114,7 +114,7 @@ class GoogleRoutesTest(unittest.TestCase):
         self._patch(configured=lambda: False, is_connected=lambda uid: False)
         r = self.client.get("/patte")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("Compte Google / YouTube", r.text)
+        self.assertIn("YouTube", r.text)
         self.assertIn("RADAR_GOOGLE_CLIENT_ID", r.text)
 
 

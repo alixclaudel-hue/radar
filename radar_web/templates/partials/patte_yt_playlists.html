@@ -1,0 +1,49 @@
+{#- Rubrique « Playlists » de /patte, bloc YouTube (htmx, auto-rechargé après
+   chaque action). Toujours remonter le même conteneur #yt-playlists. -#}
+{% import "partials/_icons.html" as icons %}
+<div id="yt-playlists">
+  {% if error %}<p class="small warn">{{ error }}</p>{% endif %}
+  {% if not configured %}
+  <p class="small muted">La connexion Google n'est pas encore configurée sur ce serveur.</p>
+  {% elif not connected %}
+  <p class="small muted">Relie ton compte YouTube (ci-dessus) pour piocher dans tes propres playlists.</p>
+  {% elif not mine %}
+  <p class="small muted">Aucune playlist sur ce compte YouTube.</p>
+  {% else %}
+  <p class="small">Tes playlists</p>
+  <ul class="pl-list">
+    {% for p in mine %}
+    <li>
+      {% if p.id in current_ids %}
+      <span class="small ok">{{ icons.check() }} {{ p.title }}</span>
+      {% else %}
+      <button type="button" class="small" hx-post="/patte/playlists/yt/add" hx-target="#yt-playlists" hx-swap="outerHTML"
+              hx-vals='{"playlist_id": {{ p.id|tojson }}, "title": {{ p.title|tojson }}}'>{{ icons.plus() }} {{ p.title }}</button>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <p class="small">Playlists à scanner</p>
+  {% if not current %}
+  <p class="small muted">Aucune pour l'instant.</p>
+  {% else %}
+  <ul class="pl-list">
+    {% for u in current %}
+    <li>
+      {{ pl_meta.get(u | pl_id, {}).get('title') or u }}
+      <button type="button" class="small ghost" hx-post="/patte/playlists/yt/remove" hx-target="#yt-playlists" hx-swap="outerHTML"
+              hx-vals='{"playlist_id": {{ (u | pl_id)|tojson }}}'>{{ icons.trash() }} Retirer</button>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <form class="formbar" hx-post="/patte/playlists/yt/add-public" hx-target="#yt-playlists" hx-swap="outerHTML"
+        hx-on::after-request="this.reset()">
+    <div class="field"><label>Ajouter une playlist publique <span class="muted">· URL ou nom exact</span>
+      <input name="value" placeholder="https://youtube.com/playlist?list=… ou « nom exact »" required></label></div>
+    <button type="submit" class="small tonal">{{ icons.plus() }} Ajouter</button>
+  </form>
+</div>

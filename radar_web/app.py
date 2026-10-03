@@ -76,6 +76,44 @@ def _sp_id(url):
 templates.env.filters["pl_id"] = _pl_id
 templates.env.filters["sp_id"] = _sp_id
 
+_YT_PL_ID_RE = re.compile(r"^(PL|UU|LL|FL|OL)[A-Za-z0-9_-]{10,}$")
+_SP_PL_ID_RE = re.compile(r"^[A-Za-z0-9]{22}$")
+
+
+def _yt_resolve(value):
+    """URL (?list=…), ID brut (PL…/UU…/…), ou nom — recherche publique en dernier
+    recours (retour utilisateur 03/10 : champ unique URL OU nom exact)."""
+    v = (value or "").strip()
+    if not v:
+        return None, "Playlist vide."
+    m = re.search(r"[?&]list=([A-Za-z0-9_-]+)", v)
+    if m:
+        return m.group(1), None
+    if _YT_PL_ID_RE.match(v):
+        return v, None
+    try:
+        r = googleauth.search_public_playlist(store.current_uid(), v)
+    except googleauth.GoogleError as e:
+        return None, e.message
+    return (r["id"], None) if r else (None, f"Aucune playlist publique trouvée pour « {v} ».")
+
+
+def _sp_resolve(value):
+    """Même principe que _yt_resolve, pour Spotify (ID = 22 caractères alphanumériques)."""
+    v = (value or "").strip()
+    if not v:
+        return None, "Playlist vide."
+    if _SP_PL_ID_RE.match(v):
+        return v, None
+    m = re.search(r"playlist[/:]([A-Za-z0-9]{22})", v)
+    if m:
+        return m.group(1), None
+    try:
+        r = spotifyauth.search_public_playlist(store.current_uid(), v)
+    except spotifyauth.SpotifyError as e:
+        return None, e.message
+    return (r["id"], None) if r else (None, f"Aucune playlist publique trouvée pour « {v} ».")
+
 # migration douce : <DATA>/*.json -> users/owner/ + shared/  (idempotent, no-op si déjà fait)
 print(f"[radar] DATA={paths.DATA}", file=sys.stderr)
 
@@ -326,31 +364,6 @@ def _queue_enrich(kind, names):
     q.setdefault(kind, []).extend(names)
     save(_pu().pending_enrich, q)
     jobs.launch("enrich")
-
-
-def _csv_first_column(raw):
-    """Première colonne d'un CSV, en-tête sautée, valeurs vides écartées."""
-    return [line.split(",")[0].strip().strip('"')
-            for i, line in enumerate(io.StringIO(raw)) if i and line.split(",")[0].strip()]
-
-
-def _add_labels(c, names, tier="2", replace=False):
-    """Ajoute des labels à la catégorie Cœur(1)/Aimé(2) `tier` (dédoublonnés par nom
-    canonique, tous tiers confondus — même modèle que artist_categories). `replace`
-    ne vide que le tier ciblé. Modifie `c` sans l'enregistrer — l'appelant décide
-    quand sauver."""
-    lc = c.setdefault("label_categories", {"1": [], "2": []})
-    tier = tier if tier in ("1", "2") else "2"
-    if replace:
-        lc[tier] = []
-    have = {normalize_label(x) for cid in ("1", "2") for x in lc.get(cid, [])}
-    added = 0
-    for n in names:
-        if normalize_label(n) not in have:
-            have.add(normalize_label(n))
-            lc.setdefault(tier, []).append(n)
-            added += 1
-    return added
 
 
 def _taste_styles(c):
@@ -671,6 +684,135 @@ def spotify_disconnect():
     return RedirectResponse("/patte?spotify=off", status_code=303)
 
 
+# --------------------------------------------------------------- Playlists /patte
+# Rubrique « Playlists » de l'étape 2 (/patte) : parcourir ses propres playlists
+# YouTube/Spotify (OAuth de l'étape 1) ou ajouter une playlist publique par URL ou
+# nom, pour remplir cfg['youtube_playlists']/cfg['spotify_playlists'] — la liste
+# que lit job_ingest_youtube/job_ingest_spotify. Retour utilisateur 03/10.
+def _yt_playlists_frag(request, error=""):
+    uid = store.current_uid()
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
+    connected = googleauth.is_connected(uid)
+    mine = []
+    if connected:
+        try:
+            mine = googleauth.list_playlists(uid)
+        except googleauth.GoogleError as e:
+            error = error or e.message
+            connected = googleauth.is_connected(uid)   # invalid_grant -> déconnecté
+    current_ids = {_pl_id(u) for u in lines}
+    return frag(request, "partials/patte_yt_playlists.html",
+                configured=googleauth.configured(), connected=connected,
+                mine=mine, current=lines, current_ids=current_ids,
+                pl_meta=load(_pu().youtube_meta, {}), error=error)
+
+
+@app.get("/patte/playlists/yt", response_class=HTMLResponse)
+def patte_playlists_yt(request: Request):
+    return _yt_playlists_frag(request)
+
+
+@app.post("/patte/playlists/yt/add", response_class=HTMLResponse)
+def patte_playlists_yt_add(request: Request, playlist_id: str = Form(""), title: str = Form("")):
+    playlist_id = playlist_id.strip()
+    if not _YT_ID.match(playlist_id):
+        return _yt_playlists_frag(request, error="Playlist invalide.")
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
+    if playlist_id not in {_pl_id(u) for u in lines}:
+        lines.append(f"https://www.youtube.com/playlist?list={playlist_id}")
+        cfg["youtube_playlists"] = "\n".join(lines)
+        store.save_config(cfg)
+    return _yt_playlists_frag(request)
+
+
+@app.post("/patte/playlists/yt/remove", response_class=HTMLResponse)
+def patte_playlists_yt_remove(request: Request, playlist_id: str = Form("")):
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
+    lines = [u for u in lines if _pl_id(u) != playlist_id]
+    cfg["youtube_playlists"] = "\n".join(lines)
+    store.save_config(cfg)
+    return _yt_playlists_frag(request)
+
+
+@app.post("/patte/playlists/yt/add-public", response_class=HTMLResponse)
+def patte_playlists_yt_add_public(request: Request, value: str = Form("")):
+    playlist_id, error = _yt_resolve(value)
+    if error:
+        return _yt_playlists_frag(request, error=error)
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("youtube_playlists") or "").splitlines() if u.strip()]
+    if playlist_id not in {_pl_id(u) for u in lines}:
+        lines.append(f"https://www.youtube.com/playlist?list={playlist_id}")
+        cfg["youtube_playlists"] = "\n".join(lines)
+        store.save_config(cfg)
+    return _yt_playlists_frag(request)
+
+
+def _sp_playlists_frag(request, error=""):
+    uid = store.current_uid()
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
+    connected = spotifyauth.is_connected(uid)
+    mine = []
+    if connected:
+        try:
+            mine = spotifyauth.list_playlists(uid)
+        except spotifyauth.SpotifyError as e:
+            error = error or e.message
+            connected = spotifyauth.is_connected(uid)   # invalid_grant -> déconnecté
+    current_ids = {_sp_id(u) for u in lines}
+    return frag(request, "partials/patte_sp_playlists.html",
+                configured=spotifyauth.configured(), connected=connected,
+                mine=mine, current=lines, current_ids=current_ids,
+                sp_meta=load(_pu().spotify_meta, {}), error=error)
+
+
+@app.get("/patte/playlists/sp", response_class=HTMLResponse)
+def patte_playlists_sp(request: Request):
+    return _sp_playlists_frag(request)
+
+
+@app.post("/patte/playlists/sp/add", response_class=HTMLResponse)
+def patte_playlists_sp_add(request: Request, playlist_id: str = Form(""), title: str = Form("")):
+    playlist_id = playlist_id.strip()
+    if not _SP_PLAYLIST_ID.match(playlist_id):
+        return _sp_playlists_frag(request, error="Playlist invalide.")
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
+    if playlist_id not in {_sp_id(u) for u in lines}:
+        lines.append(f"https://open.spotify.com/playlist/{playlist_id}")
+        cfg["spotify_playlists"] = "\n".join(lines)
+        store.save_config(cfg)
+    return _sp_playlists_frag(request)
+
+
+@app.post("/patte/playlists/sp/remove", response_class=HTMLResponse)
+def patte_playlists_sp_remove(request: Request, playlist_id: str = Form("")):
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
+    lines = [u for u in lines if _sp_id(u) != playlist_id]
+    cfg["spotify_playlists"] = "\n".join(lines)
+    store.save_config(cfg)
+    return _sp_playlists_frag(request)
+
+
+@app.post("/patte/playlists/sp/add-public", response_class=HTMLResponse)
+def patte_playlists_sp_add_public(request: Request, value: str = Form("")):
+    playlist_id, error = _sp_resolve(value)
+    if error:
+        return _sp_playlists_frag(request, error=error)
+    cfg = _cfg()
+    lines = [u for u in (cfg.get("spotify_playlists") or "").splitlines() if u.strip()]
+    if playlist_id not in {_sp_id(u) for u in lines}:
+        lines.append(f"https://open.spotify.com/playlist/{playlist_id}")
+        cfg["spotify_playlists"] = "\n".join(lines)
+        store.save_config(cfg)
+    return _sp_playlists_frag(request)
+
+
 @app.get("/reco-radar/sp-playlists", response_class=HTMLResponse)
 def reco_radar_sp_playlists(
     request: Request, artist: str = "", title: str = ""
@@ -827,32 +969,6 @@ def patte_djset_scan(request: Request, name: str = Form("")):
     jobs.launch("ingest_djsets")
     return frag(request, "partials/djset_panel.html",
                 scanned=_scanned_djs(Ctx()), job=jobs.status("ingest_djsets"))
-
-
-@app.post("/patte/import-csv", response_class=HTMLResponse)
-async def patte_import_csv(request: Request, kind: str = "labels", file: UploadFile = None,
-                           replace: str = Form(""), tier: str = Form("2")):
-    raw = (await file.read()).decode("utf-8", "ignore") if file else ""
-    names = _csv_first_column(raw)
-    c = _cfg()
-    if kind == "artists":
-        ac = c.setdefault("artist_categories", {"1": [], "2": []})
-        t = tier if tier in ("1", "2") else "2"
-        have = {normalize_label(x) for cid in ("1", "2") for x in ac.get(cid, [])}
-        added = 0
-        for n in names:
-            if normalize_label(n) not in have:
-                have.add(normalize_label(n))
-                ac.setdefault(t, []).append(n)
-                added += 1
-        _queue_enrich("artists", names)
-        store.save_config(c)
-        return HTMLResponse(f"✓ {added} artiste(s) ajouté(s) en catégorie {t}.")
-    t = tier if tier in ("1", "2") else "2"
-    added = _add_labels(c, names, tier=t, replace=bool(replace))
-    store.save_config(c)
-    total = sum(len(v) for v in c.get("label_categories", {}).values())
-    return HTMLResponse(f"✓ {added} label(s) ajouté(s) en catégorie {t} (base : {total}).")
 
 
 # ============================================================ 🔍 Chercher un disque
@@ -1104,8 +1220,10 @@ def suggest_discogs(request: Request, q: str = "", type: str = "label"):
     if len(term) < 3:
         return frag(request, "partials/suggest.html", rows=[],
                     empty="Tape au moins 3 lettres pour interroger Discogs.")
-    token = _cfg().get("token", "")
-    if not token:
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
+    token = "" if oauth_connected else _cfg().get("token", "")
+    if not oauth_connected and not token:
         return frag(request, "partials/suggest.html", rows=[],
                     empty="Token Discogs manquant (Ma patte → Connexions).")
     key = (dtype, term.lower())
@@ -1257,7 +1375,9 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
     ensuite à l'identique. Sans lui, comportement inchangé."""
     from .radar import discogs_dump as dd
     c = Ctx()
-    token = c.cfg.get("token", "")
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
+    token = "" if oauth_connected else c.cfg.get("token", "")
     year = _year_param(year_from, year_to)
     genres = [g.strip() for g in genre.splitlines() if g.strip()]
     styles = [s.strip() for s in style.splitlines() if s.strip()]
@@ -1285,7 +1405,7 @@ def search_run(request: Request, label: str = Form(""), seller: str = Form(""),
         # instantanément (cf. point 68). Court-circuite les deux chemins ci-dessous,
         # y compris « chercher dans mes labels » (une même recherche ne peut pas
         # partir de deux sources à la fois) — signalé plutôt que subi.
-        if not token:
+        if not oauth_connected and not token:
             return frag(request, "partials/results.html",
                         error="Chercher chez un vendeur demande un token Discogs "
                               "(Mon profil → Discogs) : son stock n'est lisible que par l'API.")
@@ -1475,7 +1595,9 @@ def disco_page(request: Request, kind: str = "artist", key: str = "",
         return render(request, "pages/disco.html", active="", name="?", kind=kind, key=key,
                       results=None, mystyles=[], sel=[], error="Entité inconnue.")
     c = Ctx()
-    token = c.cfg.get("token", "")
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
+    token = "" if oauth_connected else c.cfg.get("token", "")
     name, qval = _disco_resolve(c, kind, key, hint=name)
     npages = _clamp_int(pages, 1, 5, 3)
 
@@ -1485,7 +1607,7 @@ def disco_page(request: Request, kind: str = "artist", key: str = "",
 
     raw = _DISCO_CACHE.get((kind, key))
     if raw is None:
-        if not token:
+        if not oauth_connected and not token:
             return err("Token Discogs manquant (Ma patte → Connexions).")
         try:
             fn = discogs.search_label_releases if kind == "label" else discogs.search_artist_releases
@@ -1538,8 +1660,10 @@ def release_matches(request: Request, a: str = "", t: str = ""):
     plusieurs sorties — VA, rééditions...) — pour l'ajout à la wantlist depuis un
     DJ set, où on n'a résolu qu'un seul release_id à l'ingestion."""
     a, t = a.strip(), t.strip()
-    token = _cfg().get("token", "")
-    if not token:
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
+    token = "" if oauth_connected else _cfg().get("token", "")
+    if not oauth_connected and not token:
         return _err("Token Discogs manquant.", "p")
     try:
         rows = _vinyl_matches(token, a, t)
@@ -1559,9 +1683,11 @@ def cart_add(request: Request, rid: str = Form(""), title: str = Form(""), artis
     rid = (rid or "").strip()
     if not rid:
         return _err("id manquant")
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
     cfg = _cfg()
-    token = cfg.get("token", "")
-    if not token:
+    token = "" if oauth_connected else cfg.get("token", "")
+    if not oauth_connected and not token:
         return _err("Token Discogs manquant.")
 
     # Découverte RECOS exhaustive tous formats (cf. CLAUDE.md, job_scorestore_releases)
@@ -1610,8 +1736,10 @@ def cart_add(request: Request, rid: str = Form(""), title: str = Form(""), artis
 def cart_remove(request: Request, rid: str = Form("")):
     rid = (rid or "").strip()
     cfg = _cfg()
-    token = cfg.get("token", "")
-    if token:
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
+    token = "" if oauth_connected else cfg.get("token", "")
+    if oauth_connected or token:
         try:
             user = _discogs_username(cfg, token)
             if user:
@@ -1629,8 +1757,10 @@ def cart_sync(request: Request):
     wantlist Discogs est la source de vérité, le cache local (`cart.json`)
     n'existe que pour l'affichage sans appel API à chaque page."""
     cfg = _cfg()
-    token = cfg.get("token", "")
-    if not token:
+    uid = store.current_uid()
+    oauth_connected = bool(uid) and discogsauth.is_connected(uid)
+    token = "" if oauth_connected else cfg.get("token", "")
+    if not oauth_connected and not token:
         return _err("Token Discogs manquant.", "p")
     try:
         user = _discogs_username(cfg, token)

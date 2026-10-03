@@ -431,7 +431,8 @@ a.chip:hover{ border-color:var(--pin); background:var(--pin-50); }
 .tk-card__actions button{ background:none; border:none; padding:1px; cursor:pointer; color:var(--ink); line-height:0; }
 .tk-card__actions a{ line-height:0; }
 
-.tracklist{ margin:8px 0 2px; font-size:13px; }
+.tracklist{ margin:8px 0 2px; padding:0 12px; font-size:13px; }
+.tracklist:empty{ margin:0; padding:0; }
 .tracklist .tk-row{ display:flex; align-items:center; gap:7px; padding:3px 0; }
 .tracklist .tk-title{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .tracklist code{ background:var(--sunken); border:0; border-radius:6px; padding:0 5px; font-size:11px; }
@@ -693,12 +694,16 @@ h3 small, h3 .small{ font-weight:400; }
    tableau à 9 colonnes qui débordait et coupait les boutons */
 @media (max-width:720px){
   .grid{ grid-template-columns:1fr; gap:10px; }
-  .card{ flex-direction:row; align-items:flex-start; }
+  .card{ flex-direction:row; flex-wrap:wrap; align-items:flex-start; }
   .card .cover{ flex:0 0 96px; width:96px; margin:10px 0 10px 10px; border-radius:var(--r-md); }
   .card .cover-meta{ padding:4px; gap:3px; }
   .card .cover-meta .cm{ font-size:10px; padding:2px 5px; }
   .card .body{ min-width:0; padding:10px 12px; }
   .card .buys{ justify-content:flex-start; gap:2px; padding-top:0; }
+  /* tracklist hors de .body (cf. results.html) : toute la largeur de la carte,
+     sous la ligne pochette+infos, au lieu d'être coincée dans la moitié .body
+     (retour utilisateur 03/10 : titres tronqués) */
+  .card .tracklist{ flex:0 0 100%; width:100%; }
 
   .tbl--cards thead{ display:none; }
   .tbl--cards, .tbl--cards tbody{ display:block; }

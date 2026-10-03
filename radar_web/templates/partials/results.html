@@ -127,7 +127,6 @@
           </form>
           {% endif %}
         </div>
-        <div class="tracklist" id="tracks-{{ rr.id }}"></div>
         <div class="foot">
           {% if r.score is not none %}
             <span class="badge" title="Score album /100">{{ icons.album() }} {{ r.score }}</span>
@@ -147,6 +146,11 @@
           {% endif %}
         </div>
       </div>
+      {# Hors de .body : sur mobile, .card passe en ligne (pochette à gauche, cf.
+         app.css) et une tracklist coincée dans .body s'y retrouvait tronquée faute
+         de place (retour utilisateur 03/10) — en enfant direct de .card, elle
+         occupe toute la largeur de la carte, sous la ligne pochette+infos. #}
+      <div class="tracklist" id="tracks-{{ rr.id }}"></div>
     </div>
   {% endfor %}
   </div>

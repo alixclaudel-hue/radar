@@ -13,6 +13,8 @@
 
 {% if onboarding %}<p class="step-label">Étape 1 sur 3 · connexions</p>{% endif %}
 
+<h3>Connexions</h3>
+
 <!-- ============ Discogs (OAuth) ============ -->
 <details class="acc" {{ 'open' if (discogs_msg or not discogs_connected) }}>
   <summary>
@@ -85,7 +87,7 @@
 
 <!-- ============ Playlists (Étape 2) ============ -->
 {% if onboarding %}<p class="step-label">Étape 2 sur 3 · importe des musiques pour scanner tes goûts</p>{% endif %}
-<h3 class="mt-3">Playlists</h3>
+<h3 class="mt-3">Importer mes goûts</h3>
 
 <details class="acc">
   <summary>

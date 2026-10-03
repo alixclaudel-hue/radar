@@ -264,18 +264,21 @@
   }
   radios.forEach(function (r) { r.addEventListener('change', function () { switchMode(r.value); }); });
 
-  // Filtres PAR MODE : genre, style, période, pages et seuils de score ne sont pas
-  // partagés entre les trois modes. Chaque mode garde les siens ; ceux de la dernière
-  // recherche appartiennent au mode dans lequel elle a été faite, les autres modes
+  // Filtres PAR MODE : genre, style et période ne sont pas partagés entre les
+  // trois modes. Chaque mode garde les siens ; ceux de la dernière recherche
+  // appartiennent au mode dans lequel elle a été faite, les autres modes
   // partent de zéro. Avant, ces champs restaient postés (même masqués) et les seuils
   // d'une recherche « Mes labels » écartaient en silence le stock d'un vendeur.
+  // NAMES doit lister UNIQUEMENT des champs qui existent dans le formulaire :
+  // 'pages'/'label_min'/'artist_min' (seuils par mode) y figuraient sans jamais
+  // avoir leurs <input> — field() renvoyait null et le changement de mode plantait
+  // en silence (filtres figés sur « Générale », retour utilisateur 03/10).
   var form = document.getElementById('search-form');
-  var NAMES = ['genre', 'style', 'year_from', 'year_to', 'pages', 'label_min', 'artist_min'];
+  var NAMES = ['genre', 'style', 'year_from', 'year_to'];
   var LABELS = { normal: 'Générale', labels: 'Mes labels', seller: 'Vendeur' };
   function field(n) { return form.querySelector('[name="' + n + '"]'); }
   function defaults() {
-    return { genre: '', style: '', year_from: field('year_from').min, year_to: field('year_to').max,
-             pages: '2', label_min: '0', artist_min: '0' };
+    return { genre: '', style: '', year_from: field('year_from').min, year_to: field('year_to').max };
   }
   function read() { var o = {}; NAMES.forEach(function (n) { o[n] = field(n).value; }); return o; }
   function write(o) {
@@ -285,7 +288,7 @@
       if (c && window.radarRenderChips) window.radarRenderChips(c);
     });
     // les curseurs redessinent leur libellé et le récap des filtres sur « input »
-    ['year_from', 'year_to', 'label_min', 'artist_min'].forEach(function (n) {
+    ['year_from', 'year_to'].forEach(function (n) {
       field(n).dispatchEvent(new Event('input', { bubbles: true }));
     });
   }

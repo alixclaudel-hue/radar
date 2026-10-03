@@ -186,9 +186,8 @@ class PublishRecosDiscogsFirstTestCase(unittest.TestCase):
         patchers = [mock.patch.object(recos, name, path)
                     for name, path in self.paths.items()]
         patchers += [
-            mock.patch.object(recos, "cfg_load",
-                              return_value={"token": "tok",
-                                            "scoring": {"recos": {"max_tracks": 10}}}),
+            mock.patch.object(recos, "cfg_load", return_value={"token": "tok"}),
+            mock.patch.object(recos, "RECOS_MAX_TRACKS", 10),
             mock.patch.object(ytcache, "youtube_keys", return_value=["k"]),
             mock.patch.object(recos.time, "sleep"),   # cadence Discogs : pas d'attente en test
         ]

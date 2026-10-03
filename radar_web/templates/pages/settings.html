@@ -12,14 +12,38 @@
    le diagramme, pas à repartir de zéro sur des réglages déjà personnalisés. #}
 {% macro reset_btn(pairs) -%}
 <button type="button" class="small ghost" data-reset-fields='{{ pairs | tojson }}' title="Revenir aux valeurs du dernier enregistrement">{{ icons.undo() }} Annuler</button>
+<button class="primary small" type="submit">{{ icons.save() }} Enregistrer</button>
 {%- endmacro %}
+
+{# « ? » à côté d'un poids réglable : ouvre la fenêtre #help-dialog (partagée, une
+   seule pour la page) avec le texte donné. onclick=preventDefault : le bouton est
+   DANS un <label>, sinon le clic activerait aussi le champ associé. #}
+{% macro help(text) -%}
+<button type="button" class="help-btn" data-help="{{ text }}" aria-label="Aide" onclick="event.preventDefault()">?</button>
+{%- endmacro %}
+{% set help_reco = {'collection': 'Ta collection Discogs chez ce label : plus tu en as, plus ce label compte.',
+    'corpus': 'Ton écoute (corpus) chez ce label.',
+    'artist': 'Tes artistes de catégorie 1 ou 2 qui ont sorti chez ce label.',
+    'affinity': 'Affinité de style entre ce label et tes goûts.',
+    'want_factor': 'Disques de ce label déjà dans ta wantlist.',
+    'db_link': "Lien avec la base Discogs locale : artiste connu chez ce label, proximité dans le graphe de co-crédits, ou label voisin d'un label déjà suivi — zéro appel API.",
+    'tier': 'Le simple fait de suivre déjà ce label, pondéré par sa catégorie (1 ou 2) réglée plus bas.'} %}
+{% set help_album = {'label': "Affinité de ton goût pour le label de cette sortie précise.",
+    'artist': "Affinité de ton goût pour l'artiste ou les artistes de cette sortie.",
+    'style': 'Affinité de style de cette sortie avec tes goûts.',
+    'artist_max_vs_mean': "Arbitre entre le meilleur artiste de la sortie (proche de 1) et la moyenne de tous ses artistes (proche de 0)."} %}
+{% set help_artist_score = {'manual': 'La catégorie que tu donnes à la main à cet artiste (1 ou 2).',
+    'corpus': 'Ton écoute de cet artiste (corpus).',
+    'collection': 'Ta collection Discogs de cet artiste.',
+    'graph': 'Proximité de cet artiste dans le graphe de co-crédits avec tes artistes déjà suivis.',
+    'djset': 'Présence de cet artiste dans tes DJ sets.',
+    'label_link': "L'artiste a un disque chez un label que tu suis déjà (catégorie 1 ou 2) — référentiel local, zéro appel API."} %}
 {% set names = {'collection':'Collection', 'corpus':'Écoute (corpus)', 'artist':'Artiste', 'affinity':'Affinité de style',
                 'want_factor':'Wantlist', 'db_link':'Lien base Discogs', 'tier':'Catégorie du label (1 ou 2)',
                 'label':'Label', 'style':'Style', 'artist_max_vs_mean':'Artiste : meilleur ou moyenne',
                 'manual':'Catégorie donnée à la main', 'graph':'Proximité (co-crédits)', 'djset':'DJ sets', 'label_link':'Label aimé'} %}
-{# F12 (retour utilisateur 28/09) : plus besoin de défiler jusqu'en bas pour enregistrer. Avant, un bouton
-   par groupe de score ; maintenant une barre collante unique (#savebar) qui apparaît dès qu'un champ
-   change. Tous les champs restent dans le même <form> : elle enregistre l'ensemble. #}
+{# Un bouton « Enregistrer » par bloc de score (retour utilisateur 03/10) : tous les champs restent
+   dans le même <form>, donc chaque bouton enregistre l'ensemble des réglages, pas que son bloc. #}
 <form method="post" action="/settings">
   <section class="setcard">
     <div class="setcard__head"><h3>{{ icons.label() }} Score label (reco)</h3>
@@ -27,9 +51,8 @@
                   ['reco__artist', sc.reco.artist], ['reco__affinity', sc.reco.affinity],
                   ['reco__want_factor', sc.reco.want_factor], ['reco__db_link', sc.reco.db_link],
                   ['reco__tier', sc.reco.tier]]) }}</div>
-  <p class="muted small">Classe tes labels dans Mon univers (recommandations) : combien suivre ce label a de
-    sens vu ta collection, ton écoute (corpus), tes artistes des catégories 1 et 2 qui y ont sorti, ton affinité de style,
-    ta wantlist, et le fait que tu le suives déjà (catégorie 1 ou 2).</p>
+  <p class="muted small">Classe tes labels dans Mon univers (recommandations) : plus il est élevé, plus suivre ce
+    label a de sens vu tes goûts.</p>
   <div class="wgroup">
     {{ wr.toile([['reco__collection','collection'], ['reco__corpus','corpus'],
                  ['reco__artist','artiste'], ['reco__affinity','affinité'],
@@ -37,16 +60,12 @@
                  ['reco__tier','Catégorie']]) }}
     <div class="row wgroup__fields">
       {% for k in ['collection','corpus','artist','affinity','want_factor','db_link','tier'] %}
-      <div class="field"><label>{{ names[k] }}
+      <div class="field"><label>{{ names[k] }} {{ help(help_reco[k]) }}
         <input name="reco__{{ k }}" type="number" step="any" value="{{ sc.reco[k] }}"></label></div>
       {% endfor %}
-      <div class="field field--full"><label>Seuil d'affinité label (0 = off)
+      <div class="field field--full"><label>Seuil d'affinité label (0 = off) {{ help("Affinité de style minimale pour qu'elle compte dans le score de ce label (0 = désactivé).") }}
         <input name="label_affinity_floor" type="number" step="5" value="{{ sc.label_affinity_floor }}"></label></div>
     </div>
-    <p class="muted small">« base Discogs » : un artiste de catégorie 1 ou 2 a un disque chez ce label, le graphe de
-      co-crédits en repère un proche, ou il est voisin (co-crédit ou sous-label Discogs) d'un label que tu suis
-      déjà — référentiel local, aucun appel API. « Catégorie » : le fait même de suivre ce label, pondéré par
-      sa catégorie ci-dessous — avant le 17/09 ce rang n'avait aucun effet sur ce score.</p>
   </div>
   </section>
 
@@ -55,14 +74,13 @@
       {{ reset_btn([['album__label', sc.album.label], ['album__artist', sc.album.artist],
                   ['album__style', sc.album.style],
                   ['album__artist_max_vs_mean', sc.album.artist_max_vs_mean]]) }}</div>
-  <p class="muted small">Le score /100 affiché sur chaque disque en Recherche : combine l'affinité du label,
-    celle de l'artiste et celle du style pour CETTE sortie précise.</p>
+  <p class="muted small">Le score /100 affiché sur chaque disque en Recherche, pour CETTE sortie précise.</p>
   <div class="wgroup">
     {{ wr.toile([['album__label','label'], ['album__artist','artiste'],
                  ['album__style','style'], ['album__artist_max_vs_mean','max/moy.']]) }}
     <div class="row wgroup__fields">
       {% for k in ['label','artist','style','artist_max_vs_mean'] %}
-      <div class="field"><label>{{ names[k] }}
+      <div class="field"><label>{{ names[k] }} {{ help(help_album[k]) }}
         <input name="album__{{ k }}" type="number" step="any" value="{{ sc.album[k] }}"></label></div>
       {% endfor %}
     </div>
@@ -77,20 +95,18 @@
                   ['artist_score__graph', sc.artist_score.graph],
                   ['artist_score__djset', sc.artist_score.djset],
                   ['artist_score__label_link', sc.artist_score.label_link]]) }}</div>
-  <p class="muted small">Classe tes artistes dans Mon univers : combine la catégorie que tu leur donnes à la main
-    (catégories 1 et 2), ton écoute (corpus, collection, DJ sets) et leur proximité dans le graphe de co-crédits.</p>
+  <p class="muted small">Classe tes artistes dans Mon univers : plus il est élevé, plus l'artiste compte dans tes
+    recommandations.</p>
   <div class="wgroup">
     {{ wr.toile([['artist_score__manual','manuel'], ['artist_score__corpus','corpus'],
                  ['artist_score__collection','collection'], ['artist_score__graph','graphe'],
                  ['artist_score__djset','djset'], ['artist_score__label_link','label aimé']]) }}
     <div class="row wgroup__fields">
       {% for k in ['manual','corpus','collection','graph','djset','label_link'] %}
-      <div class="field"><label>{{ names[k] }}
+      <div class="field"><label>{{ names[k] }} {{ help(help_artist_score[k]) }}
         <input name="artist_score__{{ k }}" type="number" step="any" value="{{ sc.artist_score[k] }}"></label></div>
       {% endfor %}
     </div>
-    <p class="muted small">« label aimé » : l'artiste a un disque chez un label que tu suis déjà
-      (catégorie 1 ou 2) — référentiel local, aucun appel API.</p>
   </div>
   </section>
 
@@ -102,56 +118,42 @@
                   ['artist_tiers__2', sc.artist_tiers['2']],
                   ['label_tiers__1', sc.label_tiers['1']],
                   ['label_tiers__2', sc.label_tiers['2']]]) }}</div>
-  <p class="muted small">Poids appliqué selon la catégorie que tu donnes à un style, un artiste ou un label : la
-    catégorie 1 (référence) compte plus que la catégorie 2 dans les scores ci-dessus — c'est ici qu'on règle l'écart entre les deux.</p>
+  <p class="muted small">Configure l'écart entre les catégories 1 et 2 que tu veux donner dans le cerveau Radar :
+    cet écart de poids influencera les scores associés.</p>
   <div class="wgroup">
     {{ wr.toile([['taste_tiers__1','style cat.1'], ['artist_tiers__1','artiste cat.1'], ['label_tiers__1','label cat.1'],
                  ['taste_tiers__2','style cat.2'], ['artist_tiers__2','artiste cat.2'], ['label_tiers__2','label cat.2']]) }}
     <div class="row wgroup__fields">
-      <div class="field"><label>Style — catégorie 1<input name="taste_tiers__1" type="number" step="any" value="{{ sc.taste_tiers['1'] }}"></label></div>
-      <div class="field"><label>Style — catégorie 2<input name="taste_tiers__2" type="number" step="any" value="{{ sc.taste_tiers['2'] }}"></label></div>
-      <div class="field"><label>Artiste — catégorie 1<input name="artist_tiers__1" type="number" step="any" value="{{ sc.artist_tiers['1'] }}"></label></div>
-      <div class="field"><label>Artiste — catégorie 2<input name="artist_tiers__2" type="number" step="any" value="{{ sc.artist_tiers['2'] }}"></label></div>
-      <div class="field"><label>Label — catégorie 1<input name="label_tiers__1" type="number" step="any" value="{{ sc.label_tiers['1'] }}"></label></div>
-      <div class="field"><label>Label — catégorie 2<input name="label_tiers__2" type="number" step="any" value="{{ sc.label_tiers['2'] }}"></label></div>
+      <div class="field"><label>Style — catégorie 1 {{ help('Poids d\'un style classé en catégorie 1 (référence) dans le score album.') }}<input name="taste_tiers__1" type="number" step="any" value="{{ sc.taste_tiers['1'] }}"></label></div>
+      <div class="field"><label>Style — catégorie 2 {{ help('Poids d\'un style classé en catégorie 2 (aimé) dans le score album.') }}<input name="taste_tiers__2" type="number" step="any" value="{{ sc.taste_tiers['2'] }}"></label></div>
+      <div class="field"><label>Artiste — catégorie 1 {{ help('Poids d\'un artiste classé en catégorie 1 (référence) dans le score artiste.') }}<input name="artist_tiers__1" type="number" step="any" value="{{ sc.artist_tiers['1'] }}"></label></div>
+      <div class="field"><label>Artiste — catégorie 2 {{ help('Poids d\'un artiste classé en catégorie 2 (aimé) dans le score artiste.') }}<input name="artist_tiers__2" type="number" step="any" value="{{ sc.artist_tiers['2'] }}"></label></div>
+      <div class="field"><label>Label — catégorie 1 {{ help('Poids d\'un label classé en catégorie 1 (référence) dans le score label.') }}<input name="label_tiers__1" type="number" step="any" value="{{ sc.label_tiers['1'] }}"></label></div>
+      <div class="field"><label>Label — catégorie 2 {{ help('Poids d\'un label classé en catégorie 2 (aimé) dans le score label.') }}<input name="label_tiers__2" type="number" step="any" value="{{ sc.label_tiers['2'] }}"></label></div>
     </div>
   </div>
   </section>
-
-  <section class="setcard">
-    <div class="setcard__head"><h3>{{ icons.compass() }} RECOS RADAR</h3>
-      {{ reset_btn([['recos__min_score', sc.recos.min_score],
-                  ['recos__max_new_releases', sc.recos.max_new_releases],
-                  ['recos__max_tracks', sc.recos.max_tracks]]) }}</div>
-  <p class="muted small">Seuil et volume du scan quotidien des labels suivis pour la playlist YouTube
-    « RECOS RADAR » (Mon profil → RECOS RADAR).</p>
-  <div class="row wgroup__fields">
-    <div class="field"><label>Score album minimum
-      <input name="recos__min_score" type="number" step="1" value="{{ sc.recos.min_score }}"></label></div>
-    <div class="field"><label>Pistes candidates max par scan
-      <input name="recos__max_new_releases" type="number" step="1" value="{{ sc.recos.max_new_releases }}"></label></div>
-  </div>
-  <div class="row wgroup__fields">
-    <div class="field">
-      <label>Capacité de la playlist <b id="recos-maxtracks-out">{{ sc.recos.max_tracks|int }}</b>
-        <span class="muted">· au-delà, plus d'ajout (et aucune recherche) tant qu'une piste n'a pas été marquée écoutée</span></label>
-      <input type="range" id="recos-maxtracks" name="recos__max_tracks" min="1" max="300" step="1"
-             value="{{ sc.recos.max_tracks|int }}">
-    </div>
-  </div>
-  <p class="muted small">Chaque alimentation consomme le budget de recherches YouTube du jour
-    jusqu'à épuisement (~80/jour) : plus de plafond de recherches par alimentation. Les vidéos
-    trouvées via Discogs ne consomment pas ce budget. Si la playlist est pleine, aucune recherche
-    n'est lancée et les pistes existantes ne sont jamais remplacées.</p>
-  </section>
-
-  <div class="savebar" id="savebar" hidden>
-    <span>Modifications non enregistrées</span>
-    <button class="primary small" type="submit">{{ icons.save() }} Enregistrer</button>
-  </div>
 </form>
+
+{# Fenêtre d'aide partagée par tous les « ? » de la page (cf. macro help ci-dessus) :
+   une seule <dialog>, le JS y pose le texte du bouton cliqué. Même principe que
+   #pl-dialog (Reco Radar) : natif, se ferme à la croix, au clic hors fenêtre ou à Échap. #}
+<dialog id="help-dialog" class="pl-dialog">
+  <div class="pl-dialog__head"><strong>À quoi ça sert</strong>
+    <button type="button" class="wl-matches__close" data-help-close aria-label="Fermer">{{ icons.close() }}</button></div>
+  <p class="small" id="help-dialog-body"></p>
+</dialog>
+
 <script src="/static/wradar.js" defer></script>
 <script>
+(function () {
+  var helpDlg = document.getElementById('help-dialog'), helpBody = document.getElementById('help-dialog-body');
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.help-btn');
+    if (btn) { helpBody.textContent = btn.dataset.help; helpDlg.showModal(); return; }
+    if (e.target.closest('[data-help-close]') || e.target === helpDlg) helpDlg.close();
+  });
+})();
 (function () {
   document.querySelectorAll('[data-reset-fields]').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -169,7 +171,7 @@
 (function () {
   // Curseurs à libellés lisibles (charte §7). Les <input type=number> restent LA source de vérité
   // (soumission, radar) : chaque curseur les lit et les écrit, sans `name` — il n'ajoute rien au POST.
-  var form = document.querySelector('form[action="/settings"]'), bar = document.getElementById('savebar');
+  var form = document.querySelector('form[action="/settings"]');
   if (!form) return;
   function fmt(v) { return String(Math.round(v * 1000) / 1000); }
   function labelOf(inp) {
@@ -189,7 +191,10 @@
       var id = 'sl-' + inp.name;
       row.innerHTML = '<label class="wslide__lbl" for="' + id + '"></label><output></output>' +
                       '<input type="range" id="' + id + '" min="0" max="' + max + '" step="0.05">';
-      row.querySelector('label').textContent = labelOf(inp);
+      var lbl = row.querySelector('label');
+      lbl.textContent = labelOf(inp);
+      var help = inp.closest('label').querySelector('.help-btn');   // le radar masque le champ, pas son « ? »
+      if (help) lbl.appendChild(help.cloneNode(true));
       var rng = row.querySelector('input'), out = row.querySelector('output');
       function paint() {
         var x = parseFloat(inp.value) || 0;
@@ -210,39 +215,13 @@
   document.addEventListener('DOMContentLoaded', function () {   // après wradar.js (defer) : le radar a masqué ses champs
     document.querySelectorAll('.wgroup__fields').forEach(build);
   });
-  if (bar) form.addEventListener('input', function () { bar.hidden = false; });
-})();
-(function () {
-  [['recos-maxtracks', 'recos-maxtracks-out']].forEach(function (pair) {
-    var inp = document.getElementById(pair[0]), out = document.getElementById(pair[1]);
-    if (inp && out) inp.addEventListener('input', function () { out.textContent = inp.value; });
-  });
 })();
 </script>
-
-<section class="setcard">
-  <div class="setcard__head"><h3>{{ icons.label() }} Base de labels <span class="muted small">· export CSV — import : Mon profil</span></h3></div>
-  <p class="btnrow"><a class="btn small" href="/univers/labels/export">{{ icons.download() }} Exporter la base (CSV)</a></p>
-</section>
 
 {% if sellers_enabled %}
 <section class="setcard">
   <div class="setcard__head"><h3>{{ icons.store() }} Catalogue de vendeurs <span class="muted small">· pour la wantlist — « regrouper chez un vendeur »</span></h3></div>
   <div hx-get="/sellers/catalog" hx-trigger="load"></div>
-</section>
-{% endif %}
-
-<section class="setcard">
-  <div class="setcard__head"><h3>{{ icons.discogs() }} Référentiel Discogs local <span class="muted small">· catalogue vinyle, pas le marketplace</span></h3></div>
-  <div hx-get="/discogs_dump" hx-trigger="load"></div>
-</section>
-
-{% if is_owner %}
-<section class="setcard">
-  <div class="setcard__head"><h3>{{ icons.mail() }} Inviter quelqu'un <span class="muted small">· crée son propre univers, isolé du tien</span></h3></div>
-  <p class="btnrow"><button hx-post="/account/invite" hx-target="#invite-link" hx-swap="innerHTML">Générer un lien d'invitation</button></p>
-  <p class="small muted">Lien à usage unique, valable 48 h.</p>
-  <div id="invite-link" class="mt-2"></div>
 </section>
 {% endif %}
 

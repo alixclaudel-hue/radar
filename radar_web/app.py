@@ -35,10 +35,10 @@ def _pu():
     """Chemins de données de l'utilisateur de la requête courante."""
     return paths.user_paths(store.current_uid())
 
-# Valeur de repli si cfg["scoring"]["recos"]["max_tracks"] est absente (config
-# jamais réglée) -- réglable désormais via le curseur de /settings, affichage
-# seulement (radar_jobs.recos.job_publish_recos lit la même clé pour la vraie limite).
-RECOS_MAX_TRACKS = 5
+# Capacité fixe de la playlist, affichage seulement (radar_jobs.recos.job_publish_recos
+# porte la même constante pour la vraie limite ; section RECOS RADAR retirée de
+# /settings le 03/10, cette valeur n'est plus réglable par utilisateur).
+RECOS_MAX_TRACKS = 200
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(HERE, "templates"))
@@ -483,7 +483,7 @@ def reco_radar_page(request: Request, mode: str = "approfondir"):
     pl_path, cand_path = _reco_files(mode)
     playlist = load(pl_path, [])
     sfx = "_decouverte" if mode == "decouverte" else ""
-    max_tracks = int(_cfg().get("scoring", {}).get("recos", {}).get("max_tracks", RECOS_MAX_TRACKS))
+    max_tracks = RECOS_MAX_TRACKS
     return render(request, "pages/reco_radar.html", active="reco_radar",
                   playlist=playlist, n_playlist=len(playlist), max_tracks=max_tracks,
                   recos_pending=len(load(cand_path, [])),
@@ -3024,8 +3024,7 @@ async def settings_save(request: Request):
     sc = c["scoring"]
     for grp, keys in (("reco", ("collection", "corpus", "artist", "affinity", "want_factor", "db_link", "tier")),
                       ("album", ("label", "artist", "style", "artist_max_vs_mean")),
-                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link")),
-                      ("recos", ("min_score", "max_new_releases", "max_tracks"))):
+                      ("artist_score", ("manual", "corpus", "collection", "graph", "djset", "label_link"))):
         for key in keys:
             v = f.get(f"{grp}__{key}")
             if v not in (None, ""):

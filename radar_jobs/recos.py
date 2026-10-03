@@ -31,7 +31,7 @@ from radar_jobs.tracks import (
 # déjà reparti (constaté en prod le 16/09). Horloge distincte de celle de la
 # purge des pistes écoutées (worker.py), qui elle reste sur Paris.
 YT_QUOTA_TZ = ZoneInfo("America/Los_Angeles")
-RECOS_MAX_TRACKS = 5  # repli si scoring.recos.max_tracks absent (curseur /settings, 10/09)
+RECOS_MAX_TRACKS = 200  # capacité fixe de la playlist (section RECOS RADAR retirée de /settings, 03/10)
 RECOS_DAILY_SEARCH_BUDGET = 80
 # Un compte avec sa PROPRE clé YouTube (cfg["youtube_api_key"], réglages /patte)
 # protège le pot commun : la cascade ytcache.youtube_keys essaie cette clé en
@@ -205,9 +205,8 @@ def job_scan_recos(job, params):
 
     cfg = cfg_load()
     daily_budget = _recos_daily_budget(cfg)
-    rc = cfg.get("scoring", {}).get("recos", {})
-    min_score = float(params.get("min_score", rc.get("min_score", 60)))
-    max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
+    min_score = float(params.get("min_score", 50))
+    max_new = int(params.get("max_new_releases", 2000))
     force = bool(params.get("force"))
 
     if not scorestore.available(RADAR_UID):
@@ -390,8 +389,7 @@ def job_publish_recos(job, params):
     playlist = load_json(playlist_path, [])
     token = cfg.get("token", "")
     keys = ytcache.youtube_keys(cfg)
-    rc = cfg.get("scoring", {}).get("recos", {})
-    max_tracks = int(rc.get("max_tracks", RECOS_MAX_TRACKS))
+    max_tracks = RECOS_MAX_TRACKS
 
     # Playlist PLEINE : sortie AVANT toute recherche (demande utilisateur
     # 2026-09-28). Aucune recherche n'est gaspillée pour rien, et surtout la
@@ -659,8 +657,7 @@ def job_scan_recos_decouverte(job, params):
 
     params = params or {}
     cfg = cfg_load()
-    rc = cfg.get("scoring", {}).get("recos", {})
-    max_new = int(params.get("max_new_releases", rc.get("max_new_releases", 20)))
+    max_new = int(params.get("max_new_releases", 2000))
     per_artist = int(params.get("per_artist", 15))
     force = bool(params.get("force"))
     cap = _recos_daily_budget(cfg) // 2

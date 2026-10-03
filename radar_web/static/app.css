@@ -289,6 +289,14 @@ body.gfull-on{ overflow:hidden; }
 .lbl-opt__name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 label{ display:block; font-size:13px; font-weight:500; color:var(--ink-2); margin:0 0 5px; }
 label .muted, label .small{ font-weight:400; }   /* l'aide du champ ne rivalise pas avec son nom */
+/* « ? » à côté d'un poids réglable (Réglages) : ouvre #help-dialog avec data-help. */
+.help-btn{
+  display:inline-grid; place-items:center; width:16px; height:16px; margin-left:2px;
+  border:1px solid var(--line-strong); border-radius:50%; background:var(--surface);
+  color:var(--soft); font-size:10px; font-weight:700; line-height:1; padding:0; cursor:pointer;
+  vertical-align:middle;
+}
+.help-btn:hover{ background:var(--pin); border-color:var(--pin); color:var(--paper); }
 .field{ margin-bottom:12px; }
 .row{ display:flex; gap:12px; flex-wrap:wrap; }
 .row > *{ flex:1 1 140px; }
@@ -680,16 +688,6 @@ h3 small, h3 .small{ font-weight:400; }
 .wslide input[type=range]::-moz-range-progress{ height:6px; border-radius:var(--pill); background:var(--pin); }
 .wslide input[type=range]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--surface); border:2px solid var(--pin); box-shadow:var(--sh-1); cursor:grab; }
 .wslide input[type=range]:focus-visible{ outline:2px solid var(--pin); outline-offset:2px; }
-.savebar{
-  position:sticky; bottom:16px; z-index:20; display:flex; align-items:center; gap:10px;
-  background:var(--ink); color:var(--paper); border-radius:var(--r-lg); padding:8px 8px 8px 16px;
-  font-size:13px; box-shadow:var(--sh-2); margin-top:8px;
-}
-.savebar span{ flex:1; }
-.savebar .primary{ background:var(--paper); border-color:var(--paper); color:var(--ink); }
-.savebar .primary:hover{ background:#fff; border-color:#fff; }
-@media (max-width:720px){ .savebar{ bottom:calc(72px + env(safe-area-inset-bottom)); } }
-
 /* téléphone : composants de données en cartes compactes (maquette « Mes labels & artistes »)
    — résultats de recherche : pochette à gauche ; Reco Radar : chaque piste = une carte au lieu d'un
    tableau à 9 colonnes qui débordait et coupait les boutons */

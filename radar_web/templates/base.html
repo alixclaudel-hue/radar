@@ -68,6 +68,14 @@
       document.body.appendChild(w);
       d.open = false;
     });
+    // Retour utilisateur (02/10, /reco-radar) : un ajout wantlist réussi (✓ en
+    // wantlist) laissait le menu ouvert, ce qui polluait la lecture de la liste
+    // de recos — on le ferme aussi dans ce cas (pas en cas d'erreur, pour que
+    // le message reste lisible).
+    document.querySelectorAll('details.buy-menu .ok').forEach(function (w) {
+      var d = w.closest('details.buy-menu');
+      if (d) d.open = false;
+    });
   });
   // Positionnement de la liste du menu « Achat »/« Digital » : en `position:fixed`
   // sous le bouton (un menu absolu serait rogné par .tbl-wrap sur ordinateur) ;

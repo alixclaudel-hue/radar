@@ -4,209 +4,131 @@
 {% block content %}
 <h1>Mon profil</h1>
 {% if onboarding %}
-<p class="muted small">Pour démarrer : 3 étapes. Le reste (YouTube, Spotify, Bandcamp, DJ sets, import CSV) est
+<p class="muted small">Pour démarrer : 3 étapes. Connexion, playlists, styles — le reste (DJ sets) est
   facultatif et reste disponible plus bas, une fois ça fait.</p>
 {% else %}
-<p class="muted small">Une section par source : identifiants + import + résultat au même endroit. Chaque plateforme s'importe séparément.</p>
+<p class="muted small">Connexions, playlists à scanner, styles aimés — chaque section s'enregistre séparément.</p>
 {% endif %}
 {% if saved %}<p class="notice small">Enregistré.</p>{% endif %}
-{% if yt_connected %}<p class="notice small">YouTube connecté (écriture playlist).</p>{% endif %}
-{% if yt_error %}<p class="notice warn small">{{ yt_error }}</p>{% endif %}
 
-<form method="post" action="/patte">
+{% if onboarding %}<p class="step-label">Étape 1 sur 3 · connexions</p>{% endif %}
 
-  {% if onboarding %}<p class="step-label">Étape 1 sur 3</p>{% endif %}
-  <!-- ============ Discogs ============ -->
-  <details class="acc" {{ 'open' if not (cfg.token or discogs_connected) }}>
-    <summary>
-      <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>
-      Discogs
-      <span class="tag">{% if cfg.token or discogs_connected %}<span class="ok">{{ icons.check() }} connecté</span>{% else %}token manquant{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants{% if coll.fetched_at %} · importé {{ coll.fetched_at.replace('T',' ')[:16] }}{% endif %}</span>
-    </summary>
-    <div class="acc__body">
-      <div class="field"><label>Token d'accès personnel
-        <input type="password" name="token" value="{{ cfg.token or '' }}"></label></div>
-      <p class="small muted">Sert aux recommandations de labels.
-        {% if not cfg.token %}<a href="https://www.discogs.com/settings/developers" target="_blank" rel="noopener">Générer un token sur Discogs {{ icons.external() }}</a>{% endif %}</p>
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-discogs" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small tonal" hx-post="/patte/run/fetch_collection" hx-include="closest form" hx-target="#job-fetch_collection" hx-swap="outerHTML">{{ icons.download() }} Importer collection + wantlist</button>
-        <span id="save-discogs" class="small ok"></span>
-      </div>
-      <div id="job-fetch_collection" hx-get="/jobs/fetch_collection/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-    </div>
-  </details>
-
-  {% if onboarding %}
-  <p class="step-label">Facultatif — à ajouter quand tu veux</p>
-  <details class="acc">
-    <summary>{{ icons.plus() }} Ajouter d'autres sources <span class="tag">YouTube, Spotify, Bandcamp</span></summary>
-    <div class="acc__body">
-  {% endif %}
-
-  <!-- ============ YouTube ============ -->
-  <details class="acc">
-    <summary>
-      <svg class="logo" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0000"/><path d="M10 9l6 3-6 3z" fill="#fff"/></svg>
-      YouTube
-      <span class="tag">{% if cfg.youtube_api_key %}<span class="ok">{{ icons.check() }} clé</span>{% else %}clé manquante{% endif %} · {{ pl_urls|length }} playlist{{ 's' if pl_urls|length>1 }}{% if last.ingest_youtube %} · importé {{ last.ingest_youtube }}{% endif %}</span>
-    </summary>
-    <div class="acc__body">
-      <div class="field"><label>Clé API YouTube Data v3
-        <input type="password" name="youtube_api_key" value="{{ cfg.youtube_api_key or '' }}"></label></div>
-      <p class="small">Playlists (une URL par champ)</p>
-      {% for u in (pl_urls + ['']) %}
-      {% set pid = (u | pl_id) %}
-      <div class="plrow">
-        <input name="yt_pl" value="{{ u }}" placeholder="https://youtube.com/playlist?list=…">
-        {% if pid and pl_meta.get(pid) %}
-          <span class="small ok">{{ icons.check() }} {{ pl_meta[pid].title }} <span class="muted">· {{ pl_meta[pid].channel }} · {{ pl_meta[pid].n_items }} titres</span></span>
-        {% endif %}
-      </div>
-      {% endfor %}
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-youtube" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small tonal" hx-post="/patte/run/ingest_youtube" hx-include="closest form" hx-target="#job-ingest_youtube" hx-swap="outerHTML">{{ icons.download() }} Importer les playlists</button>
-        <span id="save-youtube" class="small ok"></span>
-      </div>
-      <div id="job-ingest_youtube" hx-get="/jobs/ingest_youtube/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-    </div>
-  </details>
-
-  <!-- ============ Spotify ============ -->
-  <details class="acc">
-    <summary>
-      <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.5c3.2-1 7-.7 10 1M7.5 12.5c2.6-.8 5.7-.5 8 1M8 15.3c2-.6 4.4-.4 6 .8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
-      Spotify
-      <span class="tag">{% if cfg.spotify_client_id %}<span class="ok">{{ icons.check() }} clé</span>{% else %}clé manquante{% endif %} · {{ sp_urls|length }} playlist{{ 's' if sp_urls|length>1 }} · {{ src.get('spotify', 0) }} tracks{% if last.ingest_spotify %} · importé {{ last.ingest_spotify }}{% endif %}</span>
-    </summary>
-    <div class="acc__body">
-      <p class="small muted">API Spotify → <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">developer.spotify.com/dashboard</a> → crée une app → <em>Client ID</em> + <em>Client Secret</em>. Playlists publiques uniquement.</p>
-      <div class="row">
-        <div class="field"><label>Client ID
-          <input name="spotify_client_id" value="{{ cfg.spotify_client_id or '' }}"></label></div>
-        <div class="field"><label>Client Secret
-          <input type="password" name="spotify_client_secret" value="{{ cfg.spotify_client_secret or '' }}"></label></div>
-      </div>
-      <p class="small">Playlists (une URL par champ)</p>
-      {% for u in (sp_urls + ['']) %}
-      {% set pid = (u | sp_id) %}
-      <div class="plrow">
-        <input name="sp_pl" value="{{ u }}" placeholder="https://open.spotify.com/playlist/…">
-        {% if pid and sp_meta.get(pid) %}
-          <span class="small ok">{{ icons.check() }} {{ sp_meta[pid].title }} <span class="muted">· {{ sp_meta[pid].channel }} · {{ sp_meta[pid].n_items }} titres</span></span>
-        {% endif %}
-      </div>
-      {% endfor %}
-      <div class="btnrow">
-        <button type="button" class="small" hx-post="/patte/save" hx-include="closest form" hx-target="#save-spotify" hx-swap="innerHTML">{{ icons.save() }} Enregistrer</button>
-        <button type="button" class="small tonal" hx-post="/patte/run/ingest_spotify" hx-include="closest form" hx-target="#job-ingest_spotify" hx-swap="outerHTML">{{ icons.download() }} Importer les playlists</button>
-        <span id="save-spotify" class="small ok"></span>
-      </div>
-      <div id="job-ingest_spotify" hx-get="/jobs/ingest_spotify/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
-    </div>
-  </details>
-
-  <!-- ============ Bandcamp ============ -->
-  <!-- Import désactivé le 03/10 : Subsonic ET le scraping HTML sont bloqués par le
-       challenge anti-bot Fastly depuis l'IP du VPS, identifiants valides ou non
-       (confirmé en sondant les deux voies). Formulaire retiré, backend (ingest_bandcamp,
-       cfg.bandcamp_sub_user/pass) intact — réactivation = remettre le bloc ci-dessous. -->
-  <details class="acc">
-    <summary>
-      <svg class="logo" viewBox="0 0 24 24"><path d="M3 16l6-9h12l-6 9z" fill="#1DA0C3"/></svg>
-      Bandcamp
-      <span class="tag">{{ src.get('bandcamp', 0) }} tracks{% if last.ingest_bandcamp %} · importé {{ last.ingest_bandcamp }}{% endif %}</span>
-    </summary>
-    <div class="acc__body">
-      <p class="small muted">{{ icons.warning() }} Import indisponible : Bandcamp bloque les appels serveur (Subsonic
-        et page publique) depuis le VPS, quels que soient les identifiants. Les tracks déjà importées restent dans
-        ton profil.</p>
-    </div>
-  </details>
-
-  {% if onboarding %}
-    </div>
-  </details>
-  {% endif %}
-
-</form>
-
-{% if onboarding %}
-<p class="step-label">Étape 3 sur 3</p>
-<div class="notice">
-  <p class="small">Dernière étape : lance une première recherche pour voir le moteur de score à l'œuvre.</p>
-  <a class="btn primary"
-     href="/search{% if (cats.get('1') or cats.get('2')) %}?style={{ ((cats.get('1') or cats.get('2'))[0]) | urlencode }}{% endif %}">{{ icons.search() }} Chercher un disque</a>
-</div>
-{% endif %}
-
-<!-- ============ Connexion Discogs OAuth (hors du formulaire principal) ============ -->
-<details class="acc" {{ 'open' if discogs_msg }}>
-  <summary>Connexion directe à Discogs
-    <span class="tag">{% if discogs_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif discogs_configured %}non relié{% else %}non configuré{% endif %}</span></summary>
+<!-- ============ Discogs (OAuth) ============ -->
+<details class="acc" {{ 'open' if (discogs_msg or not discogs_connected) }}>
+  <summary>
+    <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#000"/><circle cx="12" cy="12" r="6.5" fill="#fff"/><circle cx="12" cy="12" r="2.3" fill="#000"/></svg>
+    Discogs
+    <span class="tag">{% if discogs_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif discogs_configured %}non relié{% else %}non configuré{% endif %} · {{ coll.n_collection or 0 }} disques · {{ coll.n_wants or 0 }} wants{% if coll.fetched_at %} · importé {{ coll.fetched_at.replace('T',' ')[:16] }}{% endif %}</span>
+  </summary>
   <div class="acc__body">
     {% if discogs_msg %}<p class="notice small">{{ discogs_msg }}</p>{% endif %}
-    <p class="small muted">Autorise Radar sur Discogs en un clic, sans copier de token : sa
-      collection et ta wantlist sont lues avec ton compte. Tu peux révoquer l'accès ici ou
-      dans les réglages Discogs. Le token personnel ci-dessus reste un repli.</p>
     {% if not discogs_configured %}
     <p class="small">La connexion Discogs n'est pas encore configurée sur ce serveur
       (<code>RADAR_DISCOGS_CONSUMER_KEY</code> / <code>RADAR_DISCOGS_CONSUMER_SECRET</code>).</p>
     {% elif discogs_connected %}
-    <form method="post" action="/oauth/discogs/disconnect"><button class="small danger" type="submit">Délier mon compte Discogs</button></form>
+    <div class="btnrow">
+      <button type="button" class="small tonal" hx-post="/patte/run/fetch_collection" hx-target="#job-fetch_collection" hx-swap="outerHTML">{{ icons.download() }} Importer collection + wantlist</button>
+      <form method="post" action="/oauth/discogs/disconnect" class="inline"><button class="small danger" type="submit">Délier</button></form>
+    </div>
+    <div id="job-fetch_collection" hx-get="/jobs/fetch_collection/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
     {% else %}
     <a class="btn primary small" href="/oauth/discogs/start">Se connecter avec Discogs</a>
     {% endif %}
   </div>
 </details>
 
-<!-- ============ Google / YouTube (hors du formulaire principal) ============ -->
+<!-- ============ YouTube (OAuth) ============ -->
 <details class="acc" {{ 'open' if google_msg }}>
-  <summary>{{ icons.youtube() }} Compte Google / YouTube
-    <span class="tag">{% if google_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif google_configured %}non relié{% else %}non configuré{% endif %}</span></summary>
+  <summary>
+    <svg class="logo" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0000"/><path d="M10 9l6 3-6 3z" fill="#fff"/></svg>
+    YouTube
+    <span class="tag">{% if google_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif google_configured %}non relié{% else %}non configuré{% endif %}</span>
+  </summary>
   <div class="acc__body">
     {% if google_msg %}<p class="notice small">{{ google_msg }}</p>{% endif %}
-    <p class="small muted">Sert à ajouter une piste de Reco Radar à l'une de tes playlists YouTube
-      (bouton « Playlist »). Radar demande l'accès à tes playlists uniquement ; tu peux le
-      révoquer ici à tout moment.</p>
+    <p class="small muted">Sert à lire tes playlists (étape suivante) et à ajouter une piste de Reco
+      Radar à l'une d'elles. Radar demande l'accès à tes playlists uniquement ; tu peux révoquer
+      l'accès ici à tout moment.</p>
     {% if not google_configured %}
     <p class="small">La connexion Google n'est pas encore configurée sur ce serveur
       (<code>RADAR_GOOGLE_CLIENT_ID</code> / <code>RADAR_GOOGLE_CLIENT_SECRET</code>).</p>
     {% elif google_connected %}
     <form method="post" action="/oauth/google/disconnect"><button class="small danger" type="submit">Délier mon compte Google</button></form>
     {% else %}
-    <a class="btn primary small" href="/oauth/google/start">Relier mon compte Google</a>
+    <a class="btn primary small" href="/oauth/google/start">Se connecter avec Google</a>
     {% endif %}
   </div>
 </details>
 
-<!-- ============ Spotify (hors du formulaire principal) ============ -->
+<!-- ============ Spotify (OAuth) ============ -->
 <details class="acc" {{ 'open' if spotify_msg }}>
-  <summary>{{ icons.spotify() }} Compte Spotify
-    <span class="tag">{% if spotify_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif spotify_configured %}non relié{% else %}non configuré{% endif %}</span></summary>
+  <summary>
+    <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.5c3.2-1 7-.7 10 1M7.5 12.5c2.6-.8 5.7-.5 8 1M8 15.3c2-.6 4.4-.4 6 .8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+    Spotify
+    <span class="tag">{% if spotify_connected %}<span class="ok">{{ icons.check() }} relié</span>{% elif spotify_configured %}non relié{% else %}non configuré{% endif %}</span>
+  </summary>
   <div class="acc__body">
     {% if spotify_msg %}<p class="notice small">{{ spotify_msg }}</p>{% endif %}
-    <p class="small muted">Sert à ajouter une piste de Reco Radar à l'une de tes playlists Spotify
-      (bouton « Playlist »). Radar demande l'accès à tes playlists uniquement ; tu peux le
-      révoquer ici à tout moment, ou dans les réglages de ton compte Spotify.</p>
+    <p class="small muted">Sert à lire tes playlists (étape suivante) et à ajouter une piste de Reco
+      Radar à l'une d'elles. Radar demande l'accès à tes playlists uniquement ; tu peux révoquer
+      l'accès ici ou dans les réglages de ton compte Spotify.</p>
     {% if not spotify_configured %}
     <p class="small">La connexion Spotify n'est pas encore configurée sur ce serveur
       (<code>RADAR_SPOTIFY_CLIENT_ID</code> / <code>RADAR_SPOTIFY_CLIENT_SECRET</code>).</p>
     {% elif spotify_connected %}
     <form method="post" action="/oauth/spotify/disconnect"><button class="small danger" type="submit">Délier mon compte Spotify</button></form>
     {% else %}
-    <a class="btn primary small" href="/oauth/spotify/start">Relier mon compte Spotify</a>
+    <a class="btn primary small" href="/oauth/spotify/start">Se connecter avec Spotify</a>
     {% endif %}
   </div>
 </details>
 
-<!-- ============ DJ sets (hors du formulaire principal) ============ -->
+<!-- ============ Playlists (Étape 2) ============ -->
+{% if onboarding %}<p class="step-label">Étape 2 sur 3 · importe des musiques pour scanner tes goûts</p>{% endif %}
+<h3 class="mt-3">Playlists</h3>
+
+<details class="acc">
+  <summary>
+    <svg class="logo" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="4" fill="#FF0000"/><path d="M10 9l6 3-6 3z" fill="#fff"/></svg>
+    YouTube
+    <span class="tag">{{ pl_urls|length }} playlist{{ 's' if pl_urls|length>1 }}{% if last.ingest_youtube %} · importé {{ last.ingest_youtube }}{% endif %}</span>
+  </summary>
+  <div class="acc__body">
+    <div id="yt-playlists" hx-get="/patte/playlists/yt" hx-trigger="load" hx-swap="outerHTML">
+      <p class="small muted">Chargement…</p>
+    </div>
+    <div class="btnrow mt-1">
+      <button type="button" class="small tonal" hx-post="/patte/run/ingest_youtube" hx-target="#job-ingest_youtube" hx-swap="outerHTML">{{ icons.download() }} Scanner ces playlists</button>
+    </div>
+    <div id="job-ingest_youtube" hx-get="/jobs/ingest_youtube/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+  </div>
+</details>
+
+<details class="acc">
+  <summary>
+    <svg class="logo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1DB954"/><path d="M7 9.5c3.2-1 7-.7 10 1M7.5 12.5c2.6-.8 5.7-.5 8 1M8 15.3c2-.6 4.4-.4 6 .8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+    Spotify
+    <span class="tag">{{ sp_urls|length }} playlist{{ 's' if sp_urls|length>1 }} · {{ src.get('spotify', 0) }} tracks{% if last.ingest_spotify %} · importé {{ last.ingest_spotify }}{% endif %}</span>
+  </summary>
+  <div class="acc__body">
+    <div id="sp-playlists" hx-get="/patte/playlists/sp" hx-trigger="load" hx-swap="outerHTML">
+      <p class="small muted">Chargement…</p>
+    </div>
+    <div class="btnrow mt-1">
+      <button type="button" class="small tonal" hx-post="/patte/run/ingest_spotify" hx-target="#job-ingest_spotify" hx-swap="outerHTML">{{ icons.download() }} Scanner ces playlists</button>
+    </div>
+    <div id="job-ingest_spotify" hx-get="/jobs/ingest_spotify/status" hx-trigger="load" hx-swap="outerHTML" class="small"></div>
+  </div>
+</details>
+
+<!-- ============ DJ sets à scanner ============ -->
 <details class="acc">
   <summary>{{ icons.tracks() }} DJ sets à scanner <span class="tag">{{ src.get('djset', 0) }} tracks extraites</span></summary>
   <div class="acc__body">
     <p class="small muted">Scanne les sets/podcasts YouTube d'un DJ et verse les tracks jouées dans
-      ton corpus. Résultats dans <a href="/univers?tab=sets">Mes labels &amp; artistes → Mes sets</a>.</p>
+      ton corpus, pour affiner tes goûts sans avoir à les lister une par une. Aperçu des tracks
+      extraites juste en dessous une fois le scan lancé, et liste complète dans
+      <a href="/univers?tab=sets">Mes labels &amp; artistes → Mes sets</a>.</p>
     <form hx-post="/patte/djset/scan" hx-target="#djset-panel" hx-swap="outerHTML"
           hx-on::after-request="this.reset()" class="formbar combo">
       <div class="field"><label>Prochain DJ à scanner <span class="muted">· propositions Discogs</span>
@@ -220,21 +142,25 @@
   </div>
 </details>
 
-<!-- ============ Styles (hors du formulaire principal) ============ -->
-{% if onboarding %}<p class="step-label">Étape 2 sur 3 · dis ce que tu écoutes</p>{% endif %}
+
+<!-- ============ Styles (Étape 3) ============ -->
+{% if onboarding %}<p class="step-label">Étape 3 sur 3 · donne les styles que tu aimes</p>{% endif %}
 <form method="post" action="/patte">
 <details class="acc" {{ 'open' if onboarding }}>
   <summary>{{ icons.album() }} Mes styles <span class="tag">Catégorie 1 : {{ (cats.get('1') or [])|length }} · Catégorie 2 : {{ (cats.get('2') or [])|length }}</span></summary>
   <div class="acc__body">
-    <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire Discogs.</p>
+    <p class="small muted">Deux niveaux. Un style par ligne — les propositions viennent du vocabulaire
+      Discogs. La catégorie 1 compte plus que la catégorie 2 dans les estimations de score et dans
+      la définition de tes goûts : mets-y ce qui te représente le mieux, et en catégorie 2 ce que tu
+      aimes aussi mais de façon plus secondaire.</p>
     <div class="row">
-      <div class="field combo"><label>Catégorie 1 (poids {{ sc.taste_tiers['1'] }})
+      <div class="field combo"><label>Catégorie 1
         <textarea name="styles_1" rows="7" data-combo="line" autocomplete="off"
                   hx-get="/suggest/styles" hx-target="#sug-styles-1" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
                   hx-trigger="focus, keyup changed delay:220ms">{{ (cats.get('1') or [])|join('\n') }}</textarea></label>
         <div id="sug-styles-1" class="lbl-suggest" hidden></div></div>
-      <div class="field combo"><label>Catégorie 2 (poids {{ sc.taste_tiers['2'] }})
+      <div class="field combo"><label>Catégorie 2
         <textarea name="styles_2" rows="7" data-combo="line" autocomplete="off"
                   hx-get="/suggest/styles" hx-target="#sug-styles-2" hx-swap="innerHTML"
                   hx-vals='js:{q: event.target.value.split("\n").pop()}'
@@ -249,37 +175,11 @@
 </details>
 </form>
 
-<!-- ============ Import CSV (hors du formulaire principal) ============ -->
-<details class="acc">
-  <summary>{{ icons.tracks() }} Import CSV (labels / artistes)</summary>
-  <div class="acc__body">
-    <div class="stack-gap">
-      <form hx-post="/patte/import-csv?kind=labels" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data" class="formbar">
-        <div class="field"><label>Labels
-          <input type="file" name="file" accept=".csv" required></label></div>
-        <div class="field field--auto"><label>Catégorie
-          <select name="tier" class="select-sm"><option value="1">Catégorie 1</option><option value="2" selected>Catégorie 2</option></select></label></div>
-        <label class="check"><input type="checkbox" name="replace"> remplacer (ce tier)</label>
-        <button type="submit" class="small tonal">Importer</button>
-      </form>
-      <form hx-post="/patte/import-csv?kind=artists" hx-target="#csv-msg" hx-swap="innerHTML" hx-encoding="multipart/form-data" class="formbar">
-        <div class="field"><label>Artistes
-          <input type="file" name="file" accept=".csv" required></label></div>
-        <div class="field field--auto"><label>Catégorie
-          <select name="tier" class="select-sm"><option value="1">Catégorie 1</option><option value="2" selected>Catégorie 2</option></select></label></div>
-        <button type="submit" class="small tonal">Importer</button>
-      </form>
-    </div>
-    <p id="csv-msg" class="small muted"></p>
-  </div>
-</details>
 
 <h3 class="mt-3">En bref</h3>
 <div class="statgrid">
   <div class="stat" title="labels que tu as ajoutés à ta base"><b>{{ st.labels }}</b><span>labels</span></div>
-  <div class="stat" title="parmi eux, ceux dont on connaît le style musical"><b>{{ st.labels_profiled }}</b><span>labels dont on connaît le style</span></div>
   <div class="stat" title="artistes que tu as classés dans tes deux catégories de goût"><b>{{ st.coeur }} / {{ st.aimes }}</b><span>artistes catégorie 1 / catégorie 2</span></div>
-  <div class="stat" title="parmi tes artistes classés, ceux dont l'identité Discogs a été retrouvée avec certitude"><b>{{ st.artists_resolved }}</b><span>artistes reconnus sur Discogs</span></div>
   <div class="stat" title="titres (YouTube, Spotify, Bandcamp, DJ sets...) déjà analysés pour affiner tes recommandations"><b>{{ st.tracks }}</b><span>titres analysés</span></div>
   {# les deux compteurs ne portent que sur la page Nouveautés (règles + vendeurs suivis),
      en pause : masqués par le même interrupteur, cf. app.py VEILLE_ENABLED #}
